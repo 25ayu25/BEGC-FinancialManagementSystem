@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
+import TransactionFilters from "@/components/transactions/transaction-filters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -104,8 +105,13 @@ export default function Transactions() {
       />
 
       <main className="p-6">
-        <Card>
-          <CardHeader>
+        <div className="space-y-6">
+          <TransactionFilters 
+            onFilterChange={(filters) => console.log('Filters:', filters)}
+            onExport={() => console.log('Export requested')}
+          />
+          <Card>
+            <CardHeader>
             <CardTitle>Recent Transactions</CardTitle>
           </CardHeader>
           <CardContent>
@@ -162,7 +168,7 @@ export default function Transactions() {
                         </td>
                         <td className="py-4 px-6 text-sm text-right font-medium">
                           <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount), transaction.currency)}
+                            {transaction.type === 'income' ? '+' : '-'}SSP {parseFloat(transaction.amount).toLocaleString()}
                           </span>
                         </td>
                         <td className="py-4 px-6 text-center">
@@ -179,7 +185,7 @@ export default function Transactions() {
                               onClick={() => handleEditClick(transaction)}
                               data-testid={`button-edit-${transaction.id}`}
                             >
-                              <Edit className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -200,6 +206,7 @@ export default function Transactions() {
             )}
           </CardContent>
         </Card>
+        </div>
       </main>
 
       <AddTransactionModal 

@@ -12,6 +12,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -64,21 +65,7 @@ export default function Sidebar() {
 
       {/* User Profile & Status */}
       <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
-              <User className="text-white text-sm" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900" data-testid="text-user-name">
-                Admin User
-              </p>
-              <p className="text-xs text-gray-500" data-testid="text-user-role">
-                USA Admin
-              </p>
-            </div>
-          </div>
-        </div>
+        <UserProfileMenu userName="Admin User" userRole="USA Admin" />
         
         {/* Sync Status */}
         <div className="flex items-center space-x-2 text-xs">

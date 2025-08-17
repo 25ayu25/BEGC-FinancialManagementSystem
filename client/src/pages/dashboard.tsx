@@ -1,22 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import Header from "@/components/layout/header";
 import KPICards from "@/components/dashboard/kpi-cards";
 import IncomeChart from "@/components/dashboard/income-chart";
 import DepartmentBreakdown from "@/components/dashboard/department-breakdown";
 import RecentTransactions from "@/components/dashboard/recent-transactions";
 import QuickActions from "@/components/dashboard/quick-actions";
+import MonthSelector from "@/components/dashboard/month-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
   const currentDate = new Date();
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth() + 1;
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+
+  const handleMonthChange = (year: number, month: number) => {
+    setSelectedYear(year);
+    setSelectedMonth(month);
+  };
 
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ["/api/dashboard", year, month],
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth],
     queryFn: async () => {
-      const res = await fetch(`/api/dashboard/${year}/${month}`, {
+      const res = await fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch dashboard data');
@@ -37,7 +44,7 @@ export default function Dashboard() {
       <div className="flex-1 overflow-auto">
         <Header 
           title="Financial Dashboard" 
-          subtitle={`Track daily income and expenses - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
+          subtitle={`Track daily income and expenses - ${new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
         />
         <main className="p-6">
           <Card>
@@ -58,9 +65,10 @@ export default function Dashboard() {
       <div className="flex-1 overflow-auto">
         <Header 
           title="Financial Dashboard" 
-          subtitle={`Track daily income and expenses - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
+          subtitle={`Track daily income and expenses - ${new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
         />
         <main className="p-6 space-y-8">
+          <MonthSelector onMonthChange={handleMonthChange} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <Card key={i}>
@@ -95,6 +103,7 @@ export default function Dashboard() {
       />
       
       <main className="p-6 space-y-8">
+        <MonthSelector onMonthChange={handleMonthChange} />
         <KPICards data={dashboardData || {}} />
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -118,7 +127,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })} Financial Summary
+              {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })} Financial Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -130,13 +139,13 @@ export default function Dashboard() {
                     <div key={dept.id} className="flex justify-between">
                       <span className="text-gray-600">{dept.name}</span>
                       <span className="font-medium">
-                        ${(dashboardData as any)?.departmentBreakdown?.[dept.id] || '0.00'}
+                        SSP {(dashboardData as any)?.departmentBreakdown?.[dept.id] || '0.00'}
                       </span>
                     </div>
                   ))}
                   <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Total Income</span>
-                    <span className="text-green-600">${(dashboardData as any)?.totalIncome || '0.00'}</span>
+                    <span className="text-green-600">SSP {(dashboardData as any)?.totalIncome || '0.00'}</span>
                   </div>
                 </div>
               </div>
@@ -148,7 +157,7 @@ export default function Dashboard() {
                     <div key={provider.id} className="flex justify-between">
                       <span className="text-gray-600">{provider.name}</span>
                       <span className="font-medium">
-                        ${(dashboardData as any)?.insuranceBreakdown?.[provider.id] || '0.00'}
+                        SSP {(dashboardData as any)?.insuranceBreakdown?.[provider.id] || '0.00'}
                       </span>
                     </div>
                   ))}

@@ -199,11 +199,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = parseInt(pathParts[0]);
       const month = parseInt(pathParts[1]);
       
+      // Get fresh dashboard data for accurate reporting
+      const dashboardData = await storage.getDashboardData(year, month);
+      
       // Get the report data
       const report = await storage.getMonthlyReport(year, month);
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
+      
+      // Use fresh data for accurate calculations
+      const reportData = {
+        ...report,
+        totalIncome: dashboardData.totalIncome,
+        totalExpenses: dashboardData.totalExpenses,
+        netIncome: dashboardData.netIncome,
+        departmentBreakdown: dashboardData.departmentBreakdown,
+        insuranceBreakdown: dashboardData.insuranceBreakdown
+      };
       
       // Generate PDF using jsPDF
       const { jsPDF } = await import('jspdf');
@@ -266,14 +279,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Summary table
       const summaryData = [
-        ['Total Income', `$${parseFloat(report.totalIncome).toLocaleString()}`],
-        ['Total Expenses', `$${parseFloat(report.totalExpenses).toLocaleString()}`],
-        ['Net Income', `$${parseFloat(report.netIncome).toLocaleString()}`]
+        ['Total Income', `SSP ${parseFloat(reportData.totalIncome).toLocaleString()}`],
+        ['Total Expenses', `SSP ${parseFloat(reportData.totalExpenses).toLocaleString()}`],
+        ['Net Income', `SSP ${parseFloat(reportData.netIncome).toLocaleString()}`]
       ];
       
       summaryData.forEach(([label, value], index) => {
         const isNetIncome = label === 'Net Income';
-        const bgColor = isNetIncome ? (parseFloat(report.netIncome) >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
+        const bgColor = isNetIncome ? (parseFloat(reportData.netIncome) >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
         
         // Row background
         doc.setFillColor(...bgColor);
@@ -289,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Department Breakdown Section
-      if (report.departmentBreakdown && Object.keys(report.departmentBreakdown).length > 0) {
+      if (reportData.departmentBreakdown && Object.keys(reportData.departmentBreakdown).length > 0) {
         currentY += 10;
         doc.setFontSize(16);
         doc.setFont(undefined, 'bold');
@@ -317,8 +330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(0, 0, 0);
         
         // Department data
-        const deptEntries = Object.entries(report.departmentBreakdown).sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
-        const totalIncome = parseFloat(report.totalIncome);
+        const deptEntries = Object.entries(reportData.departmentBreakdown).sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
+        const totalIncome = parseFloat(reportData.totalIncome);
         
         deptEntries.forEach(([deptId, amount], index) => {
           let deptName = 'Unknown Department';
@@ -338,7 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           doc.setFont(undefined, 'normal');
           doc.setFontSize(11);
           doc.text(deptName, margin + 5, currentY);
-          doc.text(`$${parseFloat(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+          doc.text(`SSP ${parseFloat(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
           doc.text(`${percentage}%`, pageWidth - margin - 60, currentY, { align: 'right' });
           
           currentY += 12;
@@ -360,8 +373,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       
+      const filename = `Bahr_El_Ghazal_${monthName}_${year}_Report.pdf`;
+      
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${path}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', pdfBuffer.length);
       res.send(pdfBuffer);
       

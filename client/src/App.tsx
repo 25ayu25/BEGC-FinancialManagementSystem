@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import Transactions from "@/pages/transactions";
 import Reports from "@/pages/reports";
 import Receipts from "@/pages/receipts";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 
@@ -21,6 +22,7 @@ function Router() {
           <Route path="/transactions" component={Transactions} />
           <Route path="/reports" component={Reports} />
           <Route path="/receipts" component={Receipts} />
+          <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
         </Switch>
       </div>
