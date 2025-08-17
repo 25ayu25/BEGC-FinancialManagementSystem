@@ -184,36 +184,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate PDF using jsPDF
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 20;
       
-      // Add clinic header
-      doc.setFontSize(20);
-      doc.text('Bahr El Ghazal Clinic', 20, 25);
+      // Add header background and logo area
+      doc.setFillColor(20, 83, 75); // Teal header background
+      doc.rect(0, 0, pageWidth, 60, 'F');
+      
+      // Clinic name and title in white
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont(undefined, 'bold');
+      doc.text('Bahr El Ghazal Clinic', margin, 25);
+      
       doc.setFontSize(16);
-      doc.text('Monthly Financial Report', 20, 35);
+      doc.setFont(undefined, 'normal');
+      doc.text('Financial Management System', margin, 35);
       
-      // Add report date
-      doc.setFontSize(12);
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('Monthly Financial Report', margin, 50);
+      
+      // Reset text color for body
+      doc.setTextColor(0, 0, 0);
+      
+      // Report period and generation info
       const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
-      doc.text(`${monthName} ${year}`, 20, 45);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 55);
-      
-      // Add financial summary
       doc.setFontSize(14);
-      doc.text('Financial Summary', 20, 75);
-      doc.setFontSize(11);
-      doc.text(`Total Income: $${report.totalIncome}`, 20, 90);
-      doc.text(`Total Expenses: $${report.totalExpenses}`, 20, 100);
-      doc.text(`Net Income: $${report.netIncome}`, 20, 110);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Report Period: ${monthName} ${year}`, margin, 80);
       
-      // Add department breakdown
-      if (report.departmentBreakdown && Object.keys(report.departmentBreakdown).length > 0) {
-        doc.setFontSize(14);
-        doc.text('Department Breakdown', 20, 130);
-        doc.setFontSize(11);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`, margin, 90);
+      
+      // Financial Summary Section
+      let currentY = 110;
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(20, 83, 75);
+      doc.text('Financial Summary', margin, currentY);
+      
+      // Add underline
+      doc.setDrawColor(20, 83, 75);
+      doc.setLineWidth(0.5);
+      doc.line(margin, currentY + 2, margin + 60, currentY + 2);
+      
+      currentY += 15;
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(12);
+      
+      // Summary table
+      const summaryData = [
+        ['Total Income', `$${parseFloat(report.totalIncome).toLocaleString()}`],
+        ['Total Expenses', `$${parseFloat(report.totalExpenses).toLocaleString()}`],
+        ['Net Income', `$${parseFloat(report.netIncome).toLocaleString()}`]
+      ];
+      
+      summaryData.forEach(([label, value], index) => {
+        const isNetIncome = label === 'Net Income';
+        const bgColor = isNetIncome ? (parseFloat(report.netIncome) >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
         
-        let yPos = 145;
-        for (const [deptId, amount] of Object.entries(report.departmentBreakdown)) {
-          // Get department name (simplified mapping)
+        // Row background
+        doc.setFillColor(...bgColor);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        // Text
+        doc.setFont(undefined, isNetIncome ? 'bold' : 'normal');
+        doc.setFontSize(isNetIncome ? 13 : 12);
+        doc.text(label, margin + 5, currentY);
+        doc.text(value, pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 15;
+      });
+      
+      // Department Breakdown Section
+      if (report.departmentBreakdown && Object.keys(report.departmentBreakdown).length > 0) {
+        currentY += 10;
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(20, 83, 75);
+        doc.text('Department Performance', margin, currentY);
+        
+        // Add underline
+        doc.line(margin, currentY + 2, margin + 80, currentY + 2);
+        
+        currentY += 20;
+        doc.setTextColor(0, 0, 0);
+        
+        // Department table header
+        doc.setFillColor(20, 83, 75);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(12);
+        doc.text('Department', margin + 5, currentY);
+        doc.text('Revenue', pageWidth - margin - 5, currentY, { align: 'right' });
+        doc.text('% of Total', pageWidth - margin - 60, currentY, { align: 'right' });
+        
+        currentY += 15;
+        doc.setTextColor(0, 0, 0);
+        
+        // Department data
+        const deptEntries = Object.entries(report.departmentBreakdown).sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
+        const totalIncome = parseFloat(report.totalIncome);
+        
+        deptEntries.forEach(([deptId, amount], index) => {
           let deptName = 'Unknown Department';
           if (deptId === '4242abf4-e68e-48c8-9eaf-ada2612bd4c2') deptName = 'Consultation';
           else if (deptId === 'ae648a70-c159-43b7-b814-7dadb213ae8d') deptName = 'Laboratory';
@@ -221,14 +304,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           else if (deptId === '6a06d917-a94a-4637-b1f6-a3fd6855ddd6') deptName = 'X-Ray';
           else if (deptId === '8fb395f9-ae59-4ddc-9ad3-e56b7fda161c') deptName = 'Pharmacy';
           
-          doc.text(`${deptName}: $${amount}`, 25, yPos);
-          yPos += 10;
-        }
+          const percentage = totalIncome > 0 ? ((parseFloat(amount) / totalIncome) * 100).toFixed(1) : '0.0';
+          
+          // Alternating row colors
+          const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+          doc.setFillColor(...bgColor);
+          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+          
+          doc.setFont(undefined, 'normal');
+          doc.setFontSize(11);
+          doc.text(deptName, margin + 5, currentY);
+          doc.text(`$${parseFloat(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+          doc.text(`${percentage}%`, pageWidth - margin - 60, currentY, { align: 'right' });
+          
+          currentY += 12;
+        });
       }
       
-      // Add footer
-      doc.setFontSize(10);
-      doc.text('This report was generated by the Bahr El Ghazal Clinic Financial Management System', 20, 280);
+      // Footer section
+      const footerY = doc.internal.pageSize.height - 30;
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+      
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY);
+      doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
+      doc.text('Confidential - For Internal Use Only', pageWidth / 2, footerY, { align: 'center' });
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       
