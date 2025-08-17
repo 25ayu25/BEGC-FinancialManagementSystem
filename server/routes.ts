@@ -60,11 +60,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Convert date string to Date object if it's a string
       // Handle insurance provider - convert "no-insurance" to null
+      // Set sync status based on user location - USA users get "synced", South Sudan users get "pending"
+      const userLocation = (req as any).user.location;
+      const syncStatus = userLocation === "usa" ? "synced" : "pending";
+      
       const bodyWithDate = {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : new Date(),
         createdBy: (req as any).user.id,
-        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId
+        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
+        syncStatus: syncStatus
       };
       
       const validatedData = insertTransactionSchema.parse(bodyWithDate);
