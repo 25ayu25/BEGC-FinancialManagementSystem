@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
+import AdvancedDashboard from "@/pages/advanced-dashboard";
 import Transactions from "@/pages/transactions";
 import Reports from "@/pages/reports";
 import Receipts from "@/pages/receipts";
@@ -17,7 +18,9 @@ function Router() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Switch>
-          <Route path="/" component={Dashboard} />
+          <Route path="/" component={AdvancedDashboard} />
+          <Route path="/advanced" component={AdvancedDashboard} />
+          <Route path="/simple" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/transactions" component={Transactions} />
           <Route path="/reports" component={Reports} />

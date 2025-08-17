@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+  { name: "Executive Dashboard", href: "/", icon: BarChart3 },
+  { name: "Simple Dashboard", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Receipts & Vouchers", href: "/receipts", icon: Receipt },
@@ -43,7 +44,7 @@ export default function Sidebar() {
       {/* Navigation Menu */}
       <nav className="flex-1 p-4 space-y-2">
         {navigation.map((item) => {
-          const isActive = location === item.href || (item.href === '/dashboard' && location === '/');
+          const isActive = location === item.href;
           return (
             <Link key={item.name} href={item.href}>
               <a 

@@ -20,7 +20,7 @@ interface MonthSelectorProps {
   onMonthChange?: (year: number, month: number, range?: string) => void;
 }
 
-export default function MonthSelector({ onMonthChange }: MonthSelectorProps) {
+export function MonthSelector({ onMonthChange }: MonthSelectorProps) {
   const [selectedValue, setSelectedValue] = useState("current");
   const [showCustomRange, setShowCustomRange] = useState(false);
   const [startDate, setStartDate] = useState<Date>();
@@ -189,3 +189,5 @@ export default function MonthSelector({ onMonthChange }: MonthSelectorProps) {
     </div>
   );
 }
+
+export default MonthSelector;
