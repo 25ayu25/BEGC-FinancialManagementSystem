@@ -130,7 +130,7 @@ export default function Reports() {
   };
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="flex-1 flex flex-col h-full">
       <Header 
         title="Monthly Reports" 
         subtitle="Generate and manage monthly financial reports"
@@ -142,7 +142,7 @@ export default function Reports() {
         }
       />
 
-      <main className="p-6">
+      <main className="flex-1 overflow-y-auto p-6">
         <Card>
           <CardHeader>
             <CardTitle>Available Reports</CardTitle>

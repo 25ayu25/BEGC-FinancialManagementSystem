@@ -82,7 +82,7 @@ export default function Transactions() {
   };
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="flex-1 flex flex-col h-full">
       <Header 
         title="Transaction Management" 
         subtitle="Add and manage daily income and expense transactions"
@@ -104,7 +104,7 @@ export default function Transactions() {
         }
       />
 
-      <main className="p-6">
+      <main className="flex-1 overflow-y-auto p-6">
         <div className="space-y-6">
           <TransactionFilters 
             onFilterChange={(filters) => console.log('Filters:', filters)}

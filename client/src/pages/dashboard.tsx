@@ -41,12 +41,12 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col h-full">
         <Header 
           title="Financial Dashboard" 
           subtitle={`Track daily income and expenses - ${new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
         />
-        <main className="p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           <Card>
             <CardContent className="pt-6">
               <div className="text-center text-red-600">
@@ -62,12 +62,12 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col h-full">
         <Header 
           title="Financial Dashboard" 
           subtitle={`Track daily income and expenses - ${new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
         />
-        <main className="p-6 space-y-8">
+        <main className="flex-1 overflow-y-auto p-6 space-y-8">
           <MonthSelector onMonthChange={handleMonthChange} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
@@ -96,13 +96,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="flex-1 flex flex-col h-full">
       <Header 
         title="Financial Dashboard" 
         subtitle={`Track daily income and expenses - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
       />
       
-      <main className="p-6 space-y-8">
+      <main className="flex-1 overflow-y-auto p-6 space-y-8">
         <MonthSelector onMonthChange={handleMonthChange} />
         <KPICards data={dashboardData || {}} />
         
