@@ -118,7 +118,7 @@ export default function MonthSelector({ onMonthChange }: MonthSelectorProps) {
               {startDate ? format(startDate, "MMM dd") : "Start date"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="w-auto p-0 z-[9999] bg-white border shadow-lg" align="start">
             <Calendar
               mode="single"
               selected={startDate}
@@ -137,7 +137,7 @@ export default function MonthSelector({ onMonthChange }: MonthSelectorProps) {
               {endDate ? format(endDate, "MMM dd") : "End date"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="w-auto p-0 z-[9999] bg-white border shadow-lg" align="start">
             <Calendar
               mode="single"
               selected={endDate}
