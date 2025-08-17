@@ -6,6 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,6 +35,7 @@ export default function AddTransactionModal({
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("SSP");
   const [description, setDescription] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
 
   const { toast } = useToast();
@@ -99,6 +104,7 @@ export default function AddTransactionModal({
     setAmount("");
     setCurrency("SSP");
     setDescription("");
+    setSelectedDate(new Date());
   };
 
   // Populate form when editing
@@ -110,6 +116,7 @@ export default function AddTransactionModal({
       setAmount(editTransaction.amount);
       setCurrency(editTransaction.currency || "SSP");
       setDescription(editTransaction.description || "");
+      setSelectedDate(editTransaction.date ? new Date(editTransaction.date) : new Date());
     } else if (open && !editTransaction) {
       resetForm();
     }
@@ -144,7 +151,7 @@ export default function AddTransactionModal({
       currency,
       description,
       receiptPath: null,
-      date: editTransaction?.date || new Date().toISOString(),
+      date: selectedDate.toISOString(),
     };
 
     if (editTransaction) {
@@ -222,6 +229,33 @@ export default function AddTransactionModal({
                 Expense
               </Button>
             </div>
+          </div>
+
+          {/* Transaction Date */}
+          <div>
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">
+              Transaction Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal h-11"
+                  data-testid="button-select-date"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP") : "Select date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[9999] bg-white border shadow-lg" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Department/Category */}
