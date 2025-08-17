@@ -42,6 +42,13 @@ Preferred communication style: Simple, everyday language.
 - **Receipt Management**: Direct-to-cloud upload with presigned URLs for secure file handling
 - **ACL System**: Custom object access control with group-based permissions (USER_LIST, EMAIL_DOMAIN, GROUP_MEMBER, SUBSCRIBER)
 
+### PDF Report Generation
+- **Library**: jsPDF for client-side and server-side PDF generation
+- **Professional Formatting**: Medical clinic-themed reports with teal branding
+- **Features**: Tabulated summaries, department performance rankings, percentage breakdowns
+- **Layout**: Professional header, structured financial tables, confidentiality footer
+- **Currency Formatting**: Proper comma-separated values and professional presentation
+
 ### UI/UX Design Patterns
 - **Design System**: Consistent color palette with CSS custom properties for theming
 - **Component Architecture**: Modular component structure with reusable UI primitives
