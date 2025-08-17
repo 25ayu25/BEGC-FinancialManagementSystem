@@ -1,0 +1,11 @@
+Monthly Financial Report - Bahr El Ghazal Clinic
+Generated: 8/17/2025
+
+Report Path: 2025-08.pdf
+
+This is a mock PDF download. In production, this would:
+1. Retrieve the actual PDF file from storage
+2. Set proper PDF headers
+3. Stream the PDF content
+
+Current implementation serves as a placeholder for testing.
