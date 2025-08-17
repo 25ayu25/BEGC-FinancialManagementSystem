@@ -1,8 +1,22 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Clock } from "lucide-react";
+import { Check, Clock, Edit, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Transaction {
   id: string;
@@ -20,6 +34,44 @@ interface RecentTransactionsProps {
 }
 
 export default function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (transactionId: string) => {
+      return await apiRequest("DELETE", `/api/transactions/${transactionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setTransactionToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClick = (transactionId: string) => {
+    setTransactionToDelete(transactionId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (transactionToDelete) {
+      deleteTransactionMutation.mutate(transactionToDelete);
+    }
+  };
   if (!transactions?.length) {
     return (
       <Card>
@@ -102,6 +154,9 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
                 <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
                   Status
                 </th>
+                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100" data-testid="table-recent-transactions">
@@ -140,12 +195,55 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
                       {transaction.syncStatus}
                     </Badge>
                   </td>
+                  <td className="py-4 px-6 text-center">
+                    <div className="flex items-center justify-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                        data-testid={`button-edit-${transaction.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                        onClick={() => handleDeleteClick(transaction.id)}
+                        data-testid={`button-delete-${transaction.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </CardContent>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteTransactionMutation.isPending}
+            >
+              {deleteTransactionMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

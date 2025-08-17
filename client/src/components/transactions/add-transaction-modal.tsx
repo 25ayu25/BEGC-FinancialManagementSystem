@@ -27,7 +27,7 @@ export default function AddTransactionModal({
   const [departmentId, setDepartmentId] = useState("");
   const [insuranceProviderId, setInsuranceProviderId] = useState("");
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("SSP");
   const [description, setDescription] = useState("");
 
 
@@ -72,7 +72,7 @@ export default function AddTransactionModal({
     setDepartmentId("");
     setInsuranceProviderId("");
     setAmount("");
-    setCurrency("USD");
+    setCurrency("SSP");
     setDescription("");
 
   };
@@ -249,13 +249,13 @@ export default function AddTransactionModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">
-                    <span className="font-medium">USD</span>
-                    <span className="text-gray-500 ml-2">($)</span>
-                  </SelectItem>
                   <SelectItem value="SSP">
                     <span className="font-medium">SSP</span>
                     <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
+                  </SelectItem>
+                  <SelectItem value="USD">
+                    <span className="font-medium">USD</span>
+                    <span className="text-gray-500 ml-2">($)</span>
                   </SelectItem>
                 </SelectContent>
               </Select>

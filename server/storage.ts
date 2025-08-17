@@ -32,6 +32,7 @@ export interface IStorage {
   getTransactionById(id: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | undefined>;
+  deleteTransaction(id: string): Promise<void>;
 
   // Monthly Reports
   getMonthlyReport(year: number, month: number): Promise<MonthlyReport | undefined>;
@@ -141,6 +142,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transactions.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async deleteTransaction(id: string): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.id, id));
   }
 
   async getMonthlyReport(year: number, month: number): Promise<MonthlyReport | undefined> {

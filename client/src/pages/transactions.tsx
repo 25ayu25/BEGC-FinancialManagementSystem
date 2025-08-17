@@ -25,26 +25,28 @@ export default function Transactions() {
 
   return (
     <div className="flex-1 overflow-auto">
-      <Header 
-        title="Transaction Management" 
-        subtitle="Add and manage daily income and expense transactions"
-        actions={
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Transaction Management</h1>
+            <p className="text-indigo-100">Add and manage daily income and expense transactions</p>
+          </div>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
               <Filter className="h-4 w-4 mr-2" />
               Filter
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
+            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction" className="bg-white text-indigo-600 hover:bg-gray-50">
               <Plus className="h-4 w-4 mr-2" />
               Add Transaction
             </Button>
           </div>
-        }
-      />
+        </div>
+      </div>
 
       <main className="p-6">
         <Card>
