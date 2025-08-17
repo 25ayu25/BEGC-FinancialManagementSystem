@@ -58,7 +58,7 @@ export default function DepartmentBreakdown({ data, departments }: DepartmentBre
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-medium text-gray-900" data-testid={`amount-${department.code}`}>
-                      ${amount.toFixed(2)}
+                      ${Math.round(amount)}
                     </span>
                     <span className="text-xs text-gray-400">
                       {percentage.toFixed(0)}%

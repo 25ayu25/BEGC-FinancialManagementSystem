@@ -23,7 +23,7 @@ export default function KPICards({ data }: KPICardsProps) {
   const cards = [
     {
       title: "Monthly Income",
-      value: `SSP ${data?.totalIncome || '0.00'}`,
+      value: `USD ${Math.round(parseFloat(data?.totalIncome || '0'))}`,
       icon: DollarSign,
       change: "+12.5%",
       changeType: "positive" as const,
@@ -33,7 +33,7 @@ export default function KPICards({ data }: KPICardsProps) {
     },
     {
       title: "Monthly Expenses", 
-      value: `SSP ${data?.totalExpenses || '0.00'}`,
+      value: `USD ${Math.round(parseFloat(data?.totalExpenses || '0'))}`,
       icon: CreditCard,
       change: "+8.2%",
       changeType: "negative" as const,
@@ -43,7 +43,7 @@ export default function KPICards({ data }: KPICardsProps) {
     },
     {
       title: "Net Income",
-      value: `SSP ${data?.netIncome || '0.00'}`,
+      value: `USD ${Math.round(parseFloat(data?.netIncome || '0'))}`,
       icon: TrendingUp,
       change: parseFloat(data?.netIncome || '0') >= 0 ? "Profit" : "Loss",
       changeType: parseFloat(data?.netIncome || '0') >= 0 ? "positive" : "negative" as const,
@@ -53,7 +53,7 @@ export default function KPICards({ data }: KPICardsProps) {
     },
     {
       title: "Insurance Income",
-      value: `SSP ${totalInsurance.toFixed(2)}`,
+      value: `USD ${Math.round(totalInsurance)}`,
       icon: Shield,
       change: `${Object.keys(data?.insuranceBreakdown || {}).length} providers`,
       changeType: "neutral" as const,

@@ -4,20 +4,19 @@ export function formatCurrency(amount: number, currency: string = "USD"): string
   const currencyInfo = CURRENCIES[currency as keyof typeof CURRENCIES];
   
   if (!currencyInfo) {
-    return `${amount.toFixed(2)}`;
+    return `${Math.round(amount)}`;
   }
 
   if (currency === "USD") {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(amount);
   }
 
-  return `${currencyInfo.symbol} ${amount.toLocaleString('en-US', { 
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2 
-  })}`;
+  return `${currencyInfo.symbol} ${Math.round(amount).toLocaleString('en-US')}`;
 }
 
 export function parseCurrency(value: string): { amount: number; currency: string } {

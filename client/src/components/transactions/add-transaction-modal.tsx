@@ -33,7 +33,7 @@ export default function AddTransactionModal({
   const [departmentId, setDepartmentId] = useState("");
   const [insuranceProviderId, setInsuranceProviderId] = useState("");
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("SSP");
+  const [currency, setCurrency] = useState("USD");
   const [description, setDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -102,7 +102,7 @@ export default function AddTransactionModal({
     setDepartmentId("");
     setInsuranceProviderId("");
     setAmount("");
-    setCurrency("SSP");
+    setCurrency("USD");
     setDescription("");
     setSelectedDate(new Date());
   };
@@ -114,7 +114,7 @@ export default function AddTransactionModal({
       setDepartmentId(editTransaction.departmentId || "");
       setInsuranceProviderId(editTransaction.insuranceProviderId || "");
       setAmount(editTransaction.amount);
-      setCurrency(editTransaction.currency || "SSP");
+      setCurrency(editTransaction.currency || "USD");
       setDescription(editTransaction.description || "");
       setSelectedDate(editTransaction.date ? new Date(editTransaction.date) : new Date());
     } else if (open && !editTransaction) {
@@ -147,7 +147,7 @@ export default function AddTransactionModal({
       type,
       departmentId: departmentId || null,
       insuranceProviderId: insuranceProviderId || null,
-      amount: parseFloat(amount).toFixed(2),
+      amount: parseFloat(amount).toString(),
       currency,
       description,
       receiptPath: null,
@@ -289,7 +289,7 @@ export default function AddTransactionModal({
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">
+                  <SelectItem value="no-insurance">
                     <span className="text-gray-500 italic">No Insurance</span>
                   </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
@@ -313,7 +313,7 @@ export default function AddTransactionModal({
                 id="amount"
                 type="number"
                 step="0.01"
-                placeholder="0.00"
+                placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 data-testid="input-amount"
@@ -329,13 +329,13 @@ export default function AddTransactionModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SSP">
-                    <span className="font-medium">SSP</span>
-                    <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
-                  </SelectItem>
                   <SelectItem value="USD">
                     <span className="font-medium">USD</span>
                     <span className="text-gray-500 ml-2">($)</span>
+                  </SelectItem>
+                  <SelectItem value="SSP">
+                    <span className="font-medium">SSP</span>
+                    <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
                   </SelectItem>
                 </SelectContent>
               </Select>

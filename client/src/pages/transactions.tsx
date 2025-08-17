@@ -168,7 +168,7 @@ export default function Transactions() {
                         </td>
                         <td className="py-4 px-6 text-sm text-right font-medium">
                           <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                            {transaction.type === 'income' ? '+' : '-'}SSP {parseFloat(transaction.amount).toLocaleString()}
+                            {transaction.type === 'income' ? '+' : '-'}{transaction.currency} {Math.round(parseFloat(transaction.amount)).toLocaleString()}
                           </span>
                         </td>
                         <td className="py-4 px-6 text-center">

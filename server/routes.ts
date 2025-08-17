@@ -59,13 +59,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       // Convert date string to Date object if it's a string
+      // Handle insurance provider - convert "no-insurance" to null
       const bodyWithDate = {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : new Date(),
-        createdBy: (req as any).user.id
+        createdBy: (req as any).user.id,
+        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId
       };
-      
-
       
       const validatedData = insertTransactionSchema.parse(bodyWithDate);
 
