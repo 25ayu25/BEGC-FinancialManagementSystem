@@ -106,7 +106,7 @@ export default function AddTransactionModal({
       currency,
       description,
       receiptPath: null,
-      date: new Date(),
+      date: new Date().toISOString(),
     });
   };
 

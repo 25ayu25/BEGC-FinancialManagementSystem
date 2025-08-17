@@ -9,8 +9,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Authentication middleware (simplified for now)
   const requireAuth = (req: any, res: any, next: any) => {
-    // TODO: Implement proper authentication
-    req.user = { id: "user-1", role: "admin", location: "usa" };
+    // TODO: Implement proper authentication - using seeded admin user
+    req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa" };
     next();
   };
 
@@ -58,10 +58,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertTransactionSchema.parse({
+      // Convert date string to Date object if it's a string
+      const bodyWithDate = {
         ...req.body,
-        createdBy: req.user.id
-      });
+        date: req.body.date ? new Date(req.body.date) : new Date(),
+        createdBy: (req as any).user.id
+      };
+      
+
+      
+      const validatedData = insertTransactionSchema.parse(bodyWithDate);
 
       const transaction = await storage.createTransaction(validatedData);
       res.status(201).json(transaction);
