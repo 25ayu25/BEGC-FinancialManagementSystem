@@ -54,23 +54,34 @@ export default function Reports() {
 
   const downloadReport = async (pdfPath: string, filename: string) => {
     try {
-      const response = await fetch(`/api${pdfPath}`, {
+      console.log('Downloading report:', pdfPath, filename);
+      
+      // Try direct window.open first (works well for PDFs)
+      const downloadUrl = `/api${pdfPath}`;
+      window.open(downloadUrl, '_blank');
+      
+      // Also try the blob method as backup
+      const response = await fetch(downloadUrl, {
         credentials: 'include'
       });
       
       if (!response.ok) {
-        throw new Error('Failed to download report');
+        throw new Error(`Failed to download report: ${response.status} ${response.statusText}`);
       }
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = filename || 'report.pdf';
+      a.style.display = 'none';
+      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 1000);
       
       toast({
         title: "Download Started",
@@ -174,7 +185,7 @@ export default function Reports() {
                         </h3>
                         <p className="text-sm text-gray-500">
                           Net Income: <span className={`font-medium ${parseFloat(report.netIncome) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            ${report.netIncome}
+                            SSP {parseFloat(report.netIncome).toLocaleString()}
                           </span>
                         </p>
                       </div>
@@ -190,7 +201,7 @@ export default function Reports() {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => downloadReport(report.pdfPath, `${report.year}-${report.month.toString().padStart(2, '0')}.pdf`)}
+                          onClick={() => downloadReport(report.pdfPath, `Bahr_El_Ghazal_${new Date(report.year, report.month - 1).toLocaleDateString('en-US', { month: 'long' })}_${report.year}_Report.pdf`)}
                           data-testid={`button-download-${report.id}`}
                         >
                           <Download className="h-4 w-4 mr-2" />
