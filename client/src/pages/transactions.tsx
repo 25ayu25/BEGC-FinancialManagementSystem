@@ -1,15 +1,65 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Filter, Download } from "lucide-react";
+import { Plus, Filter, Download, Edit, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Transactions() {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (transactionId: string) => {
+      return await apiRequest("DELETE", `/api/transactions/${transactionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setTransactionToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClick = (transactionId: string) => {
+    setTransactionToDelete(transactionId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (transactionToDelete) {
+      deleteTransactionMutation.mutate(transactionToDelete);
+    }
+  };
 
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["/api/transactions"],
@@ -25,28 +75,26 @@ export default function Transactions() {
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-8 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Transaction Management</h1>
-            <p className="text-indigo-100">Add and manage daily income and expense transactions</p>
-          </div>
+      <Header 
+        title="Transaction Management" 
+        subtitle="Add and manage daily income and expense transactions"
+        actions={
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+            <Button variant="outline" size="sm">
               <Filter className="h-4 w-4 mr-2" />
               Filter
             </Button>
-            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+            <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction" className="bg-white text-indigo-600 hover:bg-gray-50">
+            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
               <Plus className="h-4 w-4 mr-2" />
               Add Transaction
             </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <main className="p-6">
         <Card>
@@ -86,6 +134,9 @@ export default function Transactions() {
                       <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
                         Status
                       </th>
+                      <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -112,6 +163,27 @@ export default function Transactions() {
                             {transaction.syncStatus}
                           </Badge>
                         </td>
+                        <td className="py-4 px-6 text-center">
+                          <div className="flex items-center justify-center space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                              data-testid={`button-edit-${transaction.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => handleDeleteClick(transaction.id)}
+                              data-testid={`button-delete-${transaction.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -126,6 +198,28 @@ export default function Transactions() {
         open={showAddModal} 
         onOpenChange={setShowAddModal}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteTransactionMutation.isPending}
+            >
+              {deleteTransactionMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
