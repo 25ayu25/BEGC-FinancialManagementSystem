@@ -6,7 +6,7 @@ import TransactionFilters from "@/components/transactions/transaction-filters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Filter, Download, Edit, Trash2 } from "lucide-react";
+import { Plus, Filter, Download, Edit, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
