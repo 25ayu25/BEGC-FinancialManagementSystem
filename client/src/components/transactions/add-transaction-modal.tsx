@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,14 @@ interface AddTransactionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultType?: "income" | "expense";
+  editTransaction?: any;
 }
 
 export default function AddTransactionModal({ 
   open, 
   onOpenChange, 
-  defaultType = "income" 
+  defaultType = "income",
+  editTransaction 
 }: AddTransactionModalProps) {
   const [type, setType] = useState<"income" | "expense">(defaultType);
   const [departmentId, setDepartmentId] = useState("");
@@ -67,15 +69,51 @@ export default function AddTransactionModal({
     },
   });
 
+  const updateTransactionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("PUT", `/api/transactions/${editTransaction.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
+      onOpenChange(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
-    setType("income");
+    setType(defaultType);
     setDepartmentId("");
     setInsuranceProviderId("");
     setAmount("");
     setCurrency("SSP");
     setDescription("");
-
   };
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editTransaction && open) {
+      setType(editTransaction.type);
+      setDepartmentId(editTransaction.departmentId || "");
+      setInsuranceProviderId(editTransaction.insuranceProviderId || "");
+      setAmount(editTransaction.amount);
+      setCurrency(editTransaction.currency || "SSP");
+      setDescription(editTransaction.description || "");
+    } else if (open && !editTransaction) {
+      resetForm();
+    }
+  }, [editTransaction, open, defaultType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +136,7 @@ export default function AddTransactionModal({
       return;
     }
 
-    createTransactionMutation.mutate({
+    const transactionData = {
       type,
       departmentId: departmentId || null,
       insuranceProviderId: insuranceProviderId || null,
@@ -106,8 +144,14 @@ export default function AddTransactionModal({
       currency,
       description,
       receiptPath: null,
-      date: new Date().toISOString(),
-    });
+      date: editTransaction?.date || new Date().toISOString(),
+    };
+
+    if (editTransaction) {
+      updateTransactionMutation.mutate(transactionData);
+    } else {
+      createTransactionMutation.mutate(transactionData);
+    }
   };
 
 
@@ -127,7 +171,9 @@ export default function AddTransactionModal({
         <div className="w-full max-w-2xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Add New Transaction</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {editTransaction ? "Edit Transaction" : "Add New Transaction"}
+            </h2>
             <button 
               onClick={() => onOpenChange(false)} 
               className="px-2 py-1 rounded hover:bg-slate-100 text-gray-500 hover:text-gray-700"

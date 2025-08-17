@@ -22,8 +22,10 @@ import {
 
 export default function Transactions() {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -59,6 +61,11 @@ export default function Transactions() {
     if (transactionToDelete) {
       deleteTransactionMutation.mutate(transactionToDelete);
     }
+  };
+
+  const handleEditClick = (transaction: any) => {
+    setTransactionToEdit(transaction);
+    setShowEditModal(true);
   };
 
   const { data: transactions, isLoading } = useQuery({
@@ -169,6 +176,7 @@ export default function Transactions() {
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                              onClick={() => handleEditClick(transaction)}
                               data-testid={`button-edit-${transaction.id}`}
                             >
                               <Edit className="h-4 w-4" />
@@ -197,6 +205,12 @@ export default function Transactions() {
       <AddTransactionModal 
         open={showAddModal} 
         onOpenChange={setShowAddModal}
+      />
+
+      <AddTransactionModal 
+        open={showEditModal} 
+        onOpenChange={setShowEditModal}
+        editTransaction={transactionToEdit}
       />
 
       {/* Delete confirmation dialog */}
