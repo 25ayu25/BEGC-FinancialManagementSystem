@@ -47,6 +47,35 @@
   --radius: 0.75rem;
 }
 
+/* Force Select Content to be bright and visible */
+[data-radix-select-content] {
+  background-color: white !important;
+  color: #1f2937 !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-radix-select-item] {
+  color: #1f2937 !important;
+  background-color: transparent !important;
+}
+
+[data-radix-select-item][data-highlighted] {
+  background-color: #f0fdfa !important;
+  color: #0f766e !important;
+}
+
+/* Ensure Select Viewport is bright */
+[data-radix-select-viewport] {
+  background-color: white !important;
+}
+
+/* Override any dark theme on Select Portal */
+[data-radix-portal] [data-radix-select-content] {
+  background-color: white !important;
+  border: 1px solid #d1d5db !important;
+}
+
 .dark {
   --background: hsl(0 0% 0%);
   --foreground: hsl(200 6.6667% 91.1765%);
