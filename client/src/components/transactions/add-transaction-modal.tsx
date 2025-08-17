@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,14 +112,33 @@ export default function AddTransactionModal({
 
 
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto" data-testid="modal-add-transaction">
-        <DialogHeader>
-          <DialogTitle>Add New Transaction</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true" data-testid="modal-add-transaction">
+      {/* Separate overlay with alpha background - NO opacity class */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        onClick={() => onOpenChange(false)}
+      />
+
+      {/* Modal card positioned separately */}
+      <div className="absolute inset-0 flex items-start justify-center p-6">
+        <div className="w-full max-w-2xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Add New Transaction</h2>
+            <button 
+              onClick={() => onOpenChange(false)} 
+              className="px-2 py-1 rounded hover:bg-slate-100 text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
           {/* Transaction Type */}
           <div>
             <Label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -130,10 +149,10 @@ export default function AddTransactionModal({
                 type="button"
                 variant={type === "income" ? "default" : "outline"}
                 className={cn(
-                  "flex items-center justify-center p-3",
+                  "flex items-center justify-center p-3 font-medium",
                   type === "income" 
-                    ? "bg-success text-white hover:bg-green-700" 
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    ? "bg-teal-600 text-white hover:bg-teal-700" 
+                    : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
                 )}
                 onClick={() => setType("income")}
                 data-testid="button-type-income"
@@ -145,10 +164,10 @@ export default function AddTransactionModal({
                 type="button"
                 variant={type === "expense" ? "destructive" : "outline"}
                 className={cn(
-                  "flex items-center justify-center p-3",
+                  "flex items-center justify-center p-3 font-medium",
                   type === "expense" 
-                    ? "bg-destructive text-white hover:bg-red-700" 
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    ? "bg-teal-600 text-white hover:bg-teal-700" 
+                    : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
                 )}
                 onClick={() => setType("expense")}
                 data-testid="button-type-expense"
@@ -280,8 +299,10 @@ export default function AddTransactionModal({
               {createTransactionMutation.isPending ? "Saving..." : "Save Transaction"}
             </Button>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

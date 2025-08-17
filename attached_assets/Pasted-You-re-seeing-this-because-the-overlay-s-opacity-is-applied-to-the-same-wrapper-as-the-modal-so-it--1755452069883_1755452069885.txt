@@ -1,0 +1,67 @@
+You’re seeing this because the overlay’s opacity is applied to the same wrapper as the modal, so it darkens the modal contents too. Fix = make the overlay a separate sibling with an alpha background (not opacity-*), and keep the modal card on top with its own solid background.
+
+Copy-paste fix (Tailwind)
+
+Replace your modal wrapper with this pattern (for Add Transaction modal):
+
+// Modal root
+<div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true">
+  {/* overlay – separate element, NO `opacity-*` */}
+  <div
+    className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+    onClick={onClose}
+  />
+
+  {/* modal card */}
+  <div className="absolute inset-0 flex items-start justify-center p-6">
+    <div className="w-full max-w-3xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10">
+      {/* header */}
+      <div className="flex items-center justify-between p-4 border-b">
+        <h2 className="text-lg font-semibold">Add Transaction</h2>
+        <button onClick={onClose} className="px-2 py-1 rounded hover:bg-slate-100">✕</button>
+      </div>
+
+      {/* body */}
+      <div className="p-4">
+        {/* Income / Expense toggle (high contrast) */}
+        <div className="inline-flex rounded-md ring-1 ring-slate-300 overflow-hidden mb-4">
+          <button
+            className={active==='INCOME'
+              ? 'px-4 py-2 bg-blue-600 text-white font-medium'
+              : 'px-4 py-2 bg-white text-slate-700'}
+            onClick={()=>setActive('INCOME')}
+          >Income</button>
+          <button
+            className={active==='EXPENSE'
+              ? 'px-4 py-2 bg-blue-600 text-white font-medium'
+              : 'px-4 py-2 bg-white text-slate-700'}
+            onClick={()=>setActive('EXPENSE')}
+          >Expense</button>
+        </div>
+
+        {/* …form fields… */}
+      </div>
+    </div>
+  </div>
+</div>
+
+What to remove (the bugs)
+
+Any opacity-* class on the modal wrapper (it darkens children).
+Use bg-black/40 on the overlay instead.
+
+Any brightness-*/grayscale-* on the wrapper.
+
+Any single element doing both “overlay + modal” work.
+
+Quick checklist
+
+Overlay: bg-black/30–40 (alpha color), not opacity-60.
+
+Modal: bg-white text-slate-900 shadow-2xl ring-1 ring-black/10.
+
+Z-index: overlay and modal inside a fixed inset-0 z-[1000] root; the card sits after the overlay in DOM.
+
+Toggle buttons: use solid contrast (bg-blue-600 text-white) for the active tab.
+
+Apply this and the modal will stay bright and readable while the page behind dims slightly.
