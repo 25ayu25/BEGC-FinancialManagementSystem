@@ -97,6 +97,15 @@ export default function AdvancedDashboard() {
               <SelectItem value="2025-7">July 2025</SelectItem>
               <SelectItem value="2025-6">June 2025</SelectItem>
               <SelectItem value="2025-5">May 2025</SelectItem>
+              <SelectItem value="2025-4">April 2025</SelectItem>
+              <SelectItem value="2025-3">March 2025</SelectItem>
+              <SelectItem value="2025-2">February 2025</SelectItem>
+              <SelectItem value="2025-1">January 2025</SelectItem>
+              <SelectItem value="2024-12">December 2024</SelectItem>
+              <SelectItem value="2024-11">November 2024</SelectItem>
+              <SelectItem value="2024-10">October 2024</SelectItem>
+              <SelectItem value="2024-9">September 2024</SelectItem>
+              <SelectItem value="2024-8">August 2024</SelectItem>
             </SelectContent>
           </Select>
           
@@ -108,21 +117,21 @@ export default function AdvancedDashboard() {
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Total Revenue</p>
-                <p className="text-3xl font-bold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-2 text-emerald-600">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-sm font-medium">+{revenueGrowth}% vs last month</span>
+                <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
+                <p className="text-2xl font-bold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <div className="flex items-center mt-1 text-emerald-600">
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  <span className="text-xs font-medium">+{revenueGrowth}%</span>
                 </div>
               </div>
-              <div className="bg-emerald-50 p-3 rounded-full">
-                <TrendingUp className="h-8 w-8 text-emerald-600" />
+              <div className="bg-emerald-50 p-2 rounded-full">
+                <TrendingUp className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
           </CardContent>
@@ -130,17 +139,17 @@ export default function AdvancedDashboard() {
 
         {/* Net Profit */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Net Profit</p>
-                <p className="text-3xl font-bold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-2 text-blue-600">
-                  <span className="text-sm font-medium">{profitMargin.toFixed(1)}% profit margin</span>
+                <p className="text-slate-600 text-xs font-medium">Net Profit</p>
+                <p className="text-2xl font-bold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <div className="flex items-center mt-1 text-blue-600">
+                  <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
                 </div>
               </div>
-              <div className="bg-blue-50 p-3 rounded-full">
-                <DollarSign className="h-8 w-8 text-blue-600" />
+              <div className="bg-blue-50 p-2 rounded-full">
+                <DollarSign className="h-5 w-5 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -148,17 +157,17 @@ export default function AdvancedDashboard() {
 
         {/* Insurance Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Insurance Revenue</p>
-                <p className="text-3xl font-bold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-2 text-purple-600">
-                  <span className="text-sm font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
+                <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
+                <p className="text-2xl font-bold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+                <div className="flex items-center mt-1 text-purple-600">
+                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
                 </div>
               </div>
-              <div className="bg-purple-50 p-3 rounded-full">
-                <Shield className="h-8 w-8 text-purple-600" />
+              <div className="bg-purple-50 p-2 rounded-full">
+                <Shield className="h-5 w-5 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -166,18 +175,18 @@ export default function AdvancedDashboard() {
 
         {/* Patient Volume */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Patient Volume</p>
-                <p className="text-3xl font-bold text-slate-900">{patientVolume}</p>
-                <div className="flex items-center mt-2 text-orange-600">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-sm font-medium">+8.3% this month</span>
+                <p className="text-slate-600 text-xs font-medium">Patient Volume</p>
+                <p className="text-2xl font-bold text-slate-900">{patientVolume}</p>
+                <div className="flex items-center mt-1 text-orange-600">
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  <span className="text-xs font-medium">+8.3%</span>
                 </div>
               </div>
-              <div className="bg-orange-50 p-3 rounded-full">
-                <Users className="h-8 w-8 text-orange-600" />
+              <div className="bg-orange-50 p-2 rounded-full">
+                <Users className="h-5 w-5 text-orange-600" />
               </div>
             </div>
           </CardContent>
