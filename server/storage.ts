@@ -94,21 +94,27 @@ export class DatabaseStorage implements IStorage {
     type?: string;
     limit?: number;
   }): Promise<Transaction[]> {
-    let query = db.select().from(transactions);
+    const conditions = [];
     
     if (filters?.startDate) {
-      query = query.where(gte(transactions.date, filters.startDate));
+      conditions.push(gte(transactions.date, filters.startDate));
     }
     if (filters?.endDate) {
-      query = query.where(lte(transactions.date, filters.endDate));
+      conditions.push(lte(transactions.date, filters.endDate));
     }
     if (filters?.departmentId) {
-      query = query.where(eq(transactions.departmentId, filters.departmentId));
+      conditions.push(eq(transactions.departmentId, filters.departmentId));
     }
     if (filters?.type) {
-      query = query.where(eq(transactions.type, filters.type));
+      conditions.push(eq(transactions.type, filters.type));
     }
 
+    let query = db.select().from(transactions);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
     query = query.orderBy(desc(transactions.date));
     
     if (filters?.limit) {

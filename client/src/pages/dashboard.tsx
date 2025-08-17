@@ -15,6 +15,13 @@ export default function Dashboard() {
 
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ["/api/dashboard", year, month],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard/${year}/${month}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      return res.json();
+    }
   });
 
   const { data: departments } = useQuery({
@@ -88,23 +95,23 @@ export default function Dashboard() {
       />
       
       <main className="p-6 space-y-8">
-        <KPICards data={dashboardData} />
+        <KPICards data={dashboardData || {}} />
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <IncomeChart />
           <DepartmentBreakdown 
-            data={dashboardData?.departmentBreakdown} 
-            departments={departments}
+            data={dashboardData?.departmentBreakdown || {}} 
+            departments={departments || []}
           />
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <RecentTransactions transactions={dashboardData?.recentTransactions} />
+            <RecentTransactions transactions={dashboardData?.recentTransactions || []} />
           </div>
           <QuickActions 
-            insuranceData={dashboardData?.insuranceBreakdown}
-            insuranceProviders={insuranceProviders}
+            insuranceData={dashboardData?.insuranceBreakdown || {}}
+            insuranceProviders={insuranceProviders || []}
           />
         </div>
 
@@ -119,17 +126,17 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <h4 className="font-medium text-gray-900">Income Breakdown</h4>
                 <div className="space-y-2 text-sm">
-                  {departments?.map((dept) => (
+                  {(departments || []).map((dept: any) => (
                     <div key={dept.id} className="flex justify-between">
                       <span className="text-gray-600">{dept.name}</span>
                       <span className="font-medium">
-                        ${dashboardData?.departmentBreakdown?.[dept.id] || '0.00'}
+                        ${(dashboardData as any)?.departmentBreakdown?.[dept.id] || '0.00'}
                       </span>
                     </div>
                   ))}
                   <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Total Income</span>
-                    <span className="text-green-600">${dashboardData?.totalIncome || '0.00'}</span>
+                    <span className="text-green-600">${(dashboardData as any)?.totalIncome || '0.00'}</span>
                   </div>
                 </div>
               </div>
@@ -137,11 +144,11 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <h4 className="font-medium text-gray-900">Insurance Income</h4>
                 <div className="space-y-2 text-sm">
-                  {insuranceProviders?.map((provider) => (
+                  {(insuranceProviders || []).map((provider: any) => (
                     <div key={provider.id} className="flex justify-between">
                       <span className="text-gray-600">{provider.name}</span>
                       <span className="font-medium">
-                        ${dashboardData?.insuranceBreakdown?.[provider.id] || '0.00'}
+                        ${(dashboardData as any)?.insuranceBreakdown?.[provider.id] || '0.00'}
                       </span>
                     </div>
                   ))}
@@ -154,17 +161,17 @@ export default function Dashboard() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Income</span>
-                      <span className="font-medium text-green-600">${dashboardData?.totalIncome || '0.00'}</span>
+                      <span className="font-medium text-green-600">${(dashboardData as any)?.totalIncome || '0.00'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Expenses</span>
-                      <span className="font-medium text-red-600">${dashboardData?.totalExpenses || '0.00'}</span>
+                      <span className="font-medium text-red-600">${(dashboardData as any)?.totalExpenses || '0.00'}</span>
                     </div>
                     <div className="border-t pt-3">
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-900">Net Income</span>
-                        <span className={`font-bold text-lg ${parseFloat(dashboardData?.netIncome || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${dashboardData?.netIncome || '0.00'}
+                        <span className={`font-bold text-lg ${parseFloat((dashboardData as any)?.netIncome || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${(dashboardData as any)?.netIncome || '0.00'}
                         </span>
                       </div>
                       <div className="mt-2">
@@ -172,12 +179,12 @@ export default function Dashboard() {
                           <div 
                             className="bg-green-600 h-3 rounded-full" 
                             style={{ 
-                              width: `${Math.max(0, Math.min(100, (parseFloat(dashboardData?.netIncome || '0') / parseFloat(dashboardData?.totalIncome || '1')) * 100))}%` 
+                              width: `${Math.max(0, Math.min(100, (parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100))}%` 
                             }}
                           ></div>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          Profit Margin: {((parseFloat(dashboardData?.netIncome || '0') / parseFloat(dashboardData?.totalIncome || '1')) * 100).toFixed(1)}%
+                          Profit Margin: {((parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100).toFixed(1)}%
                         </p>
                       </div>
                     </div>

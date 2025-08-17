@@ -20,7 +20,7 @@ export default function Transactions() {
   });
 
   const getDepartmentName = (departmentId: string) => {
-    return departments?.find(d => d.id === departmentId)?.name || 'Unknown';
+    return (departments as any)?.find((d: any) => d.id === departmentId)?.name || 'Unknown';
   };
 
   return (
@@ -56,7 +56,7 @@ export default function Transactions() {
               <div className="text-center py-8">
                 <p className="text-gray-500">Loading transactions...</p>
               </div>
-            ) : !transactions?.length ? (
+            ) : !(transactions as any)?.length ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">No transactions found. Add your first transaction to get started.</p>
                 <Button className="mt-4" onClick={() => setShowAddModal(true)}>
@@ -87,7 +87,7 @@ export default function Transactions() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {transactions?.map((transaction) => (
+                    {(transactions as any)?.map((transaction: any) => (
                       <tr key={transaction.id} className="hover:bg-gray-50 transition-colors" data-testid={`row-transaction-${transaction.id}`}>
                         <td className="py-4 px-6 text-sm text-gray-900">
                           {new Date(transaction.date).toLocaleDateString()}

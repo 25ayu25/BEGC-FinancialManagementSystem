@@ -47,7 +47,7 @@ export default function Reports() {
               <div className="text-center py-8">
                 <p className="text-gray-500">Loading reports...</p>
               </div>
-            ) : !reports?.length ? (
+            ) : !(reports as any)?.length ? (
               <div className="text-center py-8">
                 <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">No reports generated yet.</p>
@@ -61,7 +61,7 @@ export default function Reports() {
               </div>
             ) : (
               <div className="space-y-4">
-                {reports.map((report) => (
+                {(reports as any).map((report: any) => (
                   <div 
                     key={report.id} 
                     className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"

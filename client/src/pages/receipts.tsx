@@ -28,8 +28,8 @@ export default function Receipts() {
     // TODO: Create receipt record in database
   };
 
-  const transactionsWithReceipts = transactions?.filter(t => t.receiptPath) || [];
-  const transactionsWithoutReceipts = transactions?.filter(t => !t.receiptPath) || [];
+  const transactionsWithReceipts = (transactions as any)?.filter((t: any) => t.receiptPath) || [];
+  const transactionsWithoutReceipts = (transactions as any)?.filter((t: any) => !t.receiptPath) || [];
 
   return (
     <div className="flex-1 overflow-auto">
@@ -69,7 +69,7 @@ export default function Receipts() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {transactionsWithoutReceipts.slice(0, 5).map((transaction) => (
+                {transactionsWithoutReceipts.slice(0, 5).map((transaction: any) => (
                   <div 
                     key={transaction.id} 
                     className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg"
@@ -119,7 +119,7 @@ export default function Receipts() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {transactionsWithReceipts.map((transaction) => (
+                {transactionsWithReceipts.map((transaction: any) => (
                   <div 
                     key={transaction.id} 
                     className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"

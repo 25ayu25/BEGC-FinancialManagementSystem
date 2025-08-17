@@ -187,7 +187,7 @@ export default function AddTransactionModal({
                 <SelectValue placeholder={`Select ${type === "income" ? "Department" : "Category"}`} />
               </SelectTrigger>
               <SelectContent>
-                {departments?.map((dept) => (
+                {(departments as any)?.map((dept: any) => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name} ({dept.code})
                   </SelectItem>
@@ -207,8 +207,8 @@ export default function AddTransactionModal({
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {insuranceProviders?.map((provider) => (
+                  <SelectItem value="none">None</SelectItem>
+                  {(insuranceProviders as any)?.map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {provider.name} ({provider.code})
                     </SelectItem>
