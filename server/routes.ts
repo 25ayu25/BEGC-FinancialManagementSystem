@@ -167,6 +167,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a monthly report
+  app.delete("/api/reports/:reportId", requireAuth, async (req, res) => {
+    try {
+      const { reportId } = req.params;
+      await storage.deleteMonthlyReport(reportId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
   // Download report PDF 
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {

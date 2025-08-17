@@ -37,6 +37,7 @@ export interface IStorage {
   getMonthlyReport(year: number, month: number): Promise<MonthlyReport | undefined>;
   createMonthlyReport(report: InsertMonthlyReport): Promise<MonthlyReport>;
   getMonthlyReports(limit?: number): Promise<MonthlyReport[]>;
+  deleteMonthlyReport(reportId: string): Promise<void>;
 
   // Receipts
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
@@ -161,6 +162,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await query;
+  }
+
+  async deleteMonthlyReport(reportId: string): Promise<void> {
+    await db.delete(monthlyReports).where(eq(monthlyReports.id, reportId));
   }
 
   async createReceipt(receipt: InsertReceipt): Promise<Receipt> {

@@ -5,7 +5,7 @@ import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileText, Lock } from "lucide-react";
+import { Download, FileText, Lock, Trash2 } from "lucide-react";
 
 export default function Reports() {
   const { toast } = useToast();
@@ -86,6 +86,38 @@ export default function Reports() {
     }
   };
 
+  const deleteReport = async (reportId: string) => {
+    if (!confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/reports/${reportId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete report');
+      }
+      
+      // Refresh the reports list
+      await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+      
+      toast({
+        title: "Report Deleted",
+        description: "The monthly report has been deleted successfully."
+      });
+    } catch (error) {
+      console.error('Error deleting report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <Header 
@@ -104,7 +136,7 @@ export default function Reports() {
           <CardHeader>
             <CardTitle>Available Reports</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-96 overflow-y-auto">
             {isLoading ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">Loading reports...</p>
@@ -170,6 +202,16 @@ export default function Reports() {
                           Generate PDF
                         </Button>
                       )}
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => deleteReport(report.id)}
+                        data-testid={`button-delete-${report.id}`}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
