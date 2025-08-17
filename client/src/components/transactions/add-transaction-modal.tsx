@@ -188,12 +188,12 @@ export default function AddTransactionModal({
               <SelectTrigger data-testid="select-department" className="h-11">
                 <SelectValue placeholder={`Select ${type === "income" ? "Department" : "Category"}`} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-lg max-h-60 overflow-y-auto">
                 {(departments as any)?.map((dept: any) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{dept.name}</span>
-                      <span className="text-xs text-gray-500 ml-2">({dept.code})</span>
+                  <SelectItem key={dept.id} value={dept.id} className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
+                    <div className="flex items-center justify-between w-full py-1">
+                      <span className="text-gray-900 font-medium">{dept.name}</span>
+                      <span className="text-xs text-teal-600 ml-2 font-semibold">({dept.code})</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -211,15 +211,15 @@ export default function AddTransactionModal({
                 <SelectTrigger data-testid="select-insurance" className="h-11">
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <span className="text-gray-500">No Insurance</span>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-lg max-h-60 overflow-y-auto">
+                  <SelectItem value="none" className="hover:bg-gray-50 focus:bg-gray-50 cursor-pointer">
+                    <span className="text-gray-500 italic">No Insurance</span>
                   </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{provider.name}</span>
-                        <span className="text-xs text-gray-500 ml-2">({provider.code})</span>
+                    <SelectItem key={provider.id} value={provider.id} className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
+                      <div className="flex items-center justify-between w-full py-1">
+                        <span className="text-gray-900 font-medium">{provider.name}</span>
+                        <span className="text-xs text-teal-600 ml-2 font-semibold">({provider.code})</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -250,12 +250,22 @@ export default function AddTransactionModal({
                 Currency
               </Label>
               <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger data-testid="select-currency">
+                <SelectTrigger data-testid="select-currency" className="h-11">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="SSP">South Sudanese Pound (SSP)</SelectItem>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-lg">
+                  <SelectItem value="USD" className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
+                    <div className="flex items-center">
+                      <span className="font-medium text-gray-900">USD</span>
+                      <span className="text-gray-500 ml-2">($)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="SSP" className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
+                    <div className="flex items-center">
+                      <span className="font-medium text-gray-900">SSP</span>
+                      <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
