@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, FileText, Lock } from "lucide-react";
 
 export default function Reports() {
+  const { toast } = useToast();
   const { data: reports, isLoading } = useQuery({
     queryKey: ["/api/reports"],
   });
@@ -20,8 +23,67 @@ export default function Reports() {
   };
 
   const generateReport = async (year: number, month: number) => {
-    // TODO: Implement PDF generation
-    console.log(`Generating report for ${year}-${month}`);
+    try {
+      const response = await fetch(`/api/reports/generate/${year}/${month}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+      
+      const result = await response.json();
+      
+      // Refresh the reports list to show the newly generated report
+      await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+      
+      toast({
+        title: "Report Generated",
+        description: `Monthly report for ${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} has been generated successfully.`
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const downloadReport = async (pdfPath: string, filename: string) => {
+    try {
+      const response = await fetch(`/api${pdfPath}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to download report');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download Started",
+        description: "The monthly report PDF is being downloaded."
+      });
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download report. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -93,7 +155,12 @@ export default function Reports() {
                       </Badge>
                       
                       {report.pdfPath ? (
-                        <Button variant="outline" size="sm" data-testid={`button-download-${report.id}`}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => downloadReport(report.pdfPath, `${report.year}-${report.month.toString().padStart(2, '0')}.pdf`)}
+                          data-testid={`button-download-${report.id}`}
+                        >
                           <Download className="h-4 w-4 mr-2" />
                           Download PDF
                         </Button>

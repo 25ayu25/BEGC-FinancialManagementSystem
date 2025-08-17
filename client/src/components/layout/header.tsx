@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface HeaderProps {
   title: string;
@@ -10,6 +12,38 @@ interface HeaderProps {
 }
 
 export default function Header({ title, subtitle, actions }: HeaderProps) {
+  const { toast } = useToast();
+
+  const generateCurrentMonthReport = async () => {
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+
+    try {
+      const response = await fetch(`/api/reports/generate/${year}/${month}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+      
+      toast({
+        title: "Report Generated",
+        description: `Monthly report for ${currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} has been generated successfully.`
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 p-6">
       <div className="flex items-center justify-between">
@@ -39,7 +73,7 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
                 </SelectContent>
               </Select>
               
-              <Button data-testid="button-generate-pdf">
+              <Button onClick={generateCurrentMonthReport} data-testid="button-generate-pdf">
                 <Download className="h-4 w-4 mr-2" />
                 Generate PDF
               </Button>

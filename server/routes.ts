@@ -95,6 +95,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Income trends data
+  app.get("/api/income-trends", requireAuth, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const data = await storage.getIncomeTrends(days);
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching income trends:", error);
+      res.status(500).json({ error: "Failed to fetch income trends" });
+    }
+  });
+
   // Monthly Reports
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {
@@ -121,6 +133,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching report:", error);
       res.status(500).json({ error: "Failed to fetch report" });
+    }
+  });
+
+  app.post("/api/reports/generate/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const userId = (req as any).user.id;
+      
+      // Get dashboard data for the month
+      const dashboardData = await storage.getDashboardData(year, month);
+      
+      // Create the monthly report
+      const reportData = {
+        year,
+        month,
+        totalIncome: dashboardData.totalIncome,
+        totalExpenses: dashboardData.totalExpenses,
+        netIncome: dashboardData.netIncome,
+        departmentBreakdown: dashboardData.departmentBreakdown,
+        insuranceBreakdown: dashboardData.insuranceBreakdown,
+        status: "draft" as const,
+        pdfPath: `/reports/${year}-${month.toString().padStart(2, '0')}.pdf`, // Mock path for now
+        generatedBy: userId
+      };
+      
+      const report = await storage.createMonthlyReport(reportData);
+      res.status(201).json(report);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
+  // Download report PDF (mock implementation)
+  app.get("/api/reports/:path", requireAuth, async (req, res) => {
+    try {
+      const path = req.params.path;
+      
+      // For demo purposes, generate a simple PDF-like text response
+      // In production, this would serve actual PDF files
+      const pdfContent = `
+Monthly Financial Report - Bahr El Ghazal Clinic
+Generated: ${new Date().toLocaleDateString()}
+
+Report Path: ${path}
+
+This is a mock PDF download. In production, this would:
+1. Retrieve the actual PDF file from storage
+2. Set proper PDF headers
+3. Stream the PDF content
+
+Current implementation serves as a placeholder for testing.
+      `.trim();
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${path}"`);
+      res.send(Buffer.from(pdfContent));
+    } catch (error) {
+      console.error("Error downloading report:", error);
+      res.status(500).json({ error: "Failed to download report" });
     }
   });
 

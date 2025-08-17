@@ -266,6 +266,44 @@ export class DatabaseStorage implements IStorage {
       recentTransactions
     };
   }
+
+  async getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const endDate = new Date();
+
+    const incomeData = await db.select({
+      date: sql<string>`DATE(${transactions.date})`,
+      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`
+    }).from(transactions)
+    .where(
+      and(
+        eq(transactions.type, "income"),
+        gte(transactions.date, startDate),
+        lte(transactions.date, endDate)
+      )
+    )
+    .groupBy(sql`DATE(${transactions.date})`)
+    .orderBy(sql`DATE(${transactions.date})`);
+
+    // Fill in missing dates with 0 income
+    const result: Array<{ date: string, income: number }> = [];
+    const current = new Date(startDate);
+    
+    while (current <= endDate) {
+      const dateStr = current.toISOString().split('T')[0];
+      const existingData = incomeData.find(d => d.date === dateStr);
+      
+      result.push({
+        date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        income: existingData ? Number(existingData.income) : 0
+      });
+      
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return result;
+  }
 }
 
 export const storage = new DatabaseStorage();
