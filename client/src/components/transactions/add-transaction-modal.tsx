@@ -188,13 +188,11 @@ export default function AddTransactionModal({
               <SelectTrigger data-testid="select-department" className="h-11">
                 <SelectValue placeholder={`Select ${type === "income" ? "Department" : "Category"}`} />
               </SelectTrigger>
-              <SelectContent className="!bg-white !border-gray-200 shadow-lg rounded-lg max-h-60 overflow-y-auto z-[100]" style={{ backgroundColor: 'white', color: '#1f2937' }}>
+              <SelectContent>
                 {(departments as any)?.map((dept: any) => (
-                  <SelectItem key={dept.id} value={dept.id} className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
-                    <div className="flex items-center justify-between w-full py-1">
-                      <span className="text-gray-900 font-medium">{dept.name}</span>
-                      <span className="text-xs text-teal-600 ml-2 font-semibold">({dept.code})</span>
-                    </div>
+                  <SelectItem key={dept.id} value={dept.id}>
+                    <span className="font-medium">{dept.name}</span>
+                    <span className="text-xs text-teal-600 ml-2">({dept.code})</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -211,16 +209,14 @@ export default function AddTransactionModal({
                 <SelectTrigger data-testid="select-insurance" className="h-11">
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
-                <SelectContent className="!bg-white !border-gray-200 shadow-lg rounded-lg max-h-60 overflow-y-auto z-[100]" style={{ backgroundColor: 'white', color: '#1f2937' }}>
-                  <SelectItem value="none" className="hover:bg-gray-50 focus:bg-gray-50 cursor-pointer">
+                <SelectContent>
+                  <SelectItem value="none">
                     <span className="text-gray-500 italic">No Insurance</span>
                   </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
-                    <SelectItem key={provider.id} value={provider.id} className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
-                      <div className="flex items-center justify-between w-full py-1">
-                        <span className="text-gray-900 font-medium">{provider.name}</span>
-                        <span className="text-xs text-teal-600 ml-2 font-semibold">({provider.code})</span>
-                      </div>
+                    <SelectItem key={provider.id} value={provider.id}>
+                      <span className="font-medium">{provider.name}</span>
+                      <span className="text-xs text-teal-600 ml-2">({provider.code})</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -253,18 +249,14 @@ export default function AddTransactionModal({
                 <SelectTrigger data-testid="select-currency" className="h-11">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="!bg-white !border-gray-200 shadow-lg rounded-lg z-[100]" style={{ backgroundColor: 'white', color: '#1f2937' }}>
-                  <SelectItem value="USD" className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
-                    <div className="flex items-center">
-                      <span className="font-medium text-gray-900">USD</span>
-                      <span className="text-gray-500 ml-2">($)</span>
-                    </div>
+                <SelectContent>
+                  <SelectItem value="USD">
+                    <span className="font-medium">USD</span>
+                    <span className="text-gray-500 ml-2">($)</span>
                   </SelectItem>
-                  <SelectItem value="SSP" className="hover:bg-teal-50 focus:bg-teal-50 cursor-pointer">
-                    <div className="flex items-center">
-                      <span className="font-medium text-gray-900">SSP</span>
-                      <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
-                    </div>
+                  <SelectItem value="SSP">
+                    <span className="font-medium">SSP</span>
+                    <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
                   </SelectItem>
                 </SelectContent>
               </Select>

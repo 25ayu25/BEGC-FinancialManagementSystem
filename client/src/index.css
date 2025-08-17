@@ -47,33 +47,34 @@
   --radius: 0.75rem;
 }
 
-/* Force Select Content to be bright and visible */
+/* Force bright dropdown styling */
 [data-radix-select-content] {
-  background-color: white !important;
+  background: white !important;
   color: #1f2937 !important;
   border: 1px solid #d1d5db !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  z-index: 9999 !important;
+}
+
+[data-radix-select-viewport] {
+  background: white !important;
+  padding: 4px !important;
 }
 
 [data-radix-select-item] {
   color: #1f2937 !important;
-  background-color: transparent !important;
+  background: transparent !important;
+  padding: 8px 12px 8px 32px !important;
+  border-radius: 4px !important;
+  margin: 1px 0 !important;
 }
 
-[data-radix-select-item][data-highlighted] {
-  background-color: #f0fdfa !important;
+[data-radix-select-item][data-highlighted],
+[data-radix-select-item]:hover,
+[data-radix-select-item][data-state="checked"] {
+  background: #f0fdfa !important;
   color: #0f766e !important;
-}
-
-/* Ensure Select Viewport is bright */
-[data-radix-select-viewport] {
-  background-color: white !important;
-}
-
-/* Override any dark theme on Select Portal */
-[data-radix-portal] [data-radix-select-content] {
-  background-color: white !important;
-  border: 1px solid #d1d5db !important;
+  outline: none !important;
 }
 
 .dark {
