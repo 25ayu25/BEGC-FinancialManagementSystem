@@ -219,20 +219,20 @@ export default function AdvancedDashboard() {
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-semibold text-slate-900">Top Departments</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {departments?.slice(0, 5).map((dept: any, index: number) => {
               const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
               const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
               
               return (
                 <div key={dept.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${index === 0 ? 'bg-emerald-500' : index === 1 ? 'bg-blue-500' : index === 2 ? 'bg-purple-500' : 'bg-slate-400'}`} />
-                    <span className="font-medium text-slate-700">{dept.name}</span>
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${index === 0 ? 'bg-emerald-500' : index === 1 ? 'bg-blue-500' : index === 2 ? 'bg-purple-500' : index === 3 ? 'bg-orange-500' : 'bg-slate-400'}`} />
+                    <span className="font-medium text-slate-700 flex-1">{dept.name}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-slate-900">SSP {Math.round(amount).toLocaleString()}</p>
-                    <p className="text-sm text-slate-500">{percentage.toFixed(1)}%</p>
+                  <div className="text-right flex-shrink-0 ml-4">
+                    <p className="font-semibold text-slate-900 text-sm">SSP {Math.round(amount).toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">{percentage.toFixed(1)}%</p>
                   </div>
                 </div>
               );
