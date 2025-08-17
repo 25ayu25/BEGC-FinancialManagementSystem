@@ -7,6 +7,7 @@ import DepartmentBreakdown from "@/components/dashboard/department-breakdown";
 import RecentTransactions from "@/components/dashboard/recent-transactions";
 import QuickActions from "@/components/dashboard/quick-actions";
 import MonthSelector from "@/components/dashboard/month-selector";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,9 +16,11 @@ export default function Dashboard() {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
 
-  const handleMonthChange = (year: number, month: number) => {
+  const handleMonthChange = (year: number, month: number, range?: string) => {
     setSelectedYear(year);
     setSelectedMonth(month);
+    // Handle range-based filtering here if needed in the future
+    console.log('Filter changed:', { year, month, range });
   };
 
   const { data: dashboardData, isLoading, error } = useQuery({
@@ -100,10 +103,17 @@ export default function Dashboard() {
       <Header 
         title="Financial Dashboard" 
         subtitle={`Track daily income and expenses - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
+        actions={
+          <div className="flex items-center space-x-4">
+            <MonthSelector onMonthChange={handleMonthChange} />
+            <Button variant="outline" size="sm" data-testid="button-generate-pdf">
+              Generate PDF
+            </Button>
+          </div>
+        }
       />
       
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
-        <MonthSelector onMonthChange={handleMonthChange} />
         <KPICards data={dashboardData || {}} />
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
