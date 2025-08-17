@@ -33,7 +33,7 @@ export default function AddTransactionModal({
   const [departmentId, setDepartmentId] = useState("");
   const [insuranceProviderId, setInsuranceProviderId] = useState("");
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("SSP");
   const [description, setDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -102,7 +102,7 @@ export default function AddTransactionModal({
     setDepartmentId("");
     setInsuranceProviderId("");
     setAmount("");
-    setCurrency("USD");
+    setCurrency("SSP");
     setDescription("");
     setSelectedDate(new Date());
   };
@@ -114,13 +114,22 @@ export default function AddTransactionModal({
       setDepartmentId(editTransaction.departmentId || "");
       setInsuranceProviderId(editTransaction.insuranceProviderId || "");
       setAmount(editTransaction.amount);
-      setCurrency(editTransaction.currency || "USD");
+      setCurrency(editTransaction.currency || "SSP");
       setDescription(editTransaction.description || "");
       setSelectedDate(editTransaction.date ? new Date(editTransaction.date) : new Date());
     } else if (open && !editTransaction) {
       resetForm();
     }
   }, [editTransaction, open, defaultType]);
+
+  // Auto-switch currency when insurance provider is selected
+  useEffect(() => {
+    if (insuranceProviderId && insuranceProviderId !== "no-insurance") {
+      setCurrency("USD");
+    } else {
+      setCurrency("SSP");
+    }
+  }, [insuranceProviderId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,13 +338,13 @@ export default function AddTransactionModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">
-                    <span className="font-medium">USD</span>
-                    <span className="text-gray-500 ml-2">($)</span>
-                  </SelectItem>
                   <SelectItem value="SSP">
                     <span className="font-medium">SSP</span>
                     <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
+                  </SelectItem>
+                  <SelectItem value="USD">
+                    <span className="font-medium">USD</span>
+                    <span className="text-gray-500 ml-2">($)</span>
                   </SelectItem>
                 </SelectContent>
               </Select>

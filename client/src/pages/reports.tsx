@@ -185,7 +185,7 @@ export default function Reports() {
                         </h3>
                         <p className="text-sm text-gray-500">
                           Net Income: <span className={`font-medium ${parseFloat(report.netIncome) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            USD {Math.round(parseFloat(report.netIncome)).toLocaleString()}
+                            SSP {Math.round(parseFloat(report.netIncome)).toLocaleString()}
                           </span>
                         </p>
                       </div>

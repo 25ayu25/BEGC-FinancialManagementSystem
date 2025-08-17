@@ -149,7 +149,7 @@ export default function Dashboard() {
                     <div key={dept.id} className="flex justify-between">
                       <span className="text-gray-600">{dept.name}</span>
                       <span className="font-medium">
-                        USD {Math.round(parseFloat((dashboardData as any)?.departmentBreakdown?.[dept.id] || '0'))}
+                        SSP {Math.round(parseFloat((dashboardData as any)?.departmentBreakdown?.[dept.id] || '0'))}
                       </span>
                     </div>
                   ))}
