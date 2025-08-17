@@ -110,74 +110,74 @@ export default function AdvancedDashboard() {
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Total Revenue */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-emerald-100 text-sm font-medium">Total Revenue</p>
-                <p className="text-3xl font-bold">SSP {Math.round(totalIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-2">
+                <p className="text-slate-600 text-sm font-medium">Total Revenue</p>
+                <p className="text-3xl font-bold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <div className="flex items-center mt-2 text-emerald-600">
                   <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-sm">+{revenueGrowth}% vs last month</span>
+                  <span className="text-sm font-medium">+{revenueGrowth}% vs last month</span>
                 </div>
               </div>
-              <div className="bg-white/20 p-3 rounded-full">
-                <TrendingUp className="h-8 w-8" />
+              <div className="bg-emerald-50 p-3 rounded-full">
+                <TrendingUp className="h-8 w-8 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Net Profit */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Net Profit</p>
-                <p className="text-3xl font-bold">SSP {Math.round(netIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-2">
-                  <span className="text-sm">{profitMargin.toFixed(1)}% profit margin</span>
+                <p className="text-slate-600 text-sm font-medium">Net Profit</p>
+                <p className="text-3xl font-bold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <div className="flex items-center mt-2 text-blue-600">
+                  <span className="text-sm font-medium">{profitMargin.toFixed(1)}% profit margin</span>
                 </div>
               </div>
-              <div className="bg-white/20 p-3 rounded-full">
-                <DollarSign className="h-8 w-8" />
+              <div className="bg-blue-50 p-3 rounded-full">
+                <DollarSign className="h-8 w-8 text-blue-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Insurance Revenue */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm font-medium">Insurance Revenue</p>
-                <p className="text-3xl font-bold">USD {Math.round(insuranceIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-2">
-                  <span className="text-sm">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
+                <p className="text-slate-600 text-sm font-medium">Insurance Revenue</p>
+                <p className="text-3xl font-bold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+                <div className="flex items-center mt-2 text-purple-600">
+                  <span className="text-sm font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
                 </div>
               </div>
-              <div className="bg-white/20 p-3 rounded-full">
-                <Shield className="h-8 w-8" />
+              <div className="bg-purple-50 p-3 rounded-full">
+                <Shield className="h-8 w-8 text-purple-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Patient Volume */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium">Patient Volume</p>
-                <p className="text-3xl font-bold">{patientVolume}</p>
-                <div className="flex items-center mt-2">
+                <p className="text-slate-600 text-sm font-medium">Patient Volume</p>
+                <p className="text-3xl font-bold text-slate-900">{patientVolume}</p>
+                <div className="flex items-center mt-2 text-orange-600">
                   <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-sm">+8.3% this month</span>
+                  <span className="text-sm font-medium">+8.3% this month</span>
                 </div>
               </div>
-              <div className="bg-white/20 p-3 rounded-full">
-                <Users className="h-8 w-8" />
+              <div className="bg-orange-50 p-3 rounded-full">
+                <Users className="h-8 w-8 text-orange-600" />
               </div>
             </div>
           </CardContent>
@@ -187,18 +187,18 @@ export default function AdvancedDashboard() {
       {/* Charts and Analytics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Revenue Trend Chart */}
-        <Card className="lg:col-span-2 border-0 shadow-lg">
+        <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-semibold">Revenue Analytics</CardTitle>
-              <Badge variant="secondary">Live Data</Badge>
+              <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+              <Badge variant="outline" className="text-slate-600">Live Data</Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-64 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg flex items-center justify-center">
+            <div className="h-64 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100">
               <div className="text-center">
                 <TrendingUp className="h-12 w-12 text-slate-400 mx-auto mb-3" />
-                <p className="text-slate-600 dark:text-slate-300">Advanced Revenue Charts</p>
+                <p className="text-slate-600">Advanced Revenue Charts</p>
                 <p className="text-sm text-slate-500">Interactive analytics coming soon</p>
               </div>
             </div>
@@ -206,9 +206,9 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Top Departments */}
-        <Card className="border-0 shadow-lg">
+        <Card className="border border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-semibold">Top Departments</CardTitle>
+            <CardTitle className="text-xl font-semibold text-slate-900">Top Departments</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {departments?.slice(0, 5).map((dept: any, index: number) => {
@@ -216,13 +216,13 @@ export default function AdvancedDashboard() {
               const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
               
               return (
-                <div key={dept.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div key={dept.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                   <div className="flex items-center space-x-3">
                     <div className={`w-3 h-3 rounded-full ${index === 0 ? 'bg-emerald-500' : index === 1 ? 'bg-blue-500' : index === 2 ? 'bg-purple-500' : 'bg-slate-400'}`} />
-                    <span className="font-medium">{dept.name}</span>
+                    <span className="font-medium text-slate-700">{dept.name}</span>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold">SSP {Math.round(amount).toLocaleString()}</p>
+                    <p className="font-semibold text-slate-900">SSP {Math.round(amount).toLocaleString()}</p>
                     <p className="text-sm text-slate-500">{percentage.toFixed(1)}%</p>
                   </div>
                 </div>
@@ -233,16 +233,16 @@ export default function AdvancedDashboard() {
       </div>
 
       {/* Financial Summary */}
-      <Card className="border-0 shadow-lg">
+      <Card className="border border-slate-200 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-semibold">Financial Summary</CardTitle>
+            <CardTitle className="text-xl font-semibold text-slate-900">Financial Summary</CardTitle>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="text-slate-600 border-slate-300">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="text-slate-600 border-slate-300">
                 <Calendar className="h-4 w-4 mr-2" />
                 Compare
               </Button>
