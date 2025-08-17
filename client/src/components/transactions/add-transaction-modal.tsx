@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ObjectUploader } from "@/components/ObjectUploader";
+
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Save, Plus, Minus } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AddTransactionModalProps {
@@ -29,7 +29,7 @@ export default function AddTransactionModal({
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [description, setDescription] = useState("");
-  const [receiptPath, setReceiptPath] = useState("");
+
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,7 +74,7 @@ export default function AddTransactionModal({
     setAmount("");
     setCurrency("USD");
     setDescription("");
-    setReceiptPath("");
+
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,32 +105,12 @@ export default function AddTransactionModal({
       amount: parseFloat(amount).toFixed(2),
       currency,
       description,
-      receiptPath: receiptPath || null,
+      receiptPath: null,
       date: new Date().toISOString(),
     });
   };
 
-  const handleGetUploadParameters = async () => {
-    const response = await fetch("/api/receipts/upload", {
-      method: "POST",
-      credentials: "include",
-    });
-    const data = await response.json();
-    return {
-      method: "PUT" as const,
-      url: data.uploadURL,
-    };
-  };
 
-  const handleUploadComplete = (result: any) => {
-    if (result.successful?.[0]?.uploadURL) {
-      setReceiptPath(result.successful[0].uploadURL);
-      toast({
-        title: "Receipt Uploaded",
-        description: "Receipt uploaded successfully",
-      });
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,7 +138,7 @@ export default function AddTransactionModal({
                 onClick={() => setType("income")}
                 data-testid="button-type-income"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <span className="text-lg mr-2">+</span>
                 Income
               </Button>
               <Button
@@ -173,7 +153,7 @@ export default function AddTransactionModal({
                 onClick={() => setType("expense")}
                 data-testid="button-type-expense"
               >
-                <Minus className="h-4 w-4 mr-2" />
+                <span className="text-lg mr-2">-</span>
                 Expense
               </Button>
             </div>
@@ -279,28 +259,7 @@ export default function AddTransactionModal({
             />
           </div>
 
-          {/* Receipt Upload */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">
-              Receipt/Voucher
-            </Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-              <ObjectUploader
-                maxNumberOfFiles={1}
-                maxFileSize={5242880}
-                onGetUploadParameters={handleGetUploadParameters}
-                onComplete={handleUploadComplete}
-                buttonClassName="bg-gray-100 text-gray-700 hover:bg-gray-200"
-              >
-                <Camera className="h-5 w-5 mr-2" />
-                {receiptPath ? "Change Receipt" : "Upload Receipt"}
-              </ObjectUploader>
-              {receiptPath && (
-                <p className="text-sm text-green-600 mt-2">Receipt uploaded successfully</p>
-              )}
-              <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
-            </div>
-          </div>
+
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
@@ -317,7 +276,7 @@ export default function AddTransactionModal({
               disabled={createTransactionMutation.isPending}
               data-testid="button-save-transaction"
             >
-              <Save className="h-4 w-4 mr-2" />
+              <span className="mr-2">💾</span>
               {createTransactionMutation.isPending ? "Saving..." : "Save Transaction"}
             </Button>
           </div>
