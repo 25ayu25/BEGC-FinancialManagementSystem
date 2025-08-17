@@ -80,10 +80,10 @@ export default function AddTransactionModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!amount || !description) {
+    if (!amount) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please enter an amount",
         variant: "destructive",
       });
       return;
@@ -106,7 +106,7 @@ export default function AddTransactionModal({
       currency,
       description,
       receiptPath: null,
-      date: new Date().toISOString(),
+      date: new Date(),
     });
   };
 
@@ -265,16 +265,15 @@ export default function AddTransactionModal({
           {/* Description */}
           <div>
             <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              Description
+              Notes (Optional)
             </Label>
             <Textarea
               id="description"
               rows={3}
-              placeholder="Enter transaction description..."
+              placeholder="Enter daily consultation total or expense details (optional)..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               data-testid="textarea-description"
-              required
             />
           </div>
 

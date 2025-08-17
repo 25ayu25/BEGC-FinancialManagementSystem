@@ -32,7 +32,7 @@ export const transactions = pgTable("transactions", {
   departmentId: varchar("department_id").references(() => departments.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("USD"), // USD, SSP
-  description: text("description").notNull(),
+  description: text("description"),
   date: timestamp("date").notNull().defaultNow(),
   receiptPath: text("receipt_path"), // path to uploaded receipt
   insuranceProviderId: varchar("insurance_provider_id").references(() => insuranceProviders.id),
