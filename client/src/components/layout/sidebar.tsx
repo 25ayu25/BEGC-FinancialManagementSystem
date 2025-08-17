@@ -25,16 +25,16 @@ export default function Sidebar() {
   const [location] = useLocation();
 
   return (
-    <div className="w-64 bg-white shadow-lg flex flex-col" data-testid="sidebar-navigation">
+    <div className="w-64 bg-white shadow-xl flex flex-col border-r border-gray-100" data-testid="sidebar-navigation">
       {/* Logo and Clinic Info */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-teal-100 bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-600">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Building2 className="text-white text-lg" />
+          <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
+            <Building2 className="text-white text-xl" />
           </div>
           <div>
-            <h1 className="font-semibold text-gray-900">Bahr El Ghazal</h1>
-            <p className="text-sm text-gray-500">Financial System</p>
+            <h1 className="font-bold text-white text-lg">Bahr El Ghazal Clinic</h1>
+            <p className="text-sm text-teal-100">Financial Management System</p>
           </div>
         </div>
       </div>
@@ -49,8 +49,8 @@ export default function Sidebar() {
                 className={cn(
                   "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
                   isActive 
-                    ? "text-primary bg-blue-50" 
-                    : "text-gray-600 hover:text-primary hover:bg-gray-50"
+                    ? "text-teal-700 bg-gradient-to-r from-teal-50 to-emerald-50 border-r-2 border-teal-500 font-semibold" 
+                    : "text-gray-600 hover:text-teal-700 hover:bg-gradient-to-r hover:from-teal-50/50 hover:to-emerald-50/50"
                 )}
                 data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
               >
@@ -66,11 +66,11 @@ export default function Sidebar() {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
               <User className="text-white text-sm" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900" data-testid="text-user-name">
+              <p className="text-sm font-semibold text-gray-900" data-testid="text-user-name">
                 Admin User
               </p>
               <p className="text-xs text-gray-500" data-testid="text-user-role">

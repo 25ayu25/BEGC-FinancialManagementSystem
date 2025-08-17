@@ -36,10 +36,12 @@ export default function AddTransactionModal({
 
   const { data: departments } = useQuery({
     queryKey: ["/api/departments"],
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { data: insuranceProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const createTransactionMutation = useMutation({
@@ -183,13 +185,16 @@ export default function AddTransactionModal({
               {type === "income" ? "Department" : "Category"}
             </Label>
             <Select value={departmentId} onValueChange={setDepartmentId}>
-              <SelectTrigger data-testid="select-department">
+              <SelectTrigger data-testid="select-department" className="h-11">
                 <SelectValue placeholder={`Select ${type === "income" ? "Department" : "Category"}`} />
               </SelectTrigger>
               <SelectContent>
                 {(departments as any)?.map((dept: any) => (
                   <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name} ({dept.code})
+                    <div className="flex items-center justify-between w-full">
+                      <span>{dept.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">({dept.code})</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -203,14 +208,19 @@ export default function AddTransactionModal({
                 Insurance Provider (Optional)
               </Label>
               <Select value={insuranceProviderId} onValueChange={setInsuranceProviderId}>
-                <SelectTrigger data-testid="select-insurance">
+                <SelectTrigger data-testid="select-insurance" className="h-11">
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="none">
+                    <span className="text-gray-500">No Insurance</span>
+                  </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name} ({provider.code})
+                      <div className="flex items-center justify-between w-full">
+                        <span>{provider.name}</span>
+                        <span className="text-xs text-gray-500 ml-2">({provider.code})</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
