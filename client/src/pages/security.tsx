@@ -19,6 +19,24 @@ import { apiRequest } from "@/lib/queryClient";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
+// Types for API responses
+interface SessionInfo {
+  sid: string;
+  ua: string;
+  ip: string;
+  lastSeen: number;
+  createdAt: number;
+  current: boolean;
+}
+
+interface SessionsResponse {
+  sessions: SessionInfo[];
+}
+
+interface TimeoutResponse {
+  minutes: number;
+}
+
 
 // Password change schema
 const passwordSchema = z.object({
@@ -47,12 +65,12 @@ export default function Security() {
   });
 
   // Session management queries
-  const { data: sessionsData, refetch: refetchSessions } = useQuery({
+  const { data: sessionsData, refetch: refetchSessions } = useQuery<SessionsResponse>({
     queryKey: ['/api/sessions'],
     enabled: !!user,
   });
 
-  const { data: timeoutData, refetch: refetchTimeout } = useQuery({
+  const { data: timeoutData, refetch: refetchTimeout } = useQuery<TimeoutResponse>({
     queryKey: ['/api/sessions/timeout'],
     enabled: !!user,
   });

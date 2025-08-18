@@ -1,0 +1,52 @@
+the “Configure Session Timeout” modal is opening but the screen is still way too dark. That’s just the default shadcn/radix overlay. Here’s exactly how to fix it and make it match the Change-Password modal (light overlay, crisp panel, correct stacking), plus a quick sanity check for the sessions table.
+A) Make the overlay light and the panel sit above it
+Where: your UI Dialog wrapper (shadcn’s default lives at client/src/components/ui/dialog.tsx).
+If you don’t have a central wrapper, update the DialogPrimitive.Overlay and DialogPrimitive.Content for the Session Timeout dialog.
+Change these classes:
+Overlay:
+from: bg-black/80 (or similar)
+to: bg-black/30 md:bg-black/20 backdrop-blur-[1px] z-40
+Content:
+ensure: z-50 bg-white shadow-xl rounded-xl (and not z-40)
+add a subtle border: border border-slate-200
+Example (shadcn default edit):
+// dialog.tsx
+<DialogPrimitive.Overlay
+  className="fixed inset-0 z-40 bg-black/30 md:bg-black/20 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out"
+/>
+<DialogPrimitive.Content
+  className="fixed z-50 grid w-full max-w-md gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+>
+  {/* ... */}
+</DialogPrimitive.Content>
+Why it was so dark: the default overlay is bg-black/80. Also, if content and overlay share the same z-index, the overlay can visually “sit on” the panel.
+Also check (common gotchas):
+No parent element of the modal has transform/filter (creates a new stacking context). If your page wrapper has transform, either remove it or bump z-50 on content and z-40 on overlay.
+Ensure the modal open state closes properly so the overlay unmounts (shadcn handles it, but if you wrapped it, make sure you pass onOpenChange).
+B) Use the same modal wrapper as Change Password
+If your Change-Password dialog already looks right, reuse its wrapper:
+Pull its Dialog, DialogContent, and DialogHeader components into a shared <Modal> and use that for the Session Timeout dialog. The style will match automatically.
+C) “Active Sessions” still empty? Quick store sanity check
+I saw in the logs a query against sessions. With connect-pg-simple, the default table name is "session" (no “s”). If your endpoint uses the plural, it will always return 0 rows.
+Make sure your queries use the correct table:
+SELECT sid, expire, (sess::jsonb -> 'meta') AS meta
+FROM "session"     -- not sessions
+WHERE (sess::jsonb ->> 'userId') = $1;
+On login, save meta + session:
+req.session.userId = user.id;
+req.session.meta = {
+  ua: req.get('user-agent') || '',
+  ip: req.ip,
+  createdAt: Date.now(),
+  lastSeen: Date.now(),
+};
+await new Promise(res => req.session.save(res));
+On each authed request, update lastSeen:
+app.use((req, _res, next) => {
+  if (req.session?.userId) {
+    const m = (req.session as any).meta || {};
+    (req.session as any).meta = { ...m, lastSeen: Date.now() };
+    req.session.save(() => next());
+  } else next();
+});
+With that, View Sessions should list at least your current session, and Active Sessions ≠ 0.
