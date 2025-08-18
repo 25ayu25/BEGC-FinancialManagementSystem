@@ -26,7 +26,8 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ReferenceLine 
+  ReferenceLine,
+  Legend
 } from 'recharts';
 
 // Removed MonthSelector import - will create inline selector
@@ -60,6 +61,8 @@ export default function AdvancedDashboard() {
   const incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
     day: i + 1,
     amount: 0,
+    amountUSD: 0,
+    amountSSP: 0,
     label: `${i + 1}`,
     fullDate: new Date(selectedYear, selectedMonth - 1, i + 1).toLocaleDateString('en-US', { 
       month: 'short', 
@@ -75,25 +78,36 @@ export default function AdvancedDashboard() {
       if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
       if (!day && r.date) day = new Date(r.date).getDate();
       if (day >= 1 && day <= daysInMonth) {
-        incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0);
+        // Use new currency-specific fields
+        incomeSeries[day - 1].amountUSD += Number(r.incomeUSD ?? 0);
+        incomeSeries[day - 1].amountSSP += Number(r.incomeSSP ?? 0);
+        incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0); // Total for backward compatibility
       }
     }
   }
   
   // Compute summary stats from the same series
+  const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
+  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const monthTotal = incomeSeries.reduce((s, d) => s + d.amount, 0);
   const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length;
-  const monthlyAvg = nonzeroDays > 0 ? Math.round(monthTotal / nonzeroDays) : 0;
-  const peak = Math.max(...incomeSeries.map(d => d.amount), 0);
+  const monthlyAvg = nonzeroDays > 0 ? Math.round(monthTotalSSP / nonzeroDays) : 0;
+  const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
   const showAvgLine = nonzeroDays >= 2; // Only show if 2+ non-zero days
   
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const hasSSP = data.amountSSP > 0;
+      const hasUSD = data.amountUSD > 0;
+      
       return (
         <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
-          <p className="font-medium text-slate-900">{data.fullDate} — SSP {data.amount.toLocaleString()}</p>
+          <p className="font-medium text-slate-900 mb-1">{data.fullDate}</p>
+          {hasSSP && <p className="text-sm text-slate-600">SSP {data.amountSSP.toLocaleString()}</p>}
+          {hasUSD && <p className="text-sm text-slate-600">USD {data.amountUSD.toLocaleString()}</p>}
+          {!hasSSP && !hasUSD && <p className="text-sm text-slate-500">No transactions</p>}
         </div>
       );
     }
@@ -103,7 +117,10 @@ export default function AdvancedDashboard() {
   // Handle bar click to show day's transactions
   const handleBarClick = (data: any) => {
     if (data && data.amount > 0) {
-      console.log(`Opening transactions for ${data.fullDate} (Day ${data.day}) - Amount: SSP ${data.amount.toLocaleString()}`);
+      const sspPart = data.amountSSP > 0 ? `SSP ${data.amountSSP.toLocaleString()}` : '';
+      const usdPart = data.amountUSD > 0 ? `USD ${data.amountUSD.toLocaleString()}` : '';
+      const amounts = [sspPart, usdPart].filter(Boolean).join(' + ');
+      console.log(`Opening transactions for ${data.fullDate} (Day ${data.day}) - ${amounts}`);
       // TODO: Implement side panel with filtered transactions for that day
     }
   };
@@ -317,7 +334,7 @@ export default function AdvancedDashboard() {
                 <div className="h-64 relative">
                   {/* Y-axis title */}
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 transform-gpu">
-                    <span className="text-xs text-slate-500 font-medium">Revenue (SSP)</span>
+                    <span className="text-xs text-slate-500 font-medium">Revenue</span>
                   </div>
                   
                   <div className="ml-8 h-full w-full">
@@ -351,6 +368,12 @@ export default function AdvancedDashboard() {
                           ticks={generateYTicks()}
                         />
                         <Tooltip content={<CustomTooltip />} />
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36}
+                          iconType="rect"
+                          wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }}
+                        />
                         
                         {/* Monthly Average Reference Line */}
                         {showAvgLine && monthlyAvg > 0 && (
@@ -369,13 +392,26 @@ export default function AdvancedDashboard() {
                         )}
                         
                         <Bar 
-                          dataKey="amount" 
+                          dataKey="amountSSP" 
                           fill="#14b8a6"
+                          radius={[0, 0, 0, 0]}
+                          stroke="none"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleBarClick}
+                          maxBarSize={18}
+                          name="SSP"
+                          stackId="revenue"
+                        />
+                        <Bar 
+                          dataKey="amountUSD" 
+                          fill="#0891b2"
                           radius={[4, 4, 0, 0]}
                           stroke="none"
                           style={{ cursor: 'pointer' }}
                           onClick={handleBarClick}
                           maxBarSize={18}
+                          name="USD"
+                          stackId="revenue"
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -386,7 +422,11 @@ export default function AdvancedDashboard() {
                 <div className="border-t border-slate-100 pt-4 grid grid-cols-3 gap-4">
                   <div className="flex flex-col text-center">
                     <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
-                    <span className="text-lg font-bold text-slate-900">SSP {monthTotal.toLocaleString()}</span>
+                    <div className="space-y-1">
+                      {monthTotalSSP > 0 && <span className="block text-sm font-bold text-slate-900">SSP {monthTotalSSP.toLocaleString()}</span>}
+                      {monthTotalUSD > 0 && <span className="block text-sm font-bold text-slate-900">USD {monthTotalUSD.toLocaleString()}</span>}
+                      {monthTotalSSP === 0 && monthTotalUSD === 0 && <span className="text-sm text-slate-500">No revenue</span>}
+                    </div>
                   </div>
                   <div className="flex flex-col text-center">
                     <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>

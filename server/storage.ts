@@ -317,19 +317,16 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getIncomeTrendsForMonth(year: number, month: number): Promise<Array<{ date: string, income: number }>> {
+  async getIncomeTrendsForMonth(year: number, month: number): Promise<Array<{ date: string, income: number, incomeUSD: number, incomeSSP: number }>> {
     // Get start and end dates for the month
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0); // Last day of the month
 
     const incomeData = await db.select({
       date: sql<string>`DATE(${transactions.date})`,
-      income: sql<number>`COALESCE(SUM(
-        CASE 
-          WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} * 1320
-          ELSE ${transactions.amount}
-        END
-      ), 0)`
+      incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)` // Keep total for backward compatibility
     }).from(transactions)
     .where(
       and(
@@ -342,7 +339,7 @@ export class DatabaseStorage implements IStorage {
     .orderBy(sql`DATE(${transactions.date})`);
 
     // Show the entire month - all days from 1st to last day
-    const result: Array<{ date: string, income: number }> = [];
+    const result: Array<{ date: string, income: number, incomeUSD: number, incomeSSP: number }> = [];
     const current = new Date(startDate);
     
     while (current <= endDate) {
@@ -351,7 +348,9 @@ export class DatabaseStorage implements IStorage {
       
       result.push({
         date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        income: existingData ? Number(existingData.income) : 0
+        income: existingData ? Number(existingData.income) : 0,
+        incomeUSD: existingData ? Number(existingData.incomeUSD) : 0,
+        incomeSSP: existingData ? Number(existingData.incomeSSP) : 0
       });
       
       current.setDate(current.getDate() + 1);
