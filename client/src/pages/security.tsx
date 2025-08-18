@@ -222,7 +222,7 @@ export default function Security() {
                   <span className="text-sm font-medium">Password Strength</span>
                 </div>
                 <Badge variant="default" className="bg-green-100 text-green-800">
-                  {mockSecurityData.passwordStrength}
+                  Strong
                 </Badge>
               </div>
               
@@ -242,7 +242,7 @@ export default function Security() {
                   <span className="text-sm font-medium">Last Login</span>
                 </div>
                 <span className="text-sm text-gray-600">
-                  {mockSecurityData.lastLogin}
+                  Today
                 </span>
               </div>
             </div>
@@ -278,7 +278,7 @@ export default function Security() {
                 <div className="space-y-0.5">
                   <Label>Last Password Change</Label>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Last changed on {new Date(mockSecurityData.lastPasswordChange).toLocaleDateString()}
+                    Last changed recently
                   </p>
                 </div>
                 <Button 
@@ -594,13 +594,13 @@ export default function Security() {
                 </p>
               </div>
               <Switch 
-                checked={mockSecurityData.twoFactorEnabled}
+                checked={false}
                 onCheckedChange={() => handleSecurityAction("Toggle 2FA")}
                 data-testid="switch-2fa"
               />
             </div>
             
-            {!mockSecurityData.twoFactorEnabled && (
+            {true && (
               <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5" />
                 <div className="text-sm">
@@ -630,7 +630,7 @@ export default function Security() {
                 <div>
                   <p className="text-sm font-medium">Current Session</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {mockSecurityData.lastLogin} • {user.location === 'usa' ? 'United States' : 'South Sudan'}
+                    Today • {user.location === 'usa' ? 'United States' : 'South Sudan'}
                   </p>
                 </div>
                 <Badge variant="default">Active</Badge>
