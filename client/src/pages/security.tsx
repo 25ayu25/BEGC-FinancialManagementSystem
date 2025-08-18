@@ -131,8 +131,8 @@ export default function Security() {
     },
     onSuccess: () => {
       toast({
-        title: "Other Sessions Signed Out",
-        description: "Successfully signed out from all other devices. This session remains active.",
+        title: "Success",
+        description: "Other devices signed out successfully.",
       });
       refetchSessions();
     },
@@ -605,7 +605,7 @@ export default function Security() {
                   variant="destructive" 
                   size="sm"
                   onClick={() => {
-                    window.location.href = '/api/auth/logout';
+                    window.location.href = '/api/logout';
                   }}
                   data-testid="button-signout-everywhere"
                 >
