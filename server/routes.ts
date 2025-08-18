@@ -7,30 +7,25 @@ import { z } from "zod";
 import { requireAuth, type AuthRequest } from "./auth";
 import bcrypt from "bcryptjs";
 import session from "express-session";
-import connectPg from "connect-pg-simple";
-import { db } from "./db";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Configure session store
-  const pgSession = connectPg(session);
+  // Trust proxy for proper cookie handling
+  app.set('trust proxy', 1);
   
-  // Configure session middleware with database store
+  // Configure session middleware
   app.use(session({
-    store: new pgSession({
-      pool: db as any,
-      tableName: 'session',
-      createTableIfMissing: true,
-    }),
     secret: process.env.SESSION_SECRET || "clinic-finance-secret-key",
     resave: false,
     saveUninitialized: false,
-    name: 'connect.sid',
+    name: 'clinic.sid',
+    proxy: true,
     cookie: {
       secure: false, // Set to true in production with HTTPS
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax'
+      sameSite: 'lax',
+      domain: undefined // Let Express auto-detect the domain
     }
   }));
 
