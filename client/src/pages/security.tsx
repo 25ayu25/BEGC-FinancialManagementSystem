@@ -190,7 +190,10 @@ export default function Security() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => setShowPasswordDialog(true)}
+                onClick={() => {
+                  console.log("Change password clicked, setting dialog to true");
+                  setShowPasswordDialog(true);
+                }}
                 data-testid="button-change-password"
               >
                 Change Password
@@ -393,7 +396,7 @@ export default function Security() {
         )}
 
         {/* Change Password Form */}
-        {showPasswordDialog && (
+        {showPasswordDialog && console.log("Rendering password form with showPasswordDialog:", showPasswordDialog) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
