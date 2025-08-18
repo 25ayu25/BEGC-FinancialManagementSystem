@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Lock, Eye, AlertTriangle, CheckCircle, Clock, Globe } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Shield, Lock, Eye, AlertTriangle, CheckCircle, Clock, Globe, Monitor, Smartphone, Calendar, Trash2 } from "lucide-react";
 import Header from "@/components/layout/header";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,21 +46,20 @@ export default function Security() {
     },
   });
 
-  // Mock security data - in a real app this would come from the API
-  const { data: securityData } = useQuery({
-    queryKey: ['/api/security/settings'],
-    enabled: false, // Disable for now since we don't have this endpoint
+  // Session management queries
+  const { data: sessionsData, refetch: refetchSessions } = useQuery({
+    queryKey: ['/api/sessions'],
+    enabled: !!user,
   });
 
-  const mockSecurityData = {
-    passwordStrength: "Strong",
-    lastPasswordChange: "2024-07-15",
-    activeSessions: 2,
-    lastLogin: "2025-08-18 16:19",
-    loginAttempts: [],
-    twoFactorEnabled: false,
-    sessionTimeout: 8, // hours
-  };
+  const { data: timeoutData, refetch: refetchTimeout } = useQuery({
+    queryKey: ['/api/sessions/timeout'],
+    enabled: !!user,
+  });
+
+  // State for dialogs
+  const [showSessionsDialog, setShowSessionsDialog] = useState(false);
+  const [showTimeoutDialog, setShowTimeoutDialog] = useState(false);
 
   // Password change mutation
   const updatePasswordMutation = useMutation({
@@ -84,6 +85,98 @@ export default function Security() {
       });
     }
   });
+
+  // Session management mutations
+  const revokeSessionMutation = useMutation({
+    mutationFn: async (sid: string) => {
+      return apiRequest('POST', '/api/sessions/revoke', { sid });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Session Revoked",
+        description: "The session has been signed out successfully.",
+      });
+      refetchSessions();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Revoke Session",
+        description: error.message || "Could not revoke the session.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const revokeAllSessionsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/sessions/revoke-all', {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "All Sessions Revoked",
+        description: "Successfully signed out from all other devices.",
+      });
+      refetchSessions();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Sign Out",
+        description: error.message || "Could not sign out from all devices.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateTimeoutMutation = useMutation({
+    mutationFn: async (minutes: number | null) => {
+      return apiRequest('PUT', '/api/sessions/timeout', { minutes });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Session Timeout Updated",
+        description: "Your session timeout has been configured successfully.",
+      });
+      refetchTimeout();
+      setShowTimeoutDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update session timeout.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Helper functions
+  const formatLastSeen = (timestamp: number) => {
+    if (!timestamp) return 'Unknown';
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days} days ago`;
+    if (hours > 0) return `${hours} hours ago`;
+    if (minutes > 0) return `${minutes} minutes ago`;
+    return 'Just now';
+  };
+
+  const getDeviceIcon = (userAgent: string) => {
+    if (userAgent.includes('Mobile') || userAgent.includes('Android') || userAgent.includes('iPhone')) {
+      return <Smartphone className="h-4 w-4" />;
+    }
+    return <Monitor className="h-4 w-4" />;
+  };
+
+  const getTimeoutLabel = (minutes: number | null) => {
+    if (!minutes) return 'Never';
+    if (minutes === 240) return '4 hours';
+    if (minutes === 480) return '8 hours';
+    if (minutes === 1440) return '24 hours';
+    return `${minutes} minutes`;
+  };
 
   const handleSecurityAction = (action: string) => {
     if (action === "Change password") {
@@ -139,7 +232,7 @@ export default function Security() {
                   <span className="text-sm font-medium">Active Sessions</span>
                 </div>
                 <Badge variant="secondary">
-                  {mockSecurityData.activeSessions}
+                  {sessionsData?.sessions?.length || 0}
                 </Badge>
               </div>
               
@@ -320,17 +413,60 @@ export default function Security() {
               <div className="space-y-0.5">
                 <Label>Session Timeout</Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Automatically sign out after {mockSecurityData.sessionTimeout} hours of inactivity
+                  Automatically sign out after {getTimeoutLabel(timeoutData?.minutes)}
                 </p>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleSecurityAction("Configure session timeout")}
-                data-testid="button-session-settings"
-              >
-                Configure
-              </Button>
+              <Dialog open={showTimeoutDialog} onOpenChange={setShowTimeoutDialog}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    data-testid="button-session-settings"
+                  >
+                    Configure
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Configure Session Timeout</DialogTitle>
+                    <DialogDescription>
+                      Choose when you want to be automatically signed out due to inactivity.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant={timeoutData?.minutes === 240 ? "default" : "outline"}
+                        onClick={() => updateTimeoutMutation.mutate(240)}
+                        disabled={updateTimeoutMutation.isPending}
+                      >
+                        4 hours
+                      </Button>
+                      <Button
+                        variant={timeoutData?.minutes === 480 ? "default" : "outline"}
+                        onClick={() => updateTimeoutMutation.mutate(480)}
+                        disabled={updateTimeoutMutation.isPending}
+                      >
+                        8 hours
+                      </Button>
+                      <Button
+                        variant={timeoutData?.minutes === 1440 ? "default" : "outline"}
+                        onClick={() => updateTimeoutMutation.mutate(1440)}
+                        disabled={updateTimeoutMutation.isPending}
+                      >
+                        24 hours
+                      </Button>
+                      <Button
+                        variant={!timeoutData?.minutes ? "default" : "outline"}
+                        onClick={() => updateTimeoutMutation.mutate(null)}
+                        disabled={updateTimeoutMutation.isPending}
+                      >
+                        Never
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
             
             <Separator />
@@ -339,17 +475,84 @@ export default function Security() {
               <div className="space-y-0.5">
                 <Label>Active Sessions</Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  You have {mockSecurityData.activeSessions} active sessions
+                  You have {sessionsData?.sessions?.length || 0} active sessions
                 </p>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleSecurityAction("View active sessions")}
-                data-testid="button-view-sessions"
-              >
-                View Sessions
-              </Button>
+              <Dialog open={showSessionsDialog} onOpenChange={setShowSessionsDialog}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    data-testid="button-view-sessions"
+                  >
+                    View Sessions
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Active Sessions</DialogTitle>
+                    <DialogDescription>
+                      Manage your active sessions across different devices and locations.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {sessionsData?.sessions?.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No active sessions found.
+                      </div>
+                    ) : (
+                      sessionsData?.sessions?.map((session: any) => (
+                        <div 
+                          key={session.sid} 
+                          className={`flex items-center justify-between p-4 border rounded-lg ${
+                            session.current ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : ''
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {getDeviceIcon(session.ua)}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">
+                                  {session.ua.includes('Chrome') ? 'Chrome Browser' : 
+                                   session.ua.includes('Firefox') ? 'Firefox Browser' :
+                                   session.ua.includes('Safari') ? 'Safari Browser' : 'Web Browser'}
+                                </span>
+                                {session.current && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Current
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">
+                                IP: {session.ip || 'Unknown'}
+                              </p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">
+                                Last seen: {formatLastSeen(session.lastSeen)}
+                              </p>
+                              {session.createdAt && (
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  <Calendar className="h-3 w-3 inline mr-1" />
+                                  Signed in: {new Date(session.createdAt).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {!session.current && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => revokeSessionMutation.mutate(session.sid)}
+                              disabled={revokeSessionMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
             
             <Separator />
@@ -364,10 +567,11 @@ export default function Security() {
               <Button 
                 variant="destructive" 
                 size="sm"
-                onClick={() => handleSecurityAction("Sign out all devices")}
+                onClick={() => revokeAllSessionsMutation.mutate()}
+                disabled={revokeAllSessionsMutation.isPending}
                 data-testid="button-signout-all"
               >
-                Sign Out All
+                {revokeAllSessionsMutation.isPending ? "Signing Out..." : "Sign Out All"}
               </Button>
             </div>
           </CardContent>

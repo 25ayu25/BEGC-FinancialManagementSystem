@@ -8,6 +8,11 @@ import { requireAuth, type AuthRequest } from "./auth";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import cors from "cors";
+import { Pool } from '@neondatabase/serverless';
+import type { Response, NextFunction } from 'express';
+
+// Database pool for session management queries
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -35,6 +40,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       path: '/',
     }
   }));
+
+  // Session metadata tracking middleware
+  app.use((req, res, next) => {
+    if (req.session?.userId) {
+      const m = (req.session as any).meta || {};
+      (req.session as any).meta = {
+        ua: req.get('user-agent') || m.ua || '',
+        ip: req.ip || m.ip || '',
+        createdAt: m.createdAt || Date.now(),
+        lastSeen: Date.now(),
+      };
+      // Keep cookie rolling according to per-user timeout
+      req.session.save(() => next());
+    } else {
+      next();
+    }
+  });
 
   // Authentication routes
   app.post('/api/auth/login', async (req: AuthRequest, res) => {
@@ -64,6 +86,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         req.session.userId = user.id;
         req.session.role = user.role;
+        
+        // Add session metadata for device tracking
+        req.session.meta = {
+          ua: req.get('user-agent') || '',
+          ip: req.ip,
+          createdAt: Date.now(),
+          lastSeen: Date.now(),
+        };
         
         req.session.save((err2) => {
           if (err2) {
@@ -180,6 +210,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Password update error:', error);
       res.status(500).json({ message: 'Failed to update password' });
+    }
+  });
+
+  // Session management routes
+  // List sessions for current user
+  app.get('/api/sessions', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.session.userId;
+      const { rows } = await pool.query(`
+        SELECT sid,
+               expire,
+               (sess::jsonb -> 'meta') AS meta
+        FROM "sessions"
+        WHERE (sess::jsonb ->> 'userId') = $1
+        ORDER BY expire DESC
+      `, [String(userId)]);
+
+      const sessions = rows.map((r: any) => ({
+        sid: r.sid,
+        expiresAt: new Date(r.expire).getTime(),
+        ua: r.meta?.ua || '',
+        ip: r.meta?.ip || '',
+        createdAt: r.meta?.createdAt || null,
+        lastSeen: r.meta?.lastSeen || null,
+        current: r.sid === req.sessionID,
+      }));
+      
+      res.json({ sessions });
+    } catch (error) {
+      console.error('Failed to fetch sessions:', error);
+      res.status(500).json({ message: 'Failed to fetch sessions' });
+    }
+  });
+
+  // Revoke a specific session
+  app.post('/api/sessions/revoke', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.session.userId;
+      const { sid } = req.body as { sid: string };
+      
+      if (!sid) {
+        return res.status(400).json({ error: 'sid required' });
+      }
+
+      await pool.query(`
+        DELETE FROM "sessions"
+        WHERE sid = $1 AND (sess::jsonb ->> 'userId') = $2
+      `, [sid, String(userId)]);
+      
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Failed to revoke session:', error);
+      res.status(500).json({ message: 'Failed to revoke session' });
+    }
+  });
+
+  // Revoke all sessions except current
+  app.post('/api/sessions/revoke-all', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.session.userId;
+      const currentSid = req.sessionID;
+
+      await pool.query(`
+        DELETE FROM "sessions"
+        WHERE (sess::jsonb ->> 'userId') = $1
+          AND sid <> $2
+      `, [String(userId), currentSid]);
+      
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Failed to revoke all sessions:', error);
+      res.status(500).json({ message: 'Failed to revoke sessions' });
+    }
+  });
+
+  // Get current session timeout
+  app.get('/api/sessions/timeout', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.session.userId;
+      const { rows } = await pool.query(
+        'SELECT session_timeout_minutes FROM users WHERE id = $1',
+        [userId]
+      );
+      
+      res.json({ minutes: rows[0]?.session_timeout_minutes ?? 480 }); // default 8h
+    } catch (error) {
+      console.error('Failed to get session timeout:', error);
+      res.status(500).json({ message: 'Failed to get session timeout' });
+    }
+  });
+
+  // Update session timeout
+  app.put('/api/sessions/timeout', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.session.userId;
+      const { minutes } = req.body as { minutes: number | null };
+
+      await pool.query(
+        'UPDATE users SET session_timeout_minutes = $1 WHERE id = $2',
+        [minutes, userId]
+      );
+
+      // Apply immediately to current cookie
+      const ms = (minutes ?? 480) * 60 * 1000;
+      req.session.cookie.maxAge = ms;
+      
+      await new Promise<void>((resolve) => req.session.save(() => resolve()));
+
+      res.json({ ok: true, minutes: minutes ?? 480 });
+    } catch (error) {
+      console.error('Failed to update session timeout:', error);
+      res.status(500).json({ message: 'Failed to update session timeout' });
     }
   });
 

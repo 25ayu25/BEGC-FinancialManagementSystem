@@ -1,0 +1,130 @@
+the “Session Management” block should actually work (timeout, view sessions, sign-out all). Here’s a clean, production-ready way to wire it up without big refactors, using the connect-pg-simple session table you already have.
+1) What you’ll get
+Configure timeout (per-user): 4h / 8h / 24h / Never. Rolling inactivity timeout.
+View sessions: list device, IP, created/last seen; revoke any session.
+Sign out all: invalidate all other devices in one click.
+No new services needed. Just a few endpoints + tiny UI glue.
+2) Server changes (add these to server/routes.ts)
+Assumes:
+You already set the session on login like req.session.userId = user.id.
+Your session store table is named "session" (default in connect-pg-simple).
+You have a users table; we’ll add a nullable session_timeout_minutes column.
+2.1 Store session meta on login and update it on each request
+Add when login succeeds:
+// after successful credential check
+req.session.userId = user.id;
+req.session.meta = {
+  ua: req.get('user-agent') || '',
+  ip: req.ip,
+  createdAt: Date.now(),
+  lastSeen: Date.now(),
+};
+await new Promise((res) => req.session.save(res));
+Global middleware (place it after express-session):
+app.use((req, _res, next) => {
+  if (req.session?.userId) {
+    const m = (req.session as any).meta || {};
+    (req.session as any).meta = {
+      ua: req.get('user-agent') || m.ua || '',
+      ip: req.ip || m.ip || '',
+      createdAt: m.createdAt || Date.now(),
+      lastSeen: Date.now(),
+    };
+    // keep cookie rolling according to per-user timeout
+    req.session.save(() => next());
+  } else {
+    next();
+  }
+});
+2.2 SQL: add per-user timeout (run once)
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS session_timeout_minutes integer;  -- null = use default (480)
+2.3 Endpoints
+List sessions (current user)
+router.get('/api/sessions', requireAuth, async (req, res) => {
+  const userId = (req.session as any).userId;
+  const { rows } = await pool.query(`
+    SELECT sid,
+           expire,
+           (sess::jsonb -> 'meta')  AS meta
+    FROM "session"
+    WHERE (sess::jsonb ->> 'userId') = $1
+    ORDER BY expire DESC
+  `, [String(userId)]);
+
+  const sessions = rows.map(r => ({
+    sid: r.sid,
+    expiresAt: new Date(r.expire).getTime(),
+    ua: r.meta?.ua || '',
+    ip: r.meta?.ip || '',
+    createdAt: r.meta?.createdAt || null,
+    lastSeen: r.meta?.lastSeen || null,
+    current: r.sid === (req.session as any).id,
+  }));
+  res.json({ sessions });
+});
+Revoke one session
+router.post('/api/sessions/revoke', requireAuth, async (req, res) => {
+  const userId = (req.session as any).userId;
+  const { sid } = req.body as { sid: string };
+  if (!sid) return res.status(400).json({ error: 'sid required' });
+
+  await pool.query(`
+    DELETE FROM "session"
+    WHERE sid = $1 AND (sess::jsonb ->> 'userId') = $2
+  `, [sid, String(userId)]);
+  res.json({ ok: true });
+});
+Revoke all except this device
+router.post('/api/sessions/revoke-all', requireAuth, async (req, res) => {
+  const userId = (req.session as any).userId;
+  const currentSid = (req.session as any).id;
+
+  await pool.query(`
+    DELETE FROM "session"
+    WHERE (sess::jsonb ->> 'userId') = $1
+      AND sid <> $2
+  `, [String(userId), currentSid]);
+  res.json({ ok: true });
+});
+Get/Set session timeout
+// GET current
+router.get('/api/sessions/timeout', requireAuth, async (req, res) => {
+  const userId = (req.session as any).userId;
+  const { rows } = await pool.query(
+    'SELECT session_timeout_minutes FROM users WHERE id = $1',
+    [userId]
+  );
+  res.json({ minutes: rows[0]?.session_timeout_minutes ?? 480 }); // default 8h
+});
+
+// PUT update (e.g. body { minutes: 240 | 480 | 1440 | null })
+router.put('/api/sessions/timeout', requireAuth, async (req, res) => {
+  const userId = (req.session as any).userId;
+  const { minutes } = req.body as { minutes: number | null };
+
+  await pool.query(
+    'UPDATE users SET session_timeout_minutes = $1 WHERE id = $2',
+    [minutes, userId]
+  );
+
+  // apply immediately to current cookie
+  const ms = (minutes ?? 480) * 60 * 1000;
+  req.session.cookie.maxAge = ms;
+  await new Promise((r) => req.session.save(r));
+
+  res.json({ ok: true, minutes: minutes ?? 480 });
+});
+Express-session config: keep rolling: true.
+Cookie attrs: in dev: sameSite:'lax', secure:false; in prod: sameSite:'none', secure:true, httpOnly:true.
+CORS: credentials:true everywhere you fetch.
+3) Front-end glue (in your Security/Settings page)
+Active Sessions count = length of /api/sessions.
+“View Sessions” → modal that calls GET /api/sessions, shows each device:
+device icon from ua, IP, “Last seen x min ago”, “Signed in on …”
+“Sign out” → POST /api/sessions/revoke { sid } then refetch
+“Sign Out All” → POST /api/sessions/revoke-all, then toast “Signed out everywhere”.
+“Configure” → modal with radio:
+4h (240) • 8h (480 default) • 24h (1440) • Never (null)
+Save → PUT /api/sessions/timeout { minutes } → toast
+That’s it—those three buttons stop being placeholders and actually work.
