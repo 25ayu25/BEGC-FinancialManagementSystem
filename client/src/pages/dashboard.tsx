@@ -134,77 +134,114 @@ export default function Dashboard() {
           />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-slate-100">
+            <CardTitle className="text-lg font-semibold text-slate-900">
               {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })} Financial Summary
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Income Breakdown</h4>
-                <div className="space-y-2 text-sm">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Department Income Breakdown */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                  Income Breakdown
+                </h4>
+                <div className="space-y-3 text-sm">
                   {(departments || []).map((dept: any) => (
-                    <div key={dept.id} className="flex justify-between">
-                      <span className="text-gray-600">{dept.name}</span>
-                      <span className="font-medium">
-                        SSP {Math.round(parseFloat((dashboardData as any)?.departmentBreakdown?.[dept.id] || '0'))}
+                    <div key={dept.id} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-b-0">
+                      <span className="text-slate-600 font-medium">{dept.name}</span>
+                      <span className="font-semibold text-slate-900">
+                        SSP {Math.round(parseFloat((dashboardData as any)?.departmentBreakdown?.[dept.id] || '0')).toLocaleString()}
                       </span>
                     </div>
                   ))}
-                  <div className="flex justify-between border-t pt-2 font-semibold">
-                    <span>Total Income</span>
-                    <span className="text-green-600">SSP {(dashboardData as any)?.totalIncome || '0.00'}</span>
+                  <div className="flex justify-between items-center pt-3 border-t-2 border-teal-100 font-semibold">
+                    <span className="text-slate-900">Total Income</span>
+                    <span className="text-teal-600 text-base">
+                      SSP {Math.round(parseFloat((dashboardData as any)?.totalIncome || '0')).toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Insurance Income</h4>
-                <div className="space-y-2 text-sm">
-                  {(insuranceProviders || []).map((provider: any) => (
-                    <div key={provider.id} className="flex justify-between">
-                      <span className="text-gray-600">{provider.name}</span>
-                      <span className="font-medium">
-                        SSP {(dashboardData as any)?.insuranceBreakdown?.[provider.id] || '0.00'}
-                      </span>
-                    </div>
-                  ))}
+              {/* Insurance Income */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  Insurance Income
+                </h4>
+                <div className="space-y-3 text-sm">
+                  {(insuranceProviders || []).map((provider: any) => {
+                    const amount = parseFloat((dashboardData as any)?.insuranceBreakdown?.[provider.id] || '0');
+                    return (
+                      <div key={provider.id} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-b-0">
+                        <span className="text-slate-600 font-medium">{provider.name}</span>
+                        <span className="font-semibold text-slate-900">
+                          USD {amount.toLocaleString()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-between items-center pt-3 border-t-2 border-blue-100 font-semibold">
+                    <span className="text-slate-900">Total Insurance</span>
+                    <span className="text-blue-600 text-base">
+                      USD {Object.values((dashboardData as any)?.insuranceBreakdown || {})
+                        .reduce((sum: number, val: any) => sum + parseFloat(val || '0'), 0)
+                        .toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Net Position</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Income</span>
-                      <span className="font-medium text-green-600">${(dashboardData as any)?.totalIncome || '0.00'}</span>
+              {/* Net Position with Visual Indicators */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  Net Position
+                </h4>
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-5 border border-slate-200">
+                  <div className="space-y-4 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 font-medium">Total Income</span>
+                      <span className="font-semibold text-emerald-600">
+                        SSP {Math.round(parseFloat((dashboardData as any)?.totalIncome || '0')).toLocaleString()}
+                      </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Expenses</span>
-                      <span className="font-medium text-red-600">${(dashboardData as any)?.totalExpenses || '0.00'}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 font-medium">Total Expenses</span>
+                      <span className="font-semibold text-red-500">
+                        SSP {Math.round(parseFloat((dashboardData as any)?.totalExpenses || '0')).toLocaleString()}
+                      </span>
                     </div>
-                    <div className="border-t pt-3">
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-900">Net Income</span>
-                        <span className={`font-bold text-lg ${parseFloat((dashboardData as any)?.netIncome || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${(dashboardData as any)?.netIncome || '0.00'}
+                    <div className="border-t border-slate-300 pt-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="font-semibold text-slate-900">Net Income</span>
+                        <span className={`font-bold text-lg ${parseFloat((dashboardData as any)?.netIncome || '0') >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          SSP {Math.round(parseFloat((dashboardData as any)?.netIncome || '0')).toLocaleString()}
                         </span>
                       </div>
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                      
+                      {/* Profit Margin Visual */}
+                      <div className="space-y-2">
+                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
                           <div 
-                            className="bg-green-600 h-3 rounded-full" 
+                            className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-4 rounded-full transition-all duration-500 ease-out" 
                             style={{ 
                               width: `${Math.max(0, Math.min(100, (parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100))}%` 
                             }}
                           ></div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Profit Margin: {((parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100).toFixed(1)}%
-                        </p>
+                        <div className="flex justify-between items-center">
+                          <p className="text-xs text-slate-600 font-medium">
+                            Profit Margin: {((parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100).toFixed(1)}%
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                            <span className="text-xs text-slate-600">Healthy</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

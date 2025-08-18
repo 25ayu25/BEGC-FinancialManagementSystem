@@ -19,17 +19,18 @@ export default function IncomeChart() {
   });
 
   return (
-    <Card className="border border-gray-100">
-      <CardHeader>
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-900">
+          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
             Daily Income Trend
           </CardTitle>
           <div className="flex items-center space-x-2">
             <Button 
               variant={days === 7 ? "default" : "outline"} 
               size="sm" 
-              className="px-3 py-1 text-xs"
+              className="px-3 py-1 text-xs font-medium"
               onClick={() => setDays(7)}
             >
               7D
@@ -37,7 +38,7 @@ export default function IncomeChart() {
             <Button 
               variant={days === 30 ? "default" : "outline"} 
               size="sm" 
-              className="px-3 py-1 text-xs"
+              className="px-3 py-1 text-xs font-medium"
               onClick={() => setDays(30)}
             >
               30D
@@ -45,44 +46,48 @@ export default function IncomeChart() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         {isLoading ? (
           <div className="h-64">
-            <Skeleton className="h-full w-full" />
+            <Skeleton className="h-full w-full rounded-lg" />
           </div>
         ) : chartData && chartData.length > 0 ? (
           <>
-            <div className="h-64 flex items-end justify-between space-x-2" data-testid="chart-daily-income">
+            <div className="h-64 flex items-end justify-between space-x-1 bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4" data-testid="chart-daily-income">
               {chartData.map((item: any, index: number) => (
                 <div 
                   key={item.date}
-                  className="flex flex-col items-center flex-1"
+                  className="flex flex-col items-center flex-1 group"
                 >
                   <div 
-                    className="w-full bg-primary rounded-t hover:bg-blue-700 transition-colors cursor-pointer"
+                    className="w-full bg-gradient-to-t from-teal-600 to-teal-500 rounded-t-sm hover:from-teal-700 hover:to-teal-600 transition-all duration-200 cursor-pointer shadow-sm group-hover:shadow-md"
                     style={{ 
-                      height: `${(item.income / Math.max(...chartData.map((d: any) => d.income))) * 200}px`,
-                      minHeight: '20px'
+                      height: `${Math.max((item.income / Math.max(...chartData.map((d: any) => d.income))) * 200, 4)}px`,
+                      minHeight: '4px'
                     }}
-                    title={`${item.date}: $${item.income}`}
+                    title={`${item.date}: SSP ${Math.round(item.income).toLocaleString()}`}
                   />
-                  <span className="text-xs text-gray-500 mt-2 rotate-45 origin-left">
-                    {item.date}
+                  <span className="text-xs text-slate-500 mt-2 rotate-45 origin-left font-medium">
+                    {item.date.replace('Aug ', '')}
                   </span>
                 </div>
               ))}
             </div>
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-600">
-                Average daily income: <span className="font-medium text-primary">
-                  ${(chartData.reduce((sum: number, d: any) => sum + d.income, 0) / chartData.length).toFixed(0)}
+            <div className="mt-6 p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg border border-teal-100">
+              <p className="text-sm text-slate-700 text-center">
+                Average daily income: <span className="font-semibold text-teal-700">
+                  SSP {Math.round(chartData.reduce((sum: number, d: any) => sum + d.income, 0) / chartData.length).toLocaleString()}
                 </span>
               </p>
             </div>
           </>
         ) : (
-          <div className="h-64 flex items-center justify-center">
-            <p className="text-gray-500">No income data available for the selected period</p>
+          <div className="h-64 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-8 h-8 bg-slate-300 rounded animate-pulse"></div>
+            </div>
+            <p className="text-slate-500 font-medium">No income data available</p>
+            <p className="text-slate-400 text-sm mt-1">Try a different time period</p>
           </div>
         )}
       </CardContent>

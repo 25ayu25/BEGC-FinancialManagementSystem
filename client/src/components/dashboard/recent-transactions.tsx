@@ -74,21 +74,25 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
   };
   if (!transactions?.length) {
     return (
-      <Card>
-        <CardHeader>
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-gray-900">
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               Recent Transactions
             </CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary">
+            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50">
               View All
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <p className="text-gray-500">No recent transactions found</p>
-            <p className="text-sm text-gray-400 mt-2">
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-8 h-8 bg-slate-300 rounded animate-pulse"></div>
+            </div>
+            <p className="text-slate-500 font-medium">No recent transactions found</p>
+            <p className="text-slate-400 text-sm mt-1">
               Transactions will appear here once you start adding them.
             </p>
           </div>
@@ -123,13 +127,14 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-900">
+          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
             Recent Transactions
           </CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary hover:text-blue-700">
+          <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50">
             View All
           </Button>
         </div>
@@ -137,51 +142,51 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gradient-to-r from-slate-100 to-slate-50">
               <tr>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                <th className="text-left text-xs font-semibold text-slate-600 uppercase tracking-wider py-4 px-6">
                   Date
                 </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                <th className="text-left text-xs font-semibold text-slate-600 uppercase tracking-wider py-4 px-6">
                   Description
                 </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                <th className="text-left text-xs font-semibold text-slate-600 uppercase tracking-wider py-4 px-6">
                   Type
                 </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                <th className="text-right text-xs font-semibold text-slate-600 uppercase tracking-wider py-4 px-6">
                   Amount
                 </th>
-                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wider py-4 px-6">
                   Status
                 </th>
-                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
+                <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wider py-4 px-6">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100" data-testid="table-recent-transactions">
+            <tbody className="divide-y divide-slate-100" data-testid="table-recent-transactions">
               {transactions.slice(0, 5).map((transaction) => (
                 <tr 
                   key={transaction.id} 
-                  className="hover:bg-gray-50 transition-colors"
+                  className="hover:bg-slate-50 transition-all duration-200"
                   data-testid={`row-recent-transaction-${transaction.id}`}
                 >
-                  <td className="py-4 px-6 text-sm text-gray-900">
+                  <td className="py-4 px-6 text-sm font-medium text-slate-700">
                     {new Date(transaction.date).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric' 
                     })}
                   </td>
-                  <td className="py-4 px-6 text-sm text-gray-900">
+                  <td className="py-4 px-6 text-sm text-slate-700 font-medium">
                     {transaction.description}
                   </td>
                   <td className="py-4 px-6">
-                    <Badge variant={getDepartmentBadgeColor(transaction.type)}>
+                    <Badge variant={getDepartmentBadgeColor(transaction.type)} className="font-medium">
                       {transaction.type}
                     </Badge>
                   </td>
-                  <td className="py-4 px-6 text-sm text-right font-medium">
-                    <span className={transaction.type === 'income' ? 'text-success' : 'text-destructive'}>
+                  <td className="py-4 px-6 text-sm text-right font-bold">
+                    <span className={transaction.type === 'income' ? 'text-emerald-600' : 'text-red-500'}>
                       {transaction.type === 'income' ? '+' : '-'}
                       {formatCurrency(parseFloat(transaction.amount), transaction.currency)}
                     </span>
@@ -189,7 +194,7 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
                   <td className="py-4 px-6 text-center">
                     <Badge 
                       variant={getSyncStatusColor(transaction.syncStatus)}
-                      className="inline-flex items-center"
+                      className="inline-flex items-center font-medium"
                     >
                       {getSyncStatusIcon(transaction.syncStatus)}
                       {transaction.syncStatus}
@@ -200,7 +205,7 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                        className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                         data-testid={`button-edit-${transaction.id}`}
                       >
                         <Edit className="h-4 w-4" />
