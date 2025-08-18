@@ -583,11 +583,12 @@ export default function Security() {
                 </p>
               </div>
               <Button 
-                variant="destructive" 
+                variant="outline" 
                 size="sm"
                 onClick={() => revokeAllSessionsMutation.mutate()}
                 disabled={revokeAllSessionsMutation.isPending}
                 data-testid="button-signout-others"
+                className="border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 {revokeAllSessionsMutation.isPending ? "Signing Out..." : "Sign Out Others"}
               </Button>
