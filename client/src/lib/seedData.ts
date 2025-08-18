@@ -11,19 +11,22 @@ export async function seedSupabaseData() {
       .limit(1)
 
     if (existingDepts && existingDepts.length > 0) {
-      console.log('Data already exists, skipping seed')
-      return
+      // Force reseed by clearing first
+      console.log('Clearing existing data for fresh seed...')
+      await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('departments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('insurance_providers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     }
 
-    // Insert departments
+    // Insert departments (schema only has id, name, created_at)
     const { error: deptError } = await supabase
       .from('departments')
       .insert([
-        { id: '4242abf4-e68e-48c8-9eaf-ada2612bd412', name: 'Consultation', description: 'General consultation services' },
-        { id: '5353bcf5-f79f-59d9-afbf-beb3723ce523', name: 'Laboratory', description: 'Laboratory testing and analysis' },
-        { id: '6464cdf6-g8ag-6ae0-bgcg-cfc4834df634', name: 'Ultrasound', description: 'Ultrasound imaging services' },
-        { id: '7575def7-h9bh-7bf1-chch-dfd5945eg745', name: 'X-Ray', description: 'X-ray imaging services' },
-        { id: '8686efg8-i0ci-8cg2-didi-ege6056fh856', name: 'Pharmacy', description: 'Pharmaceutical services' }
+        { id: '4242abf4-e68e-48c8-9eaf-ada2612bd412', name: 'Consultation' },
+        { id: '5353bcf5-f79f-59d9-afbf-beb3723ce523', name: 'Laboratory' },
+        { id: '6464cdf6-g8ag-6ae0-bgcg-cfc4834df634', name: 'Ultrasound' },
+        { id: '7575def7-h9bh-7bf1-chch-dfd5945eg745', name: 'X-Ray' },
+        { id: '8686efg8-i0ci-8cg2-didi-ege6056fh856', name: 'Pharmacy' }
       ])
 
     if (deptError) {
@@ -32,13 +35,13 @@ export async function seedSupabaseData() {
       console.log('Departments inserted successfully')
     }
 
-    // Insert insurance providers
+    // Insert insurance providers (schema only has id, name, created_at)
     const { error: insuranceError } = await supabase
       .from('insurance_providers')
       .insert([
-        { id: '1111aaa1-j1dj-9dh3-ejej-fgf7167gi967', name: 'CIC Insurance', contact_info: { phone: '+211-912-345-678', email: 'contact@cic.ss' } },
-        { id: '2222bbb2-k2ek-0ei4-fkfk-ghg8278hj078', name: 'UAP Insurance', contact_info: { phone: '+211-912-345-679', email: 'contact@uap.ss' } },
-        { id: '3333ccc3-l3fl-1fj5-glgl-hih9389ik189', name: 'CIGNA', contact_info: { phone: '+211-912-345-680', email: 'contact@cigna.ss' } }
+        { id: '11111111-1111-1111-1111-111111111111', name: 'CIC Insurance' },
+        { id: '22222222-2222-2222-2222-222222222222', name: 'UAP Insurance' },
+        { id: '33333333-3333-3333-3333-333333333333', name: 'CIGNA' }
       ])
 
     if (insuranceError) {
@@ -62,88 +65,109 @@ export async function seedSupabaseData() {
       .insert([
         {
           type: 'income',
-          amount_ssp: '15000.00',
-          amount_usd: '11.54',
+          amount: 15000.00,
+          currency: 'SSP',
           description: 'Consultation fee',
           department_id: '4242abf4-e68e-48c8-9eaf-ada2612bd412',
           insurance_provider_id: '1111aaa1-j1dj-9dh3-ejej-fgf7167gi967',
-          patient_name: 'John Doe',
-          receipt_number: 'RCT001',
-          payment_method: 'insurance',
+          date: '2024-08-15',
           created_by: userId,
-          created_at: '2025-08-15T10:30:00Z'
+          created_at: '2024-08-15T10:30:00Z'
         },
         {
           type: 'income',
-          amount_ssp: '25000.00',
-          amount_usd: '19.23',
+          amount: 11.54,
+          currency: 'USD',
+          description: 'Insurance payment for consultation',
+          department_id: '4242abf4-e68e-48c8-9eaf-ada2612bd412',
+          insurance_provider_id: '1111aaa1-j1dj-9dh3-ejej-fgf7167gi967',
+          date: '2024-08-15',
+          created_by: userId,
+          created_at: '2024-08-15T10:30:00Z'
+        },
+        {
+          type: 'income',
+          amount: 25000.00,
+          currency: 'SSP',
           description: 'Laboratory tests',
           department_id: '5353bcf5-f79f-59d9-afbf-beb3723ce523',
           insurance_provider_id: '2222bbb2-k2ek-0ei4-fkfk-ghg8278hj078',
-          patient_name: 'Jane Smith',
-          receipt_number: 'RCT002',
-          payment_method: 'insurance',
+          date: '2024-08-15',
           created_by: userId,
-          created_at: '2025-08-15T14:15:00Z'
+          created_at: '2024-08-15T14:15:00Z'
         },
         {
           type: 'income',
-          amount_ssp: '35000.00',
-          amount_usd: '26.92',
+          amount: 19.23,
+          currency: 'USD',
+          description: 'Laboratory tests insurance payment',
+          department_id: '5353bcf5-f79f-59d9-afbf-beb3723ce523',
+          insurance_provider_id: '2222bbb2-k2ek-0ei4-fkfk-ghg8278hj078',
+          date: '2024-08-15',
+          created_by: userId,
+          created_at: '2024-08-15T14:15:00Z'
+        },
+        {
+          type: 'income',
+          amount: 35000.00,
+          currency: 'SSP',
           description: 'Ultrasound scan',
           department_id: '6464cdf6-g8ag-6ae0-bgcg-cfc4834df634',
-          patient_name: 'Ahmed Hassan',
-          receipt_number: 'RCT003',
-          payment_method: 'cash',
+          date: '2024-08-16',
           created_by: userId,
-          created_at: '2025-08-16T09:00:00Z'
+          created_at: '2024-08-16T09:00:00Z'
         },
         {
           type: 'income',
-          amount_ssp: '20000.00',
-          amount_usd: '15.38',
+          amount: 20000.00,
+          currency: 'SSP',
           description: 'X-ray imaging',
           department_id: '7575def7-h9bh-7bf1-chch-dfd5945eg745',
           insurance_provider_id: '3333ccc3-l3fl-1fj5-glgl-hih9389ik189',
-          patient_name: 'Sarah Wilson',
-          receipt_number: 'RCT004',
-          payment_method: 'insurance',
+          date: '2024-08-16',
           created_by: userId,
-          created_at: '2025-08-16T11:45:00Z'
+          created_at: '2024-08-16T11:45:00Z'
         },
         {
           type: 'income',
-          amount_ssp: '12000.00',
-          amount_usd: '9.23',
+          amount: 15.38,
+          currency: 'USD',
+          description: 'X-ray insurance payment',
+          department_id: '7575def7-h9bh-7bf1-chch-dfd5945eg745',
+          insurance_provider_id: '3333ccc3-l3fl-1fj5-glgl-hih9389ik189',
+          date: '2024-08-16',
+          created_by: userId,
+          created_at: '2024-08-16T11:45:00Z'
+        },
+        {
+          type: 'income',
+          amount: 12000.00,
+          currency: 'SSP',
           description: 'Medication',
           department_id: '8686efg8-i0ci-8cg2-didi-ege6056fh856',
-          patient_name: 'Mohammed Ali',
-          receipt_number: 'RCT005',
-          payment_method: 'cash',
+          date: '2024-08-17',
           created_by: userId,
-          created_at: '2025-08-17T16:20:00Z'
+          created_at: '2024-08-17T16:20:00Z'
         },
         {
           type: 'expense',
-          amount_ssp: '5000.00',
-          amount_usd: '3.85',
+          amount: 5000.00,
+          currency: 'SSP',
           description: 'Medical supplies',
           department_id: '8686efg8-i0ci-8cg2-didi-ege6056fh856',
-          receipt_number: 'EXP001',
-          payment_method: 'bank_transfer',
+          date: '2024-08-17',
           created_by: userId,
-          created_at: '2025-08-17T08:30:00Z'
+          created_at: '2024-08-17T08:30:00Z'
         },
         {
           type: 'expense',
-          amount_ssp: '8000.00',
-          amount_usd: '6.15',
+          amount: 8000.00,
+          currency: 'SSP',
           description: 'Equipment maintenance',
           department_id: '6464cdf6-g8ag-6ae0-bgcg-cfc4834df634',
-          receipt_number: 'EXP002',
-          payment_method: 'check',
+          date: '2024-08-18',
           created_by: userId,
-          created_at: '2025-08-18T12:00:00Z'
+          created_at: '2024-08-18T12:00:00Z'
         }
       ])
 

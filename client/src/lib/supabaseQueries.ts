@@ -128,6 +128,16 @@ export const supabaseInsurance = {
 // Dashboard functions
 export const supabaseDashboard = {
   async getMonthlyData(year: number, month: number) {
+    console.log('getMonthlyData called with:', { year, month })
+    
+    // First get all transactions to debug
+    const { data: allTransactions, error: allError } = await supabase
+      .from('transactions')
+      .select('*')
+      .limit(5)
+    
+    console.log('All transactions sample:', allTransactions)
+    
     // Get transactions for the month
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`
     const endDate = month === 12 ? `${year + 1}-01-01` : `${year}-${(month + 1).toString().padStart(2, '0')}-01`
@@ -142,21 +152,27 @@ export const supabaseDashboard = {
       .gte('created_at', startDate)
       .lt('created_at', endDate)
     
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('Supabase query error:', error)
+      throw new Error(error.message)
+    }
+    
+    console.log('Transactions fetched:', transactions?.length)
+    console.log('Sample transaction:', transactions?.[0])
 
-    // Calculate totals
+    // Calculate totals - fix field names based on schema
     const totalIncome = transactions
       .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + parseFloat(t.amount_ssp || '0'), 0)
+      .reduce((sum, t) => sum + (t.currency === 'SSP' ? t.amount : 0), 0)
     
     const totalExpense = transactions
       .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + parseFloat(t.amount_ssp || '0'), 0)
+      .reduce((sum, t) => sum + (t.currency === 'SSP' ? t.amount : 0), 0)
 
     // Calculate insurance revenue (USD)
     const insuranceRevenue = transactions
       .filter(t => t.type === 'income' && t.insurance_provider_id)
-      .reduce((sum, t) => sum + parseFloat(t.amount_usd || '0'), 0)
+      .reduce((sum, t) => sum + (t.currency === 'USD' ? t.amount : 0), 0)
 
     // Count unique insurance providers
     const insuranceProviders = new Set(

@@ -24,14 +24,14 @@ function Router() {
 
   console.log('Supabase Auth state:', { isAuthenticated, isLoading, user: !!user, profile: !!profile });
 
-  // Seed data if authenticated and not loading (moved to useEffect to avoid hooks issues)
-  useEffect(() => {
-    if (isAuthenticated && !isLoading && user) {
-      import('@/lib/seedData').then(({ seedSupabaseData }) => {
-        seedSupabaseData();
-      });
-    }
-  }, [isAuthenticated, isLoading, user]);
+  // Data seeding disabled during schema migration phase
+  // useEffect(() => {
+  //   if (isAuthenticated && !isLoading && user) {
+  //     import('@/lib/seedData').then(({ seedSupabaseData }) => {
+  //       seedSupabaseData();
+  //     });
+  //   }
+  // }, [isAuthenticated, isLoading, user]);
 
   if (isLoading) {
     return (
