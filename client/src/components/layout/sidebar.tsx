@@ -52,8 +52,8 @@ export default function Sidebar() {
                 className={cn(
                   "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer",
                   isActive 
-                    ? "text-teal-700 bg-gradient-to-r from-teal-50 to-emerald-50 border-r-2 border-teal-500 font-semibold" 
-                    : "text-gray-600 hover:text-teal-700 hover:bg-gradient-to-r hover:from-teal-50/50 hover:to-emerald-50/50"
+                    ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500 font-medium" 
+                    : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
                 )}
                 data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
               >
