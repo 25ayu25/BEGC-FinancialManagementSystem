@@ -540,88 +540,126 @@ export default function Settings() {
                       Create User
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800">
                     <DialogHeader>
                       <DialogTitle>Create New User</DialogTitle>
                     </DialogHeader>
-                    <Form {...createUserForm}>
-                      <form onSubmit={createUserForm.handleSubmit((data) => createUserMutation.mutate(data))} className="space-y-4">
-                        <FormField
-                          control={createUserForm.control}
-                          name="username"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Username</FormLabel>
-                              <FormControl>
-                                <Input {...field} data-testid="input-username" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4">
+                      <Form {...createUserForm}>
+                        <form onSubmit={createUserForm.handleSubmit((data) => createUserMutation.mutate(data))} className="space-y-4">
                           <FormField
                             control={createUserForm.control}
-                            name="firstName"
+                            name="username"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>First Name</FormLabel>
+                                <FormLabel>Username</FormLabel>
                                 <FormControl>
-                                  <Input {...field} data-testid="input-first-name" />
+                                  <Input {...field} data-testid="input-username" placeholder="Enter username" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                           
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={createUserForm.control}
+                              name="firstName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>First Name</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} data-testid="input-first-name" placeholder="First name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={createUserForm.control}
+                              name="lastName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Last Name</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} data-testid="input-last-name" placeholder="Last name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
                           <FormField
                             control={createUserForm.control}
-                            name="lastName"
+                            name="email"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Last Name</FormLabel>
+                                <FormLabel>Email (Optional)</FormLabel>
                                 <FormControl>
-                                  <Input {...field} data-testid="input-last-name" />
+                                  <Input type="email" {...field} data-testid="input-email" placeholder="user@example.com" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
-                        </div>
 
-                        <FormField
-                          control={createUserForm.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email (Optional)</FormLabel>
-                              <FormControl>
-                                <Input type="email" {...field} data-testid="input-email" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={createUserForm.control}
+                              name="role"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Role</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-role">
+                                        <SelectValue placeholder="Select role" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="staff">Staff</SelectItem>
+                                      <SelectItem value="admin">Administrator</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={createUserForm.control}
+                              name="location"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Location</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-location">
+                                        <SelectValue placeholder="Select location" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="south_sudan">South Sudan</SelectItem>
+                                      <SelectItem value="usa">United States</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
                           <FormField
                             control={createUserForm.control}
-                            name="role"
+                            name="password"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Role</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger data-testid="select-role">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="staff">Staff</SelectItem>
-                                    <SelectItem value="admin">Administrator</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                  <Input type="password" {...field} data-testid="input-password" placeholder="Enter password" />
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -629,74 +667,39 @@ export default function Settings() {
 
                           <FormField
                             control={createUserForm.control}
-                            name="location"
+                            name="confirmPassword"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Location</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger data-testid="select-location">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="south_sudan">South Sudan</SelectItem>
-                                    <SelectItem value="usa">United States</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <FormLabel>Confirm Password</FormLabel>
+                                <FormControl>
+                                  <Input type="password" {...field} data-testid="input-confirm-password" placeholder="Confirm password" />
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
-                        </div>
 
-                        <FormField
-                          control={createUserForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Password</FormLabel>
-                              <FormControl>
-                                <Input type="password" {...field} data-testid="input-password" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={createUserForm.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirm Password</FormLabel>
-                              <FormControl>
-                                <Input type="password" {...field} data-testid="input-confirm-password" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="flex gap-2">
-                          <Button 
-                            type="submit" 
-                            disabled={createUserMutation.isPending}
-                            data-testid="button-submit-user"
-                          >
-                            {createUserMutation.isPending ? "Creating..." : "Create User"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowCreateUserDialog(false)}
-                            data-testid="button-cancel-user"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
+                          <div className="flex gap-2 pt-4">
+                            <Button 
+                              type="submit" 
+                              disabled={createUserMutation.isPending}
+                              data-testid="button-submit-user"
+                              className="flex-1"
+                            >
+                              {createUserMutation.isPending ? "Creating..." : "Create User"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setShowCreateUserDialog(false)}
+                              data-testid="button-cancel-user"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </div>
                   </DialogContent>
                 </Dialog>
               </div>
