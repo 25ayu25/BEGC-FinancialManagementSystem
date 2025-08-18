@@ -238,17 +238,20 @@ export class DatabaseStorage implements IStorage {
       )
     );
 
-    const incomeSSP = incomeResult.totalSSP || "0";
-    const incomeUSD = incomeResult.totalUSD || "0";
-    const expenseSSP = expenseResult.totalSSP || "0";
-    const expenseUSD = expenseResult.totalUSD || "0";
+    // Safely parse currency amounts, handling potential null/undefined values
+    const incomeSSP = incomeResult?.totalSSP ? parseFloat(incomeResult.totalSSP) : 0;
+    const incomeUSD = incomeResult?.totalUSD ? parseFloat(incomeResult.totalUSD) : 0;
+    const expenseSSP = expenseResult?.totalSSP ? parseFloat(expenseResult.totalSSP) : 0;
+    const expenseUSD = expenseResult?.totalUSD ? parseFloat(expenseResult.totalUSD) : 0;
     
-    // Format totals with currency breakdown
-    const totalIncome = `SSP ${parseFloat(incomeSSP).toLocaleString()}${parseFloat(incomeUSD) > 0 ? ` | USD ${parseFloat(incomeUSD).toLocaleString()}` : ''}`;
-    const totalExpenses = `SSP ${parseFloat(expenseSSP).toLocaleString()}${parseFloat(expenseUSD) > 0 ? ` | USD ${parseFloat(expenseUSD).toLocaleString()}` : ''}`;
-    const netIncomeSSP = parseFloat(incomeSSP) - parseFloat(expenseSSP);
-    const netIncomeUSD = parseFloat(incomeUSD) - parseFloat(expenseUSD);
-    const netIncome = `SSP ${netIncomeSSP.toLocaleString()}${netIncomeUSD !== 0 ? ` | USD ${netIncomeUSD.toLocaleString()}` : ''}`;
+    // Calculate net amounts
+    const netIncomeSSP = incomeSSP - expenseSSP;
+    const netIncomeUSD = incomeUSD - expenseUSD;
+    
+    // Format totals with currency breakdown - ensure numbers are valid
+    const totalIncome = `SSP ${(isNaN(incomeSSP) ? 0 : incomeSSP).toLocaleString()}${incomeUSD > 0 ? ` | USD ${incomeUSD.toLocaleString()}` : ''}`;
+    const totalExpenses = `SSP ${(isNaN(expenseSSP) ? 0 : expenseSSP).toLocaleString()}${expenseUSD > 0 ? ` | USD ${expenseUSD.toLocaleString()}` : ''}`;
+    const netIncome = `SSP ${(isNaN(netIncomeSSP) ? 0 : netIncomeSSP).toLocaleString()}${netIncomeUSD !== 0 ? ` | USD ${netIncomeUSD.toLocaleString()}` : ''}`;
 
     // Get department breakdown by currency
     const departmentData = await db.select({
@@ -268,10 +271,10 @@ export class DatabaseStorage implements IStorage {
     const departmentBreakdown: Record<string, string> = {};
     departmentData.forEach(item => {
       if (item.departmentId) {
-        const sspAmount = parseFloat(item.totalSSP || "0");
-        const usdAmount = parseFloat(item.totalUSD || "0");
-        if (sspAmount > 0 || usdAmount > 0) {
-          const breakdown = `SSP ${sspAmount.toLocaleString()}${usdAmount > 0 ? ` | USD ${usdAmount.toLocaleString()}` : ''}`;
+        const sspAmount = item.totalSSP ? parseFloat(item.totalSSP) : 0;
+        const usdAmount = item.totalUSD ? parseFloat(item.totalUSD) : 0;
+        if ((!isNaN(sspAmount) && sspAmount > 0) || (!isNaN(usdAmount) && usdAmount > 0)) {
+          const breakdown = `SSP ${(isNaN(sspAmount) ? 0 : sspAmount).toLocaleString()}${usdAmount > 0 ? ` | USD ${usdAmount.toLocaleString()}` : ''}`;
           departmentBreakdown[item.departmentId] = breakdown;
         }
       }
