@@ -575,43 +575,22 @@ export default function Security() {
             
             <Separator />
             
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Sign Out Other Devices</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Sign out from all other devices while keeping this session active
-                  </p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => revokeAllSessionsMutation.mutate()}
-                  disabled={revokeAllSessionsMutation.isPending}
-                  data-testid="button-signout-others"
-                >
-                  {revokeAllSessionsMutation.isPending ? "Signing Out..." : "Sign Out Others"}
-                </Button>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Sign Out Other Devices</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Sign out from all other devices while keeping this session active
+                </p>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Sign Out Everywhere</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Sign out from all devices including this one (you will be logged out)
-                  </p>
-                </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => {
-                    window.location.href = '/api/logout';
-                  }}
-                  data-testid="button-signout-everywhere"
-                >
-                  Sign Out Everywhere
-                </Button>
-              </div>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => revokeAllSessionsMutation.mutate()}
+                disabled={revokeAllSessionsMutation.isPending}
+                data-testid="button-signout-others"
+              >
+                {revokeAllSessionsMutation.isPending ? "Signing Out..." : "Sign Out Others"}
+              </Button>
             </div>
           </CardContent>
         </Card>
