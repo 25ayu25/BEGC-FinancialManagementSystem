@@ -293,13 +293,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.session.userId;
       const currentSid = req.sessionID;
 
-      await pool.query(`
+      console.log('Revoking sessions for user:', userId);
+      console.log('Current session ID:', currentSid);
+      
+      // First check what sessions exist for this user
+      const existingSessions = await pool.query(`
+        SELECT sid, sess::jsonb ->> 'userId' as user_id 
+        FROM "sessions" 
+        WHERE (sess::jsonb ->> 'userId') = $1
+      `, [String(userId)]);
+      
+      console.log('Found sessions for user:', existingSessions.rows);
+
+      const result = await pool.query(`
         DELETE FROM "sessions"
         WHERE (sess::jsonb ->> 'userId') = $1
           AND sid <> $2
       `, [String(userId), currentSid]);
       
-      res.json({ ok: true });
+      console.log('Deleted sessions count:', result.rowCount);
+      
+      res.json({ ok: true, deletedCount: result.rowCount });
     } catch (error) {
       console.error('Failed to revoke all sessions:', error);
       res.status(500).json({ message: 'Failed to revoke sessions' });
