@@ -47,6 +47,19 @@
   --radius: 0.75rem;
 }
 
+/* Dialog and Modal fixes */
+[data-radix-dialog-overlay] {
+  background: rgba(0, 0, 0, 0.8) !important;
+  z-index: 9998 !important;
+}
+
+[data-radix-dialog-content] {
+  z-index: 9999 !important;
+  background: white !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid #e5e7eb !important;
+}
+
 /* Force bright dropdown styling */
 [data-radix-select-content] {
   background: white !important;
