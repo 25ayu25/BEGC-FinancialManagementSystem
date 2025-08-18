@@ -9,15 +9,40 @@ import Transactions from "@/pages/transactions";
 import Reports from "@/pages/reports";
 import Receipts from "@/pages/receipts";
 import Settings from "@/pages/settings";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
+import { useAuth } from "@/hooks/useAuth";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route component={Login} />
+      </Switch>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Switch>
+          <Route path="/login" component={Login} />
           <Route path="/" component={AdvancedDashboard} />
           <Route path="/advanced" component={AdvancedDashboard} />
           <Route path="/simple" component={Dashboard} />

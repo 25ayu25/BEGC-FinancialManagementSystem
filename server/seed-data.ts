@@ -1,21 +1,31 @@
 import { db } from "./db";
 import { departments, insuranceProviders, users } from "@shared/schema";
+import bcrypt from "bcryptjs";
 
 export async function seedData() {
   try {
     console.log("Seeding initial data...");
     
     // Seed users first
+    const hashedAdminPassword = await bcrypt.hash("admin123", 10);
+    const hashedStaffPassword = await bcrypt.hash("staff123", 10);
+    
     await db.insert(users).values([
       { 
         username: "admin", 
-        password: "admin123", // In production, this should be hashed
+        password: hashedAdminPassword,
+        firstName: "Admin",
+        lastName: "User",
+        email: "admin@bahrelghazal.clinic",
         role: "admin", 
         location: "usa" 
       },
       { 
         username: "staff", 
-        password: "staff123", // In production, this should be hashed
+        password: hashedStaffPassword,
+        firstName: "Staff",
+        lastName: "Member",
+        email: "staff@bahrelghazal.clinic",
         role: "staff", 
         location: "south_sudan" 
       }

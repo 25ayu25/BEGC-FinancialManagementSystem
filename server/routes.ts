@@ -1,21 +1,156 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertReceiptSchema } from "@shared/schema";
+import { insertTransactionSchema, insertReceiptSchema, insertUserSchema } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
+import { requireAuth, type AuthRequest } from "./auth";
+import bcrypt from "bcryptjs";
+import session from "express-session";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Authentication middleware (simplified for now)
-  const requireAuth = (req: any, res: any, next: any) => {
-    // TODO: Implement proper authentication - using seeded admin user
-    req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa" };
-    next();
-  };
+  // Configure session middleware
+  app.use(session({
+    secret: process.env.SESSION_SECRET || "clinic-finance-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
+
+  // Authentication routes
+  app.post('/api/auth/login', async (req: AuthRequest, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Store user ID in session
+      req.session.userId = user.id;
+      
+      res.json({ 
+        message: 'Login successful',
+        user: {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          location: user.location
+        }
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: 'Login failed' });
+    }
+  });
+
+  app.post('/api/auth/logout', (req: AuthRequest, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: 'Logout successful' });
+    });
+  });
+
+  app.get('/api/auth/user', requireAuth, async (req: AuthRequest, res) => {
+    res.json({
+      id: req.user!.id,
+      username: req.user!.username,
+      firstName: req.user!.firstName,
+      lastName: req.user!.lastName,
+      email: req.user!.email,
+      role: req.user!.role,
+      location: req.user!.location
+    });
+  });
+
+  // User profile management routes
+  app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { firstName, lastName, email } = req.body;
+      const userId = req.user!.id;
+
+      const updates = {
+        firstName: firstName || null,
+        lastName: lastName || null,
+        email: email || null
+      };
+
+      const updatedUser = await storage.updateUser(userId, updates);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({
+        message: 'Profile updated successfully',
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          location: updatedUser.location
+        }
+      });
+    } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(500).json({ message: 'Failed to update profile' });
+    }
+  });
+
+  app.put('/api/user/password', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.user!.id;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Current password and new password are required' });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Current password is incorrect' });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(userId, { password: hashedPassword });
+
+      res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+      console.error('Password update error:', error);
+      res.status(500).json({ message: 'Failed to update password' });
+    }
+  });
 
   // Departments
-  app.get("/api/departments", requireAuth, async (req, res) => {
+  app.get("/api/departments", requireAuth, async (req: AuthRequest, res) => {
     try {
       const departments = await storage.getDepartments();
       res.json(departments);
@@ -26,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Insurance Providers
-  app.get("/api/insurance-providers", requireAuth, async (req, res) => {
+  app.get("/api/insurance-providers", requireAuth, async (req: AuthRequest, res) => {
     try {
       const providers = await storage.getInsuranceProviders();
       res.json(providers);
@@ -37,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transactions
-  app.get("/api/transactions", requireAuth, async (req, res) => {
+  app.get("/api/transactions", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { startDate, endDate, departmentId, type, limit } = req.query;
       
@@ -56,18 +191,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/transactions", requireAuth, async (req, res) => {
+  app.post("/api/transactions", requireAuth, async (req: AuthRequest, res) => {
     try {
       // Convert date string to Date object if it's a string
       // Handle insurance provider - convert "no-insurance" to null
       // Set sync status based on user location - USA users get "synced", South Sudan users get "pending"
-      const userLocation = (req as any).user.location;
+      const userLocation = req.user!.location;
       const syncStatus = userLocation === "usa" ? "synced" : "pending";
       
       const bodyWithDate = {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : new Date(),
-        createdBy: (req as any).user.id,
+        createdBy: req.user!.id,
         insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
         syncStatus: syncStatus
       };
@@ -87,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/transactions/:id - Delete a transaction
-  app.delete("/api/transactions/:id", requireAuth, async (req, res) => {
+  app.delete("/api/transactions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       await storage.deleteTransaction(id);
@@ -99,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard data
-  app.get("/api/dashboard/:year/:month", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/:year/:month", requireAuth, async (req: AuthRequest, res) => {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
@@ -113,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Income trends data
-  app.get("/api/income-trends", requireAuth, async (req, res) => {
+  app.get("/api/income-trends", requireAuth, async (req: AuthRequest, res) => {
     try {
       const days = parseInt(req.query.days as string) || 7;
       const data = await storage.getIncomeTrends(days);
@@ -124,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/income-trends/:year/:month", requireAuth, async (req, res) => {
+  app.get("/api/income-trends/:year/:month", requireAuth, async (req: AuthRequest, res) => {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);

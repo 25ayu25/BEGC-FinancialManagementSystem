@@ -7,9 +7,13 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  email: text("email").unique(),
   role: text("role").notNull().default("staff"), // "admin", "staff"
   location: text("location").notNull().default("south_sudan"), // "usa", "south_sudan"
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const departments = pgTable("departments", {
