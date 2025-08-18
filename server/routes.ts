@@ -811,18 +811,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Footer section
-      const footerY = doc.internal.pageSize.height - 30;
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.5);
-      doc.line(margin, footerY - 15, pageWidth - margin, footerY - 15);
-      
+      // Footer section - simple page number only
+      const footerY = doc.internal.pageSize.height - 20;
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY - 5);
-      doc.text(`Page 1 of 1`, pageWidth - margin, footerY - 5, { align: 'right' });
-      doc.text('Confidential - For Internal Use Only', pageWidth / 2, footerY + 5, { align: 'center' });
+      doc.text(`Page 1 of 1`, pageWidth / 2, footerY, { align: 'center' });
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       
