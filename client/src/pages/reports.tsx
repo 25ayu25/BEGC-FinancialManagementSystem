@@ -92,11 +92,8 @@ export default function Reports() {
     try {
       console.log('Downloading report:', pdfPath, filename);
       
-      // Try direct window.open first (works well for PDFs)
+      // Use blob download method for reliable single download
       const downloadUrl = `/api${pdfPath}`;
-      window.open(downloadUrl, '_blank');
-      
-      // Also try the blob method as backup
       const response = await fetch(downloadUrl, {
         credentials: 'include'
       });
