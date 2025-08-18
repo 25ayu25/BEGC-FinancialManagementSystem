@@ -44,7 +44,6 @@ function Router() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Switch>
-          <Route path="/login" component={Login} />
           <Route path="/" component={AdvancedDashboard} />
           <Route path="/advanced" component={AdvancedDashboard} />
           <Route path="/simple" component={Dashboard} />

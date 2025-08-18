@@ -27,7 +27,7 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
   const handleLogout = async () => {
     try {
       await logout();
-      setLocation('/login');
+      // The logout function in useAuth now handles the redirect
     } catch (error) {
       toast({
         title: "Logout Failed",

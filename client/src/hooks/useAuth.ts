@@ -114,6 +114,8 @@ export function useAuth() {
         isAuthenticated: false,
       });
       queryClient.clear(); // Clear all cached data
+      // Force a hard redirect to ensure clean state
+      window.location.href = '/login';
     }
   });
 
