@@ -26,7 +26,8 @@ Preferred communication style: Simple, everyday language.
 - **Build Process**: esbuild for fast production builds with ESM module format
 
 ### Data Storage Solutions
-- **Primary Database**: Supabase PostgreSQL with real-time subscriptions and automatic scaling
+- **Migration in Progress**: Currently migrating from Neon PostgreSQL to Supabase PostgreSQL
+- **Target Architecture**: Supabase PostgreSQL with real-time subscriptions and automatic scaling
 - **Schema Design**: Normalized relational structure with tables for users, departments, insurance providers, transactions, monthly reports, and receipts
 - **Migrations**: Supabase migrations with SQL and automatic schema versioning
 - **Connection Pooling**: Built-in connection pooling and edge functions
