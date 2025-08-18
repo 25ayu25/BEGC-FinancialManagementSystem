@@ -35,11 +35,11 @@ export default function Sidebar() {
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-gray-800 font-semibold text-base leading-tight">Bahr El Ghazal Clinic</h1>
-            <p className="text-gray-500 font-normal text-xs leading-tight">Financial Management System</p>
+            <h1 className="text-slate-800 font-semibold text-base leading-tight">Bahr El Ghazal Clinic</h1>
+            <p className="text-slate-500 font-normal text-xs leading-tight">Financial Management System</p>
           </div>
         </div>
-        <div className="border-b border-gray-100 mt-3"></div>
+        <div className="border-b border-slate-200 mt-3"></div>
       </div>
 
       {/* Navigation Menu */}
