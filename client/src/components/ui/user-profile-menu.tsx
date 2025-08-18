@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut, Shield } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 interface UserProfileMenuProps {
   userName?: string;
@@ -18,6 +20,22 @@ interface UserProfileMenuProps {
 
 export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin" }: UserProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setLocation('/login');
+    } catch (error) {
+      toast({
+        title: "Logout Failed",
+        description: "Failed to logout. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -56,7 +74,11 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
           <span>Security</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-red-600">
+        <DropdownMenuItem 
+          className="text-red-600 cursor-pointer" 
+          onClick={handleLogout}
+          data-testid="button-sign-out"
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign out</span>
         </DropdownMenuItem>

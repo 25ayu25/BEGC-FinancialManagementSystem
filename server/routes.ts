@@ -98,9 +98,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/logout', (req: AuthRequest, res) => {
     req.session.destroy((err) => {
       if (err) {
+        console.error('Logout error:', err);
         return res.status(500).json({ message: 'Logout failed' });
       }
-      res.clearCookie('connect.sid');
+      res.clearCookie('bgc.sid'); // Clear the correct cookie name
       res.json({ message: 'Logout successful' });
     });
   });
