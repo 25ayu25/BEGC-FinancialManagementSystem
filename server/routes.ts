@@ -10,6 +10,7 @@ import session from "express-session";
 import cors from "cors";
 import { Pool } from '@neondatabase/serverless';
 import type { Response, NextFunction } from 'express';
+import ConnectPgSimple from 'connect-pg-simple';
 
 // Database pool for session management queries
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -25,8 +26,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     credentials: true,
   }));
   
+  // Configure session store
+  const PgSession = ConnectPgSimple(session);
+  const sessionStore = new PgSession({
+    pool: pool,
+    tableName: 'sessions',
+    createTableIfMissing: false,
+  });
+
   // Configure session middleware
   app.use(session({
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "clinic-finance-secret-key",
     resave: false,
     saveUninitialized: false,
@@ -218,25 +228,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/sessions', requireAuth, async (req: AuthRequest, res) => {
     try {
       const userId = req.session.userId;
+      console.log('Getting sessions for user:', userId);
+      console.log('Current session ID:', req.sessionID);
+      
       const { rows } = await pool.query(`
         SELECT sid,
-               expire,
-               (sess::jsonb -> 'meta') AS meta
+               sess,
+               expire
         FROM "sessions"
         WHERE (sess::jsonb ->> 'userId') = $1
+          AND expire > NOW()
         ORDER BY expire DESC
       `, [String(userId)]);
 
-      const sessions = rows.map((r: any) => ({
-        sid: r.sid,
-        expiresAt: new Date(r.expire).getTime(),
-        ua: r.meta?.ua || '',
-        ip: r.meta?.ip || '',
-        createdAt: r.meta?.createdAt || null,
-        lastSeen: r.meta?.lastSeen || null,
-        current: r.sid === req.sessionID,
-      }));
+      console.log('Found sessions:', rows.length);
+
+      const sessions = rows.map((r: any) => {
+        const sessData = r.sess;
+        const meta = sessData?.meta || {};
+        return {
+          sid: r.sid,
+          expiresAt: new Date(r.expire).getTime(),
+          ua: meta.ua || 'Unknown Browser',
+          ip: meta.ip || 'Unknown',
+          createdAt: meta.createdAt || Date.now(),
+          lastSeen: meta.lastSeen || Date.now(),
+          current: r.sid === req.sessionID,
+        };
+      });
       
+      console.log('Processed sessions:', sessions.length);
       res.json({ sessions });
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
