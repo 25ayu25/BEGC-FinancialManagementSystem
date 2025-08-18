@@ -69,9 +69,11 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
             <span>Settings</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Shield className="mr-2 h-4 w-4" />
-          <span>Security</span>
+        <DropdownMenuItem asChild>
+          <Link href="/security" className="flex items-center w-full cursor-pointer">
+            <Shield className="mr-2 h-4 w-4" />
+            <span>Security</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
