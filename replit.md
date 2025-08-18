@@ -26,21 +26,22 @@ Preferred communication style: Simple, everyday language.
 - **Build Process**: esbuild for fast production builds with ESM module format
 
 ### Data Storage Solutions
-- **Primary Database**: PostgreSQL with Neon serverless adapter for scalable cloud deployment
+- **Primary Database**: Supabase PostgreSQL with real-time subscriptions and automatic scaling
 - **Schema Design**: Normalized relational structure with tables for users, departments, insurance providers, transactions, monthly reports, and receipts
-- **Migrations**: Drizzle Kit for database schema versioning and migrations
-- **Connection Pooling**: Uses connection pooling for efficient database resource management
+- **Migrations**: Supabase migrations with SQL and automatic schema versioning
+- **Connection Pooling**: Built-in connection pooling and edge functions
 
-### Authentication and Authorization
-- **Current Implementation**: Simplified middleware-based authentication (placeholder for production-ready system)
+### Authentication and Authorization  
+- **Production System**: Supabase Auth with JWT tokens and row-level security (RLS)
 - **User Roles**: Admin and staff roles with location-based access (USA, South Sudan)
-- **Session Management**: Cookie-based sessions with credential inclusion for API requests
+- **Session Management**: JWT-based sessions with automatic refresh tokens
+- **Security**: Row-level security policies for multi-tenant data isolation
 
 ### File Upload and Storage
-- **Cloud Storage**: Google Cloud Storage integration with Replit sidecar authentication
-- **Upload System**: Uppy.js file upload library with drag-and-drop interface and progress tracking
-- **Receipt Management**: Direct-to-cloud upload with presigned URLs for secure file handling
-- **ACL System**: Custom object access control with group-based permissions (USER_LIST, EMAIL_DOMAIN, GROUP_MEMBER, SUBSCRIBER)
+- **Cloud Storage**: Supabase Storage with automatic CDN and image optimization
+- **Upload System**: Direct-to-Supabase uploads with progress tracking and resumable uploads
+- **Receipt Management**: Secure bucket storage with access control policies
+- **ACL System**: Supabase RLS policies for fine-grained access control
 
 ### PDF Report Generation
 - **Library**: jsPDF for client-side and server-side PDF generation
@@ -84,6 +85,21 @@ Preferred communication style: Simple, everyday language.
 - **Database Tools**: Drizzle Kit for schema management and migration generation
 
 ### Third-Party Integrations
-- **Authentication**: Replit sidecar token service for Google Cloud authentication
-- **Monitoring**: Built-in request logging with performance metrics
+- **Authentication**: Supabase Auth for secure user management and JWT tokens
+- **Monitoring**: Supabase Analytics and Netlify Analytics for performance metrics  
 - **Error Handling**: Centralized error boundary system with user-friendly error messages
+
+## Deployment Strategy
+
+### Production Architecture
+- **Frontend Hosting**: Netlify with global CDN and automatic deployments from Git
+- **Database & Backend**: Supabase with edge functions for API endpoints
+- **Custom Domain**: finance.bahrelghazalclinic.com with automatic SSL
+- **File Storage**: Supabase Storage for receipts and documents
+- **Scheduled Jobs**: Netlify scheduled functions for automated reports
+
+### Multi-Location Access
+- **South Sudan Staff**: Fast access via Netlify's global CDN
+- **USA Administration**: Real-time monitoring and management access
+- **Offline Support**: Service worker caching for unreliable internet
+- **Data Sync**: Real-time updates via Supabase subscriptions
