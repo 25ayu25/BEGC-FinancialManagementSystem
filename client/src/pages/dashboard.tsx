@@ -1,32 +1,39 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import Header from "@/components/layout/header";
-import KPICards from "@/components/dashboard/kpi-cards";
-import IncomeChart from "@/components/dashboard/income-chart";
-import DepartmentBreakdown from "@/components/dashboard/department-breakdown";
-import RecentTransactions from "@/components/dashboard/recent-transactions";
-import QuickActions from "@/components/dashboard/quick-actions";
-import MonthSelector from "@/components/dashboard/month-selector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Wifi, WifiOff, Clock, Plus, Upload, AlertTriangle } from "lucide-react";
+import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
+import SimpleDailyChart from "@/components/dashboard/simple-daily-chart";
+import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
+import SimpleQuickActions from "@/components/dashboard/simple-quick-actions";
+import SimpleAlerts from "@/components/dashboard/simple-alerts";
+import SimpleRecentTransactions from "@/components/dashboard/simple-recent-transactions";
+import SimpleMonthlyFooter from "@/components/dashboard/simple-monthly-footer";
 
 export default function Dashboard() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | 'month'>('month');
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSync, setLastSync] = useState(new Date());
 
-  const handleMonthChange = (year: number, month: number, range?: string) => {
+  const handleTimeRangeChange = (range: 'today' | '7d' | 'month') => {
+    setTimeRange(range);
+  };
+
+  const handleMonthChange = (year: number, month: number) => {
     setSelectedYear(year);
     setSelectedMonth(month);
-    // Handle range-based filtering here if needed in the future
-    console.log('Filter changed:', { year, month, range });
   };
 
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ["/api/dashboard", selectedYear, selectedMonth],
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange],
     queryFn: async () => {
-      const res = await fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`, {
+      const res = await fetch(`/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch dashboard data');
@@ -45,10 +52,10 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="flex-1 flex flex-col h-full">
-        <Header 
-          title="Financial Dashboard" 
-          subtitle={`Track daily income and expenses - ${new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
-        />
+        <div className="bg-white border-b border-slate-200 px-6 py-4">
+          <h1 className="text-2xl font-bold text-slate-900">Simple Dashboard</h1>
+          <p className="text-slate-600">Daily operations at a glance</p>
+        </div>
         <main className="flex-1 overflow-y-auto p-6">
           <Card>
             <CardContent className="pt-6">
@@ -65,32 +72,36 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col h-full">
-        <Header 
-          title="Financial Dashboard" 
-          subtitle={`Track daily income and expenses - ${new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
-        />
+      <div className="flex-1 flex flex-col h-full bg-slate-50">
+        {/* Simple Header with Skeleton */}
+        <div className="bg-white border-b border-slate-200 px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-10 w-24" />
+            </div>
+          </div>
+        </div>
+        
+        {/* Loading Content */}
         <main className="flex-1 overflow-y-auto p-6 space-y-8">
-          <MonthSelector onMonthChange={handleMonthChange} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <Card key={i}>
-                <CardContent className="pt-6">
-                  <Skeleton className="h-24 w-full" />
-                </CardContent>
+              <Card key={i} className="p-6">
+                <Skeleton className="h-20 w-full" />
               </Card>
             ))}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardContent className="pt-6">
-                <Skeleton className="h-64 w-full" />
-              </CardContent>
+            <Card className="p-6">
+              <Skeleton className="h-64 w-full" />
             </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <Skeleton className="h-64 w-full" />
-              </CardContent>
+            <Card className="p-6">
+              <Skeleton className="h-64 w-full" />
             </Card>
           </div>
         </main>
@@ -99,157 +110,99 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      <Header 
-        title="Financial Dashboard" 
-        subtitle={`Track daily income and expenses - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`}
-        actions={
+    <div className="flex-1 flex flex-col h-full bg-slate-50">
+      {/* Simplified Header with Time Range Controls */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Simple Dashboard</h1>
+            <p className="text-slate-600">Daily operations at a glance</p>
+          </div>
+          
           <div className="flex items-center space-x-4">
-            <MonthSelector onMonthChange={handleMonthChange} />
+            {/* Time Range Segmented Control */}
+            <div className="flex bg-slate-100 rounded-lg p-1">
+              {['today', '7d', 'month'].map((range) => (
+                <button
+                  key={range}
+                  onClick={() => handleTimeRangeChange(range as any)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                    timeRange === range
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {range === 'today' ? 'Today' : range === '7d' ? '7D' : 'Month'}
+                </button>
+              ))}
+            </div>
+
+            {/* Month Dropdown */}
+            <select 
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+              value={`${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`}
+              onChange={(e) => {
+                const [year, month] = e.target.value.split('-');
+                handleMonthChange(parseInt(year), parseInt(month));
+              }}
+            >
+              {Array.from({ length: 12 }, (_, i) => {
+                const month = i + 1;
+                const value = `${selectedYear}-${month.toString().padStart(2, '0')}`;
+                const label = new Date(selectedYear, i).toLocaleDateString('en-US', { 
+                  month: 'long', 
+                  year: 'numeric' 
+                });
+                return (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+
+            {/* Generate PDF Button */}
             <Button variant="outline" size="sm" data-testid="button-generate-pdf">
               Generate PDF
             </Button>
+
+            {/* Online Status Pill */}
+            <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-2">
+              {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              {isOnline ? 'Online' : 'Offline'}
+              {isOnline && (
+                <span className="text-xs opacity-70">
+                  • {lastSync.toLocaleTimeString()}
+                </span>
+              )}
+            </Badge>
           </div>
-        }
-      />
-      
-      <main className="flex-1 overflow-y-auto p-6 space-y-8">
-        <KPICards data={dashboardData || {}} />
-        
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
+        {/* KPI Band */}
+        <SimpleDashboardKPIs data={dashboardData || {}} />
+
+        {/* Visuals Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <IncomeChart />
-          <DepartmentBreakdown 
+          <SimpleDailyChart timeRange={timeRange} />
+          <SimpleTopDepartments 
             data={dashboardData?.departmentBreakdown || {}} 
             departments={departments || []}
           />
         </div>
-        
+
+        {/* Operations Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <RecentTransactions transactions={dashboardData?.recentTransactions || []} />
-          </div>
-          <QuickActions 
-            insuranceData={dashboardData?.insuranceBreakdown || {}}
-            insuranceProviders={insuranceProviders || []}
-          />
+          <SimpleQuickActions />
+          <SimpleAlerts />
+          <SimpleRecentTransactions transactions={dashboardData?.recentTransactions || []} />
         </div>
 
-        <Card className="border border-slate-200 shadow-sm">
-          <CardHeader className="bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-slate-100">
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })} Financial Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Department Income Breakdown */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                  Income Breakdown
-                </h4>
-                <div className="space-y-3 text-sm">
-                  {(departments || []).map((dept: any) => (
-                    <div key={dept.id} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-b-0">
-                      <span className="text-slate-600 font-medium">{dept.name}</span>
-                      <span className="font-semibold text-slate-900">
-                        SSP {Math.round(parseFloat((dashboardData as any)?.departmentBreakdown?.[dept.id] || '0')).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between items-center pt-3 border-t-2 border-teal-100 font-semibold">
-                    <span className="text-slate-900">Total Income</span>
-                    <span className="text-teal-600 text-base">
-                      SSP {Math.round(parseFloat((dashboardData as any)?.totalIncome || '0')).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Insurance Income */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  Insurance Income
-                </h4>
-                <div className="space-y-3 text-sm">
-                  {(insuranceProviders || []).map((provider: any) => {
-                    const amount = parseFloat((dashboardData as any)?.insuranceBreakdown?.[provider.id] || '0');
-                    return (
-                      <div key={provider.id} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-b-0">
-                        <span className="text-slate-600 font-medium">{provider.name}</span>
-                        <span className="font-semibold text-slate-900">
-                          USD {amount.toLocaleString()}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  <div className="flex justify-between items-center pt-3 border-t-2 border-blue-100 font-semibold">
-                    <span className="text-slate-900">Total Insurance</span>
-                    <span className="text-blue-600 text-base">
-                      USD {Object.values((dashboardData as any)?.insuranceBreakdown || {})
-                        .reduce((sum: number, val: any) => sum + parseFloat(val || '0'), 0)
-                        .toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Net Position with Visual Indicators */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  Net Position
-                </h4>
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-5 border border-slate-200">
-                  <div className="space-y-4 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 font-medium">Total Income</span>
-                      <span className="font-semibold text-emerald-600">
-                        SSP {Math.round(parseFloat((dashboardData as any)?.totalIncome || '0')).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 font-medium">Total Expenses</span>
-                      <span className="font-semibold text-red-500">
-                        SSP {Math.round(parseFloat((dashboardData as any)?.totalExpenses || '0')).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="border-t border-slate-300 pt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="font-semibold text-slate-900">Net Income</span>
-                        <span className={`font-bold text-lg ${parseFloat((dashboardData as any)?.netIncome || '0') >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          SSP {Math.round(parseFloat((dashboardData as any)?.netIncome || '0')).toLocaleString()}
-                        </span>
-                      </div>
-                      
-                      {/* Profit Margin Visual */}
-                      <div className="space-y-2">
-                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
-                          <div 
-                            className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-4 rounded-full transition-all duration-500 ease-out" 
-                            style={{ 
-                              width: `${Math.max(0, Math.min(100, (parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100))}%` 
-                            }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <p className="text-xs text-slate-600 font-medium">
-                            Profit Margin: {((parseFloat((dashboardData as any)?.netIncome || '0') / parseFloat((dashboardData as any)?.totalIncome || '1')) * 100).toFixed(1)}%
-                          </p>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                            <span className="text-xs text-slate-600">Healthy</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Footer Strip */}
+        <SimpleMonthlyFooter data={dashboardData || {}} />
       </main>
     </div>
   );
