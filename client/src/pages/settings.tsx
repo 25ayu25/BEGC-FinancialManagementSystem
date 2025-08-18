@@ -94,14 +94,14 @@ export default function Settings() {
 
   // Update form when user data loads
   useEffect(() => {
-    if (user) {
+    if (profile) {
       profileForm.reset({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        email: user.email || "",
+        firstName: profile.first_name || "",
+        lastName: profile.last_name || "",
+        email: profile.email || "",
       });
     }
-  }, [user, profileForm]);
+  }, [profile, profileForm]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: z.infer<typeof profileSchema>) => {
@@ -150,7 +150,7 @@ export default function Settings() {
   // User management queries and mutations (admin only)
   const { data: users = [] } = useQuery<any[]>({
     queryKey: ['/api/users'],
-    enabled: user?.role === 'admin',
+    enabled: profile?.role === 'admin',
   });
 
   const createUserMutation = useMutation({
@@ -198,8 +198,9 @@ export default function Settings() {
 
   const handleLogout = async () => {
     try {
-      await logout();
-      setLocation('/login');
+      const { supabase } = await import('@/lib/supabase');
+      await supabase.auth.signOut();
+      setLocation('/');
     } catch (error) {
       toast({
         title: "Logout Failed",
@@ -217,7 +218,7 @@ export default function Settings() {
     updatePasswordMutation.mutate(data);
   };
 
-  if (!user) {
+  if (!profile) {
     return <div>Loading...</div>;
   }
 
@@ -298,7 +299,7 @@ export default function Settings() {
                 
                 <div>
                   <Label>Role</Label>
-                  <Select value={user.role} disabled>
+                  <Select value={profile.role} disabled>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -467,7 +468,7 @@ export default function Settings() {
               <div className="space-y-0.5">
                 <Label>Location</Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Your current location: {user.location === 'usa' ? 'United States' : 'South Sudan'}
+                  Your current location: {profile.location === 'usa' ? 'United States' : 'South Sudan'}
                 </p>
               </div>
             </div>
@@ -504,7 +505,7 @@ export default function Settings() {
         </Card>
 
         {/* User Management (Admin Only) */}
-        {user.role === 'admin' && (
+        {profile.role === 'admin' && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -718,7 +719,7 @@ export default function Settings() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          {userData.id !== user.id && (
+                          {userData.id !== profile.id && (
                             <Button
                               size="sm"
                               variant="outline"
