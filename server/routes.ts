@@ -7,25 +7,32 @@ import { z } from "zod";
 import { requireAuth, type AuthRequest } from "./auth";
 import bcrypt from "bcryptjs";
 import session from "express-session";
+import cors from "cors";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Trust proxy for proper cookie handling
   app.set('trust proxy', 1);
   
+  // Configure CORS for cross-origin requests
+  app.use(cors({
+    origin: true, // Allow all origins in development
+    credentials: true,
+  }));
+  
   // Configure session middleware
   app.use(session({
     secret: process.env.SESSION_SECRET || "clinic-finance-secret-key",
     resave: false,
     saveUninitialized: false,
-    name: 'clinic.sid',
-    proxy: true,
+    name: 'bgc.sid',
+    rolling: true,
     cookie: {
-      secure: false, // Set to true in production with HTTPS
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax',
-      domain: undefined // Let Express auto-detect the domain
+      sameSite: 'none', // Required for cross-origin
+      secure: false, // Set to true in production with HTTPS
+      maxAge: 1000 * 60 * 60 * 8, // 8 hours
+      path: '/',
     }
   }));
 
@@ -48,28 +55,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Store user ID in session
-      req.session.userId = user.id;
-      await new Promise<void>((resolve) => {
-        req.session.save((err) => {
-          if (err) console.error('Session save error:', err);
-          resolve();
-        });
-      });
-      console.log('Login - Setting session userId:', user.id);
-      console.log('Login - Session ID:', req.sessionID);
-      
-      res.json({ 
-        message: 'Login successful',
-        user: {
-          id: user.id,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          role: user.role,
-          location: user.location
+      // Regenerate session for security and proper cookie setting
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error('Session regenerate error:', err);
+          return res.status(500).json({ message: 'Session error' });
         }
+        
+        req.session.userId = user.id;
+        req.session.role = user.role;
+        
+        req.session.save((err2) => {
+          if (err2) {
+            console.error('Session save error:', err2);
+            return res.status(500).json({ message: 'Session save error' });
+          }
+          
+          console.log('Login - Session regenerated and saved');
+          console.log('Login - Setting session userId:', user.id);
+          console.log('Login - Session ID:', req.sessionID);
+          
+          res.json({ 
+            message: 'Login successful',
+            user: {
+              id: user.id,
+              username: user.username,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              role: user.role,
+              location: user.location,
+            },
+          });
+        });
       });
     } catch (error) {
       console.error('Login error:', error);
