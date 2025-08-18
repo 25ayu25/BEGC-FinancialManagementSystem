@@ -324,7 +324,12 @@ export class DatabaseStorage implements IStorage {
 
     const incomeData = await db.select({
       date: sql<string>`DATE(${transactions.date})`,
-      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`
+      income: sql<number>`COALESCE(SUM(
+        CASE 
+          WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} * 1320
+          ELSE ${transactions.amount}
+        END
+      ), 0)`
     }).from(transactions)
     .where(
       and(
