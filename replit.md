@@ -44,9 +44,10 @@ Preferred communication style: Simple, everyday language.
 - **ACL System**: Supabase RLS policies for fine-grained access control
 
 ### PDF Report Generation
-- **Library**: jsPDF for client-side and server-side PDF generation
-- **Professional Formatting**: Medical clinic-themed reports with teal branding
-- **Features**: Tabulated summaries, department performance rankings, percentage breakdowns
+- **Library**: jsPDF for client-side PDF generation
+- **Professional Formatting**: Medical clinic-themed reports with teal branding  
+- **Executive Dashboard Export**: Real-time PDF generation with current financial metrics
+- **Features**: Revenue/expense summaries, net income calculations, department performance data
 - **Layout**: Professional header, structured financial tables, confidentiality footer
 - **Currency Formatting**: Proper comma-separated values and professional presentation
 
