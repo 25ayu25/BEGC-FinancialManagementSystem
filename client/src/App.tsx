@@ -53,10 +53,10 @@ function Router() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Switch>
-          <Route path="/" component={SimpleDashboard} />
+          <Route path="/" component={AdvancedDashboard} />
           <Route path="/advanced" component={AdvancedDashboard} />
-          <Route path="/simple" component={Dashboard} />
-          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/simple" component={SimpleDashboard} />
+          <Route path="/dashboard" component={AdvancedDashboard} />
           <Route path="/transactions" component={TransactionsSupabase} />
           <Route path="/add-transaction" component={TransactionsSupabase} />
           <Route path="/reports" component={Reports} />

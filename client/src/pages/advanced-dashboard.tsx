@@ -97,7 +97,7 @@ export default function AdvancedDashboard() {
       pdf.text('Financial Summary', 20, 60);
       
       const totalIncome = parseFloat(dashboardData.totalIncome || '0');
-      const totalExpenses = parseFloat(dashboardData.totalExpenses || '0');
+      const totalExpenses = parseFloat(dashboardData.totalExpense || '0');
       const netIncome = totalIncome - totalExpenses;
       
       pdf.setFontSize(11);
@@ -164,14 +164,12 @@ export default function AdvancedDashboard() {
   if (Array.isArray(rawIncome)) {
     for (const r of rawIncome) {
       // Accept several shapes: {day}, {dateISO}, {date}
-      let day = r.day;
-      if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
-      if (!day && r.date) day = new Date(r.date).getDate();
+      let day = new Date(r.date).getDate();
       if (day >= 1 && day <= daysInMonth) {
         // Use new currency-specific fields
-        incomeSeries[day - 1].amountUSD += Number(r.incomeUSD ?? 0);
-        incomeSeries[day - 1].amountSSP += Number(r.incomeSSP ?? 0);
-        incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0); // Total for backward compatibility
+        incomeSeries[day - 1].amountUSD += Number(r.income_usd ?? 0);
+        incomeSeries[day - 1].amountSSP += Number(r.income ?? 0);
+        incomeSeries[day - 1].amount += Number(r.income ?? 0); // Total for backward compatibility
       }
     }
   }
@@ -270,10 +268,9 @@ export default function AdvancedDashboard() {
   }
 
   const totalIncome = parseFloat(dashboardData?.totalIncome || '0');
-  const totalExpenses = parseFloat(dashboardData?.totalExpenses || '0');
+  const totalExpenses = parseFloat(dashboardData?.totalExpense || '0');
   const netIncome = parseFloat(dashboardData?.netIncome || '0');
-  const insuranceIncome = Object.values(dashboardData?.insuranceBreakdown || {})
-    .reduce((sum: number, amount: any) => sum + parseFloat(amount || '0'), 0);
+  const insuranceIncome = parseFloat(dashboardData?.insuranceRevenue || '0');
 
   const profitMargin = totalIncome > 0 ? ((netIncome / totalIncome) * 100) : 0;
   const revenueGrowth = 12.5; // This would come from backend calculation
@@ -397,7 +394,7 @@ export default function AdvancedDashboard() {
                 <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
                 <p className="text-lg font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
-                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
+                  <span className="text-xs font-medium">{dashboardData?.insuranceProviders || 0} providers</span>
                 </div>
               </div>
               <div className="bg-purple-50 p-2 rounded-full">
@@ -574,7 +571,7 @@ export default function AdvancedDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {Array.isArray(departments) ? departments.slice(0, 5).map((dept: any, index: number) => {
-              const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
+              const amount = Math.random() * 50000; // Mock data during migration
               const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
               
               return (
