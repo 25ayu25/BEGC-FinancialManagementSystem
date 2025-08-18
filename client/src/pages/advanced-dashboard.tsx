@@ -18,6 +18,7 @@ import {
   Filter,
   RefreshCw
 } from "lucide-react";
+
 // Removed MonthSelector import - will create inline selector
 
 export default function AdvancedDashboard() {
@@ -212,60 +213,35 @@ export default function AdvancedDashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              {incomeData && incomeData.length > 0 ? (
+              {incomeData && Array.isArray(incomeData) && incomeData.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Revenue Trend Visualization */}
-                  <div className="grid grid-cols-7 gap-2 h-48">
-                    {(() => {
-                      // Show only days with transactions, plus some context days around them
-                      const daysWithIncome = incomeData.filter((item: any) => item.income > 0);
-                      
-                      if (daysWithIncome.length === 0) {
-                        // No transactions - show last 7 days
-                        return incomeData.slice(-7);
-                      } else if (daysWithIncome.length <= 7) {
-                        // Few transactions - show them with some context
-                        const firstIncomeIndex = incomeData.findIndex((item: any) => item.income > 0);
-                        const lastIncomeIndex = incomeData.map((item: any) => item.income > 0).lastIndexOf(true);
+                  {/* Modern Revenue Chart - Show only days with transactions */}
+                  <div className="h-48 flex items-end justify-start gap-4 px-4 pb-4 bg-gradient-to-t from-slate-50 to-white rounded-lg border border-slate-100">
+                    {incomeData
+                      .filter((item: any) => item.income > 0)
+                      .map((item: any, index: number) => {
+                        const maxIncome = Math.max(...incomeData.filter((d: any) => d.income > 0).map((d: any) => d.income));
+                        const height = maxIncome > 0 ? (item.income / maxIncome) * 140 : 20;
                         
-                        const startIndex = Math.max(0, firstIncomeIndex - 1);
-                        const endIndex = Math.min(incomeData.length - 1, lastIncomeIndex + 1);
-                        const contextDays = incomeData.slice(startIndex, endIndex + 1);
-                        
-                        return contextDays.length <= 7 ? contextDays : incomeData.slice(-7);
-                      } else {
-                        // Many transactions - show last 7 days for readability
-                        return incomeData.slice(-7);
-                      }
-                    })().map((item: any, index: number) => {
-                      const maxIncome = Math.max(...incomeData.map((d: any) => d.income));
-                      const height = maxIncome > 0 ? (item.income / maxIncome) * 100 : 0;
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center justify-end h-full">
-                          {item.income > 0 ? (
+                        return (
+                          <div key={index} className="flex flex-col items-center group">
                             <div 
-                              className="w-full bg-gradient-to-t from-teal-500 to-teal-400 rounded-t-lg transition-all duration-300 hover:from-teal-600 hover:to-teal-500"
-                              style={{ height: `${Math.max(height, 8)}%` }}
+                              className="w-16 bg-gradient-to-t from-teal-600 to-teal-400 rounded-t-lg shadow-sm group-hover:from-teal-700 group-hover:to-teal-500 transition-all duration-200 cursor-pointer"
+                              style={{ height: `${Math.max(height, 20)}px` }}
                               title={`${item.date}: SSP ${item.income.toLocaleString()}`}
                             />
-                          ) : (
-                            <div 
-                              className="w-full bg-slate-200 rounded-lg h-2"
-                              title={`${item.date}: SSP ${item.income.toLocaleString()}`}
-                            />
-                          )}
-                          <span className="text-xs text-slate-600 mt-2 text-center">{item.date}</span>
-                        </div>
-                      );
-                    })}
+                            <span className="text-xs text-slate-600 mt-2 font-medium">{item.date}</span>
+                            <span className="text-xs text-teal-600 font-bold">SSP {(item.income / 1000).toFixed(0)}k</span>
+                          </div>
+                        );
+                      })}
                   </div>
                   
                   {/* Summary Stats */}
                   <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                     <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Weekly Avg</p>
-                      <p className="text-xs text-slate-600">SSP {Math.round(incomeData.slice(-7).reduce((sum: number, item: any) => sum + item.income, 0) / 7).toLocaleString()}</p>
+                      <p className="text-sm font-medium text-slate-900">Monthly Avg</p>
+                      <p className="text-xs text-slate-600">SSP {Math.round(incomeData.reduce((sum: number, item: any) => sum + item.income, 0) / Math.max(incomeData.filter((item: any) => item.income > 0).length, 1)).toLocaleString()}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-slate-900">Peak Day</p>
