@@ -92,19 +92,42 @@ export default function AdvancedDashboard() {
       const data = payload[0].payload;
       return (
         <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
-          <p className="font-medium text-slate-900">{data.fullDate}</p>
-          <p className="text-teal-600 font-semibold">SSP {data.amount.toLocaleString()}</p>
+          <p className="font-medium text-slate-900">{data.fullDate} — SSP {data.amount.toLocaleString()}</p>
         </div>
       );
     }
     return null;
   };
 
-  // Format Y-axis values
+  // Handle bar click to show day's transactions
+  const handleBarClick = (data: any) => {
+    if (data && data.amount > 0) {
+      console.log(`Opening transactions for ${data.fullDate} (Day ${data.day}) - Amount: SSP ${data.amount.toLocaleString()}`);
+      // TODO: Implement side panel with filtered transactions for that day
+    }
+  };
+
+  // Format Y-axis values with nice rounded ticks
   const formatYAxis = (value: number) => {
     if (value === 0) return 'SSP 0';
-    if (value >= 1000) return `SSP ${(value / 1000).toFixed(0)}k`;
-    return `SSP ${value}`;
+    if (value >= 1000) return `SSP ${Math.round(value / 1000)}k`;
+    return `SSP ${Math.round(value)}`;
+  };
+
+  // Generate nice Y-axis ticks
+  const generateYTicks = () => {
+    if (peak === 0) return [0];
+    const maxVal = peak * 1.1; // Add 10% padding
+    const tickCount = 5;
+    const roughStep = maxVal / tickCount;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const normalizedStep = Math.ceil(roughStep / magnitude) * magnitude;
+    
+    const ticks = [];
+    for (let i = 0; i <= Math.ceil(maxVal / normalizedStep); i++) {
+      ticks.push(i * normalizedStep);
+    }
+    return ticks;
   };
 
   // Custom X-axis tick formatter - show only weekly labels
@@ -297,14 +320,15 @@ export default function AdvancedDashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={incomeSeries} 
-                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        margin={{ top: 20, right: 80, left: 20, bottom: 25 }}
                         barCategoryGap="2%"
                       >
                         <CartesianGrid 
-                          strokeDasharray="1 1" 
-                          stroke="#e2e8f0" 
-                          strokeWidth={1}
-                          opacity={0.6}
+                          strokeDasharray="2 2" 
+                          stroke="#f1f5f9" 
+                          strokeWidth={0.5}
+                          opacity={0.8}
+                          vertical={false}
                         />
                         <XAxis 
                           dataKey="day"
@@ -315,27 +339,30 @@ export default function AdvancedDashboard() {
                           domain={[1, daysInMonth]}
                           type="number"
                           scale="linear"
+                          ticks={[1, 8, 15, 22, daysInMonth]}
                         />
                         <YAxis 
                           axisLine={false}
                           tickLine={false}
                           tick={{ fontSize: 11, fill: '#64748b' }}
                           tickFormatter={formatYAxis}
-                          domain={[0, 'dataMax']}
+                          domain={[0, peak > 0 ? peak * 1.1 : 1000]}
+                          ticks={generateYTicks()}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         
                         {/* Monthly Average Reference Line */}
-                        {monthlyAvg > 0 && (
+                        {monthTotal > 0 && monthlyAvg > 0 && (
                           <ReferenceLine 
                             y={monthlyAvg} 
-                            stroke="#14b8a6" 
-                            strokeWidth={1}
-                            strokeDasharray="4 4"
+                            stroke="#0d9488" 
+                            strokeWidth={0.8}
+                            strokeDasharray="3 3"
                             label={{ 
-                              value: "Avg", 
-                              position: "topRight", 
-                              style: { fontSize: 10, fill: '#14b8a6' } 
+                              value: `Avg SSP ${monthlyAvg.toLocaleString()}`, 
+                              position: "insideTopRight", 
+                              style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
+                              offset: 10
                             }}
                           />
                         )}
@@ -343,13 +370,10 @@ export default function AdvancedDashboard() {
                         <Bar 
                           dataKey="amount" 
                           fill="#14b8a6"
-                          radius={[2, 2, 0, 0]}
+                          radius={[3, 3, 0, 0]}
                           stroke="none"
                           style={{ cursor: 'pointer' }}
-                          onClick={(data: any) => {
-                            // TODO: Open filtered transactions for that day in side panel
-                            console.log(`Clicked day ${data.day} with amount ${data.amount}`);
-                          }}
+                          onClick={handleBarClick}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -372,10 +396,13 @@ export default function AdvancedDashboard() {
                   </div>
                 </div>
               ) : (
-                <div className="h-64 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100">
+                <div className="h-64 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
                   <div className="text-center">
-                    <TrendingUp className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-slate-600 text-sm">No income recorded in {monthName}</p>
+                    <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <TrendingUp className="h-7 w-7 text-slate-400" />
+                    </div>
+                    <p className="text-slate-600 text-sm font-medium">No income recorded in {monthName}</p>
+                    <p className="text-slate-500 text-xs mt-1">Add transactions to see analytics</p>
                   </div>
                 </div>
               )}
