@@ -129,6 +129,9 @@ export const supabaseInsurance = {
 export const supabaseDashboard = {
   async getMonthlyData(year: number, month: number) {
     // Get transactions for the month
+    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`
+    const endDate = month === 12 ? `${year + 1}-01-01` : `${year}-${(month + 1).toString().padStart(2, '0')}-01`
+    
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select(`
@@ -136,8 +139,8 @@ export const supabaseDashboard = {
         departments (name),
         insurance_providers (name)
       `)
-      .gte('created_at', `${year}-${month.toString().padStart(2, '0')}-01`)
-      .lt('created_at', `${year}-${(month + 1).toString().padStart(2, '0')}-01`)
+      .gte('created_at', startDate)
+      .lt('created_at', endDate)
     
     if (error) throw new Error(error.message)
 
@@ -150,10 +153,24 @@ export const supabaseDashboard = {
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + parseFloat(t.amount_ssp || '0'), 0)
 
+    // Calculate insurance revenue (USD)
+    const insuranceRevenue = transactions
+      .filter(t => t.type === 'income' && t.insurance_provider_id)
+      .reduce((sum, t) => sum + parseFloat(t.amount_usd || '0'), 0)
+
+    // Count unique insurance providers
+    const insuranceProviders = new Set(
+      transactions
+        .filter(t => t.insurance_provider_id)
+        .map(t => t.insurance_provider_id)
+    ).size
+
     return {
       totalIncome: totalIncome.toFixed(2),
       totalExpense: totalExpense.toFixed(2),
       netIncome: (totalIncome - totalExpense).toFixed(2),
+      insuranceRevenue: insuranceRevenue.toFixed(2),
+      insuranceProviders: insuranceProviders,
       transactionCount: transactions.length,
       transactions
     }

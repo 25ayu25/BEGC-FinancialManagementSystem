@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import AdvancedDashboard from "@/pages/advanced-dashboard";
 import Transactions from "@/pages/transactions";
+import TransactionsSupabase from "@/pages/transactions-supabase";
 import Reports from "@/pages/reports";
 import Receipts from "@/pages/receipts";
 import Settings from "@/pages/settings";
@@ -19,6 +20,13 @@ function Router() {
   const { isAuthenticated, isLoading, user, profile } = useSupabaseAuth();
 
   console.log('Supabase Auth state:', { isAuthenticated, isLoading, user: !!user, profile: !!profile });
+
+  // Seed data if authenticated and not loading
+  if (isAuthenticated && !isLoading && user) {
+    import('@/lib/seedData').then(({ seedSupabaseData }) => {
+      seedSupabaseData();
+    });
+  }
 
   if (isLoading) {
     return (
@@ -49,7 +57,8 @@ function Router() {
           <Route path="/advanced" component={AdvancedDashboard} />
           <Route path="/simple" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/transactions" component={Transactions} />
+          <Route path="/transactions" component={TransactionsSupabase} />
+          <Route path="/add-transaction" component={TransactionsSupabase} />
           <Route path="/reports" component={Reports} />
           <Route path="/receipts" component={Receipts} />
           <Route path="/settings" component={Settings} />

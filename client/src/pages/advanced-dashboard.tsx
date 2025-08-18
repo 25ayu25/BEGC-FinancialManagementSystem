@@ -20,6 +20,7 @@ import {
   Filter,
   RefreshCw
 } from "lucide-react";
+import { RefreshButton } from "@/components/RefreshButton";
 import { 
   ResponsiveContainer, 
   BarChart, 

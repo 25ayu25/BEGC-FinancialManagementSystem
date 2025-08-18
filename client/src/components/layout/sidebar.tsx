@@ -70,8 +70,8 @@ export default function Sidebar() {
       {/* User Profile & Status */}
       <div className="p-4 border-t border-gray-200">
         <UserProfileMenu 
-          userName={profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.username : "Loading..."}
-          userRole={profile ? `${profile.location?.toUpperCase() || ''} ${profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}` : "Loading..."}
+          userName={profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.username || "Admin User" : "Loading..."}
+          userRole={profile ? `${profile.location?.toUpperCase() || ''} ${(profile.role || 'admin').charAt(0).toUpperCase() + (profile.role || 'admin').slice(1)}` : "Loading..."}
         />
         
         {/* Sync Status */}
