@@ -29,7 +29,7 @@ export default function Sidebar() {
   return (
     <div className="w-64 bg-white shadow-xl flex flex-col border-r border-gray-100" data-testid="sidebar-navigation">
       {/* Logo and Clinic Info */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 mx-4 mt-4 shadow-sm">
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mx-4 mt-4 shadow-sm">
         <div className="flex items-center space-x-3">
           <div className="bg-teal-50 text-teal-600 border border-teal-100 rounded-lg p-2 flex items-center justify-center">
             <Building2 className="w-5 h-5" />
