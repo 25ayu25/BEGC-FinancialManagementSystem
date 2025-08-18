@@ -104,11 +104,7 @@ export default function Settings() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: z.infer<typeof profileSchema>) => {
-      return apiRequest('/api/user/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      return apiRequest('PUT', '/api/user/profile', data);
     },
     onSuccess: (data) => {
       toast({
@@ -128,13 +124,9 @@ export default function Settings() {
 
   const updatePasswordMutation = useMutation({
     mutationFn: async (data: z.infer<typeof passwordSchema>) => {
-      return apiRequest('/api/user/password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword: data.currentPassword,
-          newPassword: data.newPassword
-        })
+      return apiRequest('PUT', '/api/user/password', {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword
       });
     },
     onSuccess: () => {
@@ -163,11 +155,7 @@ export default function Settings() {
   const createUserMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createUserSchema>) => {
       const { confirmPassword, ...userData } = data;
-      return apiRequest('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
+      return apiRequest('POST', '/api/users', userData);
     },
     onSuccess: () => {
       toast({
@@ -189,9 +177,7 @@ export default function Settings() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return apiRequest(`/api/users/${userId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/users/${userId}`);
     },
     onSuccess: () => {
       toast({
