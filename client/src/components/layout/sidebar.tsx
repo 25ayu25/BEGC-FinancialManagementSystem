@@ -29,16 +29,17 @@ export default function Sidebar() {
   return (
     <div className="w-64 bg-white shadow-xl flex flex-col border-r border-gray-100" data-testid="sidebar-navigation">
       {/* Logo and Clinic Info */}
-      <div className="p-6 border-b border-teal-100 bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-600">
+      <div className="bg-[#0F3D63] rounded-xl p-4 mx-4 mt-4">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-            <Building2 className="text-white text-xl" />
+          <div className="bg-white/10 text-white/90 ring-1 ring-white/15 rounded-xl p-2 flex items-center justify-center">
+            <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-medium text-gray-100 text-base">Bahr El Ghazal Clinic</h1>
-            <p className="text-sm text-teal-100">Financial Management System</p>
+            <h1 className="text-white/95 font-semibold text-lg leading-6">Bahr El Ghazal Clinic</h1>
+            <p className="text-white/75 font-normal text-sm leading-5">Financial Management System</p>
           </div>
         </div>
+        <div className="border-b border-white/10 mt-3"></div>
       </div>
 
       {/* Navigation Menu */}
