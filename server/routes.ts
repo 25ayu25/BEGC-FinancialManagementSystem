@@ -15,10 +15,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     secret: process.env.SESSION_SECRET || "clinic-finance-secret-key",
     resave: false,
     saveUninitialized: false,
+    name: 'sessionId',
     cookie: {
       secure: false, // Set to true in production with HTTPS
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'lax'
     }
   }));
 
@@ -43,6 +45,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Store user ID in session
       req.session.userId = user.id;
+      await new Promise<void>((resolve) => {
+        req.session.save((err) => {
+          if (err) console.error('Session save error:', err);
+          resolve();
+        });
+      });
       console.log('Login - Setting session userId:', user.id);
       console.log('Login - Session ID:', req.sessionID);
       

@@ -19,8 +19,10 @@ export default function Login() {
     try {
       const result = await login({ username, password });
       console.log('Login successful:', result);
-      // Force page reload to ensure cookies are properly set
-      window.location.href = "/";
+      // Wait a bit for session to be saved, then reload
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 200);
     } catch (error) {
       console.error('Login error:', error);
       // Error is handled by the useAuth hook
