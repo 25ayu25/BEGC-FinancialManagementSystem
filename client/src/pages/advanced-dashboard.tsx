@@ -29,15 +29,47 @@ export default function AdvancedDashboard() {
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['/api/dashboard', selectedYear, selectedMonth],
+    queryFn: () =>
+      fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   });
 
   const { data: departments } = useQuery({
     queryKey: ['/api/departments'],
   });
 
-  const { data: incomeData } = useQuery({
+  const { data: rawIncome } = useQuery({
     queryKey: ['/api/income-trends', selectedYear, selectedMonth],
+    queryFn: () =>
+      fetch(`/api/income-trends/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   });
+
+  // Build a zero-filled daily series for the selected month
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  
+  const incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
+    day: i + 1,
+    amount: 0,
+  }));
+
+  if (Array.isArray(rawIncome)) {
+    for (const r of rawIncome) {
+      // Accept several shapes: {day}, {dateISO}, {date}
+      let day = r.day;
+      if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
+      if (!day && r.date) day = new Date(r.date).getDate();
+      if (day >= 1 && day <= daysInMonth) {
+        incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0);
+      }
+    }
+  }
+  
+  const maxAmount = Math.max(0, ...incomeSeries.map(d => d.amount));
+  
+  // Compute summary stats from the same series
+  const monthTotal = incomeSeries.reduce((s, d) => s + d.amount, 0);
+  const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length || 1;
+  const monthlyAvg = Math.round(monthTotal / nonzeroDays);
+  const peak = Math.max(...incomeSeries.map(d => d.amount), 0);
 
   if (isLoading) {
     return (
@@ -213,57 +245,45 @@ export default function AdvancedDashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              {incomeData && Array.isArray(incomeData) && incomeData.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Modern Revenue Chart - Show only days with transactions */}
-                  <div className="h-48 flex items-end justify-start gap-4 px-4 pb-4 bg-gradient-to-t from-slate-50 to-white rounded-lg border border-slate-100">
-                    {incomeData
-                      .filter((item: any) => item.income > 0)
-                      .map((item: any, index: number) => {
-                        const maxIncome = Math.max(...incomeData.filter((d: any) => d.income > 0).map((d: any) => d.income));
-                        const height = maxIncome > 0 ? (item.income / maxIncome) * 140 : 20;
-                        
-                        return (
-                          <div key={index} className="flex flex-col items-center group">
-                            <div 
-                              className="w-16 bg-gradient-to-t from-teal-600 to-teal-400 rounded-t-lg shadow-sm group-hover:from-teal-700 group-hover:to-teal-500 transition-all duration-200 cursor-pointer"
-                              style={{ height: `${Math.max(height, 20)}px` }}
-                              title={`${item.date}: SSP ${item.income.toLocaleString()}`}
-                            />
-                            <span className="text-xs text-slate-600 mt-2 font-medium">{item.date}</span>
-                            <span className="text-xs text-teal-600 font-bold">SSP {(item.income / 1000).toFixed(0)}k</span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                  
-                  {/* Summary Stats */}
-                  <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Monthly Avg</p>
-                      <p className="text-xs text-slate-600">SSP {Math.round(incomeData.reduce((sum: number, item: any) => sum + item.income, 0) / Math.max(incomeData.filter((item: any) => item.income > 0).length, 1)).toLocaleString()}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Peak Day</p>
-                      <p className="text-xs text-slate-600">SSP {Math.max(...incomeData.map((d: any) => d.income)).toLocaleString()}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Trend</p>
-                      <div className="flex items-center justify-center">
-                        <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-                        <p className="text-xs text-green-600">+12.5%</p>
-                      </div>
-                    </div>
+              <div className="space-y-4">
+                {/* Full Month Revenue Chart - All Days */}
+                <div className="h-48 overflow-x-auto">
+                  <div className="h-full flex items-end gap-[6px] px-4 pb-4 bg-gradient-to-t from-slate-50 to-white rounded-lg border border-slate-100 min-w-[680px]">
+                    {incomeSeries.map((d, i) => {
+                      const h = maxAmount ? Math.max(2, (d.amount / maxAmount) * 140) : 2;
+                      const active = d.amount > 0;
+                      return (
+                        <div key={i} className="flex flex-col items-center w-[12px]">
+                          <div
+                            className={`w-full rounded-t transition-colors ${active ? 'bg-teal-500 hover:bg-teal-600' : 'bg-slate-200'}`}
+                            style={{ height: `${h}px` }}
+                            title={`Day ${d.day}: SSP ${d.amount.toLocaleString()}`}
+                          />
+                          <span className="text-[10px] text-slate-500 mt-1">
+                            {(d.day === 1 || d.day % 7 === 0 || d.day === daysInMonth) ? d.day : ''}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ) : (
-                <div className="h-64 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100">
+                
+                {/* Summary Stats */}
+                <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                   <div className="text-center">
-                    <TrendingUp className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-slate-600 text-sm">No revenue data available</p>
+                    <p className="text-sm font-medium text-slate-900">Monthly Avg</p>
+                    <p className="text-xs text-slate-600">SSP {monthlyAvg.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-slate-900">Peak Day</p>
+                    <p className="text-xs text-slate-600">SSP {peak.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-slate-900">Total</p>
+                    <p className="text-xs text-slate-600">SSP {monthTotal.toLocaleString()}</p>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -274,7 +294,7 @@ export default function AdvancedDashboard() {
             <CardTitle className="text-xl font-semibold text-slate-900">Top Departments</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {departments?.slice(0, 5).map((dept: any, index: number) => {
+            {Array.isArray(departments) ? departments.slice(0, 5).map((dept: any, index: number) => {
               const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
               const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
               
@@ -290,7 +310,7 @@ export default function AdvancedDashboard() {
                   </div>
                 </div>
               );
-            })}
+            }) : []}
           </CardContent>
         </Card>
       </div>

@@ -1,0 +1,108 @@
+What’s wrong (in your code)
+
+You never force the API to filter by month.
+useQuery({ queryKey: ['/api/income-trends', selectedYear, selectedMonth] }) has no queryFn, so unless you have a global fetcher that reads the key and builds a URL, you’re probably getting a default (often current-month or last 7 days).
+
+You throw away zero-days and most dates.
+The chart maps incomeData.filter(d => d.income > 0) so it can never render a full month. That’s why July 1 is missing sometimes.
+
+The chart is “hand-rolled” and can’t scale to 30–31 bars.
+Fixed gap widths + no x-axis domain = squished or truncated data.
+
+Fixes (minimal changes, keep your UI)
+1) Make the queries month-aware (explicit URLs)
+
+Replace both dashboard and income queries with explicit queryFns:
+
+const { data: dashboardData, isLoading } = useQuery({
+  queryKey: ['/api/dashboard', selectedYear, selectedMonth],
+  queryFn: () =>
+    fetch(`/api/dashboard?year=${selectedYear}&month=${selectedMonth}`).then(r => r.json()),
+});
+
+const { data: rawIncome } = useQuery({
+  queryKey: ['/api/income-trends', selectedYear, selectedMonth],
+  queryFn: () =>
+    fetch(`/api/income-trends?year=${selectedYear}&month=${selectedMonth}`).then(r => r.json()),
+});
+
+
+If your backend expects different param names, adapt them—but pass year & month.
+
+2) Build a zero-filled daily series on the client
+
+(So the chart always has 1…lastDay and doesn’t depend on the server’s gaps.)
+
+const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
+const incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
+  day: i + 1,
+  amount: 0,
+}));
+
+if (Array.isArray(rawIncome)) {
+  for (const r of rawIncome) {
+    // Accept several shapes: {day}, {dateISO}, {date}
+    let day = r.day;
+    if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
+    if (!day && r.date)      day = new Date(r.date).getDate();
+    if (day >= 1 && day <= daysInMonth) {
+      incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0);
+    }
+  }
+}
+const maxAmount = Math.max(0, ...incomeSeries.map(d => d.amount));
+
+3) Render all days (no filter), keep it readable
+
+Use your existing bar UI but iterate incomeSeries and make narrow bars; show ticks every 7th day; allow horizontal scroll if needed.
+
+<div className="h-48 overflow-x-auto">
+  <div className="h-full flex items-end gap-[6px] px-4 pb-4 bg-gradient-to-t from-slate-50 to-white rounded-lg border border-slate-100 min-w-[680px]">
+    {incomeSeries.map((d, i) => {
+      const h = maxAmount ? Math.max(2, (d.amount / maxAmount) * 140) : 2;
+      const active = d.amount > 0;
+      return (
+        <div key={i} className="flex flex-col items-center w-[12px]">
+          <div
+            className={`w-full rounded-t ${active ? 'bg-teal-500' : 'bg-slate-200'}`}
+            style={{ height: `${h}px` }}
+            title={`Day ${d.day}: ${d.amount.toLocaleString()}`}
+          />
+          <span className="text-[10px] text-slate-500 mt-1">
+            {(d.day === 1 || d.day % 7 === 0 || d.day === daysInMonth) ? d.day : ''}
+          </span>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+
+This keeps all 30–31 bars without squishing, and it won’t hide early-month transactions.
+
+4) Compute the summary from the same series
+
+(So KPIs and chart can’t disagree.)
+
+const monthTotal = incomeSeries.reduce((s, d) => s + d.amount, 0);
+const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length || 1;
+const monthlyAvg = Math.round(monthTotal / nonzeroDays);
+const peak = Math.max(...incomeSeries.map(d => d.amount), 0);
+
+
+Use these for “Monthly Avg” and “Peak Day”.
+
+Sanity checks (what you should see)
+
+Pick July 2025 → bars on 1 and 26, zeros elsewhere.
+
+Pick August 2025 → bars on 17 and 18, zeros elsewhere.
+
+The header and KPIs change with the month.
+
+No “last 7 days” anywhere; x-axis always covers the whole month.
+
+If you want a “polished” chart later
+
+Swap the manual bars for Recharts ResponsiveContainer + BarChart and keep the same incomeSeries. But you don’t need that to fix correctness today.
