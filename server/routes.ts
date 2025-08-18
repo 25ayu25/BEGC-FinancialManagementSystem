@@ -610,17 +610,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get dashboard data for the month
       const dashboardData = await storage.getDashboardData(year, month);
       
-      // Create the monthly report
+      // Extract numeric values for database storage
+      const totalIncomeMatch = dashboardData.totalIncome.match(/SSP ([\d,.-]+)/);
+      const totalIncomeSSP = totalIncomeMatch ? parseFloat(totalIncomeMatch[1].replace(/,/g, '')) : 0;
+      
+      const totalExpensesMatch = dashboardData.totalExpenses.match(/SSP ([\d,.-]+)/);
+      const totalExpensesSSP = totalExpensesMatch ? parseFloat(totalExpensesMatch[1].replace(/,/g, '')) : 0;
+      
+      const netIncomeSSP = totalIncomeSSP - totalExpensesSSP;
+      
+      // Create the monthly report with numeric values
       const reportData = {
         year,
         month,
-        totalIncome: dashboardData.totalIncome,
-        totalExpenses: dashboardData.totalExpenses,
-        netIncome: dashboardData.netIncome,
+        totalIncome: totalIncomeSSP.toString(),
+        totalExpenses: totalExpensesSSP.toString(),
+        netIncome: netIncomeSSP.toString(),
         departmentBreakdown: dashboardData.departmentBreakdown,
         insuranceBreakdown: dashboardData.insuranceBreakdown,
         status: "draft" as const,
-        pdfPath: `/reports/${year}-${month.toString().padStart(2, '0')}.pdf`, // Mock path for now
+        pdfPath: `/reports/${year}-${month.toString().padStart(2, '0')}.pdf`,
         generatedBy: userId
       };
       
