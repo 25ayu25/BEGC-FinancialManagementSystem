@@ -15,7 +15,9 @@ import Sidebar from "@/components/layout/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  console.log('Auth state:', { isAuthenticated, isLoading, user: !!user });
 
   if (isLoading) {
     return (

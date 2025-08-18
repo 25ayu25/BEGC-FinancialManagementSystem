@@ -17,9 +17,14 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login({ username, password });
-      setLocation("/"); // Redirect to home after successful login
+      const result = await login({ username, password });
+      console.log('Login successful:', result);
+      // Give the auth state a moment to update, then redirect
+      setTimeout(() => {
+        setLocation("/");
+      }, 100);
     } catch (error) {
+      console.error('Login error:', error);
       // Error is handled by the useAuth hook
     }
   };
