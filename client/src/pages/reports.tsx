@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -11,6 +12,7 @@ import { Download, FileText, Lock, Trash2 } from "lucide-react";
 
 export default function Reports() {
   const { toast } = useToast();
+  const [selectedPeriod, setSelectedPeriod] = useState("current-month");
   const { data: reports, isLoading } = useQuery({
     queryKey: ["/api/reports"],
   });
@@ -21,6 +23,33 @@ export default function Reports() {
       case 'locked': return 'secondary';
       case 'draft': return 'outline';
       default: return 'outline';
+    }
+  };
+
+  const getDateRangeForPeriod = (period: string) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
+
+    switch (period) {
+      case "current-month":
+        return { year: currentYear, month: currentMonth };
+      
+      case "last-month":
+        const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+        return { year: lastMonthYear, month: lastMonth };
+      
+      case "last-3-months":
+        // For now, generate for 3 months ago (will improve this later to handle multiple months)
+        const threeMonthsAgo = currentMonth - 2;
+        if (threeMonthsAgo <= 0) {
+          return { year: currentYear - 1, month: 12 + threeMonthsAgo };
+        }
+        return { year: currentYear, month: threeMonthsAgo };
+      
+      default:
+        return { year: currentYear, month: currentMonth };
     }
   };
 
@@ -52,6 +81,11 @@ export default function Reports() {
         variant: "destructive"
       });
     }
+  };
+
+  const handleGenerateReport = () => {
+    const dateRange = getDateRangeForPeriod(selectedPeriod);
+    generateReport(dateRange.year, dateRange.month);
   };
 
   const downloadReport = async (pdfPath: string, filename: string) => {
@@ -154,7 +188,7 @@ export default function Reports() {
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <Label>Select Time Period</Label>
-                <Select defaultValue="current-month">
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -167,7 +201,7 @@ export default function Reports() {
                 </Select>
               </div>
               
-              <Button onClick={() => generateReport(new Date().getFullYear(), new Date().getMonth() + 1)} data-testid="button-generate-pdf">
+              <Button onClick={handleGenerateReport} data-testid="button-generate-pdf">
                 <Download className="h-4 w-4 mr-2" />
                 Generate PDF
               </Button>
