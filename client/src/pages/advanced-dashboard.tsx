@@ -329,16 +329,16 @@ export default function AdvancedDashboard() {
                       >
                         <CartesianGrid 
                           strokeDasharray="1 1" 
-                          stroke="#e2e8f0" 
+                          stroke="#eef2f7" 
                           strokeWidth={0.5}
                           opacity={0.4}
                           vertical={false}
                         />
                         <XAxis 
                           dataKey="day"
-                          axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          axisLine={{ stroke: '#eef2f7', strokeWidth: 1 }}
                           tickLine={false}
-                          tick={{ fontSize: 11, fill: '#64748b' }}
+                          tick={{ fontSize: 12, fill: '#64748b' }}
                           tickFormatter={formatXAxis}
                           ticks={[1, 8, 15, 22, daysInMonth]}
                         />
@@ -360,10 +360,10 @@ export default function AdvancedDashboard() {
                             strokeWidth={1}
                             strokeDasharray="4 2"
                             label={{ 
-                              value: `Avg ${monthlyAvg.toLocaleString()}`, 
+                              value: `Avg SSP ${monthlyAvg.toLocaleString()}`, 
                               position: "insideTopRight", 
                               style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
-                              offset: 5
+                              offset: 8
                             }}
                           />
                         )}
@@ -371,7 +371,7 @@ export default function AdvancedDashboard() {
                         <Bar 
                           dataKey="amount" 
                           fill="#14b8a6"
-                          radius={[3, 3, 0, 0]}
+                          radius={[4, 4, 0, 0]}
                           stroke="none"
                           style={{ cursor: 'pointer' }}
                           onClick={handleBarClick}
@@ -383,16 +383,16 @@ export default function AdvancedDashboard() {
                 </div>
                 
                 {/* Summary Stats Footer */}
-                <div className="border-t border-slate-200 pt-4 flex items-center justify-start space-x-8">
-                  <div className="flex flex-col">
+                <div className="border-t border-slate-100 pt-4 grid grid-cols-3 gap-4">
+                  <div className="flex flex-col text-center">
                     <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
                     <span className="text-lg font-bold text-slate-900">SSP {monthTotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col text-center">
                     <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
                     <span className="text-lg font-bold text-slate-900">SSP {peak.toLocaleString()}</span>
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col text-center">
                     <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
                     <span className="text-lg font-bold text-slate-900">SSP {monthlyAvg.toLocaleString()}</span>
                   </div>
