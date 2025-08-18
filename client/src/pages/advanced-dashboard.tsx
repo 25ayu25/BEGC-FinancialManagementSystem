@@ -18,6 +18,16 @@ import {
   Filter,
   RefreshCw
 } from "lucide-react";
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ReferenceLine 
+} from 'recharts';
 
 // Removed MonthSelector import - will create inline selector
 
@@ -45,10 +55,17 @@ export default function AdvancedDashboard() {
 
   // Build a zero-filled daily series for the selected month
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   
   const incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
     day: i + 1,
     amount: 0,
+    label: `${i + 1}`,
+    fullDate: new Date(selectedYear, selectedMonth - 1, i + 1).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    }),
   }));
 
   if (Array.isArray(rawIncome)) {
@@ -63,13 +80,41 @@ export default function AdvancedDashboard() {
     }
   }
   
-  const maxAmount = Math.max(0, ...incomeSeries.map(d => d.amount));
-  
   // Compute summary stats from the same series
   const monthTotal = incomeSeries.reduce((s, d) => s + d.amount, 0);
   const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length || 1;
   const monthlyAvg = Math.round(monthTotal / nonzeroDays);
   const peak = Math.max(...incomeSeries.map(d => d.amount), 0);
+  
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
+          <p className="font-medium text-slate-900">{data.fullDate}</p>
+          <p className="text-teal-600 font-semibold">SSP {data.amount.toLocaleString()}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Format Y-axis values
+  const formatYAxis = (value: number) => {
+    if (value === 0) return 'SSP 0';
+    if (value >= 1000) return `SSP ${(value / 1000).toFixed(0)}k`;
+    return `SSP ${value}`;
+  };
+
+  // Custom X-axis tick formatter - show only weekly labels
+  const formatXAxis = (tickItem: any, index: number) => {
+    const day = parseInt(tickItem);
+    if (day === 1 || day === 8 || day === 15 || day === 22 || day === daysInMonth) {
+      return day.toString();
+    }
+    return '';
+  };
 
   if (isLoading) {
     return (
@@ -244,46 +289,96 @@ export default function AdvancedDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <div className="space-y-4">
-                {/* Full Month Revenue Chart - All Days */}
-                <div className="h-48 overflow-x-auto">
-                  <div className="h-full flex items-end gap-[6px] px-4 pb-4 bg-gradient-to-t from-slate-50 to-white rounded-lg border border-slate-100 min-w-[680px]">
-                    {incomeSeries.map((d, i) => {
-                      const h = maxAmount ? Math.max(2, (d.amount / maxAmount) * 140) : 2;
-                      const active = d.amount > 0;
-                      return (
-                        <div key={i} className="flex flex-col items-center w-[12px]">
-                          <div
-                            className={`w-full rounded-t transition-colors ${active ? 'bg-teal-500 hover:bg-teal-600' : 'bg-slate-200'}`}
-                            style={{ height: `${h}px` }}
-                            title={`Day ${d.day}: SSP ${d.amount.toLocaleString()}`}
+            <div className="h-80">
+              {monthTotal > 0 ? (
+                <div className="space-y-4">
+                  {/* Professional Revenue Chart */}
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={incomeSeries} 
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        barCategoryGap="2%"
+                      >
+                        <CartesianGrid 
+                          strokeDasharray="1 1" 
+                          stroke="#e2e8f0" 
+                          strokeWidth={1}
+                          opacity={0.6}
+                        />
+                        <XAxis 
+                          dataKey="day"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: '#64748b' }}
+                          tickFormatter={formatXAxis}
+                          domain={[1, daysInMonth]}
+                          type="number"
+                          scale="linear"
+                        />
+                        <YAxis 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#64748b' }}
+                          tickFormatter={formatYAxis}
+                          domain={[0, 'dataMax']}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        
+                        {/* Monthly Average Reference Line */}
+                        {monthlyAvg > 0 && (
+                          <ReferenceLine 
+                            y={monthlyAvg} 
+                            stroke="#14b8a6" 
+                            strokeWidth={1}
+                            strokeDasharray="4 4"
+                            label={{ 
+                              value: "Avg", 
+                              position: "topRight", 
+                              style: { fontSize: 10, fill: '#14b8a6' } 
+                            }}
                           />
-                          <span className="text-[10px] text-slate-500 mt-1">
-                            {(d.day === 1 || d.day % 7 === 0 || d.day === daysInMonth) ? d.day : ''}
-                          </span>
-                        </div>
-                      );
-                    })}
+                        )}
+                        
+                        <Bar 
+                          dataKey="amount" 
+                          fill="#14b8a6"
+                          radius={[2, 2, 0, 0]}
+                          stroke="none"
+                          style={{ cursor: 'pointer' }}
+                          onClick={(data: any) => {
+                            // TODO: Open filtered transactions for that day in side panel
+                            console.log(`Clicked day ${data.day} with amount ${data.amount}`);
+                          }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Summary Stats */}
+                  <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-slate-900">Monthly Avg</p>
+                      <p className="text-xs text-slate-600">SSP {monthlyAvg.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-slate-900">Peak Day</p>
+                      <p className="text-xs text-slate-600">SSP {peak.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-slate-900">Total</p>
+                      <p className="text-xs text-slate-600">SSP {monthTotal.toLocaleString()}</p>
+                    </div>
                   </div>
                 </div>
-                
-                {/* Summary Stats */}
-                <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+              ) : (
+                <div className="h-64 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100">
                   <div className="text-center">
-                    <p className="text-sm font-medium text-slate-900">Monthly Avg</p>
-                    <p className="text-xs text-slate-600">SSP {monthlyAvg.toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-slate-900">Peak Day</p>
-                    <p className="text-xs text-slate-600">SSP {peak.toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-slate-900">Total</p>
-                    <p className="text-xs text-slate-600">SSP {monthTotal.toLocaleString()}</p>
+                    <TrendingUp className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                    <p className="text-slate-600 text-sm">No income recorded in {monthName}</p>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
