@@ -60,36 +60,25 @@ export default function AdvancedDashboard() {
   const patientVolume = 456; // This would come from backend
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
+    <div className="min-h-screen bg-white dark:bg-slate-900 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             Executive Dashboard
           </h1>
-          <p className="text-lg text-slate-600 dark:text-slate-300 mt-1">
-            Bahr El Ghazal Clinic Financial Overview
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+            Track key financial metrics - August 2025
           </p>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="quarter">Quarter</SelectItem>
-              <SelectItem value="year">Year</SelectItem>
-            </SelectContent>
-          </Select>
-          
+        <div className="flex items-center space-x-3">
           <Select value={`${selectedYear}-${selectedMonth}`} onValueChange={(value) => {
             const [year, month] = value.split('-').map(Number);
             setSelectedYear(year);
             setSelectedMonth(month);
           }}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-40 h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -109,8 +98,8 @@ export default function AdvancedDashboard() {
             </SelectContent>
           </Select>
           
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" className="h-9 text-sm">
+            <Download className="h-3 w-3 mr-2" />
             Export
           </Button>
         </div>
