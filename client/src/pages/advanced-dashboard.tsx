@@ -143,13 +143,29 @@ export default function AdvancedDashboard() {
     return ticks;
   };
 
-  // Custom X-axis tick formatter - show only weekly labels
+  // Custom X-axis tick formatter - show key days and transaction days
   const formatXAxis = (tickItem: any, index: number) => {
     const day = parseInt(tickItem);
-    if (day === 1 || day === 8 || day === 15 || day === 22 || day === daysInMonth) {
+    
+    // Always show days with transactions
+    const dayData = incomeSeries.find(d => d.day === day);
+    const hasTransaction = dayData && dayData.amount > 0;
+    
+    if (hasTransaction) {
       return day.toString();
     }
-    return '';
+    
+    // For months with many days, show strategic spacing
+    if (daysInMonth <= 28) {
+      // Show all days for shorter months
+      return day.toString();
+    } else if (daysInMonth <= 30) {
+      // Show every 5th day for 29-30 day months, plus first and last
+      return (day === 1 || day === daysInMonth || day % 5 === 0) ? day.toString() : '';
+    } else {
+      // Show every 5th day for 31-day months, plus first and last
+      return (day === 1 || day === daysInMonth || day % 5 === 0) ? day.toString() : '';
+    }
   };
 
   if (isLoading) {
@@ -357,7 +373,9 @@ export default function AdvancedDashboard() {
                           tickLine={false}
                           tick={{ fontSize: 12, fill: '#64748b' }}
                           tickFormatter={formatXAxis}
-                          ticks={[1, 8, 15, 22, daysInMonth]}
+                          interval={0}
+                          angle={0}
+                          height={40}
                         />
                         <YAxis 
                           axisLine={false}
