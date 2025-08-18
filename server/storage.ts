@@ -217,8 +217,8 @@ export class DatabaseStorage implements IStorage {
 
     // Get total income and expenses by currency
     const [incomeResult] = await db.select({
-      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+      totalSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "income"),
@@ -228,8 +228,8 @@ export class DatabaseStorage implements IStorage {
     );
 
     const [expenseResult] = await db.select({
-      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+      totalSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "expense"),
@@ -238,26 +238,26 @@ export class DatabaseStorage implements IStorage {
       )
     );
 
-    // Safely parse currency amounts, handling potential null/undefined values
-    const incomeSSP = incomeResult?.totalSSP ? parseFloat(incomeResult.totalSSP) : 0;
-    const incomeUSD = incomeResult?.totalUSD ? parseFloat(incomeResult.totalUSD) : 0;
-    const expenseSSP = expenseResult?.totalSSP ? parseFloat(expenseResult.totalSSP) : 0;
-    const expenseUSD = expenseResult?.totalUSD ? parseFloat(expenseResult.totalUSD) : 0;
+    // Safely handle currency amounts - they come as numbers from the database
+    const incomeSSP = Number(incomeResult?.totalSSP) || 0;
+    const incomeUSD = Number(incomeResult?.totalUSD) || 0;
+    const expenseSSP = Number(expenseResult?.totalSSP) || 0;
+    const expenseUSD = Number(expenseResult?.totalUSD) || 0;
     
     // Calculate net amounts
     const netIncomeSSP = incomeSSP - expenseSSP;
     const netIncomeUSD = incomeUSD - expenseUSD;
     
-    // Format totals with currency breakdown - ensure numbers are valid
-    const totalIncome = `SSP ${(isNaN(incomeSSP) ? 0 : incomeSSP).toLocaleString()}${incomeUSD > 0 ? ` | USD ${incomeUSD.toLocaleString()}` : ''}`;
-    const totalExpenses = `SSP ${(isNaN(expenseSSP) ? 0 : expenseSSP).toLocaleString()}${expenseUSD > 0 ? ` | USD ${expenseUSD.toLocaleString()}` : ''}`;
-    const netIncome = `SSP ${(isNaN(netIncomeSSP) ? 0 : netIncomeSSP).toLocaleString()}${netIncomeUSD !== 0 ? ` | USD ${netIncomeUSD.toLocaleString()}` : ''}`;
+    // Format totals with currency breakdown
+    const totalIncome = `SSP ${incomeSSP.toLocaleString()}${incomeUSD > 0 ? ` | USD ${incomeUSD.toLocaleString()}` : ''}`;
+    const totalExpenses = `SSP ${expenseSSP.toLocaleString()}${expenseUSD > 0 ? ` | USD ${expenseUSD.toLocaleString()}` : ''}`;
+    const netIncome = `SSP ${netIncomeSSP.toLocaleString()}${netIncomeUSD !== 0 ? ` | USD ${netIncomeUSD.toLocaleString()}` : ''}`;
 
     // Get department breakdown by currency
     const departmentData = await db.select({
       departmentId: transactions.departmentId,
-      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+      totalSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions)
     .where(
       and(
@@ -271,10 +271,10 @@ export class DatabaseStorage implements IStorage {
     const departmentBreakdown: Record<string, string> = {};
     departmentData.forEach(item => {
       if (item.departmentId) {
-        const sspAmount = item.totalSSP ? parseFloat(item.totalSSP) : 0;
-        const usdAmount = item.totalUSD ? parseFloat(item.totalUSD) : 0;
-        if ((!isNaN(sspAmount) && sspAmount > 0) || (!isNaN(usdAmount) && usdAmount > 0)) {
-          const breakdown = `SSP ${(isNaN(sspAmount) ? 0 : sspAmount).toLocaleString()}${usdAmount > 0 ? ` | USD ${usdAmount.toLocaleString()}` : ''}`;
+        const sspAmount = Number(item.totalSSP) || 0;
+        const usdAmount = Number(item.totalUSD) || 0;
+        if (sspAmount > 0 || usdAmount > 0) {
+          const breakdown = `SSP ${sspAmount.toLocaleString()}${usdAmount > 0 ? ` | USD ${usdAmount.toLocaleString()}` : ''}`;
           departmentBreakdown[item.departmentId] = breakdown;
         }
       }
