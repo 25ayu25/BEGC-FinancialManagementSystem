@@ -82,9 +82,10 @@ export default function AdvancedDashboard() {
   
   // Compute summary stats from the same series
   const monthTotal = incomeSeries.reduce((s, d) => s + d.amount, 0);
-  const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length || 1;
-  const monthlyAvg = Math.round(monthTotal / nonzeroDays);
+  const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length;
+  const monthlyAvg = nonzeroDays > 0 ? Math.round(monthTotal / nonzeroDays) : 0;
   const peak = Math.max(...incomeSeries.map(d => d.amount), 0);
+  const showAvgLine = nonzeroDays >= 2; // Only show if 2+ non-zero days
   
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -107,25 +108,20 @@ export default function AdvancedDashboard() {
     }
   };
 
-  // Format Y-axis values with nice rounded ticks
+  // Format Y-axis values - no SSP prefix on ticks
   const formatYAxis = (value: number) => {
-    if (value === 0) return 'SSP 0';
-    if (value >= 1000) return `SSP ${Math.round(value / 1000)}k`;
-    return `SSP ${Math.round(value)}`;
+    if (value === 0) return '0';
+    if (value >= 1000) return `${Math.round(value / 1000)}k`;
+    return `${Math.round(value)}`;
   };
 
-  // Generate nice Y-axis ticks
+  // Generate standard Y-axis ticks: 0, 20k, 40k, 60k, 80k
   const generateYTicks = () => {
-    if (peak === 0) return [0];
-    const maxVal = peak * 1.1; // Add 10% padding
-    const tickCount = 5;
-    const roughStep = maxVal / tickCount;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-    const normalizedStep = Math.ceil(roughStep / magnitude) * magnitude;
-    
-    const ticks = [];
-    for (let i = 0; i <= Math.ceil(maxVal / normalizedStep); i++) {
-      ticks.push(i * normalizedStep);
+    if (peak === 0) return [0, 20000, 40000, 60000, 80000];
+    const maxNeeded = Math.max(peak * 1.2, 20000);
+    const ticks = [0];
+    for (let i = 20000; i <= maxNeeded + 20000; i += 20000) {
+      ticks.push(i);
     }
     return ticks;
   };
@@ -303,40 +299,48 @@ export default function AdvancedDashboard() {
 
       {/* Charts and Analytics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Revenue Trend Chart */}
+        {/* Revenue Analytics */}
         <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+              <div>
+                <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+                <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
+              </div>
               <Badge variant="outline" className="text-slate-600">Live Data</Badge>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              {monthTotal > 0 ? (
-                <div className="space-y-4">
-                  {/* Professional Revenue Chart */}
-                  <div className="h-64">
+          <CardContent className="pb-4">
+            {monthTotal > 0 ? (
+              <div className="space-y-0">
+                {/* Professional Revenue Chart */}
+                <div className="h-64 relative">
+                  {/* Y-axis title */}
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 transform-gpu">
+                    <span className="text-xs text-slate-500 font-medium">Revenue (SSP)</span>
+                  </div>
+                  
+                  <div className="ml-8">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={incomeSeries} 
-                        margin={{ top: 20, right: 80, left: 20, bottom: 25 }}
-                        barCategoryGap="2%"
+                        margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
+                        barCategoryGap="1%"
                       >
                         <CartesianGrid 
-                          strokeDasharray="2 2" 
-                          stroke="#f1f5f9" 
+                          strokeDasharray="1 1" 
+                          stroke="#e2e8f0" 
                           strokeWidth={0.5}
-                          opacity={0.8}
+                          opacity={0.4}
                           vertical={false}
                         />
                         <XAxis 
                           dataKey="day"
-                          axisLine={false}
+                          axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                           tickLine={false}
-                          tick={{ fontSize: 12, fill: '#64748b' }}
+                          tick={{ fontSize: 11, fill: '#64748b' }}
                           tickFormatter={formatXAxis}
-                          domain={[1, daysInMonth]}
+                          domain={[0.5, daysInMonth + 0.5]}
                           type="number"
                           scale="linear"
                           ticks={[1, 8, 15, 22, daysInMonth]}
@@ -346,23 +350,23 @@ export default function AdvancedDashboard() {
                           tickLine={false}
                           tick={{ fontSize: 11, fill: '#64748b' }}
                           tickFormatter={formatYAxis}
-                          domain={[0, peak > 0 ? peak * 1.1 : 1000]}
+                          domain={[0, Math.max(...generateYTicks())]}
                           ticks={generateYTicks()}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         
                         {/* Monthly Average Reference Line */}
-                        {monthTotal > 0 && monthlyAvg > 0 && (
+                        {showAvgLine && monthlyAvg > 0 && (
                           <ReferenceLine 
                             y={monthlyAvg} 
                             stroke="#0d9488" 
-                            strokeWidth={0.8}
-                            strokeDasharray="3 3"
+                            strokeWidth={1}
+                            strokeDasharray="4 2"
                             label={{ 
-                              value: `Avg SSP ${monthlyAvg.toLocaleString()}`, 
+                              value: `Avg ${monthlyAvg.toLocaleString()}`, 
                               position: "insideTopRight", 
                               style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
-                              offset: 10
+                              offset: 5
                             }}
                           />
                         )}
@@ -378,35 +382,35 @@ export default function AdvancedDashboard() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  
-                  {/* Summary Stats */}
-                  <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Monthly Avg</p>
-                      <p className="text-xs text-slate-600">SSP {monthlyAvg.toLocaleString()}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Peak Day</p>
-                      <p className="text-xs text-slate-600">SSP {peak.toLocaleString()}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900">Total</p>
-                      <p className="text-xs text-slate-600">SSP {monthTotal.toLocaleString()}</p>
-                    </div>
+                </div>
+                
+                {/* Summary Stats Footer */}
+                <div className="border-t border-slate-200 pt-4 flex items-center justify-start space-x-8">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
+                    <span className="text-lg font-bold text-slate-900">SSP {monthTotal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
+                    <span className="text-lg font-bold text-slate-900">SSP {peak.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
+                    <span className="text-lg font-bold text-slate-900">SSP {monthlyAvg.toLocaleString()}</span>
                   </div>
                 </div>
-              ) : (
-                <div className="h-64 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <TrendingUp className="h-7 w-7 text-slate-400" />
-                    </div>
-                    <p className="text-slate-600 text-sm font-medium">No income recorded in {monthName}</p>
-                    <p className="text-slate-500 text-xs mt-1">Add transactions to see analytics</p>
+              </div>
+            ) : (
+              <div className="h-64 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <TrendingUp className="h-7 w-7 text-slate-400" />
                   </div>
+                  <p className="text-slate-600 text-sm font-medium">No income recorded in {monthName}</p>
+                  <p className="text-slate-500 text-xs mt-1">Add transactions to see analytics</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
