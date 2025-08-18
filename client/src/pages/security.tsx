@@ -67,12 +67,12 @@ export default function Security() {
   // Session management queries
   const { data: sessionsData, refetch: refetchSessions } = useQuery<SessionsResponse>({
     queryKey: ['/api/sessions'],
-    enabled: !!user,
+    enabled: !!profile,
   });
 
   const { data: timeoutData, refetch: refetchTimeout } = useQuery<TimeoutResponse>({
     queryKey: ['/api/sessions/timeout'],
-    enabled: !!user,
+    enabled: !!profile,
   });
 
   // State for dialogs
@@ -212,7 +212,7 @@ export default function Security() {
     updatePasswordMutation.mutate(data);
   };
 
-  if (!user) {
+  if (!profile) {
     return <div>Loading...</div>;
   }
 
@@ -431,7 +431,7 @@ export default function Security() {
               <div className="space-y-0.5">
                 <Label>Session Timeout</Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Automatically sign out after {getTimeoutLabel(timeoutData?.minutes)}
+                  Automatically sign out after {getTimeoutLabel(timeoutData?.minutes || null)}
                 </p>
               </div>
               <Dialog open={showTimeoutDialog} onOpenChange={setShowTimeoutDialog}>
@@ -649,7 +649,7 @@ export default function Security() {
                 <div>
                   <p className="text-sm font-medium">Current Session</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Today • {user.location === 'usa' ? 'United States' : 'South Sudan'}
+                    Today • {profile.location === 'usa' ? 'United States' : 'South Sudan'}
                   </p>
                 </div>
                 <Badge variant="default">Active</Badge>
@@ -663,7 +663,7 @@ export default function Security() {
         </Card>
 
         {/* Security Recommendations */}
-        {user.role === 'admin' && (
+        {profile.role === 'admin' && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
