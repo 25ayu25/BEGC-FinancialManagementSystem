@@ -74,12 +74,16 @@ export function useAuth() {
       return await response.json();
     },
     onSuccess: (data) => {
+      console.log('Login mutation success, updating auth state:', data);
       setAuthState({
         user: data.user,
         isLoading: false,
         isAuthenticated: true,
       });
       queryClient.invalidateQueries(); // Refresh all cached data
+    },
+    onError: (error) => {
+      console.error('Login mutation error:', error);
     }
   });
 
