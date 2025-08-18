@@ -59,26 +59,6 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-4">
-          {!actions && (
-            <>
-              <Select defaultValue="current-month">
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="current-month">Current Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                  <SelectItem value="custom-range">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Button onClick={generateCurrentMonthReport} data-testid="button-generate-pdf">
-                <Download className="h-4 w-4 mr-2" />
-                Generate PDF
-              </Button>
-            </>
-          )}
           {actions}
         </div>
       </div>

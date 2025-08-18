@@ -183,6 +183,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User management routes (admin only)
+  const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    next();
+  };
+
+  app.get('/api/users', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const users = await storage.getUsers();
+      res.json(users.map(user => ({
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        location: user.location,
+        createdAt: user.createdAt
+      })));
+    } catch (error) {
+      console.error('Get users error:', error);
+      res.status(500).json({ message: 'Failed to get users' });
+    }
+  });
+
+  app.post('/api/users', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { username, password, firstName, lastName, email, role, location } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        email: email || null,
+        role: role || 'staff',
+        location: location || 'south_sudan'
+      });
+
+      res.status(201).json({
+        message: 'User created successfully',
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: newUser.email,
+          role: newUser.role,
+          location: newUser.location
+        }
+      });
+    } catch (error) {
+      console.error('Create user error:', error);
+      if ((error as any).code === '23505') { // Unique constraint violation
+        res.status(409).json({ message: 'Username or email already exists' });
+      } else {
+        res.status(500).json({ message: 'Failed to create user' });
+      }
+    }
+  });
+
+  app.delete('/api/users/:id', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (id === req.user!.id) {
+        return res.status(400).json({ message: 'Cannot delete your own account' });
+      }
+
+      const success = await storage.deleteUser(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+      console.error('Delete user error:', error);
+      res.status(500).json({ message: 'Failed to delete user' });
+    }
+  });
+
   // Departments
   app.get("/api/departments", requireAuth, async (req: AuthRequest, res) => {
     try {

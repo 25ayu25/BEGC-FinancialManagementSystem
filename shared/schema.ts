@@ -77,6 +77,14 @@ export const receipts = pgTable("receipts", {
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+export const createUserSchema = insertUserSchema.extend({
+  confirmPassword: z.string().min(6, "Please confirm password")
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export const insertDepartmentSchema = createInsertSchema(departments).omit({
@@ -107,6 +115,7 @@ export const insertReceiptSchema = createInsertSchema(receipts).omit({
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type CreateUser = z.infer<typeof createUserSchema>;
 
 export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;

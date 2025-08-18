@@ -18,6 +18,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Trash2, Plus, Users } from "lucide-react";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -34,12 +37,27 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const createUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(1, "Please confirm password"),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  email: z.string().email("Please enter a valid email").optional().or(z.literal("")),
+  role: z.enum(["admin", "staff"]),
+  location: z.enum(["usa", "south_sudan"]),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 export default function Settings() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showCreateUserDialog, setShowCreateUserDialog] = useState(false);
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -56,6 +74,20 @@ export default function Settings() {
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
+    },
+  });
+
+  const createUserForm = useForm<z.infer<typeof createUserSchema>>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      confirmPassword: "",
+      firstName: "",
+      lastName: "",
+      email: "",
+      role: "staff",
+      location: "south_sudan",
     },
   });
 
@@ -117,6 +149,61 @@ export default function Settings() {
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update password. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // User management queries and mutations (admin only)
+  const { data: users = [] } = useQuery({
+    queryKey: ['/api/users'],
+    enabled: user?.role === 'admin',
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof createUserSchema>) => {
+      const { confirmPassword, ...userData } = data;
+      return apiRequest('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "User Created",
+        description: "New user account has been created successfully.",
+      });
+      createUserForm.reset();
+      setShowCreateUserDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create user. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest(`/api/users/${userId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "User Deleted",
+        description: "User account has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete user. Please try again.",
         variant: "destructive",
       });
     }
@@ -428,6 +515,239 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* User Management (Admin Only) */}
+        {user.role === 'admin' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                User Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Create New User</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Add new user accounts for staff or administrators
+                  </p>
+                </div>
+                <Dialog open={showCreateUserDialog} onOpenChange={setShowCreateUserDialog}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-create-user">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Create New User</DialogTitle>
+                    </DialogHeader>
+                    <Form {...createUserForm}>
+                      <form onSubmit={createUserForm.handleSubmit((data) => createUserMutation.mutate(data))} className="space-y-4">
+                        <FormField
+                          control={createUserForm.control}
+                          name="username"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Username</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-username" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={createUserForm.control}
+                            name="firstName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>First Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="input-first-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={createUserForm.control}
+                            name="lastName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Last Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="input-last-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={createUserForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email (Optional)</FormLabel>
+                              <FormControl>
+                                <Input type="email" {...field} data-testid="input-email" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={createUserForm.control}
+                            name="role"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Role</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-role">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="staff">Staff</SelectItem>
+                                    <SelectItem value="admin">Administrator</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={createUserForm.control}
+                            name="location"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Location</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-location">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="south_sudan">South Sudan</SelectItem>
+                                    <SelectItem value="usa">United States</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={createUserForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" {...field} data-testid="input-password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={createUserForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" {...field} data-testid="input-confirm-password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex gap-2">
+                          <Button 
+                            type="submit" 
+                            disabled={createUserMutation.isPending}
+                            data-testid="button-submit-user"
+                          >
+                            {createUserMutation.isPending ? "Creating..." : "Create User"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowCreateUserDialog(false)}
+                            data-testid="button-cancel-user"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              
+              {/* Users List */}
+              <div className="space-y-3">
+                <Label>Existing Users</Label>
+                <div className="max-h-64 overflow-y-auto border rounded-lg">
+                  {users.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      No users found. Create the first user account.
+                    </div>
+                  ) : (
+                    users.map((userData: any) => (
+                      <div 
+                        key={userData.id} 
+                        className="flex items-center justify-between p-3 border-b last:border-b-0"
+                        data-testid={`card-user-${userData.id}`}
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {userData.firstName || userData.lastName 
+                              ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
+                              : userData.username
+                            }
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            @{userData.username} • {userData.role} • {userData.location === 'usa' ? 'USA' : 'South Sudan'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {userData.id !== user.id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => deleteUserMutation.mutate(userData.id)}
+                              disabled={deleteUserMutation.isPending}
+                              data-testid={`button-delete-user-${userData.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

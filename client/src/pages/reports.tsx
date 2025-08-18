@@ -5,6 +5,8 @@ import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileText, Lock, Trash2 } from "lucide-react";
 
 export default function Reports() {
@@ -142,7 +144,37 @@ export default function Reports() {
         }
       />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Date Filter and PDF Generation */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Report Generation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <Label>Select Time Period</Label>
+                <Select defaultValue="current-month">
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current-month">Current Month</SelectItem>
+                    <SelectItem value="last-month">Last Month</SelectItem>
+                    <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                    <SelectItem value="custom-range">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Button onClick={() => generateReport(new Date().getFullYear(), new Date().getMonth() + 1)} data-testid="button-generate-pdf">
+                <Download className="h-4 w-4 mr-2" />
+                Generate PDF
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Available Reports</CardTitle>
