@@ -13,12 +13,12 @@ import Security from "@/pages/security";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 
 function Router() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, profile } = useSupabaseAuth();
 
-  console.log('Auth state:', { isAuthenticated, isLoading, user: !!user });
+  console.log('Supabase Auth state:', { isAuthenticated, isLoading, user: !!user, profile: !!profile });
 
   if (isLoading) {
     return (

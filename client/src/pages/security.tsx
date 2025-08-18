@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shield, Lock, Eye, AlertTriangle, CheckCircle, Clock, Globe, Monitor, Smartphone, Calendar, Trash2 } from "lucide-react";
 import Header from "@/components/layout/header";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -49,7 +49,7 @@ const passwordSchema = z.object({
 });
 
 export default function Security() {
-  const { user } = useAuth();
+  const { profile } = useSupabaseAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);

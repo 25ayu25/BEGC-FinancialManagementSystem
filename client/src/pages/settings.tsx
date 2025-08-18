@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Bell, Database, Globe, Lock, User, Download, LogOut, Save } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { supabaseAuth } from "@/lib/supabaseQueries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -52,7 +53,7 @@ const createUserSchema = z.object({
 });
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { profile } = useSupabaseAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();

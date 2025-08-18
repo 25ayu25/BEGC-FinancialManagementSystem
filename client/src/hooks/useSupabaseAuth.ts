@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import type { Database } from '../types/supabase'
+
+type Profile = Database['public']['Tables']['profiles']['Row']
 
 interface AuthState {
   user: User | null
-  profile: any | null
+  profile: Profile | null
   isLoading: boolean
   isAuthenticated: boolean
 }

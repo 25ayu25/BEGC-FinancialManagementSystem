@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,10 +7,9 @@ import { useToast } from '@/hooks/use-toast'
 import { Loader2 } from 'lucide-react'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('ayuudlls@gmail.com') // Pre-fill admin email
+  const [password, setPassword] = useState('ClinicAdmin!8427#') // Pre-fill admin password for testing
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn } = useSupabaseAuth()
   const { toast } = useToast()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -19,7 +17,8 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      const { error } = await signIn(email, password)
+      const { supabaseAuth } = await import('@/lib/supabaseQueries')
+      const { data, error } = await supabaseAuth.signIn(email, password)
       
       if (error) {
         toast({
@@ -34,6 +33,7 @@ export default function Login() {
         })
       }
     } catch (error) {
+      console.error('Login error:', error)
       toast({
         title: "Login Failed",
         description: "An unexpected error occurred. Please try again.",

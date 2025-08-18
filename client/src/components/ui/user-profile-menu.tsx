@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut, Shield } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { supabaseAuth } from "@/lib/supabaseQueries";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfileMenuProps {
@@ -20,14 +21,16 @@ interface UserProfileMenuProps {
 
 export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin" }: UserProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
-      await logout();
-      // The logout function in useAuth now handles the redirect
+      const { error } = await supabaseAuth.signOut();
+      if (error) {
+        throw error;
+      }
+      setLocation('/login');
     } catch (error) {
       toast({
         title: "Logout Failed",
