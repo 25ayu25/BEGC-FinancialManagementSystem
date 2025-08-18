@@ -215,10 +215,9 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    // Get total income and expenses by currency
+    // Get total income and expenses
     const [incomeResult] = await db.select({
-      totalSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "income"),
@@ -228,8 +227,7 @@ export class DatabaseStorage implements IStorage {
     );
 
     const [expenseResult] = await db.select({
-      totalSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "expense"),
@@ -238,26 +236,14 @@ export class DatabaseStorage implements IStorage {
       )
     );
 
-    // Safely handle currency amounts - they come as numbers from the database
-    const incomeSSP = Number(incomeResult?.totalSSP) || 0;
-    const incomeUSD = Number(incomeResult?.totalUSD) || 0;
-    const expenseSSP = Number(expenseResult?.totalSSP) || 0;
-    const expenseUSD = Number(expenseResult?.totalUSD) || 0;
-    
-    // Calculate net amounts
-    const netIncomeSSP = incomeSSP - expenseSSP;
-    const netIncomeUSD = incomeUSD - expenseUSD;
-    
-    // Format totals with currency breakdown
-    const totalIncome = `SSP ${incomeSSP.toLocaleString()}${incomeUSD > 0 ? ` | USD ${incomeUSD.toLocaleString()}` : ''}`;
-    const totalExpenses = `SSP ${expenseSSP.toLocaleString()}${expenseUSD > 0 ? ` | USD ${expenseUSD.toLocaleString()}` : ''}`;
-    const netIncome = `SSP ${netIncomeSSP.toLocaleString()}${netIncomeUSD !== 0 ? ` | USD ${netIncomeUSD.toLocaleString()}` : ''}`;
+    const totalIncome = incomeResult.total || "0";
+    const totalExpenses = expenseResult.total || "0";
+    const netIncome = (parseFloat(totalIncome) - parseFloat(totalExpenses)).toString();
 
-    // Get department breakdown by currency
+    // Get department breakdown
     const departmentData = await db.select({
       departmentId: transactions.departmentId,
-      totalSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+      total: sql<string>`SUM(${transactions.amount})`
     }).from(transactions)
     .where(
       and(
@@ -271,12 +257,7 @@ export class DatabaseStorage implements IStorage {
     const departmentBreakdown: Record<string, string> = {};
     departmentData.forEach(item => {
       if (item.departmentId) {
-        const sspAmount = Number(item.totalSSP) || 0;
-        const usdAmount = Number(item.totalUSD) || 0;
-        if (sspAmount > 0 || usdAmount > 0) {
-          const breakdown = `SSP ${sspAmount.toLocaleString()}${usdAmount > 0 ? ` | USD ${usdAmount.toLocaleString()}` : ''}`;
-          departmentBreakdown[item.departmentId] = breakdown;
-        }
+        departmentBreakdown[item.departmentId] = item.total;
       }
     });
 

@@ -610,26 +610,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get dashboard data for the month
       const dashboardData = await storage.getDashboardData(year, month);
       
-      // Extract numeric values for database storage
-      const totalIncomeMatch = dashboardData.totalIncome.match(/SSP ([\d,.-]+)/);
-      const totalIncomeSSP = totalIncomeMatch ? parseFloat(totalIncomeMatch[1].replace(/,/g, '')) : 0;
-      
-      const totalExpensesMatch = dashboardData.totalExpenses.match(/SSP ([\d,.-]+)/);
-      const totalExpensesSSP = totalExpensesMatch ? parseFloat(totalExpensesMatch[1].replace(/,/g, '')) : 0;
-      
-      const netIncomeSSP = totalIncomeSSP - totalExpensesSSP;
-      
-      // Create the monthly report with numeric values
+      // Create the monthly report
       const reportData = {
         year,
         month,
-        totalIncome: totalIncomeSSP.toString(),
-        totalExpenses: totalExpensesSSP.toString(),
-        netIncome: netIncomeSSP.toString(),
+        totalIncome: dashboardData.totalIncome,
+        totalExpenses: dashboardData.totalExpenses,
+        netIncome: dashboardData.netIncome,
         departmentBreakdown: dashboardData.departmentBreakdown,
         insuranceBreakdown: dashboardData.insuranceBreakdown,
         status: "draft" as const,
-        pdfPath: `/reports/${year}-${month.toString().padStart(2, '0')}.pdf`,
+        pdfPath: `/reports/${year}-${month.toString().padStart(2, '0')}.pdf`, // Mock path for now
         generatedBy: userId
       };
       
@@ -739,19 +730,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(12);
       
-      // Summary table - now handles both SSP and USD amounts
+      // Summary table
       const summaryData = [
-        ['Total Income', reportData.totalIncome],
-        ['Total Expenses', reportData.totalExpenses],
-        ['Net Income', reportData.netIncome]
+        ['Total Income', `SSP ${parseFloat(reportData.totalIncome).toLocaleString()}`],
+        ['Total Expenses', `SSP ${parseFloat(reportData.totalExpenses).toLocaleString()}`],
+        ['Net Income', `SSP ${parseFloat(reportData.netIncome).toLocaleString()}`]
       ];
       
       summaryData.forEach(([label, value], index) => {
         const isNetIncome = label === 'Net Income';
-        // Extract SSP amount for color determination (first number in string)
-        const sspMatch = reportData.netIncome.match(/SSP ([\d,.-]+)/);
-        const netIncomeSSP = sspMatch ? parseFloat(sspMatch[1].replace(/,/g, '')) : 0;
-        const bgColor = isNetIncome ? (netIncomeSSP >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
+        const bgColor = isNetIncome ? (parseFloat(reportData.netIncome) >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
         
         // Row background
         doc.setFillColor(...bgColor);
@@ -794,21 +782,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 15;
         doc.setTextColor(0, 0, 0);
         
-        // Department data - now handles formatted strings with both currencies
-        const deptEntries = Object.entries(reportData.departmentBreakdown);
-        
-        // Extract total SSP amount for percentage calculation
-        const totalIncomeMatch = reportData.totalIncome.match(/SSP ([\d,.-]+)/);
-        const totalIncomeSSP = totalIncomeMatch ? parseFloat(totalIncomeMatch[1].replace(/,/g, '')) : 0;
-        
-        // Sort by SSP amount (first currency in string)
-        deptEntries.sort((a, b) => {
-          const aMatch = a[1].match(/SSP ([\d,.-]+)/);
-          const bMatch = b[1].match(/SSP ([\d,.-]+)/);
-          const aAmount = aMatch ? parseFloat(aMatch[1].replace(/,/g, '')) : 0;
-          const bAmount = bMatch ? parseFloat(bMatch[1].replace(/,/g, '')) : 0;
-          return bAmount - aAmount;
-        });
+        // Department data
+        const deptEntries = Object.entries(reportData.departmentBreakdown).sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
+        const totalIncome = parseFloat(reportData.totalIncome);
         
         deptEntries.forEach(([deptId, amount], index) => {
           let deptName = 'Unknown Department';
@@ -818,10 +794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           else if (deptId === '6a06d917-a94a-4637-b1f6-a3fd6855ddd6') deptName = 'X-Ray';
           else if (deptId === '8fb395f9-ae59-4ddc-9ad3-e56b7fda161c') deptName = 'Pharmacy';
           
-          // Extract SSP amount for percentage calculation
-          const sspMatch = amount.match(/SSP ([\d,.-]+)/);
-          const sspAmount = sspMatch ? parseFloat(sspMatch[1].replace(/,/g, '')) : 0;
-          const percentage = totalIncomeSSP > 0 ? ((sspAmount / totalIncomeSSP) * 100).toFixed(1) : '0.0';
+          const percentage = totalIncome > 0 ? ((parseFloat(amount) / totalIncome) * 100).toFixed(1) : '0.0';
           
           // Alternating row colors
           const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
@@ -831,7 +804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           doc.setFont(undefined, 'normal');
           doc.setFontSize(11);
           doc.text(deptName, margin + 5, currentY);
-          doc.text(amount, pageWidth - margin - 5, currentY, { align: 'right' }); // Use formatted string directly
+          doc.text(`SSP ${parseFloat(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
           doc.text(`${percentage}%`, pageWidth - margin - 60, currentY, { align: 'right' });
           
           currentY += 12;
