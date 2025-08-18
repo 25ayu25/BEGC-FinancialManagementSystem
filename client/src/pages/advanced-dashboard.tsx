@@ -320,7 +320,7 @@ export default function AdvancedDashboard() {
                     <span className="text-xs text-slate-500 font-medium">Revenue (SSP)</span>
                   </div>
                   
-                  <div className="ml-8">
+                  <div className="ml-8 h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={incomeSeries} 
@@ -340,9 +340,6 @@ export default function AdvancedDashboard() {
                           tickLine={false}
                           tick={{ fontSize: 11, fill: '#64748b' }}
                           tickFormatter={formatXAxis}
-                          domain={[0.5, daysInMonth + 0.5]}
-                          type="number"
-                          scale="linear"
                           ticks={[1, 8, 15, 22, daysInMonth]}
                         />
                         <YAxis 
@@ -378,6 +375,7 @@ export default function AdvancedDashboard() {
                           stroke="none"
                           style={{ cursor: 'pointer' }}
                           onClick={handleBarClick}
+                          maxBarSize={18}
                         />
                       </BarChart>
                     </ResponsiveContainer>
