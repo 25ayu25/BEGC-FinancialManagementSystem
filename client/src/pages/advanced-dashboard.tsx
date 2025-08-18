@@ -35,7 +35,7 @@ export default function AdvancedDashboard() {
   });
 
   const { data: incomeData } = useQuery({
-    queryKey: ['/api/income-trends'],
+    queryKey: ['/api/income-trends', selectedYear, selectedMonth],
   });
 
   if (isLoading) {
@@ -68,7 +68,7 @@ export default function AdvancedDashboard() {
             Executive Dashboard
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-            Track key financial metrics - August 2025
+            Track key financial metrics - {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </p>
         </div>
         

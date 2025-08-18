@@ -53,6 +53,8 @@ export interface IStorage {
     insuranceBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }>;
+  getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>>;
+  getIncomeTrendsForMonth(year: number, month: number): Promise<Array<{ date: string, income: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -301,6 +303,48 @@ export class DatabaseStorage implements IStorage {
     const current = new Date(startDate);
     
     while (current <= endDate) {
+      const dateStr = current.toISOString().split('T')[0];
+      const existingData = incomeData.find(d => d.date === dateStr);
+      
+      result.push({
+        date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        income: existingData ? Number(existingData.income) : 0
+      });
+      
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return result;
+  }
+
+  async getIncomeTrendsForMonth(year: number, month: number): Promise<Array<{ date: string, income: number }>> {
+    // Get start and end dates for the month
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0); // Last day of the month
+
+    const incomeData = await db.select({
+      date: sql<string>`DATE(${transactions.date})`,
+      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`
+    }).from(transactions)
+    .where(
+      and(
+        eq(transactions.type, "income"),
+        gte(transactions.date, startDate),
+        lte(transactions.date, endDate)
+      )
+    )
+    .groupBy(sql`DATE(${transactions.date})`)
+    .orderBy(sql`DATE(${transactions.date})`);
+
+    // Get the last 7 days of the month or today's date if in current month
+    const today = new Date();
+    const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
+    const lastDayToShow = isCurrentMonth ? today : endDate;
+    
+    const result: Array<{ date: string, income: number }> = [];
+    const current = new Date(Math.max(lastDayToShow.getTime() - 6 * 24 * 60 * 60 * 1000, startDate.getTime()));
+    
+    while (current <= lastDayToShow) {
       const dateStr = current.toISOString().split('T')[0];
       const existingData = incomeData.find(d => d.date === dateStr);
       

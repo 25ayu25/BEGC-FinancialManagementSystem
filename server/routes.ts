@@ -124,6 +124,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/income-trends/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const data = await storage.getIncomeTrendsForMonth(year, month);
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching income trends for month:", error);
+      res.status(500).json({ error: "Failed to fetch income trends" });
+    }
+  });
+
   // Monthly Reports
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {
