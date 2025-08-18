@@ -35,7 +35,7 @@ export default function Sidebar() {
             <Building2 className="text-white text-xl" />
           </div>
           <div>
-            <h1 className="font-bold text-white text-lg">Bahr El Ghazal Clinic</h1>
+            <h1 className="font-medium text-gray-100 text-base">Bahr El Ghazal Clinic</h1>
             <p className="text-sm text-teal-100">Financial Management System</p>
           </div>
         </div>
