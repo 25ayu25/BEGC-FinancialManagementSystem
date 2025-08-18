@@ -52,7 +52,7 @@ export default function Sidebar() {
                 className={cn(
                   "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer",
                   isActive 
-                    ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500 font-medium" 
+                    ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500" 
                     : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
                 )}
                 data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
