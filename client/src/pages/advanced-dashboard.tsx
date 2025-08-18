@@ -106,14 +106,14 @@ export default function AdvancedDashboard() {
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                <p className="text-xl font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-emerald-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   <span className="text-xs font-medium">+{revenueGrowth}%</span>
@@ -126,13 +126,31 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Net Profit */}
+        {/* Total Expenses */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-xs font-medium">Net Profit</p>
-                <p className="text-xl font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
+                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+                <div className="flex items-center mt-1 text-red-600">
+                  <span className="text-xs font-medium">vs last month</span>
+                </div>
+              </div>
+              <div className="bg-red-50 p-2 rounded-full">
+                <TrendingDown className="h-5 w-5 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Net Income */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Net Income</p>
+                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-blue-600">
                   <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
                 </div>
@@ -150,7 +168,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
-                <p className="text-xl font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+                <p className="text-lg font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
                   <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
                 </div>
@@ -168,7 +186,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Patient Volume</p>
-                <p className="text-xl font-semibold text-slate-900">{patientVolume}</p>
+                <p className="text-lg font-semibold text-slate-900">{patientVolume}</p>
                 <div className="flex items-center mt-1 text-orange-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   <span className="text-xs font-medium">+8.3%</span>

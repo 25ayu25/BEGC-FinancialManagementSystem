@@ -47,9 +47,9 @@ export default function Sidebar() {
           const isActive = location === item.href;
           return (
             <Link key={item.name} href={item.href}>
-              <a 
+              <div 
                 className={cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer",
                   isActive 
                     ? "text-teal-700 bg-gradient-to-r from-teal-50 to-emerald-50 border-r-2 border-teal-500 font-semibold" 
                     : "text-gray-600 hover:text-teal-700 hover:bg-gradient-to-r hover:from-teal-50/50 hover:to-emerald-50/50"
@@ -58,7 +58,7 @@ export default function Sidebar() {
               >
                 <item.icon className="w-5 h-5" />
                 <span className="font-medium">{item.name}</span>
-              </a>
+              </div>
             </Link>
           );
         })}
