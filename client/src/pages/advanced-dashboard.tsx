@@ -222,11 +222,18 @@ export default function AdvancedDashboard() {
                       
                       return (
                         <div key={index} className="flex flex-col items-center justify-end h-full">
-                          <div 
-                            className="w-full bg-gradient-to-t from-teal-500 to-teal-400 rounded-t-lg min-h-[8px] transition-all duration-300 hover:from-teal-600 hover:to-teal-500"
-                            style={{ height: `${Math.max(height, 8)}%` }}
-                            title={`${item.date}: SSP ${item.income.toLocaleString()}`}
-                          />
+                          {item.income > 0 ? (
+                            <div 
+                              className="w-full bg-gradient-to-t from-teal-500 to-teal-400 rounded-t-lg transition-all duration-300 hover:from-teal-600 hover:to-teal-500"
+                              style={{ height: `${Math.max(height, 8)}%` }}
+                              title={`${item.date}: SSP ${item.income.toLocaleString()}`}
+                            />
+                          ) : (
+                            <div 
+                              className="w-full bg-slate-200 rounded-lg h-2"
+                              title={`${item.date}: SSP ${item.income.toLocaleString()}`}
+                            />
+                          )}
                           <span className="text-xs text-slate-600 mt-2 text-center">{item.date}</span>
                         </div>
                       );
