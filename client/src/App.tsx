@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -5,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import AdvancedDashboard from "@/pages/advanced-dashboard";
+import SimpleDashboard from "@/pages/simple-dashboard";
 import Transactions from "@/pages/transactions";
 import TransactionsSupabase from "@/pages/transactions-supabase";
 import Reports from "@/pages/reports";
@@ -22,12 +24,14 @@ function Router() {
 
   console.log('Supabase Auth state:', { isAuthenticated, isLoading, user: !!user, profile: !!profile });
 
-  // Seed data if authenticated and not loading
-  if (isAuthenticated && !isLoading && user) {
-    import('@/lib/seedData').then(({ seedSupabaseData }) => {
-      seedSupabaseData();
-    });
-  }
+  // Seed data if authenticated and not loading (moved to useEffect to avoid hooks issues)
+  useEffect(() => {
+    if (isAuthenticated && !isLoading && user) {
+      import('@/lib/seedData').then(({ seedSupabaseData }) => {
+        seedSupabaseData();
+      });
+    }
+  }, [isAuthenticated, isLoading, user]);
 
   if (isLoading) {
     return (
@@ -49,7 +53,7 @@ function Router() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Switch>
-          <Route path="/" component={AdvancedDashboard} />
+          <Route path="/" component={SimpleDashboard} />
           <Route path="/advanced" component={AdvancedDashboard} />
           <Route path="/simple" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
