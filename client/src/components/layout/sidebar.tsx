@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
+import { useAuth } from "@/hooks/useAuth";
 
 const navigation = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
@@ -25,6 +26,7 @@ const navigation = [
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   return (
     <div className="w-64 bg-white shadow-xl flex flex-col border-r border-gray-100" data-testid="sidebar-navigation">
@@ -67,7 +69,10 @@ export default function Sidebar() {
 
       {/* User Profile & Status */}
       <div className="p-4 border-t border-gray-200">
-        <UserProfileMenu userName="Admin User" userRole="USA Admin" />
+        <UserProfileMenu 
+          userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : "Loading..."}
+          userRole={user ? `${user.location.toUpperCase()} ${user.role.charAt(0).toUpperCase() + user.role.slice(1)}` : "Loading..."}
+        />
         
         {/* Sync Status */}
         <div className="flex items-center space-x-2 text-xs">
