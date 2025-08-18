@@ -23,6 +23,10 @@ export interface AuthRequest extends Request {
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const userId = req.session?.userId;
   
+  console.log('Auth check - Session ID:', req.sessionID);
+  console.log('Auth check - User ID:', userId);
+  console.log('Auth check - Session data:', req.session);
+  
   if (!userId) {
     return res.status(401).json({ message: 'Unauthorized' });
   }

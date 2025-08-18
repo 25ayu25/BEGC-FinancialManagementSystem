@@ -27,18 +27,23 @@ export function useAuth() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('Checking authentication status...');
         const response = await fetch('/api/auth/user', {
           credentials: 'include'
         });
         
+        console.log('Auth check response:', response.status);
+        
         if (response.ok) {
           const user = await response.json();
+          console.log('User authenticated:', user);
           setAuthState({
             user,
             isLoading: false,
             isAuthenticated: true,
           });
         } else {
+          console.log('User not authenticated');
           setAuthState({
             user: null,
             isLoading: false,
@@ -46,6 +51,7 @@ export function useAuth() {
           });
         }
       } catch (error) {
+        console.error('Auth check error:', error);
         setAuthState({
           user: null,
           isLoading: false,
