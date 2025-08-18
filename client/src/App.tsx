@@ -12,6 +12,7 @@ import Receipts from "@/pages/receipts";
 import Settings from "@/pages/settings";
 import Security from "@/pages/security";
 import Login from "@/pages/login";
+import { TempAuthBypass } from "@/components/TempAuthBypass";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -40,12 +41,7 @@ function Router() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <Switch>
-        <Route path="/login" component={Login} />
-        <Route component={Login} />
-      </Switch>
-    );
+    return <TempAuthBypass />;
   }
 
   return (
