@@ -216,7 +216,28 @@ export default function AdvancedDashboard() {
                 <div className="space-y-4">
                   {/* Revenue Trend Visualization */}
                   <div className="grid grid-cols-7 gap-2 h-48">
-                    {incomeData.slice(-7).map((item: any, index: number) => {
+                    {(() => {
+                      // Show only days with transactions, plus some context days around them
+                      const daysWithIncome = incomeData.filter((item: any) => item.income > 0);
+                      
+                      if (daysWithIncome.length === 0) {
+                        // No transactions - show last 7 days
+                        return incomeData.slice(-7);
+                      } else if (daysWithIncome.length <= 7) {
+                        // Few transactions - show them with some context
+                        const firstIncomeIndex = incomeData.findIndex((item: any) => item.income > 0);
+                        const lastIncomeIndex = incomeData.map((item: any) => item.income > 0).lastIndexOf(true);
+                        
+                        const startIndex = Math.max(0, firstIncomeIndex - 1);
+                        const endIndex = Math.min(incomeData.length - 1, lastIncomeIndex + 1);
+                        const contextDays = incomeData.slice(startIndex, endIndex + 1);
+                        
+                        return contextDays.length <= 7 ? contextDays : incomeData.slice(-7);
+                      } else {
+                        // Many transactions - show last 7 days for readability
+                        return incomeData.slice(-7);
+                      }
+                    })().map((item: any, index: number) => {
                       const maxIncome = Math.max(...incomeData.map((d: any) => d.income));
                       const height = maxIncome > 0 ? (item.income / maxIncome) * 100 : 0;
                       
