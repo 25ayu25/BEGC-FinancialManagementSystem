@@ -106,7 +106,7 @@ export default function Settings() {
     mutationFn: async (data: z.infer<typeof profileSchema>) => {
       return apiRequest('PUT', '/api/user/profile', data);
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
@@ -147,7 +147,7 @@ export default function Settings() {
   });
 
   // User management queries and mutations (admin only)
-  const { data: users = [] } = useQuery({
+  const { data: users = [] } = useQuery<any[]>({
     queryKey: ['/api/users'],
     enabled: user?.role === 'admin',
   });
@@ -699,7 +699,7 @@ export default function Settings() {
                       No users found. Create the first user account.
                     </div>
                   ) : (
-                    users.map((userData: any) => (
+                    (users as any[]).map((userData: any) => (
                       <div 
                         key={userData.id} 
                         className="flex items-center justify-between p-3 border-b last:border-b-0"
