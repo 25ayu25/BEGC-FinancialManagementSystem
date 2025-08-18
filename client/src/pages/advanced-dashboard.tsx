@@ -113,7 +113,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <p className="text-lg font-semibold text-slate-900">USD {Math.round(totalIncome * 0.00075).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-emerald-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   <span className="text-xs font-medium">+{revenueGrowth}%</span>
@@ -132,7 +132,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+                <p className="text-lg font-semibold text-slate-900">USD {Math.round(totalExpenses * 0.00075).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-red-600">
                   <span className="text-xs font-medium">vs last month</span>
                 </div>
@@ -150,7 +150,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <p className="text-lg font-semibold text-slate-900">USD {Math.round(netIncome * 0.00075).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-blue-600">
                   <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
                 </div>
