@@ -16,7 +16,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 
 // Password change schema
 const passwordSchema = z.object({
@@ -190,7 +190,7 @@ export default function Security() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => handleSecurityAction("Change password")}
+                onClick={() => setShowPasswordDialog(true)}
                 data-testid="button-change-password"
               >
                 Change Password
@@ -392,96 +392,100 @@ export default function Security() {
           </Card>
         )}
 
-        {/* Change Password Dialog */}
-        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Change Password</DialogTitle>
-            </DialogHeader>
-            <Form {...passwordForm}>
-              <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-                <FormField
-                  control={passwordForm.control}
-                  name="currentPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Current Password</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="password" 
-                          {...field} 
-                          data-testid="input-current-password"
-                          placeholder="Enter current password"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+        {/* Change Password Form */}
+        {showPasswordDialog && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Change Password
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                  <FormField
+                    control={passwordForm.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="password" 
+                            {...field} 
+                            data-testid="input-current-password"
+                            placeholder="Enter current password"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={passwordForm.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>New Password</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="password" 
-                          {...field} 
-                          data-testid="input-new-password"
-                          placeholder="Enter new password"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={passwordForm.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="password" 
+                            {...field} 
+                            data-testid="input-new-password"
+                            placeholder="Enter new password"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={passwordForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm New Password</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="password" 
-                          {...field} 
-                          data-testid="input-confirm-new-password"
-                          placeholder="Confirm new password"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm New Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="password" 
+                            {...field} 
+                            data-testid="input-confirm-new-password"
+                            placeholder="Confirm new password"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="flex gap-2 pt-4">
-                  <Button 
-                    type="submit" 
-                    disabled={updatePasswordMutation.isPending}
-                    data-testid="button-submit-password-change"
-                    className="flex-1"
-                  >
-                    {updatePasswordMutation.isPending ? "Updating..." : "Change Password"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowPasswordDialog(false);
-                      passwordForm.reset();
-                    }}
-                    data-testid="button-cancel-password-change"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      type="submit" 
+                      disabled={updatePasswordMutation.isPending}
+                      data-testid="button-submit-password-change"
+                    >
+                      {updatePasswordMutation.isPending ? "Updating..." : "Change Password"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowPasswordDialog(false);
+                        passwordForm.reset();
+                      }}
+                      data-testid="button-cancel-password-change"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
