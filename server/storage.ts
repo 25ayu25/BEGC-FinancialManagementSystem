@@ -336,45 +336,11 @@ export class DatabaseStorage implements IStorage {
     .groupBy(sql`DATE(${transactions.date})`)
     .orderBy(sql`DATE(${transactions.date})`);
 
-    // If no income data exists, show last 7 days with zeros
-    if (incomeData.length === 0) {
-      const today = new Date();
-      const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
-      const lastDayToShow = isCurrentMonth ? today : endDate;
-      
-      const result: Array<{ date: string, income: number }> = [];
-      const current = new Date(Math.max(lastDayToShow.getTime() - 6 * 24 * 60 * 60 * 1000, startDate.getTime()));
-      
-      while (current <= lastDayToShow) {
-        result.push({
-          date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          income: 0
-        });
-        current.setDate(current.getDate() + 1);
-      }
-      
-      return result;
-    }
-
-    // Show all days with transactions, plus some context days around them
-    const transactionDates = incomeData.map(d => new Date(d.date + 'T00:00:00'));
-    const firstTransactionDate = new Date(Math.min(...transactionDates.map(d => d.getTime())));
-    const lastTransactionDate = new Date(Math.max(...transactionDates.map(d => d.getTime())));
-    
-    // Add 1-2 days before and after for context, but stay within the month
-    const chartStartDate = new Date(Math.max(
-      firstTransactionDate.getTime() - 1 * 24 * 60 * 60 * 1000,
-      startDate.getTime()
-    ));
-    const chartEndDate = new Date(Math.min(
-      lastTransactionDate.getTime() + 1 * 24 * 60 * 60 * 1000,
-      endDate.getTime()
-    ));
-    
+    // Show the entire month - all days from 1st to last day
     const result: Array<{ date: string, income: number }> = [];
-    const current = new Date(chartStartDate);
+    const current = new Date(startDate);
     
-    while (current <= chartEndDate) {
+    while (current <= endDate) {
       const dateStr = current.toISOString().split('T')[0];
       const existingData = incomeData.find(d => d.date === dateStr);
       
