@@ -125,8 +125,51 @@ export const supabaseInsurance = {
   }
 }
 
-// Dashboard functions
+// Dashboard functions using SQL views
 export const supabaseDashboard = {
+  async getTotals() {
+    const { data, error } = await supabase
+      .from('v_totals_current_month')
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('Dashboard totals error:', error);
+      return {
+        total_income: '0.00',
+        total_expense: '0.00', 
+        net_income: '0.00',
+        transactions_count: 0
+      };
+    }
+    return data;
+  },
+
+  async getDepartmentTotals() {
+    const { data, error } = await supabase
+      .from('v_dept_totals_current_month')
+      .select('*')
+      .order('income', { ascending: false });
+    
+    if (error) {
+      console.error('Department totals error:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async getInsuranceTotals() {
+    const { data, error } = await supabase
+      .from('v_insurance_totals_current_month')
+      .select('*')
+      .order('income', { ascending: false });
+    
+    if (error) {
+      console.error('Insurance totals error:', error);
+      return [];
+    }
+    return data || [];
+  },
   async getMonthlyData(year: number, month: number) {
     console.log('getMonthlyData called with:', { year, month })
     

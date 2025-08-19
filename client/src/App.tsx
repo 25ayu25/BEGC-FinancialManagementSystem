@@ -45,7 +45,7 @@ function Router() {
   }
 
   if (!isAuthenticated) {
-    return <TempAuthBypass />;
+    return <Login />;
   }
 
   return (

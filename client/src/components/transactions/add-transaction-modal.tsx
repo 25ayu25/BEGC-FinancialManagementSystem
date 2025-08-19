@@ -41,23 +41,48 @@ export default function AddTransactionModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Use Supabase queries instead of API
   const { data: departments } = useQuery({
-    queryKey: ["/api/departments"],
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const { data, error } = await import('@/lib/supabase').then(({ supabase }) =>
+        supabase.from('departments').select('*').order('name')
+      );
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: insuranceProviders } = useQuery({
-    queryKey: ["/api/insurance-providers"],
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ["insurance-providers"],
+    queryFn: async () => {
+      const { data, error } = await import('@/lib/supabase').then(({ supabase }) =>
+        supabase.from('insurance_providers').select('*').order('name')
+      );
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/transactions", data);
+      const { supabase } = await import('@/lib/supabase');
+      const { data: result, error } = await supabase
+        .from('transactions')
+        .insert(data)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-departments"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-insurance"] });
       toast({
         title: "Success",
         description: "Transaction created successfully",
