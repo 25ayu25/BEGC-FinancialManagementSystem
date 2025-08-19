@@ -1,52 +1,29 @@
-import { useEffect } from "react";
 import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
+
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Dashboard from "@/pages/dashboard";
+
 import AdvancedDashboard from "@/pages/advanced-dashboard";
 import SimpleDashboard from "@/pages/simple-dashboard";
-import Transactions from "@/pages/transactions";
 import TransactionsSupabase from "@/pages/transactions-supabase";
 import Reports from "@/pages/reports";
 import Receipts from "@/pages/receipts";
 import Settings from "@/pages/settings";
 import Security from "@/pages/security";
 import Login from "@/pages/login";
-import { TempAuthBypass } from "@/components/TempAuthBypass";
 import NotFound from "@/pages/not-found";
+
 import Sidebar from "@/components/layout/sidebar";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import Loading from "@/components/Loading";
 
 function Router() {
-  const { isAuthenticated, isLoading, user, profile } = useSupabaseAuth();
+  const { isAuthenticated, isLoading } = useSupabaseAuth();
 
-  console.log('Supabase Auth state:', { isAuthenticated, isLoading, user: !!user, profile: !!profile });
-
-  // Data seeding disabled during schema migration phase
-  // useEffect(() => {
-  //   if (isAuthenticated && !isLoading && user) {
-  //     import('@/lib/seedData').then(({ seedSupabaseData }) => {
-  //       seedSupabaseData();
-  //     });
-  //   }
-  // }, [isAuthenticated, isLoading, user]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Login />;
-  }
+  if (isLoading) return <Loading />;
+  if (!isAuthenticated) return <Login />;
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -56,7 +33,6 @@ function Router() {
           <Route path="/" component={AdvancedDashboard} />
           <Route path="/advanced" component={AdvancedDashboard} />
           <Route path="/simple" component={SimpleDashboard} />
-          <Route path="/dashboard" component={AdvancedDashboard} />
           <Route path="/transactions" component={TransactionsSupabase} />
           <Route path="/add-transaction" component={TransactionsSupabase} />
           <Route path="/reports" component={Reports} />
@@ -70,7 +46,7 @@ function Router() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -80,5 +56,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;
