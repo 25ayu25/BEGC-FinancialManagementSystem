@@ -221,6 +221,37 @@ export default function AddTransactionModal({
 
 
 
+          {/* Insurance Provider (for income only) */}
+          {type === "income" && (
+            <div>
+              <Label htmlFor="insurance" className="text-sm font-medium text-gray-700">
+                Insurance Provider (Optional)
+              </Label>
+              <Select value={insuranceProviderId} onValueChange={(value) => {
+                setInsuranceProviderId(value);
+                // Default to USD for insurance transactions
+                if (value && value !== "no-insurance") {
+                  setCurrency("USD");
+                }
+              }}>
+                <SelectTrigger data-testid="select-insurance" className="h-12">
+                  <SelectValue placeholder="Select Insurance Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-insurance">
+                    <span className="text-gray-500 italic">No Insurance</span>
+                  </SelectItem>
+                  {(insuranceProviders as any)?.map((provider: any) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      <span className="font-medium">{provider.name}</span>
+                      <span className="text-xs text-teal-600 ml-2">({provider.code})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Amount Fields */}
           <div className="grid grid-cols-2 gap-4">
             <div>
