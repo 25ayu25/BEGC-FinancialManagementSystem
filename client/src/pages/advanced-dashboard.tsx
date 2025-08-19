@@ -44,27 +44,22 @@ export default function AdvancedDashboard() {
   const { toast } = useToast();
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['supabase-dashboard', selectedYear, selectedMonth],
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth],
     queryFn: async () => {
-      const { supabaseDashboard } = await import('@/lib/supabaseQueries')
-      return await supabaseDashboard.getMonthlyData(selectedYear, selectedMonth)
-    },
+      const res = await fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      return res.json();
+    }
   });
 
   const { data: departments } = useQuery({
-    queryKey: ['supabase-departments'],
-    queryFn: async () => {
-      const { supabaseDepartments } = await import('@/lib/supabaseQueries')
-      return await supabaseDepartments.getAll()
-    },
+    queryKey: ["/api/departments"],
   });
 
   const { data: rawIncome } = useQuery({
-    queryKey: ['supabase-income-trends', selectedYear, selectedMonth],
-    queryFn: async () => {
-      const { supabaseDashboard } = await import('@/lib/supabaseQueries')
-      return await supabaseDashboard.getIncomeTrends(selectedYear, selectedMonth)
-    },
+    queryKey: ["/api/income-trends"],
   });
 
   const exportDashboard = async () => {
