@@ -11,21 +11,20 @@ import {
 } from "lucide-react";
 
 export default function SimpleDashboard() {
-  // Mock data to demonstrate working dashboard while Supabase schema is being finalized
-  const dashboardData = {
-    totalIncome: "107000.00",
-    totalExpense: "13000.00", 
-    netIncome: "94000.00",
-    insuranceRevenue: "46.15",
-    insuranceProviders: 3,
-    transactionCount: 9,
-    transactions: []
-  }
-  
-  const isLoading = false
-  const error = null
+  const currentDate = new Date();
+  const selectedYear = currentDate.getFullYear();
+  const selectedMonth = currentDate.getMonth() + 1;
 
-  console.log('Displaying mock financial data while Supabase migration completes')
+  const { data: dashboardData, isLoading, error } = useQuery({
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      return res.json();
+    }
+  });
 
   if (isLoading) {
     return (
