@@ -14,10 +14,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionCookie = req.cookies?.user_session;
       
       if (!sessionCookie) {
-        // Fallback: use default admin for development
-        console.log("No session found, using default admin user");
-        req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa", username: "admin" };
-        return next();
+        // No session - require authentication
+        console.log("No session found, authentication required");
+        return res.status(401).json({ error: "Authentication required" });
       }
 
       try {
@@ -42,9 +41,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (parseError) {
         // Invalid session cookie, clear it
         res.clearCookie('user_session');
-        console.log("Invalid session cookie, using default admin user");
-        req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa", username: "admin" };
-        next();
+        console.log("Invalid session cookie");
+        return res.status(401).json({ error: "Invalid session" });
       }
     } catch (error) {
       console.error("Auth middleware error:", error);

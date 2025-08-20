@@ -64,8 +64,8 @@ export default function LoginPage() {
         description: `Welcome back, ${user.fullName || user.username}!`
       });
       
-      // Redirect to dashboard
-      navigate('/');
+      // Redirect to dashboard with full page refresh to ensure proper state
+      window.location.href = '/';
     } catch (error: any) {
       toast({
         variant: "destructive",

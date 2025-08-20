@@ -28,16 +28,25 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
       const res = await fetch('/api/auth/user', {
         credentials: 'include'
       });
-      if (!res.ok) throw new Error('Failed to fetch user');
+      if (!res.ok) {
+        if (res.status === 401) {
+          // Redirect to login if not authenticated
+          window.location.href = '/login';
+          throw new Error('Authentication required');
+        }
+        throw new Error('Failed to fetch user');
+      }
       return res.json();
-    }
+    },
+    staleTime: 0, // Always refetch
+    gcTime: 0  // Don't cache (updated property name for TanStack Query v5)
   });
 
   // Use provided props or fetched data
   const displayName = userName || currentUser?.fullName || currentUser?.username || "User";
-  const displayRole = userRole || (currentUser?.role === 'admin' ? 'Administrator' : 
-    currentUser?.location === 'usa' ? `${currentUser?.role} - USA` : 
-    currentUser?.location === 'south_sudan' ? `${currentUser?.role} - South Sudan` : 
+  const displayRole = userRole || (currentUser?.role === 'admin' ? 'USA Admin' : 
+    currentUser?.location === 'usa' ? `${currentUser?.role?.charAt(0).toUpperCase() + currentUser?.role?.slice(1)} - USA` : 
+    currentUser?.location === 'south_sudan' ? `${currentUser?.role?.charAt(0).toUpperCase() + currentUser?.role?.slice(1)} - South Sudan` : 
     currentUser?.role) || "User";
 
   const handleSignOut = async () => {
@@ -48,8 +57,8 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
       });
       
       if (res.ok) {
-        // Redirect to login page
-        navigate('/login');
+        // Clear any cached user data and redirect to login page
+        window.location.href = '/login';
       } else {
         console.error('Failed to sign out');
       }
