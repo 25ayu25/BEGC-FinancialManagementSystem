@@ -4,9 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { supabaseDashboard } from "@/lib/supabaseQueries";
-import jsPDF from 'jspdf';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -21,7 +18,6 @@ import {
   Filter,
   RefreshCw
 } from "lucide-react";
-import { RefreshButton } from "@/components/RefreshButton";
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -41,111 +37,22 @@ export default function AdvancedDashboard() {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [timeRange, setTimeRange] = useState("month");
-  const [isExporting, setIsExporting] = useState(false);
-  const { toast } = useToast();
 
-  // Use Supabase only for dashboard data
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["dashboard-totals"],
-    queryFn: () => supabaseDashboard.getTotals(),
-    retry: false
+    queryKey: ['/api/dashboard', selectedYear, selectedMonth],
+    queryFn: () =>
+      fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   });
 
-  const { data: departmentData } = useQuery({
-    queryKey: ["dashboard-departments"],
-    queryFn: () => supabaseDashboard.getDepartmentTotals(),
-    retry: false
+  const { data: departments } = useQuery({
+    queryKey: ['/api/departments'],
   });
 
-  const { data: insuranceData } = useQuery({
-    queryKey: ["dashboard-insurance"], 
-    queryFn: () => supabaseDashboard.getInsuranceTotals(),
-    retry: false
+  const { data: rawIncome } = useQuery({
+    queryKey: ['/api/income-trends', selectedYear, selectedMonth],
+    queryFn: () =>
+      fetch(`/api/income-trends/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   });
-
-  const exportDashboard = async () => {
-    if (!dashboardData) {
-      toast({
-        title: "No Data",
-        description: "No data available to export.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsExporting(true);
-    
-    try {
-      const pdf = new jsPDF();
-      const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      
-      // Header
-      pdf.setFontSize(20);
-      pdf.setTextColor(41, 128, 185);
-      pdf.text('Bahr El Ghazal Clinic', 20, 25);
-      
-      pdf.setFontSize(16);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text(`Executive Dashboard - ${monthName}`, 20, 40);
-      
-      // Key Metrics
-      pdf.setFontSize(14);
-      pdf.text('Financial Summary', 20, 60);
-      
-      const totalIncome = parseFloat(dashboardData.total_income || '0');
-      const totalExpenses = parseFloat(dashboardData.total_expense || '0');
-      const netIncome = parseFloat(dashboardData.net_income || '0');
-      
-      pdf.setFontSize(11);
-      pdf.text(`Total Revenue: SSP ${totalIncome.toLocaleString()}`, 20, 75);
-      pdf.text(`Total Expenses: SSP ${totalExpenses.toLocaleString()}`, 20, 85);
-      pdf.text(`Net Income: SSP ${netIncome.toLocaleString()}`, 20, 95);
-      pdf.text(`Total Transactions: ${transactionCount}`, 20, 105);
-      
-      // Department Performance (if available)
-      if (departmentData && departmentData.length > 0) {
-        pdf.text('Department Performance', 20, 125);
-        let yPos = 140;
-        departmentData.slice(0, 5).forEach((dept: any) => {
-          pdf.text(`${dept.department}: SSP ${parseFloat(dept.income || '0').toLocaleString()}`, 20, yPos);
-          yPos += 10;
-        });
-      }
-
-      // Insurance Performance (if available)
-      if (insuranceData && insuranceData.length > 0) {
-        pdf.text('Insurance Providers', 20, 190);
-        let yPos = 205;
-        insuranceData.slice(0, 5).forEach((ins: any) => {
-          pdf.text(`${ins.insurance}: SSP ${parseFloat(ins.income || '0').toLocaleString()}`, 20, yPos);
-          yPos += 10;
-        });
-      }
-      
-      // Footer
-      pdf.setFontSize(8);
-      pdf.setTextColor(128, 128, 128);
-      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 20, 280);
-      pdf.text('Confidential - Bahr El Ghazal Clinic Financial Report', 20, 290);
-      
-      // Download
-      pdf.save(`dashboard-${monthName.replace(' ', '_')}.pdf`);
-      
-      toast({
-        title: "Export Successful",
-        description: `Dashboard exported as PDF for ${monthName}.`
-      });
-    } catch (error) {
-      console.error('Export error:', error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to export dashboard. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   // Build a zero-filled daily series for the selected month
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
@@ -163,6 +70,21 @@ export default function AdvancedDashboard() {
       year: 'numeric' 
     }),
   }));
+
+  if (Array.isArray(rawIncome)) {
+    for (const r of rawIncome) {
+      // Accept several shapes: {day}, {dateISO}, {date}
+      let day = r.day;
+      if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
+      if (!day && r.date) day = new Date(r.date).getDate();
+      if (day >= 1 && day <= daysInMonth) {
+        // Use new currency-specific fields
+        incomeSeries[day - 1].amountUSD += Number(r.incomeUSD ?? 0);
+        incomeSeries[day - 1].amountSSP += Number(r.incomeSSP ?? 0);
+        incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0); // Total for backward compatibility
+      }
+    }
+  }
   
   // Compute summary stats from the same series
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
@@ -257,20 +179,15 @@ export default function AdvancedDashboard() {
     );
   }
 
-  // Map Supabase view field names to dashboard data or show "No data yet"
-  const totalIncome = parseFloat(dashboardData?.total_income || '0');
-  const totalExpenses = parseFloat(dashboardData?.total_expense || '0'); 
-  const netIncome = parseFloat(dashboardData?.net_income || '0');
-  const transactionCount = dashboardData?.transactions_count || 0;
-
-  // Calculate insurance revenue from insurance data
-  const insuranceIncome = insuranceData ? 
-    insuranceData.reduce((sum, ins) => sum + parseFloat(ins.income || '0'), 0) : 0;
+  const totalIncome = parseFloat(dashboardData?.totalIncome || '0');
+  const totalExpenses = parseFloat(dashboardData?.totalExpenses || '0');
+  const netIncome = parseFloat(dashboardData?.netIncome || '0');
+  const insuranceIncome = Object.values(dashboardData?.insuranceBreakdown || {})
+    .reduce((sum: number, amount: any) => sum + parseFloat(amount || '0'), 0);
 
   const profitMargin = totalIncome > 0 ? ((netIncome / totalIncome) * 100) : 0;
   const revenueGrowth = 12.5; // This would come from backend calculation
-  const patientVolume = transactionCount; // Use transaction count as patient volume proxy
-  const insuranceProviders = insuranceData ? insuranceData.length : 0;
+  const patientVolume = 456; // This would come from backend
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 p-6">
@@ -311,16 +228,9 @@ export default function AdvancedDashboard() {
             </SelectContent>
           </Select>
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-9 text-sm"
-            onClick={exportDashboard}
-            disabled={isExporting || isLoading}
-            data-testid="button-export-dashboard"
-          >
+          <Button variant="outline" size="sm" className="h-9 text-sm">
             <Download className="h-3 w-3 mr-2" />
-            {isExporting ? "Exporting..." : "Export"}
+            Export
           </Button>
         </div>
       </div>
@@ -390,7 +300,7 @@ export default function AdvancedDashboard() {
                 <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
                 <p className="text-lg font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
-                  <span className="text-xs font-medium">{insuranceProviders} providers</span>
+                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
                 </div>
               </div>
               <div className="bg-purple-50 p-2 rounded-full">
@@ -566,15 +476,15 @@ export default function AdvancedDashboard() {
             <CardTitle className="text-xl font-semibold text-slate-900">Top Departments</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {Array.isArray(departmentData) ? departmentData.slice(0, 5).map((dept: any, index: number) => {
-              const amount = parseFloat(dept.income || '0');
+            {Array.isArray(departments) ? departments.slice(0, 5).map((dept: any, index: number) => {
+              const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
               const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
               
               return (
                 <div key={dept.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                   <div className="flex items-center space-x-3 flex-1">
                     <div className={`w-3 h-3 rounded-full flex-shrink-0 ${index === 0 ? 'bg-emerald-500' : index === 1 ? 'bg-blue-500' : index === 2 ? 'bg-purple-500' : index === 3 ? 'bg-orange-500' : 'bg-slate-400'}`} />
-                    <span className="font-medium text-slate-700 flex-1">{dept.department}</span>
+                    <span className="font-medium text-slate-700 flex-1">{dept.name}</span>
                   </div>
                   <div className="text-right flex-shrink-0 ml-4">
                     <p className="font-semibold text-slate-900 text-sm">SSP {Math.round(amount).toLocaleString()}</p>

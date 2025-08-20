@@ -1,457 +1,21 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertReceiptSchema, insertUserSchema } from "@shared/schema";
+import { insertTransactionSchema, insertReceiptSchema } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
-import { requireAuth, type AuthRequest } from "./auth";
-import bcrypt from "bcryptjs";
-import session from "express-session";
-import cors from "cors";
-import { Pool } from '@neondatabase/serverless';
-import type { Response, NextFunction } from 'express';
-import ConnectPgSimple from 'connect-pg-simple';
-
-// Database pool for session management queries
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Trust proxy for proper cookie handling
-  app.set('trust proxy', 1);
-  
-  // Configure CORS for cross-origin requests
-  app.use(cors({
-    origin: true, // Allow all origins in development
-    credentials: true,
-  }));
-  
-  // Configure session store
-  const PgSession = ConnectPgSimple(session);
-  const sessionStore = new PgSession({
-    pool: pool,
-    tableName: 'sessions',
-    createTableIfMissing: false,
-  });
-
-  // Configure session middleware
-  app.use(session({
-    store: sessionStore,
-    secret: process.env.SESSION_SECRET || "clinic-finance-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    name: 'bgc.sid',
-    rolling: true,
-    cookie: {
-      httpOnly: true,
-      sameSite: 'none', // Required for cross-origin
-      secure: false, // Set to true in production with HTTPS
-      maxAge: 1000 * 60 * 60 * 8, // 8 hours
-      path: '/',
-    }
-  }));
-
-  // Session metadata tracking middleware
-  app.use((req, res, next) => {
-    if (req.session?.userId) {
-      const m = (req.session as any).meta || {};
-      (req.session as any).meta = {
-        ua: req.get('user-agent') || m.ua || '',
-        ip: req.ip || m.ip || '',
-        createdAt: m.createdAt || Date.now(),
-        lastSeen: Date.now(),
-      };
-      // Keep cookie rolling according to per-user timeout
-      req.session.save(() => next());
-    } else {
-      next();
-    }
-  });
-
-  // Authentication routes
-  app.post('/api/auth/login', async (req: AuthRequest, res) => {
-    try {
-      const { username, password } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
-      }
-
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-
-      // Regenerate session for security and proper cookie setting
-      req.session.regenerate((err) => {
-        if (err) {
-          console.error('Session regenerate error:', err);
-          return res.status(500).json({ message: 'Session error' });
-        }
-        
-        req.session.userId = user.id;
-        req.session.role = user.role;
-        
-        // Add session metadata for device tracking
-        req.session.meta = {
-          ua: req.get('user-agent') || '',
-          ip: req.ip,
-          createdAt: Date.now(),
-          lastSeen: Date.now(),
-        };
-        
-        req.session.save((err2) => {
-          if (err2) {
-            console.error('Session save error:', err2);
-            return res.status(500).json({ message: 'Session save error' });
-          }
-          
-          console.log('Login - Session regenerated and saved');
-          console.log('Login - Setting session userId:', user.id);
-          console.log('Login - Session ID:', req.sessionID);
-          
-          res.json({ 
-            message: 'Login successful',
-            user: {
-              id: user.id,
-              username: user.username,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              email: user.email,
-              role: user.role,
-              location: user.location,
-            },
-          });
-        });
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ message: 'Login failed' });
-    }
-  });
-
-  app.post('/api/auth/logout', (req: AuthRequest, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Logout error:', err);
-        return res.status(500).json({ message: 'Logout failed' });
-      }
-      res.clearCookie('bgc.sid'); // Clear the correct cookie name
-      res.json({ message: 'Logout successful' });
-    });
-  });
-
-  app.get('/api/auth/user', requireAuth, async (req: AuthRequest, res) => {
-    res.json({
-      id: req.user!.id,
-      username: req.user!.username,
-      firstName: req.user!.firstName,
-      lastName: req.user!.lastName,
-      email: req.user!.email,
-      role: req.user!.role,
-      location: req.user!.location
-    });
-  });
-
-  // User profile management routes
-  app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const { firstName, lastName, email } = req.body;
-      const userId = req.user!.id;
-
-      const updates = {
-        firstName: firstName || null,
-        lastName: lastName || null,
-        email: email || null
-      };
-
-      const updatedUser = await storage.updateUser(userId, updates);
-      
-      if (!updatedUser) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      res.json({
-        message: 'Profile updated successfully',
-        user: {
-          id: updatedUser.id,
-          username: updatedUser.username,
-          firstName: updatedUser.firstName,
-          lastName: updatedUser.lastName,
-          email: updatedUser.email,
-          role: updatedUser.role,
-          location: updatedUser.location
-        }
-      });
-    } catch (error) {
-      console.error('Profile update error:', error);
-      res.status(500).json({ message: 'Failed to update profile' });
-    }
-  });
-
-  app.put('/api/user/password', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      const userId = req.user!.id;
-
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: 'Current password and new password are required' });
-      }
-
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: 'Current password is incorrect' });
-      }
-
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await storage.updateUser(userId, { password: hashedPassword });
-
-      res.json({ message: 'Password updated successfully' });
-    } catch (error) {
-      console.error('Password update error:', error);
-      res.status(500).json({ message: 'Failed to update password' });
-    }
-  });
-
-  // Session management routes
-  // List sessions for current user
-  app.get('/api/sessions', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.session.userId;
-      console.log('Getting sessions for user:', userId);
-      console.log('Current session ID:', req.sessionID);
-      
-      const { rows } = await pool.query(`
-        SELECT sid,
-               sess,
-               expire
-        FROM "sessions"
-        WHERE (sess::jsonb ->> 'userId') = $1
-          AND expire > NOW()
-        ORDER BY expire DESC
-      `, [String(userId)]);
-
-      console.log('Found sessions:', rows.length);
-
-      const sessions = rows.map((r: any) => {
-        const sessData = r.sess;
-        const meta = sessData?.meta || {};
-        return {
-          sid: r.sid,
-          expiresAt: new Date(r.expire).getTime(),
-          ua: meta.ua || 'Unknown Browser',
-          ip: meta.ip || 'Unknown',
-          createdAt: meta.createdAt || Date.now(),
-          lastSeen: meta.lastSeen || Date.now(),
-          current: r.sid === req.sessionID,
-        };
-      });
-      
-      console.log('Processed sessions:', sessions.length);
-      res.json({ sessions });
-    } catch (error) {
-      console.error('Failed to fetch sessions:', error);
-      res.status(500).json({ message: 'Failed to fetch sessions' });
-    }
-  });
-
-  // Revoke a specific session
-  app.post('/api/sessions/revoke', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.session.userId;
-      const { sid } = req.body as { sid: string };
-      
-      if (!sid) {
-        return res.status(400).json({ error: 'sid required' });
-      }
-
-      await pool.query(`
-        DELETE FROM "sessions"
-        WHERE sid = $1 AND (sess::jsonb ->> 'userId') = $2
-      `, [sid, String(userId)]);
-      
-      res.json({ ok: true });
-    } catch (error) {
-      console.error('Failed to revoke session:', error);
-      res.status(500).json({ message: 'Failed to revoke session' });
-    }
-  });
-
-  // Revoke all sessions except current
-  app.post('/api/sessions/revoke-all', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.session.userId;
-      const currentSid = req.sessionID;
-
-      console.log('Revoking sessions for user:', userId);
-      console.log('Current session ID:', currentSid);
-      
-      // First check what sessions exist for this user
-      const existingSessions = await pool.query(`
-        SELECT sid, sess::jsonb ->> 'userId' as user_id 
-        FROM "sessions" 
-        WHERE (sess::jsonb ->> 'userId') = $1
-      `, [String(userId)]);
-      
-      console.log('Found sessions for user:', existingSessions.rows);
-
-      const result = await pool.query(`
-        DELETE FROM "sessions"
-        WHERE (sess::jsonb ->> 'userId') = $1
-          AND sid <> $2
-      `, [String(userId), currentSid]);
-      
-      console.log('Deleted sessions count:', result.rowCount);
-      
-      res.json({ ok: true, deletedCount: result.rowCount });
-    } catch (error) {
-      console.error('Failed to revoke all sessions:', error);
-      res.status(500).json({ message: 'Failed to revoke sessions' });
-    }
-  });
-
-  // Get current session timeout
-  app.get('/api/sessions/timeout', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.session.userId;
-      const { rows } = await pool.query(
-        'SELECT session_timeout_minutes FROM users WHERE id = $1',
-        [userId]
-      );
-      
-      res.json({ minutes: rows[0]?.session_timeout_minutes ?? 480 }); // default 8h
-    } catch (error) {
-      console.error('Failed to get session timeout:', error);
-      res.status(500).json({ message: 'Failed to get session timeout' });
-    }
-  });
-
-  // Update session timeout
-  app.put('/api/sessions/timeout', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.session.userId;
-      const { minutes } = req.body as { minutes: number | null };
-
-      await pool.query(
-        'UPDATE users SET session_timeout_minutes = $1 WHERE id = $2',
-        [minutes, userId]
-      );
-
-      // Apply immediately to current cookie
-      const ms = (minutes ?? 480) * 60 * 1000;
-      req.session.cookie.maxAge = ms;
-      
-      await new Promise<void>((resolve) => req.session.save(() => resolve()));
-
-      res.json({ ok: true, minutes: minutes ?? 480 });
-    } catch (error) {
-      console.error('Failed to update session timeout:', error);
-      res.status(500).json({ message: 'Failed to update session timeout' });
-    }
-  });
-
-  // User management routes (admin only)
-  const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
+  // Authentication middleware (simplified for now)
+  const requireAuth = (req: any, res: any, next: any) => {
+    // TODO: Implement proper authentication - using seeded admin user
+    req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa" };
     next();
   };
 
-  app.get('/api/users', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
-    try {
-      const users = await storage.getUsers();
-      res.json(users.map(user => ({
-        id: user.id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        location: user.location,
-        createdAt: user.createdAt
-      })));
-    } catch (error) {
-      console.error('Get users error:', error);
-      res.status(500).json({ message: 'Failed to get users' });
-    }
-  });
-
-  app.post('/api/users', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
-    try {
-      const { username, password, firstName, lastName, email, role, location } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const newUser = await storage.createUser({
-        username,
-        password: hashedPassword,
-        firstName: firstName || null,
-        lastName: lastName || null,
-        email: email || null,
-        role: role || 'staff',
-        location: location || 'south_sudan'
-      });
-
-      res.status(201).json({
-        message: 'User created successfully',
-        user: {
-          id: newUser.id,
-          username: newUser.username,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          email: newUser.email,
-          role: newUser.role,
-          location: newUser.location
-        }
-      });
-    } catch (error) {
-      console.error('Create user error:', error);
-      if ((error as any).code === '23505') { // Unique constraint violation
-        res.status(409).json({ message: 'Username or email already exists' });
-      } else {
-        res.status(500).json({ message: 'Failed to create user' });
-      }
-    }
-  });
-
-  app.delete('/api/users/:id', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (id === req.user!.id) {
-        return res.status(400).json({ message: 'Cannot delete your own account' });
-      }
-
-      const success = await storage.deleteUser(id);
-      
-      if (!success) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      res.json({ message: 'User deleted successfully' });
-    } catch (error) {
-      console.error('Delete user error:', error);
-      res.status(500).json({ message: 'Failed to delete user' });
-    }
-  });
-
   // Departments
-  app.get("/api/departments", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/departments", requireAuth, async (req, res) => {
     try {
       const departments = await storage.getDepartments();
       res.json(departments);
@@ -462,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Insurance Providers
-  app.get("/api/insurance-providers", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/insurance-providers", requireAuth, async (req, res) => {
     try {
       const providers = await storage.getInsuranceProviders();
       res.json(providers);
@@ -473,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transactions
-  app.get("/api/transactions", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
       const { startDate, endDate, departmentId, type, limit } = req.query;
       
@@ -492,18 +56,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/transactions", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       // Convert date string to Date object if it's a string
       // Handle insurance provider - convert "no-insurance" to null
       // Set sync status based on user location - USA users get "synced", South Sudan users get "pending"
-      const userLocation = req.user!.location;
+      const userLocation = (req as any).user.location;
       const syncStatus = userLocation === "usa" ? "synced" : "pending";
       
       const bodyWithDate = {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : new Date(),
-        createdBy: req.user!.id,
+        createdBy: (req as any).user.id,
         insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
         syncStatus: syncStatus
       };
@@ -523,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/transactions/:id - Delete a transaction
-  app.delete("/api/transactions/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.delete("/api/transactions/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteTransaction(id);
@@ -535,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard data
-  app.get("/api/dashboard/:year/:month", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/dashboard/:year/:month", requireAuth, async (req, res) => {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
@@ -549,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Income trends data
-  app.get("/api/income-trends", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/income-trends", requireAuth, async (req, res) => {
     try {
       const days = parseInt(req.query.days as string) || 7;
       const data = await storage.getIncomeTrends(days);
@@ -560,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/income-trends/:year/:month", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/income-trends/:year/:month", requireAuth, async (req, res) => {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
@@ -811,12 +375,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Footer section - simple page number only
-      const footerY = doc.internal.pageSize.height - 20;
+      // Footer section
+      const footerY = doc.internal.pageSize.height - 30;
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+      
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(`Page 1 of 1`, pageWidth / 2, footerY, { align: 'center' });
+      doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY);
+      doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
+      doc.text('Confidential - For Internal Use Only', pageWidth / 2, footerY, { align: 'center' });
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       

@@ -7,13 +7,9 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  firstName: text("first_name"),
-  lastName: text("last_name"),
-  email: text("email").unique(),
   role: text("role").notNull().default("staff"), // "admin", "staff"
   location: text("location").notNull().default("south_sudan"), // "usa", "south_sudan"
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const departments = pgTable("departments", {
@@ -77,14 +73,6 @@ export const receipts = pgTable("receipts", {
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
-  updatedAt: true,
-});
-
-export const createUserSchema = insertUserSchema.extend({
-  confirmPassword: z.string().min(6, "Please confirm password")
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
 });
 
 export const insertDepartmentSchema = createInsertSchema(departments).omit({
@@ -115,7 +103,6 @@ export const insertReceiptSchema = createInsertSchema(receipts).omit({
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type CreateUser = z.infer<typeof createUserSchema>;
 
 export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;

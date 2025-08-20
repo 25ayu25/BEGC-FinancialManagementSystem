@@ -41,48 +41,23 @@ export default function AddTransactionModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Use Supabase queries instead of API
   const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: async () => {
-      const { data, error } = await import('@/lib/supabase').then(({ supabase }) =>
-        supabase.from('departments').select('*').order('name')
-      );
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["/api/departments"],
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { data: insuranceProviders } = useQuery({
-    queryKey: ["insurance-providers"],
-    queryFn: async () => {
-      const { data, error } = await import('@/lib/supabase').then(({ supabase }) =>
-        supabase.from('insurance_providers').select('*').order('name')
-      );
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["/api/insurance-providers"],
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: any) => {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: result, error } = await supabase
-        .from('transactions')
-        .insert(data)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return result;
+      return await apiRequest("POST", "/api/transactions", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-departments"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-insurance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({
         title: "Success",
         description: "Transaction created successfully",
@@ -226,25 +201,91 @@ export default function AddTransactionModal({
           {/* Body */}
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Type */}
+          {/* Transaction Type */}
           <div>
             <Label className="text-sm font-medium text-gray-700 mb-2 block">
-              Type
+              Transaction Type
             </Label>
-            <Select value={type} onValueChange={(value: "income" | "expense") => setType(value)}>
-              <SelectTrigger className="w-full h-12" data-testid="select-type">
-                <SelectValue placeholder="Select type" />
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                type="button"
+                variant={type === "income" ? "default" : "outline"}
+                className={cn(
+                  "flex items-center justify-center p-3 font-medium",
+                  type === "income" 
+                    ? "bg-teal-600 text-white hover:bg-teal-700" 
+                    : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                )}
+                onClick={() => setType("income")}
+                data-testid="button-type-income"
+              >
+                <span className="text-lg mr-2">+</span>
+                Income
+              </Button>
+              <Button
+                type="button"
+                variant={type === "expense" ? "destructive" : "outline"}
+                className={cn(
+                  "flex items-center justify-center p-3 font-medium",
+                  type === "expense" 
+                    ? "bg-teal-600 text-white hover:bg-teal-700" 
+                    : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                )}
+                onClick={() => setType("expense")}
+                data-testid="button-type-expense"
+              >
+                <span className="text-lg mr-2">-</span>
+                Expense
+              </Button>
+            </div>
+          </div>
+
+          {/* Transaction Date */}
+          <div>
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">
+              Transaction Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal h-11"
+                  data-testid="button-select-date"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP") : "Select date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[9999] bg-white border shadow-lg" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Department/Category */}
+          <div>
+            <Label htmlFor="department" className="text-sm font-medium text-gray-700">
+              {type === "income" ? "Department" : "Category"}
+            </Label>
+            <Select value={departmentId} onValueChange={setDepartmentId}>
+              <SelectTrigger data-testid="select-department" className="h-11">
+                <SelectValue placeholder={`Select ${type === "income" ? "Department" : "Category"}`} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="income">Income</SelectItem>
-                <SelectItem value="expense">Expense</SelectItem>
+                {(departments as any)?.map((dept: any) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    <span className="font-medium">{dept.name}</span>
+                    <span className="text-xs text-teal-600 ml-2">({dept.code})</span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-
-
-
-
 
           {/* Insurance Provider (for income only) */}
           {type === "income" && (
@@ -252,14 +293,8 @@ export default function AddTransactionModal({
               <Label htmlFor="insurance" className="text-sm font-medium text-gray-700">
                 Insurance Provider (Optional)
               </Label>
-              <Select value={insuranceProviderId} onValueChange={(value) => {
-                setInsuranceProviderId(value);
-                // Default to USD for insurance transactions
-                if (value && value !== "no-insurance") {
-                  setCurrency("USD");
-                }
-              }}>
-                <SelectTrigger data-testid="select-insurance" className="h-12">
+              <Select value={insuranceProviderId} onValueChange={setInsuranceProviderId}>
+                <SelectTrigger data-testid="select-insurance" className="h-11">
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
@@ -277,120 +312,58 @@ export default function AddTransactionModal({
             </div>
           )}
 
-          {/* Amount Fields */}
+          {/* Amount and Currency */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="amount-ssp" className="text-sm font-medium text-gray-700">
-                Amount (SSP)
+              <Label htmlFor="amount" className="text-sm font-medium text-gray-700">
+                Amount
               </Label>
               <Input
-                id="amount-ssp"
+                id="amount"
                 type="number"
                 step="0.01"
-                placeholder="0.00"
-                value={currency === "SSP" ? amount : ""}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setCurrency("SSP");
-                }}
-                data-testid="input-amount-ssp"
+                placeholder="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                data-testid="input-amount"
+                required
               />
             </div>
             <div>
-              <Label htmlFor="amount-usd" className="text-sm font-medium text-gray-700">
-                Amount (USD)
+              <Label htmlFor="currency" className="text-sm font-medium text-gray-700">
+                Currency
               </Label>
-              <Input
-                id="amount-usd"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={currency === "USD" ? amount : ""}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setCurrency("USD");
-                }}
-                data-testid="input-amount-usd"
-              />
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger data-testid="select-currency" className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SSP">
+                    <span className="font-medium">SSP</span>
+                    <span className="text-gray-500 ml-2">(South Sudanese Pound)</span>
+                  </SelectItem>
+                  <SelectItem value="USD">
+                    <span className="font-medium">USD</span>
+                    <span className="text-gray-500 ml-2">($)</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {/* Description */}
           <div>
             <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              Description
+              Notes (Optional)
             </Label>
             <Textarea
               id="description"
               rows={3}
-              placeholder="Transaction description"
+              placeholder="Enter daily consultation total or expense details (optional)..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               data-testid="textarea-description"
             />
-          </div>
-
-          {/* Department */}
-          <div>
-            <Label htmlFor="department" className="text-sm font-medium text-gray-700">
-              Department
-            </Label>
-            <Select value={departmentId} onValueChange={setDepartmentId}>
-              <SelectTrigger data-testid="select-department" className="h-12">
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                {(departments as any)?.map((dept: any) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Patient Name and Receipt Number */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="patient-name" className="text-sm font-medium text-gray-700">
-                Patient Name
-              </Label>
-              <Input
-                id="patient-name"
-                type="text"
-                placeholder="Patient name (optional)"
-                data-testid="input-patient-name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="receipt-number" className="text-sm font-medium text-gray-700">
-                Receipt Number
-              </Label>
-              <Input
-                id="receipt-number"
-                type="text"
-                placeholder="Receipt number (optional)"
-                data-testid="input-receipt-number"
-              />
-            </div>
-          </div>
-
-          {/* Payment Method */}
-          <div>
-            <Label htmlFor="payment-method" className="text-sm font-medium text-gray-700">
-              Payment Method
-            </Label>
-            <Select defaultValue="cash">
-              <SelectTrigger data-testid="select-payment-method" className="h-12">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
-                <SelectItem value="mobile-money">Mobile Money</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
 

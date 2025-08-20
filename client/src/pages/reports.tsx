@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -6,13 +5,10 @@ import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileText, Lock, Trash2 } from "lucide-react";
 
 export default function Reports() {
   const { toast } = useToast();
-  const [selectedPeriod, setSelectedPeriod] = useState("current-month");
   const { data: reports, isLoading } = useQuery({
     queryKey: ["/api/reports"],
   });
@@ -23,33 +19,6 @@ export default function Reports() {
       case 'locked': return 'secondary';
       case 'draft': return 'outline';
       default: return 'outline';
-    }
-  };
-
-  const getDateRangeForPeriod = (period: string) => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
-
-    switch (period) {
-      case "current-month":
-        return { year: currentYear, month: currentMonth };
-      
-      case "last-month":
-        const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-        const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-        return { year: lastMonthYear, month: lastMonth };
-      
-      case "last-3-months":
-        // For now, generate for 3 months ago (will improve this later to handle multiple months)
-        const threeMonthsAgo = currentMonth - 2;
-        if (threeMonthsAgo <= 0) {
-          return { year: currentYear - 1, month: 12 + threeMonthsAgo };
-        }
-        return { year: currentYear, month: threeMonthsAgo };
-      
-      default:
-        return { year: currentYear, month: currentMonth };
     }
   };
 
@@ -83,17 +52,15 @@ export default function Reports() {
     }
   };
 
-  const handleGenerateReport = () => {
-    const dateRange = getDateRangeForPeriod(selectedPeriod);
-    generateReport(dateRange.year, dateRange.month);
-  };
-
   const downloadReport = async (pdfPath: string, filename: string) => {
     try {
       console.log('Downloading report:', pdfPath, filename);
       
-      // Use blob download method for reliable single download
+      // Try direct window.open first (works well for PDFs)
       const downloadUrl = `/api${pdfPath}`;
+      window.open(downloadUrl, '_blank');
+      
+      // Also try the blob method as backup
       const response = await fetch(downloadUrl, {
         credentials: 'include'
       });
@@ -175,37 +142,7 @@ export default function Reports() {
         }
       />
 
-      <main className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Date Filter and PDF Generation */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Report Generation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label>Select Time Period</Label>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="current-month">Current Month</SelectItem>
-                    <SelectItem value="last-month">Last Month</SelectItem>
-                    <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                    <SelectItem value="custom-range">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Button onClick={handleGenerateReport} data-testid="button-generate-pdf">
-                <Download className="h-4 w-4 mr-2" />
-                Generate PDF
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
+      <main className="flex-1 overflow-y-auto p-6">
         <Card>
           <CardHeader>
             <CardTitle>Available Reports</CardTitle>

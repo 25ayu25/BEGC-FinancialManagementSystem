@@ -4,19 +4,6 @@
 
 This is a comprehensive financial management system for Bahr El Ghazal clinic, designed to track daily income and expenses across multiple departments. The system provides real-time financial insights, transaction management, receipt handling, and monthly reporting capabilities. Built with a modern full-stack architecture using React, Express.js, and PostgreSQL, it supports both USD and South Sudanese Pound (SSP) currencies and integrates with various insurance providers.
 
-## Migration Status (Phase 2 Complete - Deployment Ready)
-
-✅ **Phase 1 Complete**: Authentication and basic dashboard connectivity established
-✅ **Phase 2 Complete**: Full transition to Supabase-only architecture for deployment
-- Supabase authentication working perfectly with direct login routing
-- Executive Dashboard fully transitioned to Supabase queries (no Express API dependency)
-- Add Transaction form creates records directly through Supabase
-- All undefined variable references resolved
-- Application routes directly to Executive Dashboard after login
-- Removed temporary auth bypass - ready for production deployment
-- Original professional medical clinic design preserved exactly
-- Ready for Netlify deployment with finance.bahrelghazalclinic.com domain
-
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -39,30 +26,26 @@ Preferred communication style: Simple, everyday language.
 - **Build Process**: esbuild for fast production builds with ESM module format
 
 ### Data Storage Solutions
-- **Current Architecture**: Supabase PostgreSQL with real-time subscriptions and automatic scaling
+- **Primary Database**: PostgreSQL with Neon serverless adapter for scalable cloud deployment
 - **Schema Design**: Normalized relational structure with tables for users, departments, insurance providers, transactions, monthly reports, and receipts
-- **SQL Views**: Created v_totals_current_month, v_dept_totals_current_month, v_insurance_totals_current_month for proper data aggregation
-- **Migrations**: Supabase migrations with SQL and automatic schema versioning
-- **Connection Pooling**: Built-in connection pooling and edge functions
-- **Data Queries**: Dashboard uses direct Supabase queries replacing Express API endpoints
+- **Migrations**: Drizzle Kit for database schema versioning and migrations
+- **Connection Pooling**: Uses connection pooling for efficient database resource management
 
-### Authentication and Authorization  
-- **Production System**: Supabase Auth with JWT tokens and row-level security (RLS)
+### Authentication and Authorization
+- **Current Implementation**: Simplified middleware-based authentication (placeholder for production-ready system)
 - **User Roles**: Admin and staff roles with location-based access (USA, South Sudan)
-- **Session Management**: JWT-based sessions with automatic refresh tokens
-- **Security**: Row-level security policies for multi-tenant data isolation
+- **Session Management**: Cookie-based sessions with credential inclusion for API requests
 
 ### File Upload and Storage
-- **Cloud Storage**: Supabase Storage with automatic CDN and image optimization
-- **Upload System**: Direct-to-Supabase uploads with progress tracking and resumable uploads
-- **Receipt Management**: Secure bucket storage with access control policies
-- **ACL System**: Supabase RLS policies for fine-grained access control
+- **Cloud Storage**: Google Cloud Storage integration with Replit sidecar authentication
+- **Upload System**: Uppy.js file upload library with drag-and-drop interface and progress tracking
+- **Receipt Management**: Direct-to-cloud upload with presigned URLs for secure file handling
+- **ACL System**: Custom object access control with group-based permissions (USER_LIST, EMAIL_DOMAIN, GROUP_MEMBER, SUBSCRIBER)
 
 ### PDF Report Generation
-- **Library**: jsPDF for client-side PDF generation
-- **Professional Formatting**: Medical clinic-themed reports with teal branding  
-- **Executive Dashboard Export**: Real-time PDF generation with current financial metrics
-- **Features**: Revenue/expense summaries, net income calculations, department performance data
+- **Library**: jsPDF for client-side and server-side PDF generation
+- **Professional Formatting**: Medical clinic-themed reports with teal branding
+- **Features**: Tabulated summaries, department performance rankings, percentage breakdowns
 - **Layout**: Professional header, structured financial tables, confidentiality footer
 - **Currency Formatting**: Proper comma-separated values and professional presentation
 
@@ -101,21 +84,6 @@ Preferred communication style: Simple, everyday language.
 - **Database Tools**: Drizzle Kit for schema management and migration generation
 
 ### Third-Party Integrations
-- **Authentication**: Supabase Auth for secure user management and JWT tokens
-- **Monitoring**: Supabase Analytics and Netlify Analytics for performance metrics  
+- **Authentication**: Replit sidecar token service for Google Cloud authentication
+- **Monitoring**: Built-in request logging with performance metrics
 - **Error Handling**: Centralized error boundary system with user-friendly error messages
-
-## Deployment Strategy
-
-### Production Architecture
-- **Frontend Hosting**: Netlify with global CDN and automatic deployments from Git
-- **Database & Backend**: Supabase with edge functions for API endpoints
-- **Custom Domain**: finance.bahrelghazalclinic.com with automatic SSL
-- **File Storage**: Supabase Storage for receipts and documents
-- **Scheduled Jobs**: Netlify scheduled functions for automated reports
-
-### Multi-Location Access
-- **South Sudan Staff**: Fast access via Netlify's global CDN
-- **USA Administration**: Real-time monitoring and management access
-- **Offline Support**: Service worker caching for unreliable internet
-- **Data Sync**: Real-time updates via Supabase subscriptions
