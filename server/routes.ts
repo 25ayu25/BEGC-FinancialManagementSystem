@@ -202,29 +202,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.createUser(userData);
       res.status(201).json(user);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
+      
+      // Handle database constraint violations
+      if (error.code === '23505') { // Unique constraint violation
+        if (error.constraint === 'users_username_key') {
+          return res.status(400).json({ error: `Username "${userData.username}" already exists. Please choose a different username.` });
+        } else if (error.constraint === 'users_email_key') {
+          return res.status(400).json({ error: `Email "${userData.email}" is already registered. Please use a different email address.` });
+        }
+      }
+      
       res.status(500).json({ error: "Failed to create user" });
     }
   });
 
-  app.patch("/api/users/:id", requireAuth, async (req, res) => {
-    try {
-      // Only admins can update users
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
 
-      const { id } = req.params;
-      const updates = req.body;
-      
-      const user = await storage.updateUser(id, updates);
-      res.json(user);
-    } catch (error) {
-      console.error("Error updating user:", error);
-      res.status(500).json({ error: "Failed to update user" });
-    }
-  });
 
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
