@@ -111,11 +111,12 @@ export default function UserManagementPage() {
         description: "New user has been added successfully."
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Create user error:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create user. Please try again."
+        description: error.message || "Failed to create user. Please try again."
       });
     }
   });
@@ -174,6 +175,8 @@ export default function UserManagementPage() {
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with data:', newUser);
+    
     if (!newUser.username || !newUser.email || !newUser.role || !newUser.location) {
       toast({
         variant: "destructive",
@@ -183,11 +186,26 @@ export default function UserManagementPage() {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newUser.email)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address."
+      });
+      return;
+    }
+
     const selectedRole = roles.find(r => r.value === newUser.role);
-    createUserMutation.mutate({
+    const userData = {
       ...newUser,
-      permissions: selectedRole?.permissions || []
-    });
+      permissions: selectedRole?.permissions || [],
+      fullName: newUser.fullName || null
+    };
+    
+    console.log('Sending user data:', userData);
+    createUserMutation.mutate(userData);
   };
 
   const handleToggleStatus = (user: User) => {
@@ -235,9 +253,9 @@ export default function UserManagementPage() {
                   Add User
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add New User</DialogTitle>
+              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white shadow-2xl border-0">
+                <DialogHeader className="pb-4">
+                  <DialogTitle className="text-xl font-semibold">Add New User</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
