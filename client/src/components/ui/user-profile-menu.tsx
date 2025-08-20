@@ -10,8 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut, Shield } from "lucide-react";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { supabaseAuth } from "@/lib/supabaseQueries";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfileMenuProps {
@@ -19,22 +18,24 @@ interface UserProfileMenuProps {
   userRole?: string;
 }
 
-export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin" }: UserProfileMenuProps) {
+export function UserProfileMenu({
+  userName = "Admin User",
+  userRole = "USA Admin",
+}: UserProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabaseAuth.signOut();
-      if (error) {
-        throw error;
-      }
-      setLocation('/login');
-    } catch (error) {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setLocation("/login");
+    } catch (err: any) {
+      console.error("Logout error:", err);
       toast({
         title: "Logout Failed",
-        description: "Failed to logout. Please try again.",
+        description: err?.message ?? "Failed to logout. Please try again.",
         variant: "destructive",
       });
     }
@@ -43,8 +44,8 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="p-0 h-auto w-full justify-start hover:bg-gray-100"
           data-testid="button-user-profile"
         >
@@ -53,7 +54,10 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
               <User className="text-white text-sm" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-gray-900" data-testid="text-user-name">
+              <p
+                className="text-sm font-semibold text-gray-900"
+                data-testid="text-user-name"
+              >
                 {userName}
               </p>
               <p className="text-xs text-gray-500" data-testid="text-user-role">
@@ -63,24 +67,31 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
           </div>
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent className="w-56" align="start">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings" className="flex items-center w-full cursor-pointer">
+          <Link
+            href="/settings"
+            className="flex items-center w-full cursor-pointer"
+          >
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/security" className="flex items-center w-full cursor-pointer">
+          <Link
+            href="/security"
+            className="flex items-center w-full cursor-pointer"
+          >
             <Shield className="mr-2 h-4 w-4" />
             <span>Security</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem 
-          className="text-red-600 cursor-pointer" 
+        <DropdownMenuItem
+          className="text-red-600 cursor-pointer"
           onClick={handleLogout}
           data-testid="button-sign-out"
         >

@@ -1,25 +1,74 @@
+// client/src/pages/transactions-supabase.tsx
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit2, Trash2, Receipt, DollarSign, CreditCard, Banknote } from "lucide-react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Receipt,
+  DollarSign,
+  CreditCard,
+} from "lucide-react";
 import Header from "@/components/layout/header";
-import { supabaseTransactions, supabaseDepartments, supabaseInsurance } from "@/lib/supabaseQueries";
+import {
+  supabaseTransactions,
+  supabaseDepartments,
+  supabaseInsurance,
+} from "@/lib/supabaseQueries";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+
+// --- helpers to sanitize payloads ---
+const toNull = (v: unknown) =>
+  v === undefined || v === null || (typeof v === "string" && v.trim() === "")
+    ? null
+    : (v as string);
+
+const toNumOrNull = (v: unknown) => {
+  if (
+    v === undefined ||
+    v === null ||
+    (typeof v === "string" && v.trim() === "")
+  )
+    return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 const transactionSchema = z.object({
   type: z.enum(["income", "expense"]),
+  // strings from <input type="number"> need sanitizing, we'll convert to numbers before insert
   amount_ssp: z.string().min(1, "Amount is required"),
   amount_usd: z.string().optional(),
   description: z.string().min(1, "Description is required"),
@@ -27,7 +76,13 @@ const transactionSchema = z.object({
   insurance_provider_id: z.string().optional(),
   patient_name: z.string().optional(),
   receipt_number: z.string().optional(),
-  payment_method: z.enum(["cash", "card", "check", "insurance", "bank_transfer"]),
+  payment_method: z.enum([
+    "cash",
+    "card",
+    "check",
+    "insurance",
+    "bank_transfer",
+  ]),
 });
 
 type TransactionFormData = z.infer<typeof transactionSchema>;
@@ -56,30 +111,41 @@ export default function TransactionsSupabase() {
 
   // Queries
   const { data: transactions, isLoading: transactionsLoading } = useQuery({
-    queryKey: ['supabase-transactions'],
+    queryKey: ["supabase-transactions"],
     queryFn: () => supabaseTransactions.getAll(),
   });
 
   const { data: departments } = useQuery({
-    queryKey: ['supabase-departments'],
+    queryKey: ["supabase-departments"],
     queryFn: () => supabaseDepartments.getAll(),
   });
 
   const { data: insuranceProviders } = useQuery({
-    queryKey: ['supabase-insurance'],
+    queryKey: ["supabase-insurance"],
     queryFn: () => supabaseInsurance.getAll(),
+  });
+
+  // Sanitize the form data for Postgres (no empty strings in numeric/nullable fields)
+  const buildPayload = (data: TransactionFormData) => ({
+    type: data.type,
+    amount_ssp: toNumOrNull(data.amount_ssp), // numeric or null
+    amount_usd: toNumOrNull(data.amount_usd), // numeric or null
+    description: data.description,
+    department_id: toNull(data.department_id), // uuid or null
+    insurance_provider_id: toNull(data.insurance_provider_id),
+    patient_name: toNull(data.patient_name),
+    receipt_number: toNull(data.receipt_number),
+    payment_method: data.payment_method,
+    created_by: user?.id ?? null,
   });
 
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: TransactionFormData) =>
-      supabaseTransactions.create({
-        ...data,
-        created_by: user?.id || '',
-      }),
+      supabaseTransactions.create(buildPayload(data)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supabase-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['supabase-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ["supabase-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["supabase-dashboard"] });
       toast({
         title: "Success",
         description: "Transaction added successfully.",
@@ -87,21 +153,21 @@ export default function TransactionsSupabase() {
       setIsDialogOpen(false);
       form.reset();
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to add transaction.",
+        description: error?.message || "Failed to add transaction.",
         variant: "destructive",
       });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<TransactionFormData> }) =>
-      supabaseTransactions.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: TransactionFormData }) =>
+      supabaseTransactions.update(id, buildPayload(data)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supabase-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['supabase-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ["supabase-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["supabase-dashboard"] });
       toast({
         title: "Success",
         description: "Transaction updated successfully.",
@@ -110,10 +176,10 @@ export default function TransactionsSupabase() {
       setEditingTransaction(null);
       form.reset();
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update transaction.",
+        description: error?.message || "Failed to update transaction.",
         variant: "destructive",
       });
     },
@@ -122,17 +188,17 @@ export default function TransactionsSupabase() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => supabaseTransactions.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supabase-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['supabase-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ["supabase-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["supabase-dashboard"] });
       toast({
         title: "Success",
         description: "Transaction deleted successfully.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete transaction.",
+        description: error?.message || "Failed to delete transaction.",
         variant: "destructive",
       });
     },
@@ -150,14 +216,14 @@ export default function TransactionsSupabase() {
     setEditingTransaction(transaction);
     form.reset({
       type: transaction.type,
-      amount_ssp: transaction.amount_ssp || "",
-      amount_usd: transaction.amount_usd || "",
-      description: transaction.description,
-      department_id: transaction.department_id || "",
-      insurance_provider_id: transaction.insurance_provider_id || "",
-      patient_name: transaction.patient_name || "",
-      receipt_number: transaction.receipt_number || "",
-      payment_method: transaction.payment_method,
+      amount_ssp: transaction.amount_ssp ?? "",
+      amount_usd: transaction.amount_usd ?? "",
+      description: transaction.description ?? "",
+      department_id: transaction.department_id ?? "",
+      insurance_provider_id: transaction.insurance_provider_id ?? "",
+      patient_name: transaction.patient_name ?? "",
+      receipt_number: transaction.receipt_number ?? "",
+      payment_method: transaction.payment_method ?? "cash",
     });
     setIsDialogOpen(true);
   };
@@ -168,31 +234,37 @@ export default function TransactionsSupabase() {
     }
   };
 
-  const formatCurrency = (amount: string | null, currency: 'SSP' | 'USD') => {
-    if (!amount) return '0.00';
-    const num = parseFloat(amount);
-    return `${currency} ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (
+    amount: string | number | null,
+    currency: "SSP" | "USD",
+  ) => {
+    if (amount === null || amount === undefined || amount === "")
+      return `${currency} 0.00`;
+    const num = typeof amount === "number" ? amount : parseFloat(amount);
+    return `${currency} ${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <Header 
-        title="Transaction Management" 
+      <Header
+        title="Transaction Management"
         description="Add and manage income and expense transactions"
       />
-      
+
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Add Transaction Button */}
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-              <p className="text-gray-600">Manage your clinic's financial transactions</p>
+              <p className="text-gray-600">
+                Manage your clinic's financial transactions
+              </p>
             </div>
-            
+
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
+                <Button
                   onClick={() => {
                     setEditingTransaction(null);
                     form.reset();
@@ -203,16 +275,21 @@ export default function TransactionsSupabase() {
                   Add Transaction
                 </Button>
               </DialogTrigger>
-              
+
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>
-                    {editingTransaction ? "Edit Transaction" : "Add New Transaction"}
+                    {editingTransaction
+                      ? "Edit Transaction"
+                      : "Add New Transaction"}
                   </DialogTitle>
                 </DialogHeader>
-                
+
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-4"
+                  >
                     {/* Transaction Type */}
                     <FormField
                       control={form.control}
@@ -220,7 +297,10 @@ export default function TransactionsSupabase() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-transaction-type">
                                 <SelectValue placeholder="Select type" />
@@ -257,7 +337,7 @@ export default function TransactionsSupabase() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="amount_usd"
@@ -305,7 +385,10 @@ export default function TransactionsSupabase() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Department</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-department">
                                 <SelectValue placeholder="Select department" />
@@ -343,7 +426,7 @@ export default function TransactionsSupabase() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="receipt_number"
@@ -370,7 +453,10 @@ export default function TransactionsSupabase() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Payment Method</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-payment-method">
                                 <SelectValue placeholder="Select payment method" />
@@ -380,8 +466,12 @@ export default function TransactionsSupabase() {
                               <SelectItem value="cash">Cash</SelectItem>
                               <SelectItem value="card">Card</SelectItem>
                               <SelectItem value="check">Check</SelectItem>
-                              <SelectItem value="insurance">Insurance</SelectItem>
-                              <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                              <SelectItem value="insurance">
+                                Insurance
+                              </SelectItem>
+                              <SelectItem value="bank_transfer">
+                                Bank Transfer
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -390,19 +480,23 @@ export default function TransactionsSupabase() {
                     />
 
                     <div className="flex justify-end space-x-2 pt-4">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => setIsDialogOpen(false)}
                       >
                         Cancel
                       </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={createMutation.isPending || updateMutation.isPending}
+                      <Button
+                        type="submit"
+                        disabled={
+                          createMutation.isPending || updateMutation.isPending
+                        }
                         data-testid="button-save-transaction"
                       >
-                        {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save Transaction"}
+                        {createMutation.isPending || updateMutation.isPending
+                          ? "Saving..."
+                          : "Save Transaction"}
                       </Button>
                     </div>
                   </form>
@@ -424,33 +518,48 @@ export default function TransactionsSupabase() {
               ) : (
                 <div className="space-y-4">
                   {transactions?.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div className="flex items-center space-x-4">
-                        <div className={`p-2 rounded-lg ${
-                          transaction.type === 'income' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                        }`}>
-                          {transaction.type === 'income' ? <DollarSign className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                        <div
+                          className={`p-2 rounded-lg ${transaction.type === "income" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
+                        >
+                          {transaction.type === "income" ? (
+                            <DollarSign className="w-4 h-4" />
+                          ) : (
+                            <CreditCard className="w-4 h-4" />
+                          )}
                         </div>
                         <div>
-                          <p className="font-medium">{transaction.description}</p>
+                          <p className="font-medium">
+                            {transaction.description}
+                          </p>
                           <div className="flex items-center space-x-2 text-sm text-gray-500">
-                            <span>{new Date(transaction.created_at).toLocaleDateString()}</span>
+                            <span>
+                              {new Date(
+                                transaction.created_at,
+                              ).toLocaleDateString()}
+                            </span>
                             {transaction.departments && (
-                              <Badge variant="secondary">{transaction.departments.name}</Badge>
+                              <Badge variant="secondary">
+                                {transaction.departments.name}
+                              </Badge>
                             )}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
-                          <p className={`font-semibold ${
-                            transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {formatCurrency(transaction.amount_ssp, 'SSP')}
+                          <p
+                            className={`font-semibold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}
+                          >
+                            {formatCurrency(transaction.amount_ssp, "SSP")}
                           </p>
                           {transaction.amount_usd && (
                             <p className="text-sm text-gray-500">
-                              {formatCurrency(transaction.amount_usd, 'USD')}
+                              {formatCurrency(transaction.amount_usd, "USD")}
                             </p>
                           )}
                         </div>
@@ -476,12 +585,14 @@ export default function TransactionsSupabase() {
                       </div>
                     </div>
                   ))}
-                  
+
                   {!transactions?.length && (
                     <div className="text-center py-8 text-gray-500">
                       <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <p>No transactions found</p>
-                      <p className="text-sm">Add your first transaction to get started</p>
+                      <p className="text-sm">
+                        Add your first transaction to get started
+                      </p>
                     </div>
                   )}
                 </div>
