@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,6 +18,31 @@ interface UserProfileMenuProps {
 
 export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin" }: UserProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [, navigate] = useLocation();
+
+  const handleSignOut = async () => {
+    try {
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        // Redirect to login page
+        navigate('/login');
+      } else {
+        console.error('Failed to sign out');
+      }
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+    setIsOpen(false);
+  };
+
+  const handleSecurityClick = () => {
+    navigate('/security');
+    setIsOpen(false);
+  };
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -46,17 +71,17 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings" className="flex items-center w-full cursor-pointer">
+          <Link href="/settings" className="flex items-center w-full cursor-pointer" data-testid="link-settings">
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSecurityClick} className="cursor-pointer" data-testid="button-security">
           <Shield className="mr-2 h-4 w-4" />
           <span>Security</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-red-600">
+        <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer" data-testid="button-sign-out">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign out</span>
         </DropdownMenuItem>

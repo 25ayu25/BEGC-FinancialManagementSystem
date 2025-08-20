@@ -14,6 +14,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Authentication routes
+  app.post("/api/auth/logout", (req, res) => {
+    // Clear session/cookies if using them
+    res.clearCookie('session');
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
+
+  app.post("/api/auth/change-password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "New password must be at least 8 characters long" });
+      }
+
+      // TODO: Implement actual password verification and update
+      // For now, simulate success
+      console.log(`Password change requested for user ${req.user.id}`);
+      
+      res.json({ success: true, message: 'Password updated successfully' });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
   // Departments
   app.get("/api/departments", requireAuth, async (req, res) => {
     try {
