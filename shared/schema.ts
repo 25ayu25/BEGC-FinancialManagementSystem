@@ -6,10 +6,16 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  fullName: text("full_name"),
   password: text("password").notNull(),
-  role: text("role").notNull().default("staff"), // "admin", "staff"
+  role: text("role").notNull().default("staff"), // "admin", "manager", "staff", "viewer"
   location: text("location").notNull().default("south_sudan"), // "usa", "south_sudan"
+  status: text("status").notNull().default("active"), // "active", "inactive"
+  permissions: jsonb("permissions").notNull().default("[]"), // JSON array of permissions
+  lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const departments = pgTable("departments", {

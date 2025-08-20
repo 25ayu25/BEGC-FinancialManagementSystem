@@ -9,7 +9,8 @@ import {
   Building2,
   User,
   Wifi,
-  WifiOff
+  WifiOff,
+  Users
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
@@ -20,6 +21,7 @@ const navigation = [
   { name: "Add Transaction", href: "/transactions", icon: Plus },
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Receipts & Vouchers", href: "/receipts", icon: Receipt },
+  { name: "User Management", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

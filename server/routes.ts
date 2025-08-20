@@ -44,6 +44,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management Routes
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      // Only admins can view all users
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const users = await storage.getUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", requireAuth, async (req, res) => {
+    try {
+      // Only admins can create users
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { username, email, fullName, role, location, password, permissions } = req.body;
+      
+      if (!username || !email || !role || !location) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const userData = {
+        username,
+        email,
+        fullName: fullName || null,
+        role,
+        location,
+        password: password || "defaultPassword123", // In production, generate secure password
+        permissions: JSON.stringify(permissions || []),
+        status: "active"
+      };
+
+      const user = await storage.createUser(userData);
+      res.status(201).json(user);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.patch("/api/users/:id", requireAuth, async (req, res) => {
+    try {
+      // Only admins can update users
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const user = await storage.updateUser(id, updates);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", requireAuth, async (req, res) => {
+    try {
+      // Only admins can delete users
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { id } = req.params;
+      
+      // Prevent deleting yourself
+      if (id === req.user.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Departments
   app.get("/api/departments", requireAuth, async (req, res) => {
     try {

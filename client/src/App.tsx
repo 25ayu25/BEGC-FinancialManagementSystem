@@ -10,6 +10,7 @@ import Reports from "@/pages/reports";
 import Receipts from "@/pages/receipts";
 import Settings from "@/pages/settings";
 import Security from "@/pages/security";
+import UserManagement from "@/pages/user-management";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
@@ -36,6 +37,7 @@ function Router() {
                 <Route path="/receipts" component={Receipts} />
                 <Route path="/settings" component={Settings} />
                 <Route path="/security" component={Security} />
+                <Route path="/users" component={UserManagement} />
                 <Route component={NotFound} />
               </Switch>
             </div>
