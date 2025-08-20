@@ -7,18 +7,112 @@ import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Authentication middleware (simplified for now)
-  const requireAuth = (req: any, res: any, next: any) => {
-    // TODO: Implement proper authentication - using seeded admin user
-    req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa" };
-    next();
+  // Authentication middleware
+  const requireAuth = async (req: any, res: any, next: any) => {
+    try {
+      // Check for session cookie
+      const sessionCookie = req.cookies?.user_session;
+      
+      if (!sessionCookie) {
+        // Fallback: use default admin for development
+        console.log("No session found, using default admin user");
+        req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa", username: "admin" };
+        return next();
+      }
+
+      try {
+        const userSession = JSON.parse(sessionCookie);
+        
+        // Verify user still exists and is active
+        const user = await storage.getUser(userSession.id);
+        if (!user || user.status === 'inactive') {
+          res.clearCookie('user_session');
+          return res.status(401).json({ error: "Session invalid" });
+        }
+
+        req.user = {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          location: user.location,
+          fullName: user.fullName
+        };
+        
+        next();
+      } catch (parseError) {
+        // Invalid session cookie, clear it
+        res.clearCookie('user_session');
+        console.log("Invalid session cookie, using default admin user");
+        req.user = { id: "de2bba16-93e6-4a6d-b0a9-a0b99ec805d4", role: "admin", location: "usa", username: "admin" };
+        next();
+      }
+    } catch (error) {
+      console.error("Auth middleware error:", error);
+      res.status(500).json({ error: "Authentication error" });
+    }
   };
 
   // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+
+      // Find user by username
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Check password (in production, use bcrypt to compare hashed passwords)
+      if (user.password !== password) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Check if user is active
+      if (user.status === 'inactive') {
+        return res.status(401).json({ error: "Account is deactivated" });
+      }
+
+      // Update last login
+      await storage.updateUser(user.id, { lastLogin: new Date() });
+
+      // Create session (simplified - in production use proper session management)
+      const userSession = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        location: user.location,
+        fullName: user.fullName
+      };
+
+      // Set session cookie (simplified)
+      res.cookie('user_session', JSON.stringify(userSession), {
+        httpOnly: true,
+        secure: false, // Set to true in production with HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      });
+
+      res.json(userSession);
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/auth/logout", (req, res) => {
     // Clear session/cookies if using them
+    res.clearCookie('user_session');
     res.clearCookie('session');
     res.json({ success: true, message: 'Logged out successfully' });
+  });
+
+  // Get current user info
+  app.get("/api/auth/user", requireAuth, (req, res) => {
+    res.json(req.user);
   });
 
   app.post("/api/auth/change-password", requireAuth, async (req, res) => {
@@ -57,6 +151,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Update user
+  app.patch("/api/users/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const updates = req.body;
+
+      // Validate user exists
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Update user
+      const updatedUser = await storage.updateUser(userId, updates);
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
     }
   });
 

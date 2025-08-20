@@ -41,22 +41,36 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      // For demo purposes, accept any credentials and redirect
-      // In real implementation, this would call the authentication API
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      // Call the actual login API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: credentials.username,
+          password: credentials.password
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
+      }
+
+      const user = await response.json();
       
       toast({
         title: "Login Successful",
-        description: "Welcome back to Bahr El Ghazal Financial System."
+        description: `Welcome back, ${user.fullName || user.username}!`
       });
       
       // Redirect to dashboard
       navigate('/');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Please check your credentials and try again."
+        description: error.message || "Please check your credentials and try again."
       });
     } finally {
       setIsLoading(false);

@@ -61,6 +61,15 @@ export default function UserManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editUser, setEditUser] = useState({
+    username: "",
+    email: "",
+    fullName: "",
+    role: "",
+    location: "",
+    status: "",
+    permissions: [] as string[]
+  });
   
   const [newUser, setNewUser] = useState({
     username: "",
@@ -160,6 +169,58 @@ export default function UserManagementPage() {
       });
     }
   });
+
+  // Edit user mutation
+  const editUserMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      const res = await fetch(`/api/users/${selectedUser?.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updates)
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+      toast({
+        title: "User Updated",
+        description: "User has been updated successfully."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update user. Please try again."
+      });
+    }
+  });
+
+  const handleEditUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser.username || !editUser.email || !editUser.role || !editUser.location) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please fill in all required fields."
+      });
+      return;
+    }
+
+    const selectedRole = roles.find(r => r.value === editUser.role);
+    editUserMutation.mutate({
+      ...editUser,
+      permissions: selectedRole?.permissions || [],
+      fullName: editUser.fullName || null
+    });
+  };
 
   const roles = [
     { value: "admin", label: "Administrator", permissions: ["all"] },
@@ -355,6 +416,113 @@ export default function UserManagementPage() {
                 </form>
               </DialogContent>
             </Dialog>
+
+            {/* Edit User Dialog */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white shadow-2xl border-0">
+                <DialogHeader className="pb-4">
+                  <DialogTitle className="text-xl font-semibold">Edit User</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleEditUser} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-username">Username *</Label>
+                      <Input
+                        id="edit-username"
+                        value={editUser.username}
+                        onChange={(e) => setEditUser(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="john.doe"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-email">Email *</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        value={editUser.email}
+                        onChange={(e) => setEditUser(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="john@clinic.com"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-fullName">Full Name</Label>
+                    <Input
+                      id="edit-fullName"
+                      value={editUser.fullName}
+                      onChange={(e) => setEditUser(prev => ({ ...prev, fullName: e.target.value }))}
+                      placeholder="John Doe"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-role">Role *</Label>
+                      <Select value={editUser.role} onValueChange={(value) => setEditUser(prev => ({ ...prev, role: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-location">Location *</Label>
+                      <Select value={editUser.location} onValueChange={(value) => setEditUser(prev => ({ ...prev, location: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location.value} value={location.value}>
+                              {location.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select value={editUser.status} onValueChange={(value) => setEditUser(prev => ({ ...prev, status: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsEditDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={editUserMutation.isPending}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {editUserMutation.isPending ? "Updating..." : "Update User"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
@@ -490,6 +658,15 @@ export default function UserManagementPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => {
                             setSelectedUser(user);
+                            setEditUser({
+                              username: user.username,
+                              email: user.email,
+                              fullName: user.fullName || "",
+                              role: user.role,
+                              location: user.location,
+                              status: user.status,
+                              permissions: user.permissions || []
+                            });
                             setIsEditDialogOpen(true);
                           }}>
                             <Edit className="w-4 h-4 mr-2" />

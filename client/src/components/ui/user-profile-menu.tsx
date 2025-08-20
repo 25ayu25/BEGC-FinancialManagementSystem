@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,9 +17,28 @@ interface UserProfileMenuProps {
   userRole?: string;
 }
 
-export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin" }: UserProfileMenuProps) {
+export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [, navigate] = useLocation();
+
+  // Fetch current user info
+  const { data: currentUser, isLoading } = useQuery({
+    queryKey: ['/api/auth/user'],
+    queryFn: async () => {
+      const res = await fetch('/api/auth/user', {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch user');
+      return res.json();
+    }
+  });
+
+  // Use provided props or fetched data
+  const displayName = userName || currentUser?.fullName || currentUser?.username || "User";
+  const displayRole = userRole || (currentUser?.role === 'admin' ? 'Administrator' : 
+    currentUser?.location === 'usa' ? `${currentUser?.role} - USA` : 
+    currentUser?.location === 'south_sudan' ? `${currentUser?.role} - South Sudan` : 
+    currentUser?.role) || "User";
 
   const handleSignOut = async () => {
     try {
@@ -44,6 +64,18 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
     setIsOpen(false);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center space-x-3 w-full p-2">
+        <div className="w-10 h-10 bg-slate-200 rounded-full animate-pulse"></div>
+        <div className="text-left">
+          <div className="w-20 h-4 bg-slate-200 rounded animate-pulse mb-1"></div>
+          <div className="w-16 h-3 bg-slate-200 rounded animate-pulse"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -58,10 +90,10 @@ export function UserProfileMenu({ userName = "Admin User", userRole = "USA Admin
             </div>
             <div className="text-left">
               <p className="text-sm font-semibold text-gray-900" data-testid="text-user-name">
-                {userName}
+                {displayName}
               </p>
               <p className="text-xs text-gray-500" data-testid="text-user-role">
-                {userRole}
+                {displayRole}
               </p>
             </div>
           </div>
