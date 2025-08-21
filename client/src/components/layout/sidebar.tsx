@@ -7,12 +7,8 @@ import {
   Receipt, 
   Settings, 
   Building2,
-  User,
-  Wifi,
-  WifiOff,
   Users
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 
 const navigation = [
@@ -71,18 +67,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-gray-200">
         <UserProfileMenu />
         
-        {/* Sync Status */}
-        <div className="flex items-center space-x-2 text-xs">
-          <div className="flex items-center space-x-1">
-            <Wifi className="w-3 h-3 text-green-600" />
-            <span className="text-gray-600">Online</span>
-          </div>
-          <span className="text-gray-400">•</span>
-          <span className="text-gray-600">Last sync: 2 min ago</span>
-          <Badge variant="secondary" className="ml-auto">
-            Synced
-          </Badge>
-        </div>
+
       </div>
     </div>
   );
