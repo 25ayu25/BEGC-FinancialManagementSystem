@@ -38,15 +38,18 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
   const totalInsurance = Object.values(data?.insuranceBreakdown || {})
     .reduce((sum, amount) => sum + parseFloat(amount), 0);
 
-  const income = parseFloat(data?.totalIncome || '0');
+  const totalIncome = parseFloat(data?.totalIncome || '0');
   const expenses = parseFloat(data?.totalExpenses || '0');
-  const net = parseFloat(data?.netIncome || '0');
-  const margin = income > 0 ? (net / income) * 100 : 0;
+  
+  // Calculate SSP-only revenue (total minus USD insurance to prevent currency mixing)
+  const sspIncome = Math.max(0, totalIncome - totalInsurance);
+  const sspNet = sspIncome - expenses;
+  const margin = sspIncome > 0 ? (sspNet / sspIncome) * 100 : 0;
 
   const kpis = [
     {
       title: "Income",
-      value: `SSP ${Math.round(income).toLocaleString()}`,
+      value: `SSP ${Math.round(sspIncome).toLocaleString()}`,
       icon: DollarSign,
       trend: 12.5,
       delta: "+12.5%",
@@ -66,14 +69,14 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
     },
     {
       title: "Net",
-      value: `SSP ${Math.round(net).toLocaleString()}`,
+      value: `SSP ${Math.round(sspNet).toLocaleString()}`,
       subtitle: `${margin.toFixed(1)}% margin`,
       icon: PiggyBank,
-      trend: net >= 0 ? 15.3 : -5.2,
-      delta: net >= 0 ? "+15.3%" : "-5.2%",
-      bgColor: net >= 0 ? "bg-blue-500" : "bg-orange-500",
-      textColor: net >= 0 ? "text-blue-600" : "text-orange-600",
-      lightBg: net >= 0 ? "bg-blue-50" : "bg-orange-50",
+      trend: sspNet >= 0 ? 15.3 : -5.2,
+      delta: sspNet >= 0 ? "+15.3%" : "-5.2%",
+      bgColor: sspNet >= 0 ? "bg-blue-500" : "bg-orange-500",
+      textColor: sspNet >= 0 ? "text-blue-600" : "text-orange-600",
+      lightBg: sspNet >= 0 ? "bg-blue-50" : "bg-orange-50",
     },
     {
       title: "Insurance",
