@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Wifi, WifiOff, Clock, Plus, Upload, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Wifi, WifiOff, Clock, Plus, Upload, AlertTriangle, CalendarIcon } from "lucide-react";
 import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
 import SimpleDailyChart from "@/components/dashboard/simple-daily-chart";
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
@@ -18,6 +23,8 @@ export default function Dashboard() {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState(new Date());
 
@@ -44,9 +51,13 @@ export default function Dashboard() {
   };
 
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange],
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
-      const res = await fetch(`/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`, {
+      let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      }
+      const res = await fetch(url, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch dashboard data');
@@ -134,23 +145,99 @@ export default function Dashboard() {
                timeRange === 'last-month' ? 'Last month overview' :
                timeRange === 'last-3-months' ? 'Last 3 months overview' :
                timeRange === 'year' ? 'This year overview' :
-               'Custom period overview'}
+               timeRange === 'custom' && customStartDate && customEndDate ? 
+                 `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
+                 'Custom period overview'}
             </p>
           </div>
           
           <div className="flex items-center space-x-4">
             {/* Time Period Dropdown */}
-            <select 
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-w-32"
-              value={timeRange}
-              onChange={(e) => handleTimeRangeChange(e.target.value as any)}
-            >
-              <option value="current-month">Current Month</option>
-              <option value="last-month">Last Month</option>
-              <option value="last-3-months">Last 3 Months</option>
-              <option value="year">This Year</option>
-              <option value="custom">Custom</option>
-            </select>
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className="h-9 w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current-month">Current Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Custom Date Range Controls */}
+            {timeRange === 'custom' && (
+              <>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !customStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="bottom" 
+                    align="start" 
+                    sideOffset={12} 
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
+                    avoidCollisions={true}
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                <span aria-hidden="true" className="text-muted-foreground">to</span>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !customEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="bottom" 
+                    align="start" 
+                    sideOffset={12} 
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
+                    avoidCollisions={true}
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </>
+            )}
 
             {/* Online Status Pill */}
             <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-2">
