@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -5,13 +6,41 @@ import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileText, Lock, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Download, FileText, Lock, Trash2, Calendar } from "lucide-react";
 
 export default function Reports() {
   const { toast } = useToast();
   const { data: reports, isLoading } = useQuery({
     queryKey: ["/api/reports"],
   });
+
+  // State for month/year selection
+  const currentDate = new Date();
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString());
+
+  // Generate year options (current year and past 2 years)
+  const yearOptions = [];
+  for (let i = 0; i < 3; i++) {
+    yearOptions.push((currentDate.getFullYear() - i).toString());
+  }
+
+  // Month options
+  const monthOptions = [
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+    { value: "7", label: "July" },
+    { value: "8", label: "August" },
+    { value: "9", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -135,10 +164,41 @@ export default function Reports() {
         title="Monthly Reports" 
         subtitle="Generate and manage monthly financial reports"
         actions={
-          <Button onClick={() => generateReport(new Date().getFullYear(), new Date().getMonth() + 1)}>
-            <Download className="h-4 w-4 mr-2" />
-            Generate Current Month
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-24">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
+              data-testid="button-generate-report"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Generate Report
+            </Button>
+          </div>
         }
       />
 
@@ -159,8 +219,12 @@ export default function Reports() {
                 <p className="text-sm text-gray-400 mt-2">
                   Reports are automatically generated at month-end or you can generate them manually.
                 </p>
-                <Button className="mt-4" onClick={() => generateReport(new Date().getFullYear(), new Date().getMonth() + 1)}>
-                  <Download className="h-4 w-4 mr-2" />
+                <Button 
+                  className="mt-4" 
+                  onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
+                  data-testid="button-generate-first-report"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
                   Generate First Report
                 </Button>
               </div>
