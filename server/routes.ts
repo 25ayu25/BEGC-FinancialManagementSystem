@@ -218,10 +218,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "New password must be at least 8 characters long" });
       }
 
-      // TODO: Implement actual password verification and update
-      // For now, simulate success
-      console.log(`Password change requested for user ${req.user.id}`);
-      
+      // Get current user to verify current password
+      const currentUser = await storage.getUser(req.user.id);
+      if (!currentUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify current password
+      if (currentUser.password !== currentPassword) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+
+      // Update password in database
+      const updatedUser = await storage.updateUser(req.user.id, { 
+        password: newPassword 
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Failed to update password" });
+      }
+
+      console.log(`Password successfully changed for user ${req.user.id}`);
       res.json({ success: true, message: 'Password updated successfully' });
     } catch (error) {
       console.error("Error changing password:", error);
