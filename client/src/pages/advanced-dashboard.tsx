@@ -781,7 +781,6 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
-                <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
               </div>
 
             </div>
@@ -879,40 +878,63 @@ export default function AdvancedDashboard() {
                   </div>
                 </div>
                 
-                {/* Data Table Toggle */}
-                <div className="flex justify-center mt-4 pt-3 border-t border-slate-100">
-                  {monthTotal > 0 ? (
-                    <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-data-table">
-                          <Building2 className="h-4 w-4 mr-2" />
-                          View Data Table
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col bg-white dark:bg-slate-900">
-                        <DialogHeader>
-                          <DialogTitle>Revenue Data • {monthName}</DialogTitle>
-                          <DialogDescription>
-                            Daily revenue breakdown {selectedDepartment ? `(filtered by ${Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'department' : 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <RevenueDataTable 
-                          data={incomeSeries.filter(d => d.amount > 0)} 
-                          selectedDepartment={selectedDepartment}
-                          departments={Array.isArray(departments) ? departments : []}
-                          monthName={monthName}
-                          selectedYear={selectedYear}
-                          selectedMonth={selectedMonth}
-                          onClose={() => setShowDataTable(false)}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                  ) : (
-                    <Button variant="outline" size="sm" className="text-slate-400 cursor-not-allowed" disabled title="No data for this range">
-                      <Building2 className="h-4 w-4 mr-2" />
-                      View Data Table
-                    </Button>
-                  )}
+                {/* Summary Stats Footer */}
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
+                      <div className="space-y-1">
+                        {monthTotalSSP > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">SSP {monthTotalSSP.toLocaleString()}</span>}
+                        {monthTotalUSD > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">USD {monthTotalUSD.toLocaleString()}</span>}
+                        {monthTotalSSP === 0 && monthTotalUSD === 0 && <span className="text-sm text-slate-500">No revenue in this range</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
+                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {peak.toLocaleString()}</span>
+                      {peakDay && <span className="text-xs text-slate-500 mt-1">{peakDay.fullDate}</span>}
+                    </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
+                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {monthlyAvg.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Data Table Toggle */}
+                  <div className="flex justify-center mt-4 pt-3 border-t border-slate-100">
+                    {monthTotal > 0 ? (
+                      <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-data-table">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            View Data Table
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col bg-white dark:bg-slate-900">
+                          <DialogHeader>
+                            <DialogTitle>Revenue Data • {monthName}</DialogTitle>
+                            <DialogDescription>
+                              Daily revenue breakdown {selectedDepartment ? `(filtered by ${Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'department' : 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <RevenueDataTable 
+                            data={incomeSeries.filter(d => d.amount > 0)} 
+                            selectedDepartment={selectedDepartment}
+                            departments={Array.isArray(departments) ? departments : []}
+                            monthName={monthName}
+                            selectedYear={selectedYear}
+                            selectedMonth={selectedMonth}
+                            onClose={() => setShowDataTable(false)}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <Button variant="outline" size="sm" className="text-slate-400 cursor-not-allowed" disabled title="No data for this range">
+                        <Building2 className="h-4 w-4 mr-2" />
+                        View Data Table
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : isLoading ? (
