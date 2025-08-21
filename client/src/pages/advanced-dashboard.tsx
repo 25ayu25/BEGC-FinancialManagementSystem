@@ -563,8 +563,11 @@ export default function AdvancedDashboard() {
   
   // Calculate SSP-only revenue (total minus USD insurance to prevent currency mixing)
   const sspRevenue = monthTotalSSP || Math.max(0, totalIncome - insuranceIncome);
+  
+  // Calculate correct SSP-only net income
+  const sspNetIncome = sspRevenue - totalExpenses;
 
-  const profitMargin = totalIncome > 0 ? ((netIncome / totalIncome) * 100) : 0;
+  const profitMargin = sspRevenue > 0 ? ((sspNetIncome / sspRevenue) * 100) : 0;
   // Remove hardcoded values - use real data only
   const hasRealData = totalIncome > 0 || totalExpenses > 0;
 
@@ -727,7 +730,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">SSP {Math.round(sspNetIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-blue-600">
                   <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
                 </div>
