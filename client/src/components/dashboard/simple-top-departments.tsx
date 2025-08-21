@@ -77,16 +77,23 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 ${colors[index]} rounded-full`} />
-                    <span className="text-sm font-medium text-slate-700">
-                      {department.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-700">
+                        {department.name}
+                      </span>
+                      {index === 0 && department.amount > 0 && (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">
+                          Top Performer
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold text-slate-900">
                       SSP {Math.round(department.amount).toLocaleString()}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {department.percentage.toFixed(1)}%
+                      {department.percentage.toFixed(1)}% • Avg/day: SSP {Math.round(department.amount / new Date().getDate()).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -102,11 +109,17 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
 
           {/* Total Summary */}
           <div className="pt-4 border-t border-slate-200">
-            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <span className="text-sm font-semibold text-slate-700">Total Revenue</span>
-              <span className="text-lg font-bold text-slate-900">
-                SSP {Math.round(total).toLocaleString()}
-              </span>
+            <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-slate-700">Total Revenue</span>
+                <span className="text-lg font-bold text-slate-900">
+                  SSP {Math.round(total).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-slate-500">
+                <span>{sortedDepartments.filter(d => d.amount > 0).length} active departments</span>
+                <span>Day {new Date().getDate()} of {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}</span>
+              </div>
             </div>
           </div>
         </div>

@@ -46,10 +46,18 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
   const sspNet = sspIncome - expenses;
   const margin = sspIncome > 0 ? (sspNet / sspIncome) * 100 : 0;
 
+  // Calculate additional context (mock for now - should come from API)
+  const currentDay = new Date().getDate();
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const monthProgress = (currentDay / daysInMonth) * 100;
+  const estimatedMonthlyIncome = sspIncome > 0 ? (sspIncome / currentDay) * daysInMonth : 0;
+
   const kpis = [
     {
       title: "Income",
       value: `SSP ${Math.round(sspIncome).toLocaleString()}`,
+      subtitle: `Day ${currentDay} of ${daysInMonth} • ${monthProgress.toFixed(0)}% complete`,
+      context: estimatedMonthlyIncome > 0 ? `Projected: SSP ${Math.round(estimatedMonthlyIncome).toLocaleString()}` : undefined,
       icon: DollarSign,
       trend: 12.5,
       delta: "+12.5%",
@@ -60,6 +68,8 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
     {
       title: "Expenses", 
       value: `SSP ${Math.round(expenses).toLocaleString()}`,
+      subtitle: expenses > 0 ? `${((expenses / sspIncome) * 100).toFixed(1)}% of income` : "No expenses yet",
+      context: `Avg per day: SSP ${currentDay > 0 ? Math.round(expenses / currentDay).toLocaleString() : 0}`,
       icon: CreditCard,
       trend: -8.2,
       delta: "-8.2%",
@@ -71,6 +81,7 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
       title: "Net",
       value: `SSP ${Math.round(sspNet).toLocaleString()}`,
       subtitle: `${margin.toFixed(1)}% margin`,
+      context: sspNet > 0 ? "Positive cash flow" : "Monitor expenses",
       icon: PiggyBank,
       trend: sspNet >= 0 ? 15.3 : -5.2,
       delta: sspNet >= 0 ? "+15.3%" : "-5.2%",
@@ -81,6 +92,8 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
     {
       title: "Insurance",
       value: `USD ${Math.round(usdIncome).toLocaleString()}`,
+      subtitle: usdIncome > 0 ? "Claims processed" : "No claims yet",
+      context: `Separate from SSP operations`,
       icon: Shield,
       trend: 5.7,
       delta: "+5.7%",
@@ -121,6 +134,9 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
               <p className="text-slate-600 text-sm font-medium">{kpi.title}</p>
               {kpi.subtitle && (
                 <p className="text-slate-500 text-xs">{kpi.subtitle}</p>
+              )}
+              {kpi.context && (
+                <p className="text-slate-400 text-xs mt-1">{kpi.context}</p>
               )}
             </div>
           </CardContent>
