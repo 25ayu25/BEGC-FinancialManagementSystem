@@ -7,6 +7,7 @@ This is a comprehensive financial management system for Bahr El Ghazal clinic, d
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Design preference: Minimal, clean designs over elaborate styling, gradients, or complex visual enhancements.
 
 ## System Architecture
 
@@ -54,6 +55,7 @@ Preferred communication style: Simple, everyday language.
 - **Component Architecture**: Modular component structure with reusable UI primitives
 - **Responsive Design**: Mobile-first approach with breakpoint-aware components
 - **Data Visualization**: Custom chart components for financial data presentation
+- **Date Selection**: Professional shadcn calendar components with clinic's teal branding for custom date ranges
 
 ### Business Logic Implementation
 - **Multi-Currency Support**: USD and SSP with conversion utilities and proper formatting
@@ -61,6 +63,7 @@ Preferred communication style: Simple, everyday language.
 - **Insurance Integration**: Support for multiple insurance providers (CIC, UAP, CIGNA, etc.)
 - **Transaction Types**: Income and expense tracking with detailed categorization
 - **Reporting System**: Monthly report generation with department and insurance breakdowns
+- **Time Period Analysis**: Flexible date filtering with Current Month, Last Month, Last 3 Months, This Year, and Custom date range options
 
 ## External Dependencies
 
