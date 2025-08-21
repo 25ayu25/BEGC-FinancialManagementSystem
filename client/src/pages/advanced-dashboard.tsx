@@ -88,47 +88,75 @@ export default function AdvancedDashboard() {
   const { data: rawIncome } = useQuery({
     queryKey: ['/api/income-trends', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: () => {
+      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${timeRange}`;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
-        // For custom date range, use the custom dates
-        const year = customStartDate.getFullYear();
-        const month = customStartDate.getMonth() + 1;
-        return fetch(`/api/income-trends/${year}/${month}`, { credentials: 'include' }).then(r => r.json());
+        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
-      return fetch(`/api/income-trends/${selectedYear}/${selectedMonth}`, { credentials: 'include' }).then(r => r.json());
+      return fetch(url, { credentials: 'include' }).then(r => r.json());
     },
   });
 
-  // Build a zero-filled daily series for the selected month
-  // For custom date range, use the custom start date's month
-  const displayYear = timeRange === 'custom' && customStartDate ? customStartDate.getFullYear() : selectedYear;
-  const displayMonth = timeRange === 'custom' && customStartDate ? customStartDate.getMonth() + 1 : selectedMonth;
-  const daysInMonth = new Date(displayYear, displayMonth, 0).getDate();
-  const monthName = new Date(displayYear, displayMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  // Build income series based on the selected range
+  let incomeSeries = [];
+  let monthName = '';
   
-  const incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
-    day: i + 1,
-    amount: 0,
-    amountUSD: 0,
-    amountSSP: 0,
-    label: `${i + 1}`,
-    fullDate: new Date(displayYear, displayMonth - 1, i + 1).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    }),
-  }));
-
-  if (Array.isArray(rawIncome)) {
+  if (timeRange === 'custom' && customStartDate && customEndDate && Array.isArray(rawIncome)) {
+    // For custom date range, create series from the API response dates
+    monthName = `${format(customStartDate, 'MMM d, yyyy')} - ${format(customEndDate, 'MMM d, yyyy')}`;
+    
+    // Create a map from the API response
+    const dataMap = new Map();
     for (const r of rawIncome) {
-      // Accept several shapes: {day}, {dateISO}, {date}
-      let day = r.day;
-      if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
-      if (!day && r.date) day = new Date(r.date).getDate();
-      if (day >= 1 && day <= daysInMonth) {
-        // Use new currency-specific fields
-        incomeSeries[day - 1].amountUSD += Number(r.incomeUSD ?? 0);
-        incomeSeries[day - 1].amountSSP += Number(r.incomeSSP ?? 0);
-        incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0); // Total for backward compatibility
+      const dateStr = r.date; // "Jun 1", "Jul 15", etc.
+      dataMap.set(dateStr, {
+        amount: Number(r.income ?? r.amount ?? 0),
+        amountUSD: Number(r.incomeUSD ?? 0),
+        amountSSP: Number(r.incomeSSP ?? 0),
+        dateStr: dateStr
+      });
+    }
+    
+    // Build series from the API data
+    incomeSeries = rawIncome.map((r, index) => ({
+      day: index + 1, // Sequential numbering for chart
+      amount: Number(r.income ?? r.amount ?? 0),
+      amountUSD: Number(r.incomeUSD ?? 0),
+      amountSSP: Number(r.incomeSSP ?? 0),
+      label: r.date, // "Jun 1", "Jul 15", etc.
+      fullDate: r.date,
+    }));
+  } else {
+    // For single month ranges, use the existing logic
+    const displayYear = selectedYear;
+    const displayMonth = selectedMonth;
+    const daysInMonth = new Date(displayYear, displayMonth, 0).getDate();
+    monthName = new Date(displayYear, displayMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
+      day: i + 1,
+      amount: 0,
+      amountUSD: 0,
+      amountSSP: 0,
+      label: `${i + 1}`,
+      fullDate: new Date(displayYear, displayMonth - 1, i + 1).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      }),
+    }));
+
+    if (Array.isArray(rawIncome)) {
+      for (const r of rawIncome) {
+        // Accept several shapes: {day}, {dateISO}, {date}
+        let day = r.day;
+        if (!day && r.dateISO) day = new Date(r.dateISO).getDate();
+        if (!day && r.date) day = new Date(r.date).getDate();
+        if (day >= 1 && day <= daysInMonth) {
+          // Use new currency-specific fields
+          incomeSeries[day - 1].amountUSD += Number(r.incomeUSD ?? 0);
+          incomeSeries[day - 1].amountSSP += Number(r.incomeSSP ?? 0);
+          incomeSeries[day - 1].amount += Number(r.income ?? r.amount ?? 0); // Total for backward compatibility
+        }
       }
     }
   }
@@ -181,6 +209,7 @@ export default function AdvancedDashboard() {
 
   // Generate standard Y-axis ticks: 0, 20k, 40k, 60k, 80k
   const generateYTicks = () => {
+    const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
     if (peak === 0) return [0, 20000, 40000, 60000, 80000];
     const maxNeeded = Math.max(peak * 1.2, 20000);
     const ticks = [0];
@@ -190,28 +219,39 @@ export default function AdvancedDashboard() {
     return ticks;
   };
 
-  // Custom X-axis tick formatter - show key days and transaction days
+  // Custom X-axis tick formatter
   const formatXAxis = (tickItem: any, index: number) => {
-    const day = parseInt(tickItem);
-    
-    // Always show days with transactions
-    const dayData = incomeSeries.find(d => d.day === day);
-    const hasTransaction = dayData && dayData.amount > 0;
-    
-    if (hasTransaction) {
-      return day.toString();
-    }
-    
-    // For months with many days, show strategic spacing
-    if (daysInMonth <= 28) {
-      // Show all days for shorter months
-      return day.toString();
-    } else if (daysInMonth <= 30) {
-      // Show every 5th day for 29-30 day months, plus first and last
-      return (day === 1 || day === daysInMonth || day % 5 === 0) ? day.toString() : '';
+    if (timeRange === 'custom' && customStartDate && customEndDate) {
+      // For custom date ranges, show the date labels directly
+      const dayData = incomeSeries[index];
+      if (!dayData) return '';
+      
+      // Show dates with transactions, plus strategic spacing
+      const hasTransaction = dayData.amount > 0;
+      if (hasTransaction) {
+        return dayData.label;
+      }
+      
+      // Show every 7th day for readability in custom ranges
+      return index % 7 === 0 ? dayData.label : '';
     } else {
-      // Show every 5th day for 31-day months, plus first and last
-      return (day === 1 || day === daysInMonth || day % 5 === 0) ? day.toString() : '';
+      // Single month logic
+      const day = parseInt(tickItem);
+      const dayData = incomeSeries.find(d => d.day === day);
+      const hasTransaction = dayData && dayData.amount > 0;
+      
+      if (hasTransaction) {
+        return day.toString();
+      }
+      
+      const daysInCurrentMonth = incomeSeries.length;
+      if (daysInCurrentMonth <= 28) {
+        return day.toString();
+      } else if (daysInCurrentMonth <= 30) {
+        return (day === 1 || day === daysInCurrentMonth || day % 5 === 0) ? day.toString() : '';
+      } else {
+        return (day === 1 || day === daysInCurrentMonth || day % 5 === 0) ? day.toString() : '';
+      }
     }
   };
 
