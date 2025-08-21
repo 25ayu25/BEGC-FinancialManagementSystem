@@ -270,7 +270,10 @@ export default function Transactions() {
                                   </td>
                                   <td className="py-3 px-4">
                                     <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>
-                                      {transaction.departmentId ? getDepartmentName(transaction.departmentId) : transaction.type}
+                                      {transaction.type === 'income' 
+                                        ? (transaction.departmentId ? getDepartmentName(transaction.departmentId) : 'Income')
+                                        : (transaction.expenseCategory || 'Expense')
+                                      }
                                     </Badge>
                                   </td>
                                   <td className="py-3 px-4 text-sm text-right font-medium">
