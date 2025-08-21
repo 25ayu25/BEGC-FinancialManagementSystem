@@ -277,7 +277,7 @@ export default function Settings() {
                 </div>
                 <Switch 
                   checked={form.watch("emailNotifications")}
-                  onCheckedChange={(checked) => form.setValue("emailNotifications", checked)}
+                  onCheckedChange={(checked) => form.setValue("emailNotifications", checked, { shouldDirty: true })}
                   data-testid="switch-email-notifications"
                 />
               </div>
@@ -289,7 +289,7 @@ export default function Settings() {
                 </div>
                 <Switch 
                   checked={form.watch("reportAlerts")}
-                  onCheckedChange={(checked) => form.setValue("reportAlerts", checked)}
+                  onCheckedChange={(checked) => form.setValue("reportAlerts", checked, { shouldDirty: true })}
                   data-testid="switch-report-alerts"
                 />
               </div>

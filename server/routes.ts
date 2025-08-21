@@ -90,7 +90,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Find user by username
-      const user = await storage.getUserByUsername(username);
+      // Case-insensitive username lookup
+      const user = await storage.getUserByUsername(username.toLowerCase());
       if (!user) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
@@ -160,9 +161,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json({
               id: user.id,
               username: user.username,
+              email: user.email,
               role: user.role,
               location: user.location,
-              fullName: user.fullName
+              fullName: user.fullName,
+              defaultCurrency: user.defaultCurrency,
+              emailNotifications: user.emailNotifications,
+              reportAlerts: user.reportAlerts
             });
           }
         } catch (parseError) {
@@ -180,9 +185,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json({
               id: user.id,
               username: user.username,
+              email: user.email,
               role: user.role,
               location: user.location,
-              fullName: user.fullName
+              fullName: user.fullName,
+              defaultCurrency: user.defaultCurrency,
+              emailNotifications: user.emailNotifications,
+              reportAlerts: user.reportAlerts
             });
           }
         } catch (parseError) {
@@ -217,6 +226,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error changing password:", error);
       res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  // Update user settings (profile and preferences)
+  app.put("/api/user/settings", requireAuth, async (req, res) => {
+    try {
+      const { firstName, lastName, email, emailNotifications, reportAlerts } = req.body;
+      
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({ error: "First name, last name, and email are required" });
+      }
+
+      // Combine names for fullName
+      const fullName = `${firstName} ${lastName}`;
+      
+      // Update user preferences
+      const updatedUser = await storage.updateUser(req.user.id, {
+        fullName,
+        email,
+        emailNotifications: emailNotifications ?? true,
+        reportAlerts: reportAlerts ?? true
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Settings updated successfully',
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          fullName: updatedUser.fullName,
+          role: updatedUser.role,
+          location: updatedUser.location,
+          defaultCurrency: updatedUser.defaultCurrency,
+          emailNotifications: updatedUser.emailNotifications,
+          reportAlerts: updatedUser.reportAlerts
+        }
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      res.status(500).json({ error: "Failed to update settings" });
     }
   });
 
