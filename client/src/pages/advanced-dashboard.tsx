@@ -277,7 +277,7 @@ export default function AdvancedDashboard() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="w-auto p-2 bg-white border border-slate-200 shadow-xl rounded-lg" 
+                  className="p-2 w-[280px] bg-white border border-slate-200 shadow-xl rounded-lg" 
                   align="start" 
                   side="bottom" 
                   sideOffset={12}
@@ -287,6 +287,8 @@ export default function AdvancedDashboard() {
                 >
                   <DatePicker
                     mode="single"
+                    numberOfMonths={1}
+                    showOutsideDays={false}
                     selected={customStartDate}
                     onSelect={setCustomStartDate}
                     initialFocus
@@ -310,7 +312,7 @@ export default function AdvancedDashboard() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="w-auto p-2 bg-white border border-slate-200 shadow-xl rounded-lg" 
+                  className="p-2 w-[280px] bg-white border border-slate-200 shadow-xl rounded-lg" 
                   align="start" 
                   side="bottom" 
                   sideOffset={12}
@@ -320,6 +322,8 @@ export default function AdvancedDashboard() {
                 >
                   <DatePicker
                     mode="single"
+                    numberOfMonths={1}
+                    showOutsideDays={false}
                     selected={customEndDate}
                     onSelect={setCustomEndDate}
                     initialFocus

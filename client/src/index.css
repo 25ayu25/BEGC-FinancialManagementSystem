@@ -67,7 +67,7 @@
 /* Fix calendar overlay issues - make more compact and professional */
 [data-radix-popover-content] .rdp {
   --rdp-cell-size: 24px !important;
-  --rdp-accent-color: hsl(173 100% 40%) !important;
+  --rdp-accent-color: var(--primary) !important;
   --rdp-background-color: white !important;
   background: white !important;
   font-size: 12px !important;
@@ -78,16 +78,21 @@
 [data-radix-popover-content] .rdp-day_selected,
 [data-radix-popover-content] .rdp-day_selected:focus,
 [data-radix-popover-content] .rdp-day_selected:hover {
-  background-color: hsl(173 100% 40%) !important;
+  background-color: var(--primary) !important;
   color: white !important;
   border-radius: 4px !important;
 }
 
 [data-radix-popover-content] .rdp-day_today {
-  color: hsl(173 100% 40%) !important;
+  color: var(--primary) !important;
   font-weight: 600 !important;
-  border: 1px solid hsl(173 100% 40%) !important;
+  border: 1px solid var(--primary) !important;
   border-radius: 4px !important;
+}
+
+/* Hide outside days as fallback */
+[data-radix-popover-content] .rdp-day_outside {
+  visibility: hidden;
 }
 
 [data-radix-popover-content] .rdp-day:hover:not(.rdp-day_selected) {

@@ -1,0 +1,61 @@
+calendar is still “big with too many dates” because of the component props, not CSS. Here’s exactly what to change.
+1) Make the calendar small (1 month, no extra/outside days)
+Find your date-range picker component (often components/date-range-picker.tsx|jsx). Replace the Calendar props with these:
+<Calendar
+  mode="range"
+  numberOfMonths={1}        // was 2 by default in shadcn example
+  showOutsideDays={false}   // hides previous/next-month days
+  selected={range}
+  onSelect={setRange}
+/>
+If you’re using a Radix Popover, also give the content some offset so it isn’t kissing the title:
+<PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[320px]">
+  {/* presets + calendar */}
+</PopoverContent>
+2) Move the picker away from “Executive Dashboard”
+Put the title on its own line and the filters in a toolbar below it:
+<h1 className="text-3xl font-semibold tracking-tight">Executive Dashboard</h1>
+
+<div className="mt-3 mb-4 sticky top-0 z-10 bg-white/70 backdrop-blur
+                border rounded-xl p-2 flex flex-wrap items-center gap-2">
+  {/* presets … */}
+  <div className="ml-auto">
+    {/* date range button that opens the popover */}
+  </div>
+</div>
+3) Use your teal accent (already defined) everywhere
+You’ve already set a teal in :root:
+--primary: hsl(173 100% 40%);
+Your overrides look good. One small cleanup—use the variable instead of hard-coding the HSL (keeps future theme edits simple):
+[data-radix-popover-content] .rdp {
+  --rdp-cell-size: 24px !important;
+  --rdp-accent-color: var(--primary) !important;   /* ← use the variable */
+  --rdp-background-color: white !important;
+}
+[data-radix-popover-content] .rdp-day_selected,
+[data-radix-popover-content] .rdp-day_selected:focus,
+[data-radix-popover-content] .rdp-day_selected:hover {
+  background-color: var(--primary) !important;
+  color: white !important;
+}
+[data-radix-popover-content] .rdp-day_today {
+  color: var(--primary) !important;
+  border: 1px solid var(--primary) !important;
+}
+4) (Optional) If you still see “outside” days
+If, for some reason, you can’t change the props right now, this CSS fallback will visually hide outside days:
+/* last resort: visually remove outside days */
+[data-radix-popover-content] .rdp-day_outside {
+  visibility: hidden;   /* keeps grid alignment; display:none will collapse cells */
+}
+5) Show the actual range on the button
+Don’t label the trigger “Custom”. Show the chosen dates so the control explains itself:
+<Button variant="outline" className="h-9 gap-2">
+  <CalendarIcon className="h-4 w-4 opacity-70" />
+  <span className="text-sm">
+    {range?.from && range?.to
+      ? `${format(range.from, "MMM d, yyyy")} – ${format(range.to, "MMM d, yyyy")}`
+      : "Select dates"}
+  </span>
+</Button>
+Result: one compact month, teal highlights, no clutter from outside days, and the picker sits comfortably below the “Executive Dashboard” title.
