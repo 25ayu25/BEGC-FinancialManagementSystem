@@ -9,12 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Clock, Plus, Upload, AlertTriangle, CalendarIcon } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
 
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
-import SimpleQuickActions from "@/components/dashboard/simple-quick-actions";
-import SimpleAlerts from "@/components/dashboard/simple-alerts";
+
 import SimpleRecentTransactions from "@/components/dashboard/simple-recent-transactions";
 import SimpleMonthlyFooter from "@/components/dashboard/simple-monthly-footer";
 
@@ -260,10 +259,8 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Operations Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SimpleQuickActions />
-          <SimpleAlerts />
+        {/* Recent Transactions - Full Width */}
+        <div className="grid grid-cols-1">
           <SimpleRecentTransactions transactions={dashboardData?.recentTransactions || []} />
         </div>
 
