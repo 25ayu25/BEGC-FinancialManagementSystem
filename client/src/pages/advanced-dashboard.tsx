@@ -36,7 +36,25 @@ export default function AdvancedDashboard() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState("month");
+  const [timeRange, setTimeRange] = useState("current-month");
+
+  const handleTimeRangeChange = (range: string) => {
+    setTimeRange(range);
+    
+    // Auto-set dates based on preset selection
+    const now = new Date();
+    if (range === 'current-month') {
+      setSelectedYear(now.getFullYear());
+      setSelectedMonth(now.getMonth() + 1);
+    } else if (range === 'last-month') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+      setSelectedYear(lastMonth.getFullYear());
+      setSelectedMonth(lastMonth.getMonth() + 1);
+    } else if (range === 'year') {
+      setSelectedYear(now.getFullYear());
+      setSelectedMonth(1); // January for year view
+    }
+  };
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['/api/dashboard', selectedYear, selectedMonth],
@@ -202,36 +220,57 @@ export default function AdvancedDashboard() {
           </p>
         </div>
         
-        <div className="flex items-center space-x-3">
-          <Select value={`${selectedYear}-${selectedMonth}`} onValueChange={(value) => {
-            const [year, month] = value.split('-').map(Number);
-            setSelectedYear(year);
-            setSelectedMonth(month);
-          }}>
-            <SelectTrigger className="w-40 h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2025-8">August 2025</SelectItem>
-              <SelectItem value="2025-7">July 2025</SelectItem>
-              <SelectItem value="2025-6">June 2025</SelectItem>
-              <SelectItem value="2025-5">May 2025</SelectItem>
-              <SelectItem value="2025-4">April 2025</SelectItem>
-              <SelectItem value="2025-3">March 2025</SelectItem>
-              <SelectItem value="2025-2">February 2025</SelectItem>
-              <SelectItem value="2025-1">January 2025</SelectItem>
-              <SelectItem value="2024-12">December 2024</SelectItem>
-              <SelectItem value="2024-11">November 2024</SelectItem>
-              <SelectItem value="2024-10">October 2024</SelectItem>
-              <SelectItem value="2024-9">September 2024</SelectItem>
-              <SelectItem value="2024-8">August 2024</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button variant="outline" size="sm" className="h-9 text-sm">
-            <Download className="h-3 w-3 mr-2" />
-            Export
-          </Button>
+        <div className="flex items-center space-x-4">
+          {/* Time Range Preset Buttons */}
+          <div className="flex bg-slate-100 rounded-lg p-1">
+            {[
+              { key: 'current-month', label: 'Current Month' },
+              { key: 'last-month', label: 'Last Month' },
+              { key: 'last-3-months', label: 'Last 3 Months' },
+              { key: 'year', label: 'Year' },
+              { key: 'custom', label: 'Custom' }
+            ].map((range) => (
+              <button
+                key={range.key}
+                onClick={() => handleTimeRangeChange(range.key)}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                  timeRange === range.key
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Date Picker - Only show when Custom is selected */}
+          {timeRange === 'custom' && (
+            <Select value={`${selectedYear}-${selectedMonth}`} onValueChange={(value) => {
+              const [year, month] = value.split('-').map(Number);
+              setSelectedYear(year);
+              setSelectedMonth(month);
+            }}>
+              <SelectTrigger className="w-40 h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2025-8">August 2025</SelectItem>
+                <SelectItem value="2025-7">July 2025</SelectItem>
+                <SelectItem value="2025-6">June 2025</SelectItem>
+                <SelectItem value="2025-5">May 2025</SelectItem>
+                <SelectItem value="2025-4">April 2025</SelectItem>
+                <SelectItem value="2025-3">March 2025</SelectItem>
+                <SelectItem value="2025-2">February 2025</SelectItem>
+                <SelectItem value="2025-1">January 2025</SelectItem>
+                <SelectItem value="2024-12">December 2024</SelectItem>
+                <SelectItem value="2024-11">November 2024</SelectItem>
+                <SelectItem value="2024-10">October 2024</SelectItem>
+                <SelectItem value="2024-9">September 2024</SelectItem>
+                <SelectItem value="2024-8">August 2024</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
