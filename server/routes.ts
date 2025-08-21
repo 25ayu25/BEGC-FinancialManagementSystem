@@ -429,8 +429,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const defaultStartDate = new Date();
       defaultStartDate.setMonth(defaultStartDate.getMonth() - 3);
       
-      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : defaultStartDate;
-      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+      let startDate = defaultStartDate;
+      let endDate = new Date();
+      
+      // Use provided dates if they exist
+      if (req.query.startDate && req.query.startDate !== 'undefined') {
+        startDate = new Date(req.query.startDate as string);
+      }
+      if (req.query.endDate && req.query.endDate !== 'undefined') {
+        endDate = new Date(req.query.endDate as string);
+      }
+      
+      console.log('Date filtering - Start:', startDate.toISOString().split('T')[0], 'End:', endDate.toISOString().split('T')[0]);
 
       const filters: any = {
         startDate,

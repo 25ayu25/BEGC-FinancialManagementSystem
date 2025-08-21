@@ -55,9 +55,14 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
-    // Convert empty strings and "all" to undefined for the API
+    // Convert empty strings and "all" to undefined for the API, but keep date values
     const apiFilters = Object.fromEntries(
-      Object.entries(newFilters).map(([k, v]) => [k, (v === "" || v === "all") ? undefined : v])
+      Object.entries(newFilters).map(([k, v]) => {
+        if (k === 'startDate' || k === 'endDate') {
+          return [k, v === "" ? undefined : v];
+        }
+        return [k, (v === "" || v === "all") ? undefined : v];
+      })
     );
     
     onFilterChange?.(apiFilters);
@@ -251,12 +256,13 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
                     {filters.startDate ? format(new Date(filters.startDate), "PPP") : "Select start date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 bg-white border shadow-lg z-50" align="start">
                   <Calendar
                     mode="single"
                     selected={filters.startDate ? new Date(filters.startDate) : undefined}
                     onSelect={(date) => handleFilterChange("startDate", date ? date.toISOString().split('T')[0] : "")}
                     initialFocus
+                    className="bg-white"
                   />
                 </PopoverContent>
               </Popover>
@@ -278,12 +284,13 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
                     {filters.endDate ? format(new Date(filters.endDate), "PPP") : "Select end date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 bg-white border shadow-lg z-50" align="start">
                   <Calendar
                     mode="single"
                     selected={filters.endDate ? new Date(filters.endDate) : undefined}
                     onSelect={(date) => handleFilterChange("endDate", date ? date.toISOString().split('T')[0] : "")}
                     initialFocus
+                    className="bg-white"
                   />
                 </PopoverContent>
               </Popover>
