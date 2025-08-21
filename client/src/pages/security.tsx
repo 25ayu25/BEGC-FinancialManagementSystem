@@ -4,14 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+
 import { 
   Shield, 
   Key, 
   Eye, 
   EyeOff, 
-  Smartphone, 
-  AlertTriangle,
   CheckCircle,
   Clock
 } from "lucide-react";
@@ -95,22 +93,7 @@ export default function SecurityPage() {
     }
   };
 
-  const sessions = [
-    {
-      id: 1,
-      device: "Chrome on Windows",
-      location: "USA, Washington DC",
-      lastActive: "Current session",
-      current: true
-    },
-    {
-      id: 2,
-      device: "Mobile Safari",
-      location: "South Sudan, Juba",
-      lastActive: "2 hours ago",
-      current: false
-    }
-  ];
+
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50">
@@ -151,11 +134,11 @@ export default function SecurityPage() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <Shield className="w-5 h-5 text-blue-600" />
                   <div>
-                    <p className="font-medium text-yellow-900">2FA Recommended</p>
-                    <p className="text-sm text-yellow-700">Enable two-factor auth</p>
+                    <p className="font-medium text-blue-900">Account Secure</p>
+                    <p className="text-sm text-blue-700">Basic security active</p>
                   </div>
                 </div>
                 
@@ -260,63 +243,7 @@ export default function SecurityPage() {
             </CardContent>
           </Card>
 
-          {/* Two-Factor Authentication */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-slate-600" />
-                Two-Factor Authentication
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div>
-                  <h4 className="font-medium text-slate-900">Authenticator App</h4>
-                  <p className="text-sm text-slate-600">Use an authenticator app for extra security</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary">Not Setup</Badge>
-                  <Button variant="outline" size="sm">
-                    Enable 2FA
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Active Sessions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Sessions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {sessions.map((session, index) => (
-                  <div key={session.id} className={`p-4 rounded-lg border ${session.current ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-slate-900">{session.device}</h4>
-                          {session.current && (
-                            <Badge variant="default" className="bg-green-100 text-green-800">
-                              Current
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-600">{session.location}</p>
-                        <p className="text-sm text-slate-500">{session.lastActive}</p>
-                      </div>
-                      {!session.current && (
-                        <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-50">
-                          Terminate
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
         </div>
       </main>

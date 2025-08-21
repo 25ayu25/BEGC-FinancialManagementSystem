@@ -9,6 +9,7 @@ This is a comprehensive financial management system for Bahr El Ghazal clinic, d
 Preferred communication style: Simple, everyday language.
 Design preference: Minimal, clean designs over elaborate styling, gradients, or complex visual enhancements.
 Header layout preference: Clean 2-column grid layout with title/subtitle on left, controls on right with proper spacing.
+Security preference: Keep security features minimal for 3-person team - removed Active Sessions and Two-Factor Authentication for simplicity.
 
 ## System Architecture
 
