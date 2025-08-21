@@ -64,47 +64,70 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
 }
 
-/* Fix calendar overlay issues */
-.rdp {
-  --rdp-cell-size: 28px;
-  --rdp-accent-color: hsl(173 100% 40%);
-  --rdp-background-color: white;
+/* Fix calendar overlay issues - make more compact and professional */
+[data-radix-popover-content] .rdp {
+  --rdp-cell-size: 24px !important;
+  --rdp-accent-color: hsl(173 100% 40%) !important;
+  --rdp-background-color: white !important;
   background: white !important;
-  font-size: 13px;
+  font-size: 12px !important;
+  min-width: 240px !important;
 }
 
 /* Style the calendar with teal accent */
-.rdp-day_selected {
+[data-radix-popover-content] .rdp-day_selected,
+[data-radix-popover-content] .rdp-day_selected:focus,
+[data-radix-popover-content] .rdp-day_selected:hover {
   background-color: hsl(173 100% 40%) !important;
   color: white !important;
+  border-radius: 4px !important;
 }
 
-.rdp-day_today {
+[data-radix-popover-content] .rdp-day_today {
   color: hsl(173 100% 40%) !important;
+  font-weight: 600 !important;
+  border: 1px solid hsl(173 100% 40%) !important;
+  border-radius: 4px !important;
+}
+
+[data-radix-popover-content] .rdp-day:hover:not(.rdp-day_selected) {
+  background-color: hsl(173 50% 96%) !important;
+  color: hsl(173 100% 30%) !important;
+  border-radius: 4px !important;
+}
+
+[data-radix-popover-content] .rdp-nav_button:hover {
+  background-color: hsl(173 50% 96%) !important;
+  border-radius: 4px !important;
+}
+
+[data-radix-popover-content] .rdp-head_cell {
+  font-size: 11px !important;
+  color: hsl(210 25% 50%) !important;
+  font-weight: 600 !important;
+  padding: 4px !important;
+}
+
+[data-radix-popover-content] .rdp-caption {
+  padding: 6px !important;
+  font-size: 13px !important;
   font-weight: 600 !important;
 }
 
-.rdp-day:hover:not(.rdp-day_selected) {
-  background-color: hsl(173 50% 96%) !important;
-  color: hsl(173 100% 30%) !important;
-}
-
-.rdp-nav_button:hover {
-  background-color: hsl(173 50% 96%) !important;
-}
-
-.rdp-head_cell {
-  font-size: 12px !important;
-  color: hsl(210 25% 50%) !important;
-  font-weight: 500 !important;
-}
-
-.rdp-caption {
-  padding: 8px !important;
-}
-
-.rdp-table {
+[data-radix-popover-content] .rdp-table {
   margin: 0 !important;
+}
+
+[data-radix-popover-content] .rdp-cell {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 1px !important;
+}
+
+[data-radix-popover-content] .rdp-button {
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 11px !important;
 }
 
 /* Ensure all dashboard content has lower z-index */
