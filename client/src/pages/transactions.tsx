@@ -78,6 +78,10 @@ export default function Transactions() {
     queryKey: ["/api/departments"],
   });
 
+  const { data: insuranceProviders } = useQuery({
+    queryKey: ["/api/insurance-providers"],
+  });
+
   const getDepartmentName = (departmentId: string) => {
     return (departments as any)?.find((d: any) => d.id === departmentId)?.name || 'Unknown';
   };
@@ -132,6 +136,9 @@ export default function Transactions() {
               setAppliedFilters(filters);
             }}
             onExport={() => console.log('Export requested')}
+            transactions={transactions}
+            departments={departments as any[]}
+            insuranceProviders={insuranceProviders as any[]}
           />
           <Card>
             <CardHeader>

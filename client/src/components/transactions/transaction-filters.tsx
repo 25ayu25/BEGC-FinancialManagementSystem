@@ -20,9 +20,12 @@ interface TransactionFiltersProps {
     searchQuery?: string;
   }) => void;
   onExport?: () => void;
+  transactions?: any[];
+  departments?: any[];
+  insuranceProviders?: any[];
 }
 
-export default function TransactionFilters({ onFilterChange, onExport }: TransactionFiltersProps) {
+export default function TransactionFilters({ onFilterChange, onExport, transactions = [], departments: propDepartments, insuranceProviders: propInsuranceProviders }: TransactionFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filters, setFilters] = useState({
     type: "all",
@@ -31,13 +34,16 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
     searchQuery: "",
   });
 
-  const { data: departments } = useQuery({
+  const { data: queryDepartments } = useQuery({
     queryKey: ["/api/departments"],
   });
 
-  const { data: insuranceProviders } = useQuery({
+  const { data: queryInsuranceProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
   });
+
+  const departments = propDepartments || queryDepartments;
+  const insuranceProviders = propInsuranceProviders || queryInsuranceProviders;
 
   const handleFilterChange = (key: string, value: string) => {
     const newFilters = { ...filters, [key]: value };
@@ -65,14 +71,28 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
   const hasActiveFilters = Object.values(filters).some(value => value !== "" && value !== "all");
 
   const handleExport = () => {
-    // Create CSV content
-    const csvContent = "data:text/csv;charset=utf-8,Type,Department,Insurance,Amount,Currency,Description,Date\n";
+    // Create CSV headers
+    let csvContent = "Type,Department,Insurance,Amount,Currency,Description,Date\n";
     
-    // For now, just trigger a download with sample data
-    const encodedUri = encodeURI(csvContent);
+    // Add transaction data
+    transactions.forEach((transaction: any) => {
+      const departmentName = (departments as any[])?.find((d: any) => d.id === transaction.departmentId)?.name || 'Unknown';
+      const insuranceName = (insuranceProviders as any[])?.find((p: any) => p.id === transaction.insuranceProviderId)?.name || 'None';
+      const amount = transaction.amount || '0';
+      const currency = transaction.currency || 'SSP';
+      const description = (transaction.description || '').replace(/,/g, ';'); // Replace commas to avoid CSV issues
+      const date = new Date(transaction.date).toLocaleDateString();
+      
+      csvContent += `${transaction.type},${departmentName},${insuranceName},${amount},${currency},"${description}",${date}\n`;
+    });
+    
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
     link.setAttribute("download", `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -175,7 +195,7 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All departments</SelectItem>
-                  {(departments || []).map((dept: any) => (
+                  {((departments as any[]) || []).map((dept: any) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
                     </SelectItem>
@@ -195,7 +215,7 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All providers</SelectItem>
-                  {(insuranceProviders || []).map((provider: any) => (
+                  {((insuranceProviders as any[]) || []).map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {provider.name}
                     </SelectItem>
