@@ -868,8 +868,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Footer section
-      const footerY = doc.internal.pageSize.height - 30;
+      // Add some spacing before footer
+      currentY += 20;
+      
+      // Footer section - ensure it doesn't overlap with content
+      const minFooterY = currentY + 20;
+      const footerY = Math.max(doc.internal.pageSize.height - 30, minFooterY);
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.5);
       doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
