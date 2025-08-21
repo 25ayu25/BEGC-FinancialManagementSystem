@@ -6,7 +6,8 @@ import TransactionFilters from "@/components/transactions/transaction-filters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Filter, Download, Edit, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, Filter, Download, Edit, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,6 +31,7 @@ export default function Transactions() {
   const [appliedFilters, setAppliedFilters] = useState<any>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(50); // Default page size
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -104,11 +106,56 @@ export default function Transactions() {
     return (departments as any)?.find((d: any) => d.id === departmentId)?.name || 'Unknown';
   };
 
+  // Group transactions by month
+  const groupTransactionsByMonth = (transactions: any[]) => {
+    const groups: { [key: string]: any[] } = {};
+    
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      
+      if (!groups[monthKey]) {
+        groups[monthKey] = [];
+      }
+      groups[monthKey].push({ ...transaction, monthLabel });
+    });
+
+    // Convert to array and sort by month (newest first)
+    return Object.entries(groups)
+      .map(([monthKey, transactions]) => ({
+        monthKey,
+        monthLabel: transactions[0].monthLabel,
+        transactions,
+        totalAmount: transactions.reduce((sum, t) => {
+          const amount = parseFloat(t.amount) || 0;
+          return sum + (t.type === 'income' ? amount : -amount);
+        }, 0),
+        transactionCount: transactions.length
+      }))
+      .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  };
+
+  const toggleMonth = (monthKey: string) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthKey)) {
+        newSet.delete(monthKey);
+      } else {
+        newSet.add(monthKey);
+      }
+      return newSet;
+    });
+  };
+
   // Extract data from paginated response
   const transactions = transactionData?.transactions || [];
   const total = transactionData?.total || 0;
   const totalPages = transactionData?.totalPages || 1;
   const hasMore = transactionData?.hasMore || false;
+
+  // Group transactions by month
+  const groupedTransactions = groupTransactionsByMonth(transactions);
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -154,80 +201,119 @@ export default function Transactions() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
-                        Date
-                      </th>
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
-                        Description
-                      </th>
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
-                        Department
-                      </th>
-                      <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
-                        Amount
-                      </th>
-                      <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
-                        Status
-                      </th>
-                      <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-6">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {transactions?.map((transaction: any) => (
-                      <tr key={transaction.id} className="hover:bg-gray-50 transition-colors" data-testid={`row-transaction-${transaction.id}`}>
-                        <td className="py-4 px-6 text-sm text-gray-900">
-                          {new Date(transaction.date).toLocaleDateString()}
-                        </td>
-                        <td className="py-4 px-6 text-sm text-gray-900">
-                          {transaction.description}
-                        </td>
-                        <td className="py-4 px-6">
-                          <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>
-                            {transaction.departmentId ? getDepartmentName(transaction.departmentId) : transaction.type}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-6 text-sm text-right font-medium">
-                          <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                            {transaction.type === 'income' ? '+' : '-'}{transaction.currency} {Math.round(parseFloat(transaction.amount)).toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <Badge variant={transaction.syncStatus === 'synced' ? 'default' : 'secondary'}>
-                            {transaction.syncStatus}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <div className="flex items-center justify-center space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
-                              onClick={() => handleEditClick(transaction)}
-                              data-testid={`button-edit-${transaction.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                              onClick={() => handleDeleteClick(transaction.id)}
-                              data-testid={`button-delete-${transaction.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+              <div className="space-y-4">
+                {groupedTransactions.map((monthGroup) => (
+                  <Collapsible
+                    key={monthGroup.monthKey}
+                    open={expandedMonths.has(monthGroup.monthKey)}
+                    onOpenChange={() => toggleMonth(monthGroup.monthKey)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            {expandedMonths.has(monthGroup.monthKey) ? (
+                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-gray-500" />
+                            )}
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {monthGroup.monthLabel}
+                            </h3>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <Badge variant="secondary">
+                            {monthGroup.transactionCount} transaction{monthGroup.transactionCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-lg font-semibold ${monthGroup.totalAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {monthGroup.totalAmount >= 0 ? '+' : '-'}${Math.abs(monthGroup.totalAmount).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    
+                    <CollapsibleContent className="space-y-2 mt-2">
+                      <div className="bg-white border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                  Date
+                                </th>
+                                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                  Description
+                                </th>
+                                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                  Department
+                                </th>
+                                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                  Amount
+                                </th>
+                                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                  Status
+                                </th>
+                                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                  Actions
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {monthGroup.transactions.map((transaction: any) => (
+                                <tr key={transaction.id} className="hover:bg-gray-50 transition-colors" data-testid={`row-transaction-${transaction.id}`}>
+                                  <td className="py-3 px-4 text-sm text-gray-900">
+                                    {new Date(transaction.date).toLocaleDateString()}
+                                  </td>
+                                  <td className="py-3 px-4 text-sm text-gray-900">
+                                    {transaction.description}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>
+                                      {transaction.departmentId ? getDepartmentName(transaction.departmentId) : transaction.type}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 px-4 text-sm text-right font-medium">
+                                    <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                                      {transaction.type === 'income' ? '+' : '-'}{transaction.currency} {Math.round(parseFloat(transaction.amount)).toLocaleString()}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <Badge variant={transaction.syncStatus === 'synced' ? 'default' : 'secondary'}>
+                                      {transaction.syncStatus}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="flex items-center justify-center space-x-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                                        onClick={() => handleEditClick(transaction)}
+                                        data-testid={`button-edit-${transaction.id}`}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                        onClick={() => handleDeleteClick(transaction.id)}
+                                        data-testid={`button-delete-${transaction.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
               </div>
             )}
           </CardContent>
