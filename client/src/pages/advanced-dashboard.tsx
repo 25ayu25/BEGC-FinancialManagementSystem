@@ -134,8 +134,10 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
     const csvData = [
       headers.join(','),
       ...sortedData.map(row => {
+        const departmentName = selectedDepartment ? 
+          (departments?.find(d => d.id === selectedDepartment)?.name || 'Unknown') : '';
         const values = [
-          ...(selectedDepartment ? ['Department Name'] : []), // Would need to resolve department name
+          ...(selectedDepartment ? [departmentName] : []),
           `"${row.fullDate}"`,
           Math.round(row.amountSSP).toLocaleString(),
           row.amountUSD.toLocaleString(),
@@ -166,7 +168,9 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
           <p className="text-slate-600 text-sm font-medium mb-4">No rows for this range</p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>Change dates</Button>
-            <Button variant="outline" size="sm" onClick={() => {}}>Reset filters</Button>
+            {selectedDepartment && (
+              <Button variant="outline" size="sm" onClick={() => {}}>Reset filters</Button>
+            )}
           </div>
         </div>
       </div>
@@ -211,9 +215,9 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
           </TableHeader>
           <TableBody>
             {sortedData.map((row, index) => (
-              <TableRow key={index} className="hover:bg-slate-50">
+              <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                 {selectedDepartment && (
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm font-medium text-teal-700 dark:text-teal-400">
                     {departments?.find(d => d.id === selectedDepartment)?.name || 'Unknown'}
                   </TableCell>
                 )}
@@ -890,7 +894,7 @@ export default function AdvancedDashboard() {
                           <DialogHeader>
                             <DialogTitle>Revenue Data • {monthName}</DialogTitle>
                             <DialogDescription>
-                              Daily revenue breakdown {selectedDepartment ? `(filtered by department)` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              Daily revenue breakdown {selectedDepartment ? `(filtered by ${departments?.find(d => d.id === selectedDepartment)?.name || 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </DialogDescription>
                           </DialogHeader>
                           <RevenueDataTable 
