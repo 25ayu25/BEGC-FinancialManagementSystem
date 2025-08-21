@@ -357,7 +357,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
-      const data = await storage.getIncomeTrendsForMonth(year, month);
+      const range = req.query.range as string;
+      const startDateStr = req.query.startDate as string;
+      const endDateStr = req.query.endDate as string;
+
+      let data;
+      
+      if (range === 'custom' && startDateStr && endDateStr) {
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
+        data = await storage.getIncomeTrendsForDateRange(startDate, endDate);
+      } else {
+        // For non-custom ranges, use the existing month-based logic
+        data = await storage.getIncomeTrendsForMonth(year, month);
+      }
+      
       res.json(data);
     } catch (error) {
       console.error("Error fetching income trends for month:", error);

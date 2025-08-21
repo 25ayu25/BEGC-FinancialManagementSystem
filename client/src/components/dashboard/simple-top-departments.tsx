@@ -14,7 +14,7 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Top 5 Departments
+              Departments
             </CardTitle>
             <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
               View full breakdown
@@ -61,7 +61,7 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            Top 5 Departments
+            Departments
           </CardTitle>
           <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
             View full breakdown

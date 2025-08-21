@@ -58,6 +58,7 @@ export interface IStorage {
   }>;
   getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>>;
   getIncomeTrendsForMonth(year: number, month: number): Promise<Array<{ date: string, income: number }>>;
+  getIncomeTrendsForDateRange(startDate: Date, endDate: Date): Promise<Array<{ date: string, income: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -407,6 +408,40 @@ export class DatabaseStorage implements IStorage {
         income: existingData ? Number(existingData.income) : 0,
         incomeUSD: existingData ? Number(existingData.incomeUSD) : 0,
         incomeSSP: existingData ? Number(existingData.incomeSSP) : 0
+      });
+      
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return result;
+  }
+
+  async getIncomeTrendsForDateRange(startDate: Date, endDate: Date): Promise<Array<{ date: string, income: number }>> {
+    const incomeData = await db.select({
+      date: sql<string>`DATE(${transactions.date})`,
+      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`
+    }).from(transactions)
+    .where(
+      and(
+        eq(transactions.type, "income"),
+        gte(transactions.date, startDate),
+        lte(transactions.date, endDate)
+      )
+    )
+    .groupBy(sql`DATE(${transactions.date})`)
+    .orderBy(sql`DATE(${transactions.date})`);
+
+    // Fill in missing dates with 0 income
+    const result: Array<{ date: string, income: number }> = [];
+    const current = new Date(startDate);
+    
+    while (current <= endDate) {
+      const dateStr = current.toISOString().split('T')[0];
+      const existingData = incomeData.find(d => d.date === dateStr);
+      
+      result.push({
+        date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        income: existingData ? Number(existingData.income) : 0
       });
       
       current.setDate(current.getDate() + 1);

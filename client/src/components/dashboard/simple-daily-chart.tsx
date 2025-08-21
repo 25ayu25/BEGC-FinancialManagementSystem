@@ -3,15 +3,24 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface SimpleDailyChartProps {
-  timeRange: 'today' | '7d' | 'month';
+  timeRange: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom';
+  selectedYear: number;
+  selectedMonth: number;
+  customStartDate?: Date;
+  customEndDate?: Date;
 }
 
-export default function SimpleDailyChart({ timeRange }: SimpleDailyChartProps) {
+export default function SimpleDailyChart({ timeRange, selectedYear, selectedMonth, customStartDate, customEndDate }: SimpleDailyChartProps) {
   const { data: chartData, isLoading } = useQuery({
-    queryKey: ["/api/income-trends", timeRange],
+    queryKey: ["/api/income-trends", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
-      const days = timeRange === 'today' ? 1 : timeRange === '7d' ? 7 : 30;
-      const res = await fetch(`/api/income-trends?days=${days}`, {
+      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        const startDate = customStartDate.toISOString().split('T')[0];
+        const endDate = customEndDate.toISOString().split('T')[0];
+        url += `&startDate=${startDate}&endDate=${endDate}`;
+      }
+      const res = await fetch(url, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch income trends');
@@ -33,7 +42,14 @@ export default function SimpleDailyChart({ timeRange }: SimpleDailyChartProps) {
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
           <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-          Daily Income ({timeRange === 'today' ? 'Today' : timeRange === '7d' ? 'Last 7 Days' : 'This Month'})
+          Daily Income ({
+            timeRange === 'current-month' ? 'Current Month' :
+            timeRange === 'last-month' ? 'Last Month' :
+            timeRange === 'last-3-months' ? 'Last 3 Months' :
+            timeRange === 'year' ? 'This Year' :
+            timeRange === 'custom' ? 'Custom Range' :
+            'This Month'
+          })
         </CardTitle>
       </CardHeader>
       <CardContent>

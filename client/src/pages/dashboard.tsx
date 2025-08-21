@@ -249,7 +249,13 @@ export default function Dashboard() {
 
         {/* Visuals Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SimpleDailyChart timeRange="month" />
+          <SimpleDailyChart 
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            timeRange={timeRange}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+          />
           <SimpleTopDepartments 
             data={dashboardData?.departmentBreakdown || {}} 
             departments={(departments as any) || []}
