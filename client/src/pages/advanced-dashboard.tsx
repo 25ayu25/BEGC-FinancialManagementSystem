@@ -351,21 +351,21 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-emerald-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   <span className="text-xs font-medium">+{revenueGrowth}%</span>
                 </div>
               </div>
-              <div className="bg-emerald-50 p-2 rounded-full">
-                <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <div className="bg-emerald-50 p-1.5 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
           </CardContent>
@@ -373,17 +373,17 @@ export default function AdvancedDashboard() {
 
         {/* Total Expenses */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-red-600">
                   <span className="text-xs font-medium">vs last month</span>
                 </div>
               </div>
-              <div className="bg-red-50 p-2 rounded-full">
-                <TrendingDown className="h-5 w-5 text-red-600" />
+              <div className="bg-red-50 p-1.5 rounded-lg">
+                <TrendingDown className="h-4 w-4 text-red-600" />
               </div>
             </div>
           </CardContent>
@@ -391,17 +391,17 @@ export default function AdvancedDashboard() {
 
         {/* Net Income */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                <p className="text-lg font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-blue-600">
                   <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
                 </div>
               </div>
-              <div className="bg-blue-50 p-2 rounded-full">
-                <DollarSign className="h-5 w-5 text-blue-600" />
+              <div className="bg-blue-50 p-1.5 rounded-lg">
+                <DollarSign className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -409,17 +409,17 @@ export default function AdvancedDashboard() {
 
         {/* Insurance Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
-                <p className="text-lg font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
                   <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
                 </div>
               </div>
-              <div className="bg-purple-50 p-2 rounded-full">
-                <Shield className="h-5 w-5 text-purple-600" />
+              <div className="bg-purple-50 p-1.5 rounded-lg">
+                <Shield className="h-4 w-4 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -427,18 +427,18 @@ export default function AdvancedDashboard() {
 
         {/* Patient Volume */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Patient Volume</p>
-                <p className="text-lg font-semibold text-slate-900">{patientVolume}</p>
+                <p className="text-base font-semibold text-slate-900">{patientVolume}</p>
                 <div className="flex items-center mt-1 text-orange-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   <span className="text-xs font-medium">+8.3%</span>
                 </div>
               </div>
-              <div className="bg-orange-50 p-2 rounded-full">
-                <Users className="h-5 w-5 text-orange-600" />
+              <div className="bg-orange-50 p-1.5 rounded-lg">
+                <Users className="h-4 w-4 text-orange-600" />
               </div>
             </div>
           </CardContent>

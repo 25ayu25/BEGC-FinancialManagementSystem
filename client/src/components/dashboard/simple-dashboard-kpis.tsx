@@ -88,13 +88,13 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {kpis.map((kpi) => (
         <Card key={kpi.title} className="border-0 shadow-md hover:shadow-lg transition-all duration-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${kpi.lightBg}`}>
-                <kpi.icon className={`h-6 w-6 ${kpi.textColor}`} />
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${kpi.lightBg}`}>
+                <kpi.icon className={`h-5 w-5 ${kpi.textColor}`} />
               </div>
               <div className="text-right">
                 <div className={`text-xs font-medium ${kpi.textColor} flex items-center gap-1`}>
@@ -112,7 +112,7 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
             </div>
             
             <div className="space-y-1">
-              <h3 className={`text-3xl font-bold ${kpi.textColor}`} data-testid={`value-${kpi.title.toLowerCase()}`}>
+              <h3 className={`text-2xl font-bold ${kpi.textColor}`} data-testid={`value-${kpi.title.toLowerCase()}`}>
                 {kpi.value}
               </h3>
               <p className="text-slate-600 text-sm font-medium">{kpi.title}</p>
