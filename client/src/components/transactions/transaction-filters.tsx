@@ -253,14 +253,21 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
                     data-testid="button-start-date"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.startDate ? format(new Date(filters.startDate), "PPP") : "Select start date"}
+                    {filters.startDate ? format(new Date(filters.startDate + 'T12:00:00'), "PPP") : "Select start date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-white border shadow-lg z-50" align="start">
                   <Calendar
                     mode="single"
-                    selected={filters.startDate ? new Date(filters.startDate) : undefined}
-                    onSelect={(date) => handleFilterChange("startDate", date ? date.toISOString().split('T')[0] : "")}
+                    selected={filters.startDate ? new Date(filters.startDate + 'T12:00:00') : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+                        handleFilterChange("startDate", localDate.toISOString().split('T')[0]);
+                      } else {
+                        handleFilterChange("startDate", "");
+                      }
+                    }}
                     initialFocus
                     className="bg-white"
                   />
@@ -281,14 +288,21 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
                     data-testid="button-end-date"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.endDate ? format(new Date(filters.endDate), "PPP") : "Select end date"}
+                    {filters.endDate ? format(new Date(filters.endDate + 'T12:00:00'), "PPP") : "Select end date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-white border shadow-lg z-50" align="start">
                   <Calendar
                     mode="single"
-                    selected={filters.endDate ? new Date(filters.endDate) : undefined}
-                    onSelect={(date) => handleFilterChange("endDate", date ? date.toISOString().split('T')[0] : "")}
+                    selected={filters.endDate ? new Date(filters.endDate + 'T12:00:00') : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+                        handleFilterChange("endDate", localDate.toISOString().split('T')[0]);
+                      } else {
+                        handleFilterChange("endDate", "");
+                      }
+                    }}
                     initialFocus
                     className="bg-white"
                   />
@@ -297,67 +311,7 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
             </div>
           </div>
 
-          {/* Quick Date Range Buttons */}
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Quick Date Ranges
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const today = new Date();
-                  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-                  handleFilterChange("startDate", startOfMonth.toISOString().split('T')[0]);
-                  handleFilterChange("endDate", today.toISOString().split('T')[0]);
-                }}
-                data-testid="button-current-month"
-              >
-                Current Month
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const today = new Date();
-                  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                  const endLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-                  handleFilterChange("startDate", lastMonth.toISOString().split('T')[0]);
-                  handleFilterChange("endDate", endLastMonth.toISOString().split('T')[0]);
-                }}
-                data-testid="button-last-month"
-              >
-                Last Month
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const today = new Date();
-                  const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-                  handleFilterChange("startDate", threeMonthsAgo.toISOString().split('T')[0]);
-                  handleFilterChange("endDate", today.toISOString().split('T')[0]);
-                }}
-                data-testid="button-last-3-months"
-              >
-                Last 3 Months
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const today = new Date();
-                  const yearStart = new Date(today.getFullYear(), 0, 1);
-                  handleFilterChange("startDate", yearStart.toISOString().split('T')[0]);
-                  handleFilterChange("endDate", today.toISOString().split('T')[0]);
-                }}
-                data-testid="button-this-year"
-              >
-                This Year
-              </Button>
-            </div>
-          </div>
+
         </div>
       )}
     </div>
