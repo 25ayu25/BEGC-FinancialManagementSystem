@@ -367,8 +367,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const startDate = new Date(startDateStr);
         const endDate = new Date(endDateStr);
         data = await storage.getIncomeTrendsForDateRange(startDate, endDate);
+      } else if (range === 'last-3-months') {
+        // Calculate last 3 months from current date
+        const endDate = new Date();
+        const startDate = new Date(endDate);
+        startDate.setMonth(startDate.getMonth() - 3);
+        data = await storage.getIncomeTrendsForDateRange(startDate, endDate);
       } else {
-        // For non-custom ranges, use the existing month-based logic
+        // For other ranges, use the existing month-based logic
         data = await storage.getIncomeTrendsForMonth(year, month);
       }
       

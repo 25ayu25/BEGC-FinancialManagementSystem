@@ -41,6 +41,11 @@ export default function Dashboard() {
         setSelectedYear(lastMonth.getFullYear());
         setSelectedMonth(lastMonth.getMonth() + 1);
         break;
+      case 'last-3-months':
+        // For last 3 months, use current month but let the backend handle the 3-month range
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(now.getMonth() + 1);
+        break;
       case 'year':
         setSelectedYear(now.getFullYear());
         setSelectedMonth(1); // January for year view
