@@ -6,7 +6,7 @@ import TransactionFilters from "@/components/transactions/transaction-filters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Filter, Download, Edit, Pencil, Trash2 } from "lucide-react";
+import { Plus, Filter, Download, Edit, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -28,6 +28,8 @@ export default function Transactions() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
   const [appliedFilters, setAppliedFilters] = useState<any>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50); // Default page size
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -70,8 +72,24 @@ export default function Transactions() {
     setShowEditModal(true);
   };
 
-  const { data: allTransactions, isLoading } = useQuery({
-    queryKey: ["/api/transactions"],
+  // Build query parameters for server-side filtering and pagination
+  const queryParams = new URLSearchParams({
+    page: currentPage.toString(),
+    limit: pageSize.toString(),
+    ...Object.fromEntries(
+      Object.entries(appliedFilters).filter(([_, value]) => value !== undefined && value !== '')
+    )
+  });
+
+  const { data: transactionData, isLoading } = useQuery({
+    queryKey: ["/api/transactions", queryParams.toString()],
+    queryFn: async () => {
+      const response = await fetch(`/api/transactions?${queryParams}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
 
   const { data: departments } = useQuery({
@@ -86,34 +104,11 @@ export default function Transactions() {
     return (departments as any)?.find((d: any) => d.id === departmentId)?.name || 'Unknown';
   };
 
-  // Apply filters to transactions
-  const transactions = (allTransactions as any[])?.filter((transaction: any) => {
-    // Department filter
-    if (appliedFilters.departmentId && transaction.departmentId !== appliedFilters.departmentId) {
-      return false;
-    }
-    
-    // Insurance provider filter
-    if (appliedFilters.insuranceProviderId && transaction.insuranceProviderId !== appliedFilters.insuranceProviderId) {
-      return false;
-    }
-    
-    // Transaction type filter
-    if (appliedFilters.type && transaction.type !== appliedFilters.type) {
-      return false;
-    }
-    
-    // Search query filter
-    if (appliedFilters.searchQuery && appliedFilters.searchQuery.trim()) {
-      const searchTerm = appliedFilters.searchQuery.toLowerCase();
-      const description = transaction.description?.toLowerCase() || '';
-      if (!description.includes(searchTerm)) {
-        return false;
-      }
-    }
-    
-    return true;
-  }) || [];
+  // Extract data from paginated response
+  const transactions = transactionData?.transactions || [];
+  const total = transactionData?.total || 0;
+  const totalPages = transactionData?.totalPages || 1;
+  const hasMore = transactionData?.hasMore || false;
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -134,6 +129,7 @@ export default function Transactions() {
             onFilterChange={(filters) => {
               console.log('Filters:', filters);
               setAppliedFilters(filters);
+              setCurrentPage(1); // Reset to first page when filters change
             }}
             onExport={() => console.log('Export requested')}
             transactions={transactions}
@@ -235,6 +231,42 @@ export default function Transactions() {
               </div>
             )}
           </CardContent>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+              <div className="text-sm text-gray-500">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()} transactions
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                
+                <div className="text-sm text-gray-500">
+                  Page {currentPage} of {totalPages}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-next-page"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
         </div>
       </main>

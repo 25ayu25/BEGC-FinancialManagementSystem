@@ -420,17 +420,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transactions
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
-      const { startDate, endDate, departmentId, type, limit } = req.query;
-      
-      const filters: any = {};
-      if (startDate) filters.startDate = new Date(startDate as string);
-      if (endDate) filters.endDate = new Date(endDate as string);
-      if (departmentId) filters.departmentId = departmentId as string;
-      if (type) filters.type = type as string;
-      if (limit) filters.limit = parseInt(limit as string);
+      // Parse pagination parameters
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50; // Default 50 per page
+      const offset = (page - 1) * limit;
 
-      const transactions = await storage.getTransactions(filters);
-      res.json(transactions);
+      // Parse date range (default to last 3 months for performance)
+      const defaultStartDate = new Date();
+      defaultStartDate.setMonth(defaultStartDate.getMonth() - 3);
+      
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : defaultStartDate;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+
+      const filters: any = {
+        startDate,
+        endDate,
+        limit,
+        offset
+      };
+      
+      if (req.query.departmentId) filters.departmentId = req.query.departmentId as string;
+      if (req.query.type) filters.type = req.query.type as string;
+      if (req.query.insuranceProviderId) filters.insuranceProviderId = req.query.insuranceProviderId as string;
+      if (req.query.searchQuery) filters.searchQuery = req.query.searchQuery as string;
+
+      const result = await storage.getTransactionsPaginated(filters);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching transactions:", error);
       res.status(500).json({ error: "Failed to fetch transactions" });

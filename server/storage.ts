@@ -32,6 +32,22 @@ export interface IStorage {
     type?: string;
     limit?: number;
   }): Promise<Transaction[]>;
+  getTransactionsPaginated(filters?: {
+    startDate?: Date;
+    endDate?: Date;
+    departmentId?: string;
+    insuranceProviderId?: string;
+    type?: string;
+    searchQuery?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    transactions: Transaction[];
+    total: number;
+    page: number;
+    totalPages: number;
+    hasMore: boolean;
+  }>;
   getTransactionById(id: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | undefined>;
@@ -149,6 +165,79 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await query;
+  }
+
+  async getTransactionsPaginated(filters?: {
+    startDate?: Date;
+    endDate?: Date;
+    departmentId?: string;
+    insuranceProviderId?: string;
+    type?: string;
+    searchQuery?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    transactions: Transaction[];
+    total: number;
+    page: number;
+    totalPages: number;
+    hasMore: boolean;
+  }> {
+    const limit = filters?.limit || 50;
+    const offset = filters?.offset || 0;
+    const page = Math.floor(offset / limit) + 1;
+
+    // Build WHERE conditions
+    const conditions: any[] = [];
+    
+    // Apply date range filter (default to last 3 months)
+    if (filters?.startDate) {
+      conditions.push(gte(transactions.date, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(transactions.date, filters.endDate));
+    }
+    if (filters?.departmentId) {
+      conditions.push(eq(transactions.departmentId, filters.departmentId));
+    }
+    if (filters?.insuranceProviderId) {
+      conditions.push(eq(transactions.insuranceProviderId, filters.insuranceProviderId));
+    }
+    if (filters?.type) {
+      conditions.push(eq(transactions.type, filters.type));
+    }
+    if (filters?.searchQuery) {
+      conditions.push(sql`${transactions.description} ILIKE ${`%${filters.searchQuery}%`}`);
+    }
+
+    // Get total count
+    let countQuery = db.select({ count: sql<number>`count(*)` }).from(transactions);
+    if (conditions.length > 0) {
+      countQuery = countQuery.where(and(...conditions));
+    }
+    const [{ count: total }] = await countQuery;
+
+    // Get paginated results
+    let dataQuery = db.select().from(transactions);
+    if (conditions.length > 0) {
+      dataQuery = dataQuery.where(and(...conditions));
+    }
+    
+    const transactionResults = await dataQuery
+      .orderBy(desc(transactions.date))
+      .limit(limit)
+      .offset(offset);
+
+    const totalPages = Math.ceil(total / limit);
+    const hasMore = page < totalPages;
+
+    return {
+      transactions: transactionResults,
+      total,
+      page,
+      totalPages,
+      hasMore
+    };
   }
 
   async getTransactionById(id: string): Promise<Transaction | undefined> {
