@@ -385,6 +385,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New endpoint for detailed transactions for data table
+  app.get("/api/detailed-transactions/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      const data = await storage.getDetailedTransactionsForMonth(year, month);
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching detailed transactions:", error);
+      res.status(500).json({ error: "Failed to fetch detailed transactions" });
+    }
+  });
+
   // Monthly Reports
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {

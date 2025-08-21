@@ -416,6 +416,56 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  // Get detailed transaction data with department information for the data table
+  async getDetailedTransactionsForMonth(year: number, month: number): Promise<Array<{ 
+    id: string,
+    date: string, 
+    fullDate: string,
+    amount: number, 
+    currency: string,
+    departmentId: string,
+    departmentName: string,
+    description: string
+  }>> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const transactionData = await db.select({
+      id: transactions.id,
+      date: sql<string>`DATE(${transactions.date})`,
+      fullDate: sql<string>`${transactions.date}`,
+      amount: transactions.amount,
+      currency: transactions.currency,
+      departmentId: transactions.departmentId,
+      departmentName: departments.name,
+      description: transactions.description
+    }).from(transactions)
+    .leftJoin(departments, eq(transactions.departmentId, departments.id))
+    .where(
+      and(
+        eq(transactions.type, "income"),
+        gte(transactions.date, startDate),
+        lte(transactions.date, endDate)
+      )
+    )
+    .orderBy(transactions.date);
+
+    return transactionData.map(row => ({
+      id: row.id,
+      date: new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      fullDate: new Date(row.fullDate).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      }),
+      amount: Number(row.amount),
+      currency: row.currency,
+      departmentId: row.departmentId || '',
+      departmentName: row.departmentName || 'Unknown',
+      description: row.description
+    }));
+  }
+
   async getIncomeTrendsForDateRange(startDate: Date, endDate: Date): Promise<Array<{ date: string, income: number }>> {
     const incomeData = await db.select({
       date: sql<string>`DATE(${transactions.date})`,

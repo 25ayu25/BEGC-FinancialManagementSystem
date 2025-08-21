@@ -55,6 +55,17 @@ import {
 } from 'recharts';
 
 // Revenue Data Table Component
+interface DetailedTransaction {
+  id: string;
+  date: string;
+  fullDate: string;
+  amount: number;
+  currency: string;
+  departmentId: string;
+  departmentName: string;
+  description: string;
+}
+
 interface RevenueDataTableProps {
   data: Array<{
     day: number;
@@ -67,13 +78,24 @@ interface RevenueDataTableProps {
   selectedDepartment: string | null;
   departments: any[];
   monthName: string;
+  selectedYear: number;
+  selectedMonth: number;
   onClose: () => void;
 }
 
 type SortField = 'date' | 'ssp' | 'usd' | 'total' | 'department';
 type SortDirection = 'asc' | 'desc';
 
-function RevenueDataTable({ data, selectedDepartment, departments, monthName, onClose }: RevenueDataTableProps) {
+function RevenueDataTable({ data, selectedDepartment, departments, monthName, selectedYear, selectedMonth, onClose }: RevenueDataTableProps) {
+  // Fetch detailed transaction data for the table
+  const { data: detailedTransactions, isLoading: isLoadingDetailed } = useQuery({
+    queryKey: ['/api/detailed-transactions', selectedYear, selectedMonth],
+    enabled: true,
+  }) as { data: DetailedTransaction[] | undefined, isLoading: boolean };
+
+  // Use detailed transactions if available, otherwise fallback to aggregated data
+  const tableData = detailedTransactions || [];
+  const showDepartmentColumn = true; // Always show department column now
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -86,7 +108,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
     }
   };
 
-  const sortedData = [...data].sort((a, b) => {
+  const sortedData = [...tableData].sort((a, b) => {
     let aVal: any, bVal: any;
     
     switch (sortField) {
@@ -95,16 +117,20 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
         bVal = new Date(b.fullDate).getTime();
         break;
       case 'ssp':
-        aVal = a.amountSSP;
-        bVal = b.amountSSP;
+        aVal = a.currency === 'SSP' ? a.amount : 0;
+        bVal = b.currency === 'SSP' ? b.amount : 0;
         break;
       case 'usd':
-        aVal = a.amountUSD;
-        bVal = b.amountUSD;
+        aVal = a.currency === 'USD' ? a.amount : 0;
+        bVal = b.currency === 'USD' ? b.amount : 0;
         break;
       case 'total':
         aVal = a.amount;
         bVal = b.amount;
+        break;
+      case 'department':
+        aVal = a.departmentName;
+        bVal = b.departmentName;
         break;
       default:
         aVal = a.fullDate;
@@ -117,9 +143,9 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
   });
 
   const totals = {
-    ssp: data.reduce((sum, row) => sum + row.amountSSP, 0),
-    usd: data.reduce((sum, row) => sum + row.amountUSD, 0),
-    total: data.reduce((sum, row) => sum + row.amount, 0)
+    ssp: tableData.reduce((sum, row) => sum + (row.currency === 'SSP' ? row.amount : 0), 0),
+    usd: tableData.reduce((sum, row) => sum + (row.currency === 'USD' ? row.amount : 0), 0),
+    total: tableData.reduce((sum, row) => sum + row.amount, 0)
   };
 
   const getSortIcon = (field: SortField) => {
@@ -130,18 +156,19 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
   };
 
   const exportCSV = () => {
-    const headers = selectedDepartment ? ['Department', 'Date', 'SSP', 'USD', 'Total'] : ['Date', 'SSP', 'USD', 'Total'];
+    const headers = ['Department', 'Date', 'SSP', 'USD', 'Total', 'Description'];
     const csvData = [
       headers.join(','),
       ...sortedData.map(row => {
-        const departmentName = selectedDepartment ? 
-          (departments?.find(d => d.id === selectedDepartment)?.name || 'Unknown') : '';
+        const sspAmount = row.currency === 'SSP' ? row.amount : 0;
+        const usdAmount = row.currency === 'USD' ? row.amount : 0;
         const values = [
-          ...(selectedDepartment ? [departmentName] : []),
+          `"${row.departmentName}"`,
           `"${row.fullDate}"`,
-          Math.round(row.amountSSP).toLocaleString(),
-          row.amountUSD.toLocaleString(),
-          Math.round(row.amount).toLocaleString()
+          Math.round(sspAmount).toLocaleString(),
+          usdAmount.toLocaleString(),
+          Math.round(row.amount).toLocaleString(),
+          `"${row.description}"`
         ];
         return values.join(',');
       })
@@ -158,7 +185,20 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
     window.URL.revokeObjectURL(url);
   };
 
-  if (data.length === 0) {
+  if (isLoadingDetailed) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-12">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+            <Building2 className="h-7 w-7 text-slate-400" />
+          </div>
+          <p className="text-slate-600 text-sm font-medium">Loading transaction details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (tableData.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-12">
         <div className="text-center">
@@ -184,13 +224,11 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
         <Table>
           <TableHeader className="sticky top-0 bg-white dark:bg-slate-800 z-10">
             <TableRow>
-              {selectedDepartment && (
-                <TableHead>
-                  <Button variant="ghost" size="sm" onClick={() => handleSort('department')} className="font-semibold h-8 p-1">
-                    Department {getSortIcon('department')}
-                  </Button>
-                </TableHead>
-              )}
+              <TableHead>
+                <Button variant="ghost" size="sm" onClick={() => handleSort('department')} className="font-semibold h-8 p-1">
+                  Department {getSortIcon('department')}
+                </Button>
+              </TableHead>
               <TableHead>
                 <Button variant="ghost" size="sm" onClick={() => handleSort('date')} className="font-semibold h-8 p-1">
                   Date {getSortIcon('date')}
@@ -215,18 +253,16 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
           </TableHeader>
           <TableBody>
             {sortedData.map((row, index) => (
-              <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                {selectedDepartment && (
-                  <TableCell className="text-sm font-medium text-teal-700 dark:text-teal-400">
-                    {departments?.find(d => d.id === selectedDepartment)?.name || 'Unknown'}
-                  </TableCell>
-                )}
+              <TableRow key={row.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                <TableCell className="text-sm font-medium text-teal-700 dark:text-teal-400">
+                  {row.departmentName}
+                </TableCell>
                 <TableCell className="text-sm font-medium">{row.fullDate}</TableCell>
                 <TableCell className="text-sm font-mono tabular-nums text-right">
-                  {row.amountSSP > 0 ? Math.round(row.amountSSP).toLocaleString() : '—'}
+                  {row.currency === 'SSP' ? Math.round(row.amount).toLocaleString() : '—'}
                 </TableCell>
                 <TableCell className="text-sm font-mono tabular-nums text-right">
-                  {row.amountUSD > 0 ? row.amountUSD.toLocaleString() : '—'}
+                  {row.currency === 'USD' ? row.amount.toLocaleString() : '—'}
                 </TableCell>
                 <TableCell className="text-sm font-mono tabular-nums text-right font-semibold">
                   {Math.round(row.amount).toLocaleString()}
@@ -236,7 +272,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
             
             {/* Sticky Totals Row */}
             <TableRow className="bg-slate-100 dark:bg-slate-700 border-t-2 border-slate-300 dark:border-slate-600 font-semibold sticky bottom-0">
-              {selectedDepartment && <TableCell className="font-bold">Total</TableCell>}
+              <TableCell className="font-bold">Total</TableCell>
               <TableCell className="font-bold">Total</TableCell>
               <TableCell className="text-sm font-mono tabular-nums text-right font-bold">
                 {Math.round(totals.ssp).toLocaleString()}
@@ -255,7 +291,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
       {/* Footer Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
         <div className="text-sm text-slate-500">
-          {data.length} row{data.length !== 1 ? 's' : ''} • Total: SSP {Math.round(totals.total).toLocaleString()}
+          {tableData.length} transaction{tableData.length !== 1 ? 's' : ''} • Total: SSP {Math.round(totals.total).toLocaleString()}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={exportCSV}>
@@ -902,6 +938,8 @@ export default function AdvancedDashboard() {
                             selectedDepartment={selectedDepartment}
                             departments={Array.isArray(departments) ? departments : []}
                             monthName={monthName}
+                            selectedYear={selectedYear}
+                            selectedMonth={selectedMonth}
                             onClose={() => setShowDataTable(false)}
                           />
                         </DialogContent>
