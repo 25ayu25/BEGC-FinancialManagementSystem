@@ -252,7 +252,7 @@ export default function AdvancedDashboard() {
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             {/* Period select */}
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="h-9 w-[120px]">
+              <SelectTrigger className="h-9 w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
