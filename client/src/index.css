@@ -56,6 +56,14 @@
   z-index: 9999 !important;
 }
 
+/* Ensure popover content appears above everything */
+[data-radix-popover-content] {
+  z-index: 9999 !important;
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
 [data-radix-select-viewport] {
   background: white !important;
   padding: 4px !important;

@@ -276,7 +276,7 @@ export default function AdvancedDashboard() {
                     {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
                   <DatePicker
                     mode="single"
                     selected={customStartDate}
@@ -301,7 +301,7 @@ export default function AdvancedDashboard() {
                     {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
                   <DatePicker
                     mode="single"
                     selected={customEndDate}
