@@ -228,112 +228,117 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 p-6 dashboard-content">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Executive Dashboard
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-            Track key financial metrics - {
-              timeRange === 'current-month' ? 'Current month overview' :
-              timeRange === 'last-month' ? 'Last month overview' :
-              timeRange === 'last-3-months' ? 'Last 3 months overview' :
-              timeRange === 'year' ? 'This year overview' :
-              timeRange === 'custom' && customStartDate && customEndDate ? 
-                `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
-                'Custom period overview'
-            }
-          </p>
-        </div>
-        
-        <div className="flex items-center space-x-3 relative">
-          <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-            <SelectTrigger className="w-40 h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current-month">Current Month</SelectItem>
-              <SelectItem value="last-month">Last Month</SelectItem>
-              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {timeRange === 'custom' && (
-            <>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[140px] h-9 justify-start text-left font-normal",
-                      !customStartDate && "text-muted-foreground"
-                    )}
+      <header className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-end md:gap-x-8">
+          {/* Left: title + subtitle */}
+          <div>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+              Executive Dashboard
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Track key financial metrics — {
+                timeRange === 'current-month' ? 'Current month overview' :
+                timeRange === 'last-month' ? 'Last month overview' :
+                timeRange === 'last-3-months' ? 'Last 3 months overview' :
+                timeRange === 'year' ? 'This year overview' :
+                timeRange === 'custom' && customStartDate && customEndDate ? 
+                  `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
+                  'Custom period overview'
+              }
+            </p>
+          </div>
+
+          {/* Right: controls (moved away from title) */}
+          <div className="mt-3 md:mt-0 flex flex-wrap items-center justify-end gap-2">
+            {/* Period select */}
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className="h-9 w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current-month">Current Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Date range controls */}
+            {timeRange === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !customStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="bottom" 
+                    align="start" 
+                    sideOffset={12} 
+                    className="p-2 w-[280px]"
+                    style={{ zIndex: 10000 }}
+                    avoidCollisions={true}
+                    collisionPadding={15}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent 
-                  className="p-2 w-[280px] bg-white border border-slate-200 shadow-xl rounded-lg" 
-                  align="start" 
-                  side="bottom" 
-                  sideOffset={12}
-                  style={{ zIndex: 10000 }}
-                  avoidCollisions={true}
-                  collisionPadding={15}
-                >
-                  <DatePicker
-                    mode="single"
-                    numberOfMonths={1}
-                    showOutsideDays={false}
-                    selected={customStartDate}
-                    onSelect={setCustomStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              
-              <span className="text-slate-400 text-sm">to</span>
-              
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[140px] h-9 justify-start text-left font-normal",
-                      !customEndDate && "text-muted-foreground"
-                    )}
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                <span aria-hidden="true" className="text-muted-foreground">to</span>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !customEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="bottom" 
+                    align="start" 
+                    sideOffset={12} 
+                    className="p-2 w-[280px]"
+                    style={{ zIndex: 10000 }}
+                    avoidCollisions={true}
+                    collisionPadding={15}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent 
-                  className="p-2 w-[280px] bg-white border border-slate-200 shadow-xl rounded-lg" 
-                  align="start" 
-                  side="bottom" 
-                  sideOffset={12}
-                  style={{ zIndex: 10000 }}
-                  avoidCollisions={true}
-                  collisionPadding={15}
-                >
-                  <DatePicker
-                    mode="single"
-                    numberOfMonths={1}
-                    showOutsideDays={false}
-                    selected={customEndDate}
-                    onSelect={setCustomEndDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </>
-          )}
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
