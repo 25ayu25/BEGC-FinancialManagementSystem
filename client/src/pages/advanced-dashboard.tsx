@@ -893,7 +893,7 @@ export default function AdvancedDashboard() {
                         <DialogHeader>
                           <DialogTitle>Revenue Data • {monthName}</DialogTitle>
                           <DialogDescription>
-                            Daily revenue breakdown {selectedDepartment ? `(filtered by ${departments?.find(d => d.id === selectedDepartment)?.name || 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            Daily revenue breakdown {selectedDepartment ? `(filtered by ${Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'department' : 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                           </DialogDescription>
                         </DialogHeader>
                         <RevenueDataTable 
