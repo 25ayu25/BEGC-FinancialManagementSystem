@@ -17,17 +17,30 @@ export default function Dashboard() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'today' | '7d' | 'month'>('month');
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState(new Date());
 
-  const handleTimeRangeChange = (range: 'today' | '7d' | 'month') => {
+  const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
-  };
-
-  const handleMonthChange = (year: number, month: number) => {
-    setSelectedYear(year);
-    setSelectedMonth(month);
+    
+    // Auto-set appropriate dates based on selection
+    const now = new Date();
+    switch(range) {
+      case 'current-month':
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(now.getMonth() + 1);
+        break;
+      case 'last-month':
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+        setSelectedYear(lastMonth.getFullYear());
+        setSelectedMonth(lastMonth.getMonth() + 1);
+        break;
+      case 'year':
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(1); // January for year view
+        break;
+    }
   };
 
   const { data: dashboardData, isLoading, error } = useQuery({
@@ -116,55 +129,28 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Simple Dashboard</h1>
-            <p className="text-slate-600">Daily operations at a glance</p>
+            <p className="text-slate-600">
+              {timeRange === 'current-month' ? 'Current month overview' :
+               timeRange === 'last-month' ? 'Last month overview' :
+               timeRange === 'last-3-months' ? 'Last 3 months overview' :
+               timeRange === 'year' ? 'This year overview' :
+               'Custom period overview'}
+            </p>
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Time Range Segmented Control */}
-            <div className="flex bg-slate-100 rounded-lg p-1">
-              {['today', '7d', 'month'].map((range) => (
-                <button
-                  key={range}
-                  onClick={() => handleTimeRangeChange(range as any)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                    timeRange === range
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {range === 'today' ? 'Today' : range === '7d' ? '7D' : 'Month'}
-                </button>
-              ))}
-            </div>
-
-            {/* Month Dropdown */}
+            {/* Time Period Dropdown */}
             <select 
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-              value={`${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`}
-              onChange={(e) => {
-                const [year, month] = e.target.value.split('-');
-                handleMonthChange(parseInt(year), parseInt(month));
-              }}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-w-32"
+              value={timeRange}
+              onChange={(e) => handleTimeRangeChange(e.target.value as any)}
             >
-              {Array.from({ length: 12 }, (_, i) => {
-                const month = i + 1;
-                const value = `${selectedYear}-${month.toString().padStart(2, '0')}`;
-                const label = new Date(selectedYear, i).toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  year: 'numeric' 
-                });
-                return (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                );
-              })}
+              <option value="current-month">Current Month</option>
+              <option value="last-month">Last Month</option>
+              <option value="last-3-months">Last 3 Months</option>
+              <option value="year">This Year</option>
+              <option value="custom">Custom</option>
             </select>
-
-            {/* Generate PDF Button */}
-            <Button variant="outline" size="sm" data-testid="button-generate-pdf">
-              Generate PDF
-            </Button>
 
             {/* Online Status Pill */}
             <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-2">
@@ -187,10 +173,10 @@ export default function Dashboard() {
 
         {/* Visuals Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SimpleDailyChart timeRange={timeRange} />
+          <SimpleDailyChart timeRange="month" />
           <SimpleTopDepartments 
             data={dashboardData?.departmentBreakdown || {}} 
-            departments={departments || []}
+            departments={(departments as any) || []}
           />
         </div>
 
