@@ -203,7 +203,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(receipts).where(eq(receipts.transactionId, transactionId));
   }
 
-  async getDashboardData(year: number, month: number): Promise<{
+  async getDashboardData(year: number, month: number, range?: string): Promise<{
     totalIncome: string;
     totalExpenses: string;
     netIncome: string;
@@ -211,8 +211,34 @@ export class DatabaseStorage implements IStorage {
     insuranceBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }> {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    let startDate: Date;
+    let endDate: Date;
+
+    // Calculate date range based on the range parameter
+    const now = new Date();
+    
+    switch(range) {
+      case 'current-month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'last-month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        break;
+      case 'last-3-months':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1); // 3 months ago
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); // end of current month
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1); // January 1st
+        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59); // December 31st
+        break;
+      default:
+        // Default to the original single month logic
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0, 23, 59, 59);
+    }
 
     // Get total income and expenses
     const [incomeResult] = await db.select({

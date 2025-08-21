@@ -329,8 +329,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
+      const range = req.query.range as string;
       
-      const data = await storage.getDashboardData(year, month);
+      const data = await storage.getDashboardData(year, month, range);
       res.json(data);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);

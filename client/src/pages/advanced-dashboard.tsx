@@ -41,7 +41,8 @@ export default function AdvancedDashboard() {
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
     
-    // Auto-set appropriate dates based on selection
+    // For single month selections, set specific month
+    // For multi-period selections, we'll let the backend handle the range
     const now = new Date();
     switch(range) {
       case 'current-month':
@@ -53,17 +54,21 @@ export default function AdvancedDashboard() {
         setSelectedYear(lastMonth.getFullYear());
         setSelectedMonth(lastMonth.getMonth() + 1);
         break;
+      case 'last-3-months':
       case 'year':
+        // Keep current date for reference, but let backend calculate the range
         setSelectedYear(now.getFullYear());
-        setSelectedMonth(1); // January for year view
+        setSelectedMonth(now.getMonth() + 1);
         break;
     }
   };
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['/api/dashboard', selectedYear, selectedMonth],
+    queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange],
     queryFn: () =>
-      fetch(`/api/dashboard/${selectedYear}/${selectedMonth}`).then(r => r.json()),
+      fetch(`/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`, {
+        credentials: 'include'
+      }).then(r => r.json()),
   });
 
   const { data: departments } = useQuery({
