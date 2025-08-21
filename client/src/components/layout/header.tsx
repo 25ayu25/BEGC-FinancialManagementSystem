@@ -59,7 +59,7 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-4">
-          {!actions && (
+          {actions || (
             <>
               <Select defaultValue="current-month">
                 <SelectTrigger className="w-48">

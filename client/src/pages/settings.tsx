@@ -182,7 +182,9 @@ export default function Settings() {
               <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
               Unsaved changes
             </div>
-          ) : null
+          ) : (
+            <div></div>
+          )
         }
       />
 
