@@ -453,7 +453,7 @@ export default function AdvancedDashboard() {
       const hasSSP = data.amountSSP > 0;
       const hasUSD = data.amountUSD > 0;
       const totalAmount = data.amount;
-      const shareOfMonth = monthTotal > 0 ? ((totalAmount / monthTotal) * 100) : 0;
+      const shareOfMonth = (monthTotalSSP + monthTotalUSD) > 0 ? ((totalAmount / (monthTotalSSP + monthTotalUSD)) * 100) : 0;
       
       // Calculate MTD total up to this point
       const dayIndex = incomeSeries.findIndex(d => d.day === data.day);
