@@ -79,7 +79,6 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
               </Button>
             </>
           )}
-          {actions}
         </div>
       </div>
     </header>
