@@ -74,17 +74,17 @@ export default function SimpleDailyChart({ timeRange, selectedYear, selectedMont
                 }}
               />
               
-              {/* Bars */}
-              <div className="h-full flex items-end justify-between gap-1">
+              {/* Bars and Labels Container */}
+              <div className="h-full flex items-end justify-between gap-1 pb-6">
                 {chartData.map((item: any, index: number) => (
                   <div 
                     key={item.date}
-                    className="flex flex-col items-center flex-1 group"
+                    className="flex flex-col items-center flex-1 group relative"
                   >
                     <div 
                       className="w-full bg-gradient-to-t from-teal-600 to-teal-500 rounded-t-sm hover:from-teal-700 hover:to-teal-600 transition-all duration-200 cursor-pointer shadow-sm relative"
                       style={{ 
-                        height: `${Math.max((item.income / Math.max(...chartData.map((d: any) => d.income))) * 200, 4)}px`,
+                        height: `${Math.max((item.income / Math.max(...chartData.map((d: any) => d.income))) * 180, 4)}px`,
                         minHeight: '4px'
                       }}
                     >
@@ -93,7 +93,8 @@ export default function SimpleDailyChart({ timeRange, selectedYear, selectedMont
                         {item.date}: SSP {Math.round(item.income).toLocaleString()}
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500 mt-1 font-medium">
+                    {/* Date label positioned below the bar */}
+                    <span className="text-xs text-slate-500 font-medium absolute bottom-0 left-1/2 transform -translate-x-1/2">
                       {getDayLabel(item.date)}
                     </span>
                   </div>
