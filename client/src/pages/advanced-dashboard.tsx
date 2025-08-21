@@ -787,7 +787,7 @@ export default function AdvancedDashboard() {
             </div>
           </CardHeader>
           <CardContent className="pb-4">
-            {monthTotal > 0 ? (
+            {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
               <div className="space-y-0">
                 {/* Professional Revenue Chart */}
                 <div className="h-64 relative">
@@ -837,14 +837,14 @@ export default function AdvancedDashboard() {
                         />
                         
                         {/* Monthly Average Reference Line */}
-                        {showAvgLine && monthlyAvg > 0 && (
+                        {showAvgLine && monthlyAvgSSP > 0 && (
                           <ReferenceLine 
-                            y={monthlyAvg} 
+                            y={monthlyAvgSSP} 
                             stroke="#0d9488" 
                             strokeWidth={1}
                             strokeDasharray="4 2"
                             label={{ 
-                              value: `Avg ${(monthlyAvg / 1000).toFixed(0)}k`, 
+                              value: `Avg ${(monthlyAvgSSP / 1000).toFixed(0)}k`, 
                               position: "insideTopRight", 
                               style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
                               offset: 8

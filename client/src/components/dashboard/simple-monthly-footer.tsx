@@ -3,8 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 interface SimpleMonthlyFooterProps {
   data?: {
     totalIncome: string;
+    totalIncomeSSP?: string;
     totalExpenses: string;
+    totalExpensesSSP?: string;
     netIncome: string;
+    netIncomeSSP?: string;
     insuranceBreakdown: Record<string, string>;
   };
 }
