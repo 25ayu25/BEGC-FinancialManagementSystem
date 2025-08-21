@@ -36,7 +36,29 @@ export default function AdvancedDashboard() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState("month");
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
+
+  const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
+    setTimeRange(range);
+    
+    // Auto-set appropriate dates based on selection
+    const now = new Date();
+    switch(range) {
+      case 'current-month':
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(now.getMonth() + 1);
+        break;
+      case 'last-month':
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+        setSelectedYear(lastMonth.getFullYear());
+        setSelectedMonth(lastMonth.getMonth() + 1);
+        break;
+      case 'year':
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(1); // January for year view
+        break;
+    }
+  };
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['/api/dashboard', selectedYear, selectedMonth],
@@ -198,40 +220,29 @@ export default function AdvancedDashboard() {
             Executive Dashboard
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-            Track key financial metrics - {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            Track key financial metrics - {
+              timeRange === 'current-month' ? 'Current month overview' :
+              timeRange === 'last-month' ? 'Last month overview' :
+              timeRange === 'last-3-months' ? 'Last 3 months overview' :
+              timeRange === 'year' ? 'This year overview' :
+              'Custom period overview'
+            }
           </p>
         </div>
         
         <div className="flex items-center space-x-3">
-          <Select value={`${selectedYear}-${selectedMonth}`} onValueChange={(value) => {
-            const [year, month] = value.split('-').map(Number);
-            setSelectedYear(year);
-            setSelectedMonth(month);
-          }}>
+          <Select value={timeRange} onValueChange={handleTimeRangeChange}>
             <SelectTrigger className="w-40 h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2025-8">August 2025</SelectItem>
-              <SelectItem value="2025-7">July 2025</SelectItem>
-              <SelectItem value="2025-6">June 2025</SelectItem>
-              <SelectItem value="2025-5">May 2025</SelectItem>
-              <SelectItem value="2025-4">April 2025</SelectItem>
-              <SelectItem value="2025-3">March 2025</SelectItem>
-              <SelectItem value="2025-2">February 2025</SelectItem>
-              <SelectItem value="2025-1">January 2025</SelectItem>
-              <SelectItem value="2024-12">December 2024</SelectItem>
-              <SelectItem value="2024-11">November 2024</SelectItem>
-              <SelectItem value="2024-10">October 2024</SelectItem>
-              <SelectItem value="2024-9">September 2024</SelectItem>
-              <SelectItem value="2024-8">August 2024</SelectItem>
+              <SelectItem value="current-month">Current Month</SelectItem>
+              <SelectItem value="last-month">Last Month</SelectItem>
+              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
-          
-          <Button variant="outline" size="sm" className="h-9 text-sm">
-            <Download className="h-3 w-3 mr-2" />
-            Export
-          </Button>
         </div>
       </div>
 
