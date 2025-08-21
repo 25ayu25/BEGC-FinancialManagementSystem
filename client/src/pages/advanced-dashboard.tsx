@@ -227,7 +227,7 @@ export default function AdvancedDashboard() {
   const patientVolume = 456; // This would come from backend
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 p-6">
+    <div className="min-h-screen bg-white dark:bg-slate-900 p-6 dashboard-content">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -276,7 +276,15 @@ export default function AdvancedDashboard() {
                     {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
+                <PopoverContent 
+                  className="w-auto p-0" 
+                  align="start" 
+                  side="bottom" 
+                  sideOffset={8}
+                  style={{ zIndex: 10000 }}
+                  avoidCollisions={true}
+                  collisionPadding={10}
+                >
                   <DatePicker
                     mode="single"
                     selected={customStartDate}
@@ -301,7 +309,15 @@ export default function AdvancedDashboard() {
                     {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
+                <PopoverContent 
+                  className="w-auto p-0" 
+                  align="start" 
+                  side="bottom" 
+                  sideOffset={8}
+                  style={{ zIndex: 10000 }}
+                  avoidCollisions={true}
+                  collisionPadding={10}
+                >
                   <DatePicker
                     mode="single"
                     selected={customEndDate}
