@@ -176,9 +176,9 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Table Container */}
-      <div className="flex-1 overflow-auto border border-slate-200 rounded-lg">
+      <div className="flex-1 overflow-auto border border-slate-200 rounded-lg bg-white dark:bg-slate-800">
         <Table>
-          <TableHeader className="sticky top-0 bg-white z-10">
+          <TableHeader className="sticky top-0 bg-white dark:bg-slate-800 z-10">
             <TableRow>
               {selectedDepartment && (
                 <TableHead>
@@ -231,7 +231,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
             ))}
             
             {/* Sticky Totals Row */}
-            <TableRow className="bg-slate-100 border-t-2 border-slate-300 font-semibold sticky bottom-0">
+            <TableRow className="bg-slate-100 dark:bg-slate-700 border-t-2 border-slate-300 dark:border-slate-600 font-semibold sticky bottom-0">
               {selectedDepartment && <TableCell className="font-bold">Total</TableCell>}
               <TableCell className="font-bold">Total</TableCell>
               <TableCell className="text-sm font-mono tabular-nums text-right font-bold">
@@ -249,7 +249,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, on
       </div>
       
       {/* Footer Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+      <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
         <div className="text-sm text-slate-500">
           {data.length} row{data.length !== 1 ? 's' : ''} • Total: SSP {Math.round(totals.total).toLocaleString()}
         </div>
@@ -886,7 +886,7 @@ export default function AdvancedDashboard() {
                             View Data Table
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col bg-white dark:bg-slate-900">
                           <DialogHeader>
                             <DialogTitle>Revenue Data • {monthName}</DialogTitle>
                             <DialogDescription>
