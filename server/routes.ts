@@ -1,17 +1,34 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertReceiptSchema } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 
+// Extend Express Request type to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        username: string;
+        role: string;
+        location: string;
+        fullName: string;
+      };
+    }
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Authentication middleware
-  const requireAuth = async (req: any, res: any, next: any) => {
+  const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Check for session cookie
+      // Check for session cookie with debug logging
       const sessionCookie = req.cookies?.user_session;
+      console.log("Debug - Cookies received:", Object.keys(req.cookies || {}));
+      console.log("Debug - Session cookie exists:", !!sessionCookie);
       
       if (!sessionCookie) {
         // No session - require authentication
@@ -87,11 +104,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName: user.fullName
       };
 
-      // Set session cookie (simplified)
+      // Set session cookie with proper settings for development
       res.cookie('user_session', JSON.stringify(userSession), {
         httpOnly: true,
         secure: false, // Set to true in production with HTTPS
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        sameSite: 'lax', // Important for cross-origin requests
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/' // Ensure cookie is available for all paths
       });
 
       res.json(userSession);

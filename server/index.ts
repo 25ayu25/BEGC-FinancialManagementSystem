@@ -7,7 +7,12 @@ import { seedData } from "./seed-data";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure cookie parser with proper settings
 app.use(cookieParser());
+
+// Trust proxy for correct cookie handling in development
+app.set('trust proxy', 1);
 
 app.use((req, res, next) => {
   const start = Date.now();
