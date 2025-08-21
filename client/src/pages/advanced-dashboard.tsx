@@ -678,7 +678,7 @@ export default function AdvancedDashboard() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Insurance Claims</span>
                   <span className="font-medium text-slate-900 font-mono text-right">
-                    USD {Math.round(insuranceIncome).toLocaleString()} (≈ SSP {Math.round(insuranceIncome * 150).toLocaleString()})
+                    USD {Math.round(insuranceIncome).toLocaleString()}
                   </span>
                 </div>
                 <div className="border-t border-slate-200 pt-3 mt-4 bg-emerald-100 -mx-2 px-2 py-2 rounded">
@@ -757,7 +757,7 @@ export default function AdvancedDashboard() {
           {/* Footer */}
           <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-200 pt-4">
             <div>
-              Exchange rate: 1 USD = 150 SSP as of Aug 21, 2025 • Last updated: {new Date().toLocaleTimeString()}
+              Last updated: {new Date().toLocaleTimeString()}
             </div>
             <Button variant="ghost" size="sm" className="text-xs text-slate-500 hover:text-slate-700">
               <Download className="h-3 w-3 mr-1" />
