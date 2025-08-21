@@ -13,6 +13,9 @@ export const users = pgTable("users", {
   location: text("location").notNull().default("south_sudan"), // "usa", "south_sudan"
   status: text("status").notNull().default("active"), // "active", "inactive"
   permissions: jsonb("permissions").notNull().default("[]"), // JSON array of permissions
+  defaultCurrency: text("default_currency").default("SSP"), // "USD", "SSP"
+  emailNotifications: boolean("email_notifications").default(true),
+  reportAlerts: boolean("report_alerts").default(true),
   lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
