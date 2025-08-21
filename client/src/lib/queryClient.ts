@@ -12,9 +12,17 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Safari fallback: include session token in headers
+  const sessionBackup = localStorage.getItem('user_session_backup');
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  if (sessionBackup) {
+    headers['x-session-token'] = sessionBackup;
+  }
+  
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,8 +37,17 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    // Safari fallback: include session token in headers
+    const sessionBackup = localStorage.getItem('user_session_backup');
+    const headers: Record<string, string> = {};
+    
+    if (sessionBackup) {
+      headers['x-session-token'] = sessionBackup;
+    }
+    
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

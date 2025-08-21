@@ -59,6 +59,9 @@ export default function LoginPage() {
 
       const user = await response.json();
       
+      // Safari fallback: store session in localStorage as backup
+      localStorage.setItem('user_session_backup', JSON.stringify(user));
+      
       toast({
         title: "Login Successful",
         description: `Welcome back, ${user.fullName || user.username}!`

@@ -22,45 +22,58 @@ declare global {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Authentication middleware
+  // Authentication middleware with Safari fallback support
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Check for session cookie with debug logging
+      let userSession = null;
+      
+      // First try cookie-based auth
       const sessionCookie = req.cookies?.user_session;
       console.log("Debug - Cookies received:", Object.keys(req.cookies || {}));
       console.log("Debug - Session cookie exists:", !!sessionCookie);
       
-      if (!sessionCookie) {
-        // No session - require authentication
+      if (sessionCookie) {
+        try {
+          userSession = JSON.parse(sessionCookie);
+        } catch (parseError) {
+          console.log("Cookie parse error:", parseError);
+        }
+      }
+      
+      // Safari fallback: check for session token in request headers
+      if (!userSession) {
+        const authHeader = req.headers['x-session-token'];
+        if (authHeader) {
+          try {
+            userSession = JSON.parse(authHeader as string);
+            console.log("Using header-based auth for Safari compatibility");
+          } catch (parseError) {
+            console.log("Header session parse error:", parseError);
+          }
+        }
+      }
+      
+      if (!userSession) {
         console.log("No session found, authentication required");
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      try {
-        const userSession = JSON.parse(sessionCookie);
-        
-        // Verify user still exists and is active
-        const user = await storage.getUser(userSession.id);
-        if (!user || user.status === 'inactive') {
-          res.clearCookie('user_session');
-          return res.status(401).json({ error: "Session invalid" });
-        }
-
-        req.user = {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          location: user.location,
-          fullName: user.fullName
-        };
-        
-        next();
-      } catch (parseError) {
-        // Invalid session cookie, clear it
+      // Verify user still exists and is active
+      const user = await storage.getUser(userSession.id);
+      if (!user || user.status === 'inactive') {
         res.clearCookie('user_session');
-        console.log("Invalid session cookie");
-        return res.status(401).json({ error: "Invalid session" });
+        return res.status(401).json({ error: "Session invalid" });
       }
+
+      req.user = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        location: user.location,
+        fullName: user.fullName
+      };
+      
+      next();
     } catch (error) {
       console.error("Auth middleware error:", error);
       res.status(500).json({ error: "Authentication error" });
@@ -104,11 +117,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName: user.fullName
       };
 
-      // Set session cookie with Safari-compatible settings for same-origin
+      // Set session cookie with minimal restrictions for Safari compatibility
       res.cookie('user_session', JSON.stringify(userSession), {
-        httpOnly: true,
+        httpOnly: false, // Allow client-side access for Safari compatibility
         secure: false, // Keep false for development (localhost)
-        sameSite: 'strict', // Safari-compatible for same-origin requests
+        sameSite: false, // Most permissive setting for Safari
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/' // Ensure cookie is available for all paths
       });
@@ -123,18 +136,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", (req, res) => {
     // Clear session/cookies with same settings as when set
     res.clearCookie('user_session', {
-      httpOnly: true,
+      httpOnly: false,
       secure: false,
-      sameSite: 'strict',
+      sameSite: false,
       path: '/'
     });
     res.clearCookie('session');
     res.json({ success: true, message: 'Logged out successfully' });
   });
 
-  // Get current user info
-  app.get("/api/auth/user", requireAuth, (req, res) => {
-    res.json(req.user);
+  // Get current user info - with Safari fallback support
+  app.get("/api/auth/user", async (req, res) => {
+    try {
+      // First try cookie-based auth
+      const sessionCookie = req.cookies?.user_session;
+      console.log("Auth check - Cookie exists:", !!sessionCookie);
+      
+      if (sessionCookie) {
+        try {
+          const userSession = JSON.parse(sessionCookie);
+          const user = await storage.getUser(userSession.id);
+          if (user && user.status !== 'inactive') {
+            return res.json({
+              id: user.id,
+              username: user.username,
+              role: user.role,
+              location: user.location,
+              fullName: user.fullName
+            });
+          }
+        } catch (parseError) {
+          console.log("Cookie parse error:", parseError);
+        }
+      }
+      
+      // Safari fallback: check for session token in request headers
+      const authHeader = req.headers['x-session-token'];
+      if (authHeader) {
+        try {
+          const userSession = JSON.parse(authHeader as string);
+          const user = await storage.getUser(userSession.id);
+          if (user && user.status !== 'inactive') {
+            return res.json({
+              id: user.id,
+              username: user.username,
+              role: user.role,
+              location: user.location,
+              fullName: user.fullName
+            });
+          }
+        } catch (parseError) {
+          console.log("Header session parse error:", parseError);
+        }
+      }
+      
+      res.status(401).json({ error: "Authentication required" });
+    } catch (error) {
+      console.error("Auth check error:", error);
+      res.status(500).json({ error: "Authentication error" });
+    }
   });
 
   app.post("/api/auth/change-password", requireAuth, async (req, res) => {
