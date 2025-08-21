@@ -236,14 +236,14 @@ export default function AdvancedDashboard() {
               Executive Dashboard
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Track key financial metrics — {
-                timeRange === 'current-month' ? 'Current month overview' :
-                timeRange === 'last-month' ? 'Last month overview' :
-                timeRange === 'last-3-months' ? 'Last 3 months overview' :
-                timeRange === 'year' ? 'This year overview' :
+              Key financials · {
+                timeRange === 'current-month' ? 'Current month' :
+                timeRange === 'last-month' ? 'Last month' :
+                timeRange === 'last-3-months' ? 'Last 3 months' :
+                timeRange === 'year' ? 'This year' :
                 timeRange === 'custom' && customStartDate && customEndDate ? 
                   `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
-                  'Custom period overview'
+                  'Custom period'
               }
             </p>
           </div>
