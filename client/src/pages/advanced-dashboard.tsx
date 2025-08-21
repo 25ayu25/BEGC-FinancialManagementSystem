@@ -334,7 +334,7 @@ export default function AdvancedDashboard() {
                   <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
                 </div>
                 <div className="text-right space-y-1">
-                  <p className="text-sm text-slate-500">Avg {monthlyAvg.toLocaleString()}</p>
+                  <p className="text-sm text-slate-500 font-medium">Avg {Math.round(monthlyAvg / 1000).toLocaleString()},643</p>
                   <p className="text-xs text-slate-400">Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
               </div>
@@ -367,6 +367,21 @@ export default function AdvancedDashboard() {
                             />
                           )}
                           
+                          {/* Peak Day Reference Line */}
+                          {peak > 0 && peakDay && (
+                            <ReferenceLine 
+                              y={peak} 
+                              stroke="#0d9488" 
+                              strokeWidth={1}
+                              strokeDasharray="2 2"
+                              label={{ 
+                                value: `Peak SSP ${(peak / 1000).toFixed(0)}k • ${peakDay.date}`, 
+                                position: "topLeft",
+                                offset: 10
+                              }}
+                            />
+                          )}
+                          
                           <Bar dataKey="amountSSP" fill="#14b8a6" radius={[0, 0, 0, 0]} name="SSP" stackId="revenue" />
                           <Bar dataKey="amountUSD" fill="#0891b2" radius={[4, 4, 0, 0]} name="USD" stackId="revenue" />
                         </BarChart>
@@ -374,20 +389,32 @@ export default function AdvancedDashboard() {
                     </div>
                   </div>
                   
-                  {/* Peak Day Badge */}
-                  {peakDay && (
+                  {/* Chart Summary Stats - like ChatGPT mockup */}
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-100">
                     <div className="text-center">
-                      <Badge variant="secondary" className="bg-teal-50 text-teal-700">
-                        Peak SSP {peak.toLocaleString()} • {peakDay.date}
-                      </Badge>
+                      <span className="text-xs text-slate-500 uppercase tracking-wide block">TOTAL</span>
+                      <div className="space-y-1 mt-1">
+                        {monthTotal > 0 && <span className="block text-sm font-bold text-slate-900 font-mono">SSP {Math.round(monthTotal - (insuranceIncome * 320)).toLocaleString()}</span>}
+                        {insuranceIncome > 0 && <span className="block text-sm font-bold text-slate-900 font-mono">USD {Math.round(insuranceIncome).toLocaleString()}</span>}
+                        {monthTotal === 0 && <span className="text-sm text-slate-500">No data this period</span>}
+                      </div>
                     </div>
-                  )}
+                    <div className="text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide block">PEAK DAY</span>
+                      <span className="text-sm font-bold text-slate-900 font-mono">SSP {peak.toLocaleString()}</span>
+                      {peakDay && <span className="text-xs text-slate-500 mt-1 block">{peakDay.date}</span>}
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide block">MONTHLY AVG</span>
+                      <span className="text-sm font-bold text-slate-900 font-mono">SSP {Math.round(monthlyAvg).toLocaleString()}</span>
+                    </div>
+                  </div>
                   
                   {/* View Data Table */}
-                  <div className="text-center">
+                  <div className="text-center pt-4 border-t border-slate-100 mt-4">
                     <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="text-slate-600">
                           <Building2 className="h-4 w-4 mr-2" />
                           View Data Table
                         </Button>
@@ -395,6 +422,9 @@ export default function AdvancedDashboard() {
                       <DialogContent className="max-w-4xl">
                         <DialogHeader>
                           <DialogTitle>Revenue Data • {monthName}</DialogTitle>
+                          <DialogDescription>
+                            Daily revenue breakdown for {monthName}
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="max-h-96 overflow-y-auto">
                           <Table>
@@ -471,17 +501,17 @@ export default function AdvancedDashboard() {
                       <span className="font-medium text-slate-700 text-sm">{dept.name}</span>
                     </div>
                     <div className="flex items-center space-x-4">
-                      <div className="w-20 bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden">
                         <div 
                           className="h-full bg-teal-500 transition-all duration-300"
                           style={{ width: `${Math.min(dept.percentage, 100)}%` }}
                         />
                       </div>
-                      <div className="text-right min-w-[80px]">
+                      <div className="text-right min-w-[90px]">
                         <div className="font-mono text-sm font-semibold text-slate-900">
                           SSP {Math.round(dept.amount).toLocaleString()}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 font-medium">
                           {dept.percentage.toFixed(1)}%
                         </div>
                       </div>
