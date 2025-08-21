@@ -783,22 +783,7 @@ export default function AdvancedDashboard() {
                 <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
                 <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500">Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => window.location.reload()}>
-                  <RefreshCw className="h-3 w-3 text-slate-400" />
-                </Button>
-                <Select defaultValue="off">
-                  <SelectTrigger className="w-20 h-6 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="off">Off</SelectItem>
-                    <SelectItem value="5m">5m</SelectItem>
-                    <SelectItem value="15m">15m</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
             </div>
           </CardHeader>
           <CardContent className="pb-4">
