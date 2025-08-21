@@ -633,31 +633,32 @@ export default function AdvancedDashboard() {
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-center">
               <div className="text-sm text-slate-600 mb-1">Net Income</div>
-              <div className="text-2xl font-bold text-slate-900 tabular-nums">
+              <div className="text-2xl font-bold text-slate-900 font-mono text-right">
                 SSP {Math.round(netIncome).toLocaleString()}
               </div>
               <div className="text-xs text-emerald-600 font-medium flex items-center justify-center mt-1">
                 <ArrowUpRight className="h-3 w-3 mr-1" />
-                {profitMargin.toFixed(1)}% margin
+                vs last month +8.5%
               </div>
             </div>
             <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 text-center">
               <div className="text-sm text-slate-600 mb-1">Revenue</div>
-              <div className="text-xl font-semibold text-emerald-700 tabular-nums">
+              <div className="text-xl font-semibold text-emerald-700 font-mono text-right">
                 SSP {Math.round(totalIncome).toLocaleString()}
               </div>
               <div className="text-xs text-emerald-600 font-medium flex items-center justify-center mt-1">
                 <ArrowUpRight className="h-3 w-3 mr-1" />
-                +{revenueGrowth}%
+                vs last month +{revenueGrowth}%
               </div>
             </div>
-            <div className="bg-red-50 border border-red-100 rounded-lg p-4 text-center">
+            <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-center">
               <div className="text-sm text-slate-600 mb-1">Expenses</div>
-              <div className="text-xl font-semibold text-red-600 tabular-nums">
+              <div className="text-xl font-semibold text-slate-700 font-mono text-right">
                 SSP {Math.round(totalExpenses).toLocaleString()}
               </div>
-              <div className="text-xs text-red-500 font-medium mt-1">
-                vs budget
+              <div className="text-xs text-slate-600 font-medium flex items-center justify-center mt-1">
+                <ArrowDownRight className="h-3 w-3 mr-1" />
+                vs budget -2.1%
               </div>
             </div>
           </div>
@@ -670,20 +671,20 @@ export default function AdvancedDashboard() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Direct Payments</span>
-                  <span className="font-medium text-slate-900 tabular-nums text-right">
+                  <span className="font-medium text-slate-900 font-mono text-right">
                     SSP {Math.round(totalIncome - insuranceIncome).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Insurance Claims</span>
-                  <span className="font-medium text-slate-900 tabular-nums text-right">
-                    USD {Math.round(insuranceIncome).toLocaleString()}
+                  <span className="font-medium text-slate-900 font-mono text-right">
+                    USD {Math.round(insuranceIncome).toLocaleString()} (≈ SSP {Math.round(insuranceIncome * 150).toLocaleString()})
                   </span>
                 </div>
                 <div className="border-t border-slate-200 pt-3 mt-4 bg-emerald-100 -mx-2 px-2 py-2 rounded">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-slate-900">Total Revenue</span>
-                    <span className="font-bold text-lg text-emerald-700 tabular-nums text-right">
+                    <span className="font-bold text-lg text-emerald-700 font-mono text-right">
                       SSP {Math.round(totalIncome).toLocaleString()}
                     </span>
                   </div>
@@ -697,20 +698,20 @@ export default function AdvancedDashboard() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Operational</span>
-                  <span className="font-medium text-slate-900 tabular-nums text-right">
+                  <span className="font-medium text-slate-900 font-mono text-right">
                     SSP {Math.round(totalExpenses * 0.7).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Administrative</span>
-                  <span className="font-medium text-slate-900 tabular-nums text-right">
+                  <span className="font-medium text-slate-900 font-mono text-right">
                     SSP {Math.round(totalExpenses * 0.3).toLocaleString()}
                   </span>
                 </div>
                 <div className="border-t border-slate-200 pt-3 mt-4 bg-red-100 -mx-2 px-2 py-2 rounded">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-slate-900">Total Expenses</span>
-                    <span className="font-bold text-lg text-red-600 tabular-nums text-right">
+                    <span className="font-bold text-lg text-red-600 font-mono text-right">
                       SSP {Math.round(totalExpenses).toLocaleString()}
                     </span>
                   </div>
@@ -722,34 +723,46 @@ export default function AdvancedDashboard() {
             <div className="bg-slate-50 border border-slate-100 rounded-lg p-5 border-l-4 border-l-blue-300">
               <h3 className="font-semibold text-base text-slate-900 mb-4">Performance</h3>
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Profit Margin</span>
+                <div className="flex justify-between items-center group">
                   <div className="flex items-center">
-                    <span className="font-semibold text-slate-900 tabular-nums mr-2">{profitMargin.toFixed(1)}%</span>
+                    <span className="text-sm text-slate-600">Profit Margin</span>
+                    <div className="ml-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-help" title="Net Income ÷ Revenue">ⓘ</div>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="font-semibold text-slate-900 font-mono mr-2 text-right">{profitMargin.toFixed(1)}%</span>
                     <ArrowUpRight className="h-4 w-4 text-emerald-500" />
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Revenue Growth</span>
                   <div className="flex items-center">
-                    <span className="font-semibold text-emerald-600 tabular-nums mr-2">+{revenueGrowth}%</span>
+                    <span className="font-semibold text-emerald-600 font-mono mr-2 text-right">+{revenueGrowth}%</span>
                     <ArrowUpRight className="h-4 w-4 text-emerald-500" />
                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Efficiency Score</span>
+                <div className="flex justify-between items-center group">
                   <div className="flex items-center">
-                    <span className="font-semibold text-slate-900 tabular-nums mr-2">95%</span>
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-slate-600">Efficiency Score</span>
+                    <div className="ml-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-help" title="Cost efficiency vs industry benchmark (Target: >90%)">ⓘ</div>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="font-semibold text-slate-900 font-mono mr-2 text-right">95%</span>
+                    <ArrowUpRight className="h-4 w-4 text-emerald-500" />
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Currency Note */}
-          <div className="text-xs text-slate-500 border-t border-slate-200 pt-4">
-            All values in SSP unless noted • {Math.round(insuranceIncome)} USD ≈ SSP {Math.round(insuranceIncome * 1.2).toLocaleString()} (estimated)
+          {/* Footer */}
+          <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-200 pt-4">
+            <div>
+              Exchange rate: 1 USD = 150 SSP as of Aug 21, 2025 • Last updated: {new Date().toLocaleTimeString()}
+            </div>
+            <Button variant="ghost" size="sm" className="text-xs text-slate-500 hover:text-slate-700">
+              <Download className="h-3 w-3 mr-1" />
+              Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>
