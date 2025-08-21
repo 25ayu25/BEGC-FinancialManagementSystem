@@ -44,6 +44,7 @@ export default function AdvancedDashboard() {
   const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -172,20 +173,33 @@ export default function AdvancedDashboard() {
   const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length;
   const monthlyAvg = nonzeroDays > 0 ? Math.round(monthTotalSSP / nonzeroDays) : 0;
   const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
+  const peakDay = incomeSeries.find(d => d.amountSSP === peak);
   const showAvgLine = nonzeroDays >= 2; // Only show if 2+ non-zero days
   
-  // Custom tooltip component
+  // Enhanced tooltip component with context
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const hasSSP = data.amountSSP > 0;
       const hasUSD = data.amountUSD > 0;
+      const totalAmount = data.amount;
+      const shareOfMonth = monthTotal > 0 ? ((totalAmount / monthTotal) * 100) : 0;
+      
+      // Calculate MTD total up to this point
+      const dayIndex = incomeSeries.findIndex(d => d.day === data.day);
+      const mtdTotal = incomeSeries.slice(0, dayIndex + 1).reduce((sum, d) => sum + d.amount, 0);
       
       return (
-        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
-          <p className="font-medium text-slate-900 mb-1">{data.fullDate}</p>
-          {hasSSP && <p className="text-sm text-slate-600">SSP {data.amountSSP.toLocaleString()}</p>}
-          {hasUSD && <p className="text-sm text-slate-600">USD {data.amountUSD.toLocaleString()}</p>}
+        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
+          <p className="font-semibold text-slate-900 mb-2">{data.fullDate}</p>
+          {hasSSP && <p className="text-sm text-slate-700 font-mono">SSP {data.amountSSP.toLocaleString()}</p>}
+          {hasUSD && <p className="text-sm text-slate-700 font-mono">USD {data.amountUSD.toLocaleString()}</p>}
+          {totalAmount > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-500">Share of period: {shareOfMonth.toFixed(1)}%</p>
+              <p className="text-xs text-slate-500">MTD total: SSP {mtdTotal.toLocaleString()}</p>
+            </div>
+          )}
           {!hasSSP && !hasUSD && <p className="text-sm text-slate-500">No transactions</p>}
         </div>
       );
@@ -211,13 +225,13 @@ export default function AdvancedDashboard() {
     return `${Math.round(value)}`;
   };
 
-  // Generate standard Y-axis ticks: 0, 20k, 40k, 60k, 80k
+  // Generate Y-axis ticks: 0, 10k, 20k, 30k, 40k
   const generateYTicks = () => {
     const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
-    if (peak === 0) return [0, 20000, 40000, 60000, 80000];
-    const maxNeeded = Math.max(peak * 1.2, 20000);
+    if (peak === 0) return [0, 10000, 20000, 30000, 40000];
+    const maxNeeded = Math.max(peak * 1.2, 10000);
     const ticks = [0];
-    for (let i = 20000; i <= maxNeeded + 20000; i += 20000) {
+    for (let i = 10000; i <= maxNeeded + 10000; i += 10000) {
       ticks.push(i);
     }
     return ticks;
@@ -498,7 +512,22 @@ export default function AdvancedDashboard() {
                 <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
                 <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
               </div>
-              <Badge variant="outline" className="text-slate-600">Live Data</Badge>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-500">Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => window.location.reload()}>
+                  <RefreshCw className="h-3 w-3 text-slate-400" />
+                </Button>
+                <Select defaultValue="off">
+                  <SelectTrigger className="w-20 h-6 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="off">Off</SelectItem>
+                    <SelectItem value="5m">5m</SelectItem>
+                    <SelectItem value="15m">15m</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pb-4">
@@ -520,9 +549,9 @@ export default function AdvancedDashboard() {
                       >
                         <CartesianGrid 
                           strokeDasharray="1 1" 
-                          stroke="#eef2f7" 
-                          strokeWidth={0.5}
-                          opacity={0.4}
+                          stroke="#f1f5f9" 
+                          strokeWidth={0.3}
+                          opacity={0.3}
                           vertical={false}
                         />
                         <XAxis 
@@ -559,7 +588,7 @@ export default function AdvancedDashboard() {
                             strokeWidth={1}
                             strokeDasharray="4 2"
                             label={{ 
-                              value: `Avg SSP ${monthlyAvg.toLocaleString()}`, 
+                              value: `Avg ${(monthlyAvg / 1000).toFixed(0)}k`, 
                               position: "insideTopRight", 
                               style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
                               offset: 8
@@ -595,23 +624,45 @@ export default function AdvancedDashboard() {
                 </div>
                 
                 {/* Summary Stats Footer */}
-                <div className="border-t border-slate-100 pt-4 grid grid-cols-3 gap-4">
-                  <div className="flex flex-col text-center">
-                    <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
-                    <div className="space-y-1">
-                      {monthTotalSSP > 0 && <span className="block text-sm font-bold text-slate-900">SSP {monthTotalSSP.toLocaleString()}</span>}
-                      {monthTotalUSD > 0 && <span className="block text-sm font-bold text-slate-900">USD {monthTotalUSD.toLocaleString()}</span>}
-                      {monthTotalSSP === 0 && monthTotalUSD === 0 && <span className="text-sm text-slate-500">No revenue</span>}
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
+                      <div className="space-y-1">
+                        {monthTotalSSP > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">SSP {monthTotalSSP.toLocaleString()}</span>}
+                        {monthTotalUSD > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">USD {monthTotalUSD.toLocaleString()}</span>}
+                        {monthTotalSSP === 0 && monthTotalUSD === 0 && <span className="text-sm text-slate-500">No revenue in this range</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
+                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {peak.toLocaleString()}</span>
+                      {peakDay && <span className="text-xs text-slate-500 mt-1">{peakDay.fullDate}</span>}
+                    </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
+                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {monthlyAvg.toLocaleString()}</span>
                     </div>
                   </div>
-                  <div className="flex flex-col text-center">
-                    <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
-                    <span className="text-lg font-bold text-slate-900">SSP {peak.toLocaleString()}</span>
+                  
+                  {/* Data Table Toggle */}
+                  <div className="flex justify-center mt-4 pt-3 border-t border-slate-100">
+                    <Button variant="outline" size="sm" className="text-slate-600">
+                      <Building2 className="h-4 w-4 mr-2" />
+                      View Data Table
+                    </Button>
                   </div>
-                  <div className="flex flex-col text-center">
-                    <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
-                    <span className="text-lg font-bold text-slate-900">SSP {monthlyAvg.toLocaleString()}</span>
-                  </div>
+                </div>
+              </div>
+            ) : isLoading ? (
+              <div className="h-64 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
+                <div className="flex items-center space-x-4">
+                  {[...Array(7)].map((_, i) => (
+                    <div key={i} className="bg-slate-200 rounded animate-pulse" style={{ 
+                      height: `${Math.random() * 120 + 20}px`, 
+                      width: '12px' 
+                    }} />
+                  ))}
                 </div>
               </div>
             ) : (
@@ -620,37 +671,94 @@ export default function AdvancedDashboard() {
                   <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
                     <TrendingUp className="h-7 w-7 text-slate-400" />
                   </div>
-                  <p className="text-slate-600 text-sm font-medium">No income recorded in {monthName}</p>
-                  <p className="text-slate-500 text-xs mt-1">Add transactions to see analytics</p>
+                  <p className="text-slate-600 text-sm font-medium">No revenue in this range</p>
+                  <p className="text-slate-500 text-xs mt-1">Try selecting a different time period</p>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Top Departments */}
+
+        
+        {/* Enhanced Departments */}
         <Card className="border border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-semibold text-slate-900">Top Departments</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
+              {selectedDepartment && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setSelectedDepartment(null)}
+                  className="text-slate-600"
+                >
+                  Reset Filter
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {Array.isArray(departments) ? departments.slice(0, 5).map((dept: any, index: number) => {
-              const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
-              const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
-              
-              return (
-                <div key={dept.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <div className="flex items-center space-x-3 flex-1">
-                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${index === 0 ? 'bg-emerald-500' : index === 1 ? 'bg-blue-500' : index === 2 ? 'bg-purple-500' : index === 3 ? 'bg-orange-500' : 'bg-slate-400'}`} />
-                    <span className="font-medium text-slate-700 flex-1">{dept.name}</span>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-4">
-                    <p className="font-semibold text-slate-900 text-sm">SSP {Math.round(amount).toLocaleString()}</p>
-                    <p className="text-xs text-slate-500">{percentage.toFixed(1)}%</p>
-                  </div>
-                </div>
-              );
-            }) : []}
+          <CardContent className="space-y-2">
+            {Array.isArray(departments) ? departments
+              .map((dept: any) => {
+                const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
+                const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
+                return { ...dept, amount, percentage };
+              })
+              .sort((a, b) => b.amount - a.amount) // Sort by revenue descending
+              .slice(0, 5)
+              .map((dept: any, index: number) => {
+                const isSelected = selectedDepartment === dept.id;
+                const maxAmount = Math.max(...departments.map((d: any) => parseFloat(dashboardData?.departmentBreakdown?.[d.id] || '0')));
+                const proportionWidth = maxAmount > 0 ? (dept.amount / maxAmount) * 100 : 0;
+                
+                return (
+                  <button
+                    key={dept.id}
+                    onClick={() => setSelectedDepartment(isSelected ? null : dept.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setSelectedDepartment(isSelected ? null : dept.id); }}
+                    className={cn(
+                      "w-full flex items-center justify-between p-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500",
+                      isSelected 
+                        ? "bg-teal-50 border-teal-200 shadow-sm" 
+                        : "bg-slate-50 border-slate-100 hover:bg-slate-100"
+                    )}
+                    tabIndex={0}
+                    data-testid={`row-department-${dept.id}`}
+                  >
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                        index === 0 ? 'bg-emerald-500' : 
+                        index === 1 ? 'bg-blue-500' : 
+                        index === 2 ? 'bg-purple-500' : 
+                        index === 3 ? 'bg-orange-500' : 
+                        'bg-slate-400'
+                      }`} />
+                      <span className="font-medium text-slate-700 flex-1 text-left">{dept.name}</span>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-4 min-w-[80px]">
+                      <p className="font-semibold text-slate-900 text-sm font-mono tabular-nums">
+                        SSP {Math.round(dept.amount).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-slate-500">{dept.percentage.toFixed(1)}%</p>
+                      {/* Proportion bar */}
+                      <div className="w-full bg-slate-200 rounded-full h-1 mt-1">
+                        <div 
+                          className="bg-teal-500 h-1 rounded-full transition-all duration-300"
+                          style={{ width: `${proportionWidth}%` }}
+                        />
+                      </div>
+                    </div>
+                  </button>
+                );
+              }) : []}
+            
+            {/* View all departments button if more than 5 */}
+            {Array.isArray(departments) && departments.length > 5 && (
+              <Button variant="ghost" size="sm" className="w-full mt-2 text-slate-600">
+                View all departments ({departments.length} total)
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
