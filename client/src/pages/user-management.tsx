@@ -348,12 +348,14 @@ export default function UserManagementPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
+                    <Label htmlFor="fullName">Full Name *</Label>
                     <Input
                       id="fullName"
                       value={newUser.fullName}
                       onChange={(e) => setNewUser(prev => ({ ...prev, fullName: e.target.value }))}
                       placeholder="John Doe"
+                      required
+                      data-testid="input-fullname"
                     />
                   </div>
 
@@ -453,7 +455,7 @@ export default function UserManagementPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-fullName">Full Name</Label>
+                    <Label htmlFor="edit-fullName">Full Name *</Label>
                     <Input
                       id="edit-fullName"
                       value={editUser.fullName}

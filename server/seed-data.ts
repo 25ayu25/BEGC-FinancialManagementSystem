@@ -9,12 +9,16 @@ export async function seedData() {
     await db.insert(users).values([
       { 
         username: "admin", 
+        email: "admin@bahrelghazal.clinic",
+        fullName: "Administrator",
         password: "admin123", // In production, this should be hashed
         role: "admin", 
         location: "usa" 
       },
       { 
         username: "staff", 
+        email: "staff@bahrelghazal.clinic",
+        fullName: "Staff User",
         password: "staff123", // In production, this should be hashed
         role: "staff", 
         location: "south_sudan" 
