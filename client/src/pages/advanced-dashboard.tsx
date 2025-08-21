@@ -86,14 +86,24 @@ export default function AdvancedDashboard() {
   });
 
   const { data: rawIncome } = useQuery({
-    queryKey: ['/api/income-trends', selectedYear, selectedMonth],
-    queryFn: () =>
-      fetch(`/api/income-trends/${selectedYear}/${selectedMonth}`).then(r => r.json()),
+    queryKey: ['/api/income-trends', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryFn: () => {
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        // For custom date range, use the custom dates
+        const year = customStartDate.getFullYear();
+        const month = customStartDate.getMonth() + 1;
+        return fetch(`/api/income-trends/${year}/${month}`, { credentials: 'include' }).then(r => r.json());
+      }
+      return fetch(`/api/income-trends/${selectedYear}/${selectedMonth}`, { credentials: 'include' }).then(r => r.json());
+    },
   });
 
   // Build a zero-filled daily series for the selected month
-  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-  const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  // For custom date range, use the custom start date's month
+  const displayYear = timeRange === 'custom' && customStartDate ? customStartDate.getFullYear() : selectedYear;
+  const displayMonth = timeRange === 'custom' && customStartDate ? customStartDate.getMonth() + 1 : selectedMonth;
+  const daysInMonth = new Date(displayYear, displayMonth, 0).getDate();
+  const monthName = new Date(displayYear, displayMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   
   const incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
     day: i + 1,
@@ -101,7 +111,7 @@ export default function AdvancedDashboard() {
     amountUSD: 0,
     amountSSP: 0,
     label: `${i + 1}`,
-    fullDate: new Date(selectedYear, selectedMonth - 1, i + 1).toLocaleDateString('en-US', { 
+    fullDate: new Date(displayYear, displayMonth - 1, i + 1).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric', 
       year: 'numeric' 
@@ -227,7 +237,7 @@ export default function AdvancedDashboard() {
   const patientVolume = 456; // This would come from backend
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 p-6 dashboard-content">
+    <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
       <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           {/* Left: title + subtitle */}
