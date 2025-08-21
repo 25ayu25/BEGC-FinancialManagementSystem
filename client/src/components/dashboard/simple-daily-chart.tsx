@@ -3,22 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface SimpleDailyChartProps {
-  timeRange: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom';
+  timeRange: 'today' | '7d' | 'month';
 }
 
 export default function SimpleDailyChart({ timeRange }: SimpleDailyChartProps) {
   const { data: chartData, isLoading } = useQuery({
     queryKey: ["/api/income-trends", timeRange],
     queryFn: async () => {
-      let days = 30; // default
-      if (timeRange === 'current-month' || timeRange === 'last-month' || timeRange === 'custom') {
-        days = 30;
-      } else if (timeRange === 'last-3-months') {
-        days = 90;
-      } else if (timeRange === 'year') {
-        days = 365;
-      }
-      
+      const days = timeRange === 'today' ? 1 : timeRange === '7d' ? 7 : 30;
       const res = await fetch(`/api/income-trends?days=${days}`, {
         credentials: 'include'
       });
@@ -41,13 +33,7 @@ export default function SimpleDailyChart({ timeRange }: SimpleDailyChartProps) {
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
           <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-          Daily Income ({
-            timeRange === 'current-month' ? 'Current Month' : 
-            timeRange === 'last-month' ? 'Last Month' :
-            timeRange === 'last-3-months' ? 'Last 3 Months' :
-            timeRange === 'year' ? 'This Year' :
-            'Custom Period'
-          })
+          Daily Income ({timeRange === 'today' ? 'Today' : timeRange === '7d' ? 'Last 7 Days' : 'This Month'})
         </CardTitle>
       </CardHeader>
       <CardContent>
