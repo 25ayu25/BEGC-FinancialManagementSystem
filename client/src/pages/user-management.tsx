@@ -71,6 +71,10 @@ export default function UserManagementPage() {
     permissions: [] as string[]
   });
   
+  const [filterRole, setFilterRole] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+  
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
@@ -531,73 +535,175 @@ export default function UserManagementPage() {
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
 
-          {/* Stats Cards */}
+          {/* Interactive Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
+            {/* Total Users Card */}
+            <Card 
+              className="cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all duration-200 group"
+              onClick={() => {
+                setFilterRole("");
+                setFilterStatus("");
+                setFilterLocation("");
+                toast({
+                  title: "Filter Reset",
+                  description: "Showing all users"
+                });
+              }}
+              data-testid="card-total-users"
+            >
               <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                      {users?.length || 0}
+                    </p>
+                    <p className="text-sm text-slate-600 mb-1">Total Users</p>
+                    <p className="text-xs text-slate-400">Click to show all</p>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Users className="w-5 h-5 text-blue-600" />
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900">{users?.length || 0}</p>
-                    <p className="text-sm text-slate-600">Total Users</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* Active Users Card */}
+            <Card 
+              className="cursor-pointer hover:shadow-lg hover:border-green-300 transition-all duration-200 group"
+              onClick={() => {
+                setFilterStatus("active");
+                setFilterRole("");
+                setFilterLocation("");
+                toast({
+                  title: "Filter Applied",
+                  description: "Showing active users only"
+                });
+              }}
+              data-testid="card-active-users"
+            >
               <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  </div>
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-3xl font-bold text-slate-900 group-hover:text-green-600 transition-colors">
                       {users?.filter((u: User) => u.status === 'active').length || 0}
                     </p>
-                    <p className="text-sm text-slate-600">Active Users</p>
+                    <p className="text-sm text-slate-600 mb-1">Active Users</p>
+                    <p className="text-xs text-slate-400">Click to filter</p>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* Administrators Card */}
+            <Card 
+              className="cursor-pointer hover:shadow-lg hover:border-orange-300 transition-all duration-200 group"
+              onClick={() => {
+                setFilterRole("admin");
+                setFilterStatus("");
+                setFilterLocation("");
+                toast({
+                  title: "Filter Applied",
+                  description: "Showing administrators only"
+                });
+              }}
+              data-testid="card-administrators"
+            >
               <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-orange-600" />
-                  </div>
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-orange-600">
+                    <p className="text-3xl font-bold text-slate-900 group-hover:text-orange-600 transition-colors">
                       {users?.filter((u: User) => u.role === 'admin').length || 0}
                     </p>
-                    <p className="text-sm text-slate-600">Administrators</p>
+                    <p className="text-sm text-slate-600 mb-1">Admins</p>
+                    <p className="text-xs text-slate-400">Click to filter</p>
+                  </div>
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Shield className="w-5 h-5 text-orange-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* Locations Card */}
+            <Card 
+              className="cursor-pointer hover:shadow-lg hover:border-purple-300 transition-all duration-200 group"
+              onClick={() => {
+                const locations = [...new Set(users?.map(user => user.location))];
+                const locationNames = locations.map(loc => loc === 'usa' ? 'USA' : 'South Sudan');
+                toast({
+                  title: "Active Locations",
+                  description: `Users are located in: ${locationNames.join(', ')}`
+                });
+              }}
+              data-testid="card-locations"
+            >
               <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-purple-600" />
-                  </div>
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-purple-600">2</p>
-                    <p className="text-sm text-slate-600">Locations</p>
+                    <p className="text-3xl font-bold text-slate-900 group-hover:text-purple-600 transition-colors">
+                      {new Set(users?.map(user => user.location)).size || 0}
+                    </p>
+                    <p className="text-sm text-slate-600 mb-1">Locations</p>
+                    <p className="text-xs text-slate-400">Click to view details</p>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Building2 className="w-5 h-5 text-purple-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
+          {/* Filter Status */}
+          {(filterRole || filterStatus || filterLocation) && (
+            <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                <span className="text-sm font-medium text-blue-800">
+                  Filters applied: 
+                  {filterRole && ` Role: ${filterRole}`}
+                  {filterStatus && ` Status: ${filterStatus}`}
+                  {filterLocation && ` Location: ${filterLocation}`}
+                </span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setFilterRole("");
+                  setFilterStatus("");
+                  setFilterLocation("");
+                  toast({
+                    title: "Filters Cleared",
+                    description: "Showing all users"
+                  });
+                }}
+                className="text-blue-600 border-blue-200 hover:bg-blue-100"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
+
           {/* Users Table */}
           <Card>
             <CardHeader>
-              <CardTitle>All Users</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>All Users</span>
+                {(filterRole || filterStatus || filterLocation) && (
+                  <span className="text-sm font-normal text-slate-500">
+                    ({users?.filter((user: User) => {
+                      if (filterRole && user.role !== filterRole) return false;
+                      if (filterStatus && user.status !== filterStatus) return false;
+                      if (filterLocation && user.location !== filterLocation) return false;
+                      return true;
+                    }).length || 0} filtered)
+                  </span>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -620,7 +726,13 @@ export default function UserManagementPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {users?.map((user: User) => (
+                  {users?.filter((user: User) => {
+                    // Apply filters
+                    if (filterRole && user.role !== filterRole) return false;
+                    if (filterStatus && user.status !== filterStatus) return false;
+                    if (filterLocation && user.location !== filterLocation) return false;
+                    return true;
+                  }).map((user: User) => (
                     <div key={user.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
