@@ -75,6 +75,19 @@
   min-width: 240px !important;
 }
 
+/* Ensure completely opaque calendar background */
+[data-radix-popover-content] {
+  background: rgba(255, 255, 255, 1) !important;
+  backdrop-filter: none !important;
+}
+
+[data-radix-popover-content] .rdp,
+[data-radix-popover-content] .rdp-months,
+[data-radix-popover-content] .rdp-month,
+[data-radix-popover-content] .rdp-table {
+  background: rgba(255, 255, 255, 1) !important;
+}
+
 /* Style the calendar with teal accent */
 [data-radix-popover-content] .rdp-day_selected,
 [data-radix-popover-content] .rdp-day_selected:focus,

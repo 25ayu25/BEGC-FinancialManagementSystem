@@ -284,8 +284,8 @@ export default function AdvancedDashboard() {
                     side="bottom" 
                     align="start" 
                     sideOffset={12} 
-                    className="p-2 w-[280px]"
-                    style={{ zIndex: 50000 }}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
                     avoidCollisions={true}
                     collisionPadding={15}
                   >
@@ -319,8 +319,8 @@ export default function AdvancedDashboard() {
                     side="bottom" 
                     align="start" 
                     sideOffset={12} 
-                    className="p-2 w-[280px]"
-                    style={{ zIndex: 50000 }}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
                     avoidCollisions={true}
                     collisionPadding={15}
                   >
