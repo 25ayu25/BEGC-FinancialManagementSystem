@@ -247,7 +247,7 @@ export default function AdvancedDashboard() {
           </p>
         </div>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 relative">
           <Select value={timeRange} onValueChange={handleTimeRangeChange}>
             <SelectTrigger className="w-40 h-9 text-sm">
               <SelectValue />
@@ -277,13 +277,13 @@ export default function AdvancedDashboard() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="w-auto p-0" 
+                  className="w-auto p-2 bg-white border border-slate-200 shadow-xl rounded-lg" 
                   align="start" 
                   side="bottom" 
-                  sideOffset={8}
+                  sideOffset={12}
                   style={{ zIndex: 10000 }}
                   avoidCollisions={true}
-                  collisionPadding={10}
+                  collisionPadding={15}
                 >
                   <DatePicker
                     mode="single"
@@ -310,13 +310,13 @@ export default function AdvancedDashboard() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="w-auto p-0" 
+                  className="w-auto p-2 bg-white border border-slate-200 shadow-xl rounded-lg" 
                   align="start" 
                   side="bottom" 
-                  sideOffset={8}
+                  sideOffset={12}
                   style={{ zIndex: 10000 }}
                   avoidCollisions={true}
-                  collisionPadding={10}
+                  collisionPadding={15}
                 >
                   <DatePicker
                     mode="single"

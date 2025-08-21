@@ -66,10 +66,45 @@
 
 /* Fix calendar overlay issues */
 .rdp {
-  --rdp-cell-size: 32px;
+  --rdp-cell-size: 28px;
   --rdp-accent-color: hsl(173 100% 40%);
   --rdp-background-color: white;
   background: white !important;
+  font-size: 13px;
+}
+
+/* Style the calendar with teal accent */
+.rdp-day_selected {
+  background-color: hsl(173 100% 40%) !important;
+  color: white !important;
+}
+
+.rdp-day_today {
+  color: hsl(173 100% 40%) !important;
+  font-weight: 600 !important;
+}
+
+.rdp-day:hover:not(.rdp-day_selected) {
+  background-color: hsl(173 50% 96%) !important;
+  color: hsl(173 100% 30%) !important;
+}
+
+.rdp-nav_button:hover {
+  background-color: hsl(173 50% 96%) !important;
+}
+
+.rdp-head_cell {
+  font-size: 12px !important;
+  color: hsl(210 25% 50%) !important;
+  font-weight: 500 !important;
+}
+
+.rdp-caption {
+  padding: 8px !important;
+}
+
+.rdp-table {
+  margin: 0 !important;
 }
 
 /* Ensure all dashboard content has lower z-index */
