@@ -4,14 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+
 import { 
   Eye, 
   EyeOff, 
-  Building2,
-  Shield,
-  Globe,
-  MapPin
+  Building2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -158,42 +155,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Quick Access Demo Accounts */}
-        <Card className="border border-slate-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Demo Accounts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-blue-500" />
-                <div>
-                  <p className="font-medium text-sm">USA Admin</p>
-                  <p className="text-xs text-slate-500">admin / password123</p>
-                </div>
-              </div>
-              <Badge variant="default" className="text-xs">
-                USA
-              </Badge>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-green-500" />
-                <div>
-                  <p className="font-medium text-sm">South Sudan Staff</p>
-                  <p className="text-xs text-slate-500">staff / password123</p>
-                </div>
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                South Sudan
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-500">

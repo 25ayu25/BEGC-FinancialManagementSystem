@@ -39,9 +39,7 @@ Security preference: Keep security features minimal for 3-person team - removed 
 - **User Roles**: Admin and staff roles with location-based access (USA, South Sudan)
 - **Session Management**: Cookie-based sessions with Safari-compatible sameSite settings and credential inclusion
 - **Browser Compatibility**: Tested and working on Chrome, Safari, and other major browsers
-- **Default Credentials**: 
-  - USA Admin: admin / password123
-  - South Sudan Staff: staff / password123
+- **User Management**: Demo accounts removed - users must be created through proper registration or admin interface
 
 ### File Upload and Storage
 - **Cloud Storage**: Google Cloud Storage integration with Replit sidecar authentication

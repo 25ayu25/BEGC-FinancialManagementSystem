@@ -5,25 +5,7 @@ export async function seedData() {
   try {
     console.log("Seeding initial data...");
     
-    // Seed users first
-    await db.insert(users).values([
-      { 
-        username: "admin", 
-        email: "admin@bahrelghazal.clinic",
-        fullName: "Administrator",
-        password: "admin123", // In production, this should be hashed
-        role: "admin", 
-        location: "usa" 
-      },
-      { 
-        username: "staff", 
-        email: "staff@bahrelghazal.clinic",
-        fullName: "Staff User",
-        password: "staff123", // In production, this should be hashed
-        role: "staff", 
-        location: "south_sudan" 
-      }
-    ]).onConflictDoNothing();
+    // No default demo users - users should be created through proper registration
 
     // Seed departments
     await db.insert(departments).values([
