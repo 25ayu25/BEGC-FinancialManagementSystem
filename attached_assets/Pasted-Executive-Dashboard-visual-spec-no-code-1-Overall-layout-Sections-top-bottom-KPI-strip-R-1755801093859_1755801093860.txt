@@ -1,0 +1,60 @@
+Executive Dashboard — visual spec (no code)
+1) Overall layout
+Sections (top → bottom): KPI strip → Revenue Analytics (left) + Departments (right).
+Grid & spacing: 24px outer padding; 20px gaps between cards; card padding 16–20px.
+Cards: white background, subtle border, soft shadow, rounded corners (12–16px).
+2) Typography
+Page title: 24–28px, semibold.
+Subtitles & labels: 13–14px, muted color.
+Money values: 20–22px, monospaced/tabular numbers, right-aligned when in columns.
+Tiny annotations (avg/peak/percent): 11–12px, muted.
+3) KPI strip (4 tiles)
+Titles (top left): Total revenue, Total expenses, Net income, Insurance (USD).
+Big value beneath the title.
+Sub-line on every tile in the same pattern:
+Revenue: “↑ +12.5% vs last month”.
+Expenses: “2.1% under budget” (use under/over wording, no red tile by default).
+Net income: “99.4% margin”.
+Insurance: “2 providers”.
+Hide any empty tiles (e.g., Patient Volume) or show “Connect data source”.
+4) Revenue Analytics (left card)
+Header: “Revenue Analytics · Daily revenue · {Month YYYY}”.
+Right side of header: small “Avg 11,643” tag (always visible).
+Chart:
+Dashed mean line matching the tag.
+Peak badge above the tallest bar: “Peak SSP 30,000 · Aug 12”.
+Axis ticks with k suffix (0, 10k, 20k, 30k, 40k).
+Tooltip fields: Date, SSP, USD, % of month.
+Totals row under chart (three columns):
+TOTAL: “SSP 81,499.98 · USD 6,000”
+PEAK DAY: “SSP 30,000” + small date below
+MONTHLY AVG: “SSP 11,643”
+View Data Table button enabled only if rows exist; otherwise hide/disable with tooltip “No data for this range”.
+Single “Updated {time}” timestamp in the chart header only.
+5) Departments (right card)
+List sorted by revenue (desc).
+Each row as a mini card:
+Left: colored dot + department name.
+Right: amount (right-aligned) + percent share in small text.
+Proportion bar underneath (soft gray track with teal fill).
+Rows are clickable filters for the chart and totals; when active, show a Reset chip at the top.
+6) Color & tone
+Use clinic teal as the primary accent (icons, bars, avg tag).
+Expenses use neutral styling unless over budget (then show a small red badge, not a red tile).
+Keep contrast high; avoid heavy reds/greens for large surfaces.
+7) Copy & empty states
+Page subtitle: “Key financials · {range}”.
+Replace N/A with friendlier lines:
+“No data this period” / “Waiting for entries” / “Connect providers”.
+Insurance tile explicitly says (USD) to avoid currency confusion.
+8) Alignment & rhythm
+All amounts and percents right-aligned.
+Consistent vertical rhythm: 8/12/16px steps inside components.
+Icons and labels aligned on a single baseline within each tile/row.
+Acceptance checklist (what “done” looks like)
+Only one place shows big totals (KPI strip).
+Chart shows Avg tag and Peak badge; tooltips include date, SSP, USD, %.
+Departments rows filter the chart with a visible Reset.
+Empty tiles are hidden; copy is friendly (no “N/A”).
+Labels are consistent: Total revenue, Total expenses, Net income, Insurance (USD).
+Numbers are tabular and neatly aligned; spacing feels even.

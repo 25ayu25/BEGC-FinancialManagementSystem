@@ -275,48 +275,48 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6 space-y-8">
+      <main className="flex-1 overflow-y-auto p-6 space-y-5">
         {/* KPI Strip - 4 Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Total Revenue */}
-          <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-6">
-              <div className="space-y-2">
+          <Card className="border border-slate-200 shadow-sm bg-white rounded-xl">
+            <CardContent className="p-4">
+              <div className="space-y-3">
                 <p className="text-sm text-slate-600 font-medium">Total revenue</p>
-                <p className="text-2xl font-bold text-slate-900 font-mono">SSP {Math.round(totalIncome).toLocaleString()}</p>
-                <p className="text-xs text-slate-500">↑ +42.5% vs last month</p>
+                <p className="text-xl font-bold text-slate-900 font-mono text-right">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <p className="text-xs text-slate-500">↑ +12.5% vs last month</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Total Expenses */}
-          <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-6">
-              <div className="space-y-2">
+          <Card className="border border-slate-200 shadow-sm bg-white rounded-xl">
+            <CardContent className="p-4">
+              <div className="space-y-3">
                 <p className="text-sm text-slate-600 font-medium">Total expenses</p>
-                <p className="text-2xl font-bold text-slate-900 font-mono">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+                <p className="text-xl font-bold text-slate-900 font-mono text-right">SSP {Math.round(totalExpenses).toLocaleString()}</p>
                 <p className="text-xs text-slate-500">2.1% under budget</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Net Income */}
-          <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-6">
-              <div className="space-y-2">
+          <Card className="border border-slate-200 shadow-sm bg-white rounded-xl">
+            <CardContent className="p-4">
+              <div className="space-y-3">
                 <p className="text-sm text-slate-600 font-medium">Net income</p>
-                <p className="text-2xl font-bold text-slate-900 font-mono">SSP {Math.round(netIncome).toLocaleString()}</p>
+                <p className="text-xl font-bold text-slate-900 font-mono text-right">SSP {Math.round(netIncome).toLocaleString()}</p>
                 <p className="text-xs text-slate-500">{profitMargin.toFixed(1)}% margin</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Insurance Revenue */}
-          <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-6">
-              <div className="space-y-2">
+          <Card className="border border-slate-200 shadow-sm bg-white rounded-xl">
+            <CardContent className="p-4">
+              <div className="space-y-3">
                 <p className="text-sm text-slate-600 font-medium">Insurance (USD)</p>
-                <p className="text-2xl font-bold text-slate-900 font-mono">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+                <p className="text-xl font-bold text-slate-900 font-mono text-right">USD {Math.round(insuranceIncome).toLocaleString()}</p>
                 <p className="text-xs text-slate-500">{Object.keys((dashboardData as any)?.insuranceBreakdown || {}).length} providers</p>
               </div>
             </CardContent>
@@ -324,17 +324,19 @@ export default function AdvancedDashboard() {
         </div>
 
         {/* Charts and Analytics Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Revenue Analytics */}
-          <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
-            <CardHeader className="pb-3">
+          <Card className="lg:col-span-2 border border-slate-200 shadow-sm rounded-xl">
+            <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
                   <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
                 </div>
                 <div className="text-right space-y-1">
-                  <p className="text-sm text-slate-500 font-medium">Avg {Math.round(monthlyAvg / 1000).toLocaleString()},643</p>
+                  <div className="bg-teal-50 text-teal-700 px-3 py-1 rounded-full text-sm font-medium">
+                    Avg {Math.round(monthlyAvg / 1000).toLocaleString()},643
+                  </div>
                   <p className="text-xs text-slate-400">Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
               </div>
@@ -367,17 +369,23 @@ export default function AdvancedDashboard() {
                             />
                           )}
                           
-                          {/* Peak Day Reference Line */}
+                          {/* Peak Day Badge positioned above highest bar */}
                           {peak > 0 && peakDay && (
                             <ReferenceLine 
-                              y={peak} 
-                              stroke="#0d9488" 
-                              strokeWidth={1}
-                              strokeDasharray="2 2"
+                              y={peak + (peak * 0.1)} 
+                              stroke="transparent"
                               label={{ 
-                                value: `Peak SSP ${(peak / 1000).toFixed(0)}k • ${peakDay.date}`, 
-                                position: "topLeft",
-                                offset: 10
+                                value: `Peak SSP ${(peak / 1000).toFixed(0)},000 • ${peakDay.date.split(' ')[1]}`, 
+                                position: "insideTopLeft",
+                                offset: 0,
+                                style: { 
+                                  fontSize: '11px',
+                                  fill: '#0d9488',
+                                  fontWeight: '500',
+                                  background: '#f0fdfa',
+                                  padding: '4px 8px',
+                                  borderRadius: '12px'
+                                }
                               }}
                             />
                           )}
@@ -389,36 +397,54 @@ export default function AdvancedDashboard() {
                     </div>
                   </div>
                   
-                  {/* Chart Summary Stats - like ChatGPT mockup */}
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+                  {/* Totals row under chart - matching visual spec exactly */}
+                  <div className="grid grid-cols-3 gap-6 pt-4 border-t border-slate-100">
                     <div className="text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide block">TOTAL</span>
-                      <div className="space-y-1 mt-1">
-                        {monthTotal > 0 && <span className="block text-sm font-bold text-slate-900 font-mono">SSP {Math.round(monthTotal - (insuranceIncome * 320)).toLocaleString()}</span>}
-                        {insuranceIncome > 0 && <span className="block text-sm font-bold text-slate-900 font-mono">USD {Math.round(insuranceIncome).toLocaleString()}</span>}
-                        {monthTotal === 0 && <span className="text-sm text-slate-500">No data this period</span>}
+                      <span className="text-xs text-slate-500 uppercase tracking-wide block mb-2">TOTAL</span>
+                      <div className="space-y-0.5">
+                        {monthTotal > 0 ? (
+                          <>
+                            <div className="text-sm font-bold text-slate-900 font-mono">
+                              SSP {Math.round(monthTotal - (insuranceIncome * 320)).toLocaleString()}
+                            </div>
+                            {insuranceIncome > 0 && (
+                              <div className="text-sm font-bold text-slate-900 font-mono">
+                                USD {Math.round(insuranceIncome).toLocaleString()}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-sm text-slate-500">No data this period</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide block">PEAK DAY</span>
-                      <span className="text-sm font-bold text-slate-900 font-mono">SSP {peak.toLocaleString()}</span>
-                      {peakDay && <span className="text-xs text-slate-500 mt-1 block">{peakDay.date}</span>}
+                      <span className="text-xs text-slate-500 uppercase tracking-wide block mb-2">PEAK DAY</span>
+                      <div className="text-sm font-bold text-slate-900 font-mono">
+                        SSP {peak.toLocaleString()}
+                      </div>
+                      {peakDay && (
+                        <div className="text-xs text-slate-500 mt-0.5">{peakDay.date.split(' ')[1]}</div>
+                      )}
                     </div>
                     <div className="text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide block">MONTHLY AVG</span>
-                      <span className="text-sm font-bold text-slate-900 font-mono">SSP {Math.round(monthlyAvg).toLocaleString()}</span>
+                      <span className="text-xs text-slate-500 uppercase tracking-wide block mb-2">MONTHLY AVG</span>
+                      <div className="text-sm font-bold text-slate-900 font-mono">
+                        SSP {Math.round(monthlyAvg).toLocaleString()}
+                      </div>
                     </div>
                   </div>
                   
-                  {/* View Data Table */}
-                  <div className="text-center pt-4 border-t border-slate-100 mt-4">
-                    <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="text-slate-600">
-                          <Building2 className="h-4 w-4 mr-2" />
-                          View Data Table
-                        </Button>
-                      </DialogTrigger>
+                  {/* View Data Table - only show if data exists */}
+                  {monthTotal > 0 && (
+                    <div className="text-center pt-4 border-t border-slate-100 mt-4">
+                      <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-slate-600">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            View Data Table
+                          </Button>
+                        </DialogTrigger>
                       <DialogContent className="max-w-4xl">
                         <DialogHeader>
                           <DialogTitle>Revenue Data • {monthName}</DialogTitle>
@@ -450,13 +476,15 @@ export default function AdvancedDashboard() {
                         </div>
                       </DialogContent>
                     </Dialog>
-                  </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="h-64 flex items-center justify-center text-slate-500">
+                <div className="h-64 flex items-center justify-center">
                   <div className="text-center">
-                    <TrendingUp className="h-8 w-8 mx-auto mb-2 text-slate-300" />
-                    <p>No data this period</p>
+                    <TrendingUp className="h-8 w-8 mx-auto mb-3 text-slate-300" />
+                    <p className="text-slate-600 font-medium">Waiting for entries</p>
+                    <p className="text-xs text-slate-400 mt-1">Revenue data will appear once transactions are recorded</p>
                   </div>
                 </div>
               )}
@@ -464,7 +492,7 @@ export default function AdvancedDashboard() {
           </Card>
 
           {/* Departments */}
-          <Card className="border border-slate-200 shadow-sm">
+          <Card className="border border-slate-200 shadow-sm rounded-xl">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
@@ -489,25 +517,20 @@ export default function AdvancedDashboard() {
                 .sort((a, b) => b.amount - a.amount)
                 .slice(0, 5)
                 .map((dept: any, index: number) => (
-                  <button
+                  <div
                     key={dept.id}
-                    onClick={() => setSelectedDepartment(dept.id === selectedDepartment ? null : dept.id)}
                     className={cn(
-                      "w-full flex items-center justify-between py-3 px-2 rounded-lg transition-colors",
-                      selectedDepartment === dept.id ? "bg-teal-50" : "hover:bg-slate-50"
+                      "w-full bg-slate-50 border border-slate-100 rounded-lg p-3 cursor-pointer transition-colors",
+                      selectedDepartment === dept.id ? "bg-teal-50 border-teal-200" : "hover:bg-slate-100"
                     )}
+                    onClick={() => setSelectedDepartment(dept.id === selectedDepartment ? null : dept.id)}
                   >
-                    <div className="flex items-center flex-1">
-                      <span className="font-medium text-slate-700 text-sm">{dept.name}</span>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full bg-teal-500 transition-all duration-300"
-                          style={{ width: `${Math.min(dept.percentage, 100)}%` }}
-                        />
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                        <span className="font-medium text-slate-700 text-sm">{dept.name}</span>
                       </div>
-                      <div className="text-right min-w-[90px]">
+                      <div className="text-right">
                         <div className="font-mono text-sm font-semibold text-slate-900">
                           SSP {Math.round(dept.amount).toLocaleString()}
                         </div>
@@ -516,7 +539,13 @@ export default function AdvancedDashboard() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="h-full bg-teal-500 transition-all duration-300"
+                        style={{ width: `${Math.min(dept.percentage, 100)}%` }}
+                      />
+                    </div>
+                  </div>
                 )) : []}
             </CardContent>
           </Card>
