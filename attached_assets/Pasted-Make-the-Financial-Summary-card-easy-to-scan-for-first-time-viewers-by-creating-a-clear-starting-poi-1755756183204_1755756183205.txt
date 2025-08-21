@@ -1,0 +1,33 @@
+Make the Financial Summary card easy to scan for first-time viewers by creating a clear starting point and stronger grouping.
+Do this
+Create a clear “start here”
+Add a top KPI strip with three small tiles: Net income (primary), Revenue, Expenses.
+Net income should be the most prominent of the three.
+Strengthen grouping
+Visually separate the three columns into distinct sub-panels: Income sources, Expenses, Performance.
+Add soft background and inner padding to each panel so they read as different sections.
+Keep Filter and Compare buttons out of this card (place them in the page toolbar/top-right).
+Emphasize totals
+Make “Total revenue” and “Total expenses” stand out with bolder weight and a subtle highlight row.
+Right-align all numbers; use monospaced/tabular numerals for perfect column alignment.
+Reduce cognitive load
+Use one base currency by default (SSP). If other currencies appear, add a short helper note: “All values in SSP unless noted,” and show the conversion in a tooltip.
+Keep labels short and secondary (lighter color); keep values larger and primary.
+Limit decimals (0 unless needed).
+Add a readable flow
+Reading order should be: Top KPIs → Income → Expenses → Performance (left to right).
+Add subtle vertical dividers between columns on desktop.
+Clarify performance metrics
+Add tiny tooltips or “i” icons explaining formulas (e.g., Profit margin = Net income ÷ Revenue).
+Show changes with both color and an up/down arrow (not color alone).
+Microcopy consistency
+Card title: Financial summary
+Subtitle under it: Key financials · {range} (e.g., “Key financials · Last 3 months”).
+Acceptance checklist
+At a glance, a new viewer can answer: Net income? Revenue? Expenses?
+The three columns read as separate sections without squinting.
+Totals are immediately noticeable and aligned.
+No action buttons inside the summary card.
+Numbers are right-aligned, easy to compare, and consistently formatted.
+Currency usage is obvious; mixed-currency handling is explained.
+Performance metrics are understandable via tooltips and arrows.
