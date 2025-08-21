@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Database, Globe, Lock, User, Save, X } from "lucide-react";
+import { Bell, Lock, User, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -33,8 +33,6 @@ const settingsSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  location: z.enum(["usa", "south-sudan"]),
-  defaultCurrency: z.enum(["USD", "SSP"]),
   emailNotifications: z.boolean(),
   reportAlerts: z.boolean(),
 });
@@ -57,8 +55,6 @@ export default function Settings() {
       firstName: "",
       lastName: "", 
       email: "",
-      location: "usa",
-      defaultCurrency: "SSP",
       emailNotifications: true,
       reportAlerts: true,
     },
@@ -75,8 +71,6 @@ export default function Settings() {
         firstName,
         lastName,
         email: user.email || "",
-        location: user.location === "usa" ? "usa" as const : "south-sudan" as const,
-        defaultCurrency: user.defaultCurrency === "USD" ? "USD" as const : "SSP" as const,
         emailNotifications: user.emailNotifications ?? true,
         reportAlerts: user.reportAlerts ?? true,
       };
@@ -99,8 +93,6 @@ export default function Settings() {
         currentValues.firstName !== firstName ||
         currentValues.lastName !== lastName ||
         currentValues.email !== (user.email || "") ||
-        currentValues.location !== (user.location === "usa" ? "usa" : "south-sudan") ||
-        currentValues.defaultCurrency !== (user.defaultCurrency === "USD" ? "USD" : "SSP") ||
         currentValues.emailNotifications !== (user.emailNotifications ?? true) ||
         currentValues.reportAlerts !== (user.reportAlerts ?? true);
       
@@ -114,8 +106,6 @@ export default function Settings() {
       const updateData = {
         fullName: `${data.firstName} ${data.lastName}`.trim(),
         email: data.email,
-        location: data.location,
-        defaultCurrency: data.defaultCurrency,
         emailNotifications: data.emailNotifications,
         reportAlerts: data.reportAlerts,
       };
@@ -160,8 +150,6 @@ export default function Settings() {
         firstName,
         lastName,
         email: user.email || "",
-        location: user.location === "usa" ? "usa" as const : "south-sudan" as const,
-        defaultCurrency: user.defaultCurrency === "USD" ? "USD" as const : "SSP" as const,
         emailNotifications: user.emailNotifications ?? true,
         reportAlerts: user.reportAlerts ?? true,
       });
@@ -269,47 +257,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* System Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                System Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="location">Location</Label>
-                <Select 
-                  value={form.watch("location")} 
-                  onValueChange={(value) => form.setValue("location", value as "usa" | "south-sudan")}
-                >
-                  <SelectTrigger data-testid="select-location">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="usa">USA</SelectItem>
-                    <SelectItem value="south-sudan">South Sudan</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="currency">Default Currency</Label>
-                <Select 
-                  value={form.watch("defaultCurrency")} 
-                  onValueChange={(value) => form.setValue("defaultCurrency", value as "USD" | "SSP")}
-                >
-                  <SelectTrigger data-testid="select-currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SSP">South Sudanese Pound (SSP)</SelectItem>
-                    <SelectItem value="USD">US Dollar (USD)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* Notification Settings */}
           <Card>
