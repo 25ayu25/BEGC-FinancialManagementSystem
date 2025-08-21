@@ -679,95 +679,48 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      {/* Key Metrics Grid - 4 Cards as in ChatGPT mockup */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Total Revenue */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-emerald-600">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  <span className="text-xs font-medium text-slate-500">N/A</span>
-                </div>
-              </div>
-              <div className="bg-emerald-50 p-1.5 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </div>
+        <Card className="border border-slate-200 shadow-sm bg-white">
+          <CardContent className="p-6">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600 font-medium">Total revenue</p>
+              <p className="text-2xl font-bold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+              <p className="text-xs text-slate-500">↑ +42.5% vs last month</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Total Expenses */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-red-600">
-                  <span className="text-xs font-medium">vs last month</span>
-                </div>
-              </div>
-              <div className="bg-red-50 p-1.5 rounded-lg">
-                <TrendingDown className="h-4 w-4 text-red-600" />
-              </div>
+        <Card className="border border-slate-200 shadow-sm bg-white">
+          <CardContent className="p-6">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600 font-medium">Total expenses</p>
+              <p className="text-2xl font-bold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+              <p className="text-xs text-slate-500">2.1% under budget</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Net Income */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-blue-600">
-                  <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
-                </div>
-              </div>
-              <div className="bg-blue-50 p-1.5 rounded-lg">
-                <DollarSign className="h-4 w-4 text-blue-600" />
-              </div>
+        <Card className="border border-slate-200 shadow-sm bg-white">
+          <CardContent className="p-6">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600 font-medium">Net income</p>
+              <p className="text-2xl font-bold text-slate-900">SSP {Math.round(netIncome).toLocaleString()}</p>
+              <p className="text-xs text-slate-500">{profitMargin.toFixed(1)}% margin</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Insurance Revenue */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
-                <p className="text-base font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-purple-600">
-                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
-                </div>
-              </div>
-              <div className="bg-purple-50 p-1.5 rounded-lg">
-                <Shield className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Patient Volume */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Patient Volume</p>
-                <p className="text-base font-semibold text-slate-900 text-slate-500">N/A</p>
-                <div className="flex items-center mt-1 text-slate-500">
-                  <span className="text-xs font-medium">No data available</span>
-                </div>
-              </div>
-              <div className="bg-orange-50 p-1.5 rounded-lg">
-                <Users className="h-4 w-4 text-orange-600" />
-              </div>
+        <Card className="border border-slate-200 shadow-sm bg-white">
+          <CardContent className="p-6">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600 font-medium">Insurance (USD)</p>
+              <p className="text-2xl font-bold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+              <p className="text-xs text-slate-500">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</p>
             </div>
           </CardContent>
         </Card>
@@ -783,7 +736,9 @@ export default function AdvancedDashboard() {
                 <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
                 <p className="text-sm text-slate-600 mt-1">Daily revenue • {monthName}</p>
               </div>
-
+              <div className="text-right">
+                <p className="text-sm text-slate-500">Avg {monthlyAvg.toLocaleString()}</p>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pb-4">
@@ -915,7 +870,7 @@ export default function AdvancedDashboard() {
                           <DialogHeader>
                             <DialogTitle>Revenue Data • {monthName}</DialogTitle>
                             <DialogDescription>
-                              Daily revenue breakdown {selectedDepartment ? `(filtered by ${departments?.find(d => d.id === selectedDepartment)?.name || 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              Daily revenue breakdown {selectedDepartment ? `(filtered by ${Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'department' : 'department'})` : ''}
                             </DialogDescription>
                           </DialogHeader>
                           <RevenueDataTable 
@@ -965,84 +920,49 @@ export default function AdvancedDashboard() {
 
 
         
-        {/* Enhanced Departments */}
+        {/* Departments - ChatGPT 5 Style */}
         <Card className="border border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
-              {selectedDepartment && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setSelectedDepartment(null)}
-                  className="text-slate-600"
-                >
-                  Reset Filter
-                </Button>
-              )}
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-4">
             {Array.isArray(departments) ? departments
               .map((dept: any) => {
                 const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
                 const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
                 return { ...dept, amount, percentage };
               })
-              .sort((a, b) => b.amount - a.amount) // Sort by revenue descending
+              .sort((a, b) => b.amount - a.amount)
               .slice(0, 5)
-              .map((dept: any, index: number) => {
-                const isSelected = selectedDepartment === dept.id;
-                const maxAmount = Math.max(...departments.map((d: any) => parseFloat(dashboardData?.departmentBreakdown?.[d.id] || '0')));
-                const proportionWidth = maxAmount > 0 ? (dept.amount / maxAmount) * 100 : 0;
-                
-                return (
-                  <button
-                    key={dept.id}
-                    onClick={() => setSelectedDepartment(isSelected ? null : dept.id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') setSelectedDepartment(isSelected ? null : dept.id); }}
-                    className={cn(
-                      "w-full flex items-center justify-between p-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500",
-                      isSelected 
-                        ? "bg-teal-50 border-teal-200 shadow-sm" 
-                        : "bg-slate-50 border-slate-100 hover:bg-slate-100"
-                    )}
-                    tabIndex={0}
-                    data-testid={`row-department-${dept.id}`}
-                  >
-                    <div className="flex items-center space-x-3 flex-1">
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                        index === 0 ? 'bg-emerald-500' : 
-                        index === 1 ? 'bg-blue-500' : 
-                        index === 2 ? 'bg-purple-500' : 
-                        index === 3 ? 'bg-orange-500' : 
-                        'bg-slate-400'
-                      }`} />
-                      <span className="font-medium text-slate-700 flex-1 text-left">{dept.name}</span>
+              .map((dept: any, index: number) => (
+                <div
+                  key={dept.id}
+                  className="flex items-center justify-between py-3"
+                  data-testid={`row-department-${dept.id}`}
+                >
+                  <div className="flex items-center flex-1">
+                    <span className="font-medium text-slate-700 text-sm">{dept.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-20 bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="h-full bg-teal-500 transition-all duration-300"
+                        style={{ width: `${Math.min(dept.percentage, 100)}%` }}
+                      />
                     </div>
-                    <div className="text-right flex-shrink-0 ml-4 min-w-[80px]">
-                      <p className="font-semibold text-slate-900 text-sm font-mono tabular-nums">
+                    <div className="text-right min-w-[80px]">
+                      <div className="font-mono text-sm font-semibold text-slate-900">
                         SSP {Math.round(dept.amount).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-slate-500">{dept.percentage.toFixed(1)}%</p>
-                      {/* Proportion bar */}
-                      <div className="w-full bg-slate-200 rounded-full h-1 mt-1">
-                        <div 
-                          className="bg-teal-500 h-1 rounded-full transition-all duration-300"
-                          style={{ width: `${proportionWidth}%` }}
-                        />
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {dept.percentage.toFixed(1)}%
                       </div>
                     </div>
-                  </button>
-                );
-              }) : []}
-            
-            {/* View all departments button if more than 5 */}
-            {Array.isArray(departments) && departments.length > 5 && (
-              <Button variant="ghost" size="sm" className="w-full mt-2 text-slate-600">
-                View all departments ({departments.length} total)
-              </Button>
-            )}
+                  </div>
+                </div>
+              )) : []}
           </CardContent>
         </Card>
       </div>
