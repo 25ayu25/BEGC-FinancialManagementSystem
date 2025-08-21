@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/currency";
 
@@ -27,9 +28,11 @@ export default function SimpleRecentTransactions({ transactions }: SimpleRecentT
               <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
               Recent Transactions
             </CardTitle>
-            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
-              View all
-            </Button>
+            <Link href="/transactions">
+              <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
+                View all
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
@@ -53,9 +56,11 @@ export default function SimpleRecentTransactions({ transactions }: SimpleRecentT
             <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
             Recent Transactions
           </CardTitle>
-          <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
-            View all
-          </Button>
+          <Link href="/transactions">
+            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
+              View all
+            </Button>
+          </Link>
         </div>
       </CardHeader>
       <CardContent>
