@@ -21,15 +21,26 @@ export const CURRENCIES = {
 } as const;
 
 export const EXPENSE_CATEGORIES = [
-  "Landlord",
-  "Staff Salaries", 
+  "Clinic Operations",
+  "Doctor Payments", 
+  "Lab Tech Payments",
+  "Radiographer Payments",
+  "Insurance Payments",
+  "Staff Salaries",
   "Drugs Purchased",
-  "TV Accessories",
-  "Generator",
-  "Sono Papers",
   "Lab Reagents",
-  "Chemistry Machine",
+  "Equipment",
+  "Utilities",
   "Other",
+] as const;
+
+export const STAFF_TYPES = [
+  "doctor",
+  "lab_tech", 
+  "radiographer",
+  "nurse",
+  "admin",
+  "other"
 ] as const;
 
 export const SYNC_STATUS = {

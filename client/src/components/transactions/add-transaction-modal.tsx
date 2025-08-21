@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EXPENSE_CATEGORIES, STAFF_TYPES } from "@/lib/constants";
 
 interface AddTransactionModalProps {
   open: boolean;
@@ -36,6 +37,8 @@ export default function AddTransactionModal({
   const [currency, setCurrency] = useState("SSP");
   const [description, setDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [staffType, setStaffType] = useState("");
 
 
   const { toast } = useToast();
@@ -105,6 +108,8 @@ export default function AddTransactionModal({
     setCurrency("SSP");
     setDescription("");
     setSelectedDate(new Date());
+    setExpenseCategory("");
+    setStaffType("");
   };
 
   // Populate form when editing
@@ -161,6 +166,8 @@ export default function AddTransactionModal({
       description,
       receiptPath: null,
       date: selectedDate.toISOString(),
+      expenseCategory: type === "expense" ? (expenseCategory || null) : null,
+      staffType: type === "expense" && expenseCategory && expenseCategory.includes("Payments") ? (staffType || null) : null,
     };
 
     if (editTransaction) {
@@ -286,6 +293,48 @@ export default function AddTransactionModal({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Expense Category (only for expenses) */}
+          {type === "expense" && (
+            <div>
+              <Label htmlFor="expense-category" className="text-sm font-medium text-gray-700">
+                Expense Category
+              </Label>
+              <Select value={expenseCategory} onValueChange={setExpenseCategory}>
+                <SelectTrigger data-testid="select-expense-category" className="h-11">
+                  <SelectValue placeholder="Select Expense Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Staff Type (only for staff payment expenses) */}
+          {type === "expense" && expenseCategory && expenseCategory.includes("Payments") && (
+            <div>
+              <Label htmlFor="staff-type" className="text-sm font-medium text-gray-700">
+                Staff Type
+              </Label>
+              <Select value={staffType} onValueChange={setStaffType}>
+                <SelectTrigger data-testid="select-staff-type" className="h-11">
+                  <SelectValue placeholder="Select Staff Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAFF_TYPES.map((typeOption) => (
+                    <SelectItem key={typeOption} value={typeOption}>
+                      {typeOption.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Insurance Provider (for income only) */}
           {type === "income" && (

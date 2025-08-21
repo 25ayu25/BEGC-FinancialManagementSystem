@@ -45,6 +45,9 @@ export const transactions = pgTable("transactions", {
   date: timestamp("date").notNull().defaultNow(),
   receiptPath: text("receipt_path"), // path to uploaded receipt
   insuranceProviderId: varchar("insurance_provider_id").references(() => insuranceProviders.id),
+  // Enhanced expense categorization for detailed staff and operational tracking
+  expenseCategory: text("expense_category"), // "clinic_operations", "doctor_payments", "lab_tech_payments", "radiographer_payments", "insurance_payments", "general"
+  staffType: text("staff_type"), // "doctor", "lab_tech", "radiographer" - for staff payment tracking
   createdBy: varchar("created_by").notNull().references(() => users.id),
   syncStatus: text("sync_status").notNull().default("pending"), // "pending", "synced", "failed"
   createdAt: timestamp("created_at").defaultNow(),
