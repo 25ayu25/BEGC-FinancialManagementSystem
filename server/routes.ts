@@ -425,12 +425,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 50; // Default 50 per page
       const offset = (page - 1) * limit;
 
-      // Parse date range (default to last 3 months for performance)
-      const defaultStartDate = new Date();
-      defaultStartDate.setMonth(defaultStartDate.getMonth() - 3);
-      
-      let startDate = defaultStartDate;
-      let endDate = new Date();
+      // Parse date range (only filter if dates are explicitly provided)
+      let startDate = null;
+      let endDate = null;
       
       // Use provided dates if they exist
       if (req.query.startDate && req.query.startDate !== 'undefined') {
@@ -440,14 +437,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate = new Date(req.query.endDate as string);
       }
       
-      console.log('Date filtering - Start:', startDate.toISOString().split('T')[0], 'End:', endDate.toISOString().split('T')[0]);
+      if (startDate && endDate) {
+        console.log('Date filtering - Start:', startDate.toISOString().split('T')[0], 'End:', endDate.toISOString().split('T')[0]);
+      } else {
+        console.log('No date filtering applied - showing all transactions');
+      }
 
       const filters: any = {
-        startDate,
-        endDate,
         limit,
         offset
       };
+      
+      // Only add date filters if they're explicitly provided
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate;
       
       if (req.query.departmentId) filters.departmentId = req.query.departmentId as string;
       if (req.query.type) filters.type = req.query.type as string;
