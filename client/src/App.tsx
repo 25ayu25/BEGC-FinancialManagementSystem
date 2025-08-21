@@ -26,7 +26,7 @@ function Router() {
         {(params) => (
           <div className="flex h-screen bg-gray-50">
             <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-auto">
               <Switch>
                 <Route path="/" component={AdvancedDashboard} />
                 <Route path="/advanced" component={AdvancedDashboard} />
