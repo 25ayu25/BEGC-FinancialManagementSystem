@@ -467,6 +467,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PUT /api/transactions/:id - Update a transaction
+  app.put("/api/transactions/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Convert date string to Date object if it's a string
+      const updates = {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : undefined,
+        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
+      };
+      
+      // Remove undefined values
+      Object.keys(updates).forEach(key => {
+        if (updates[key] === undefined) {
+          delete updates[key];
+        }
+      });
+      
+      const transaction = await storage.updateTransaction(id, updates);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update transaction" });
+      }
+    }
+  });
+
   // DELETE /api/transactions/:id - Delete a transaction
   app.delete("/api/transactions/:id", requireAuth, async (req, res) => {
     try {
