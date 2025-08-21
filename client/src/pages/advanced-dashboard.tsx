@@ -560,6 +560,9 @@ export default function AdvancedDashboard() {
   const netIncome = parseFloat(dashboardData?.netIncome || '0');
   const insuranceIncome = Object.values(dashboardData?.insuranceBreakdown || {})
     .reduce((sum: number, amount: any) => sum + parseFloat(amount || '0'), 0);
+  
+  // Calculate SSP-only revenue (total minus USD insurance to prevent currency mixing)
+  const sspRevenue = monthTotalSSP || Math.max(0, totalIncome - insuranceIncome);
 
   const profitMargin = totalIncome > 0 ? ((netIncome / totalIncome) * 100) : 0;
   // Remove hardcoded values - use real data only
@@ -687,7 +690,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">SSP {Math.round(sspRevenue).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-emerald-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   <span className="text-xs font-medium text-slate-500">N/A</span>
