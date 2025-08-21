@@ -14,6 +14,7 @@ export default function Settings() {
       <Header 
         title="Settings" 
         subtitle="Manage your system preferences and configurations"
+        actions={<div></div>}
       />
 
       <main className="flex-1 overflow-y-auto p-6 space-y-6">
