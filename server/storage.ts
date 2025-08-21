@@ -50,6 +50,8 @@ export interface IStorage {
   // Analytics
   getDashboardData(year: number, month: number): Promise<{
     totalIncome: string;
+    totalIncomeSSP: string;
+    totalIncomeUSD: string;
     totalExpenses: string;
     netIncome: string;
     departmentBreakdown: Record<string, string>;
@@ -207,6 +209,8 @@ export class DatabaseStorage implements IStorage {
 
   async getDashboardData(year: number, month: number, range?: string, customStartDate?: string, customEndDate?: string): Promise<{
     totalIncome: string;
+    totalIncomeSSP: string;
+    totalIncomeUSD: string;
     totalExpenses: string;
     netIncome: string;
     departmentBreakdown: Record<string, string>;
@@ -253,9 +257,10 @@ export class DatabaseStorage implements IStorage {
         endDate = new Date(year, month, 0, 23, 59, 59);
     }
 
-    // Get total income and expenses
+    // Get total income separated by currency to prevent mixing
     const [incomeResult] = await db.select({
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`
+      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "income"),
@@ -265,7 +270,7 @@ export class DatabaseStorage implements IStorage {
     );
 
     const [expenseResult] = await db.select({
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`
+      total: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "expense"),
@@ -274,9 +279,10 @@ export class DatabaseStorage implements IStorage {
       )
     );
 
-    const totalIncome = incomeResult.total || "0";
+    const totalIncomeSSP = incomeResult.totalSSP || "0";
+    const totalIncomeUSD = incomeResult.totalUSD || "0";
     const totalExpenses = expenseResult.total || "0";
-    const netIncome = (parseFloat(totalIncome) - parseFloat(totalExpenses)).toString();
+    const netIncome = (parseFloat(totalIncomeSSP) - parseFloat(totalExpenses)).toString();
 
     // Get department breakdown (SSP only to prevent currency mixing)
     const departmentData = await db.select({
@@ -328,7 +334,9 @@ export class DatabaseStorage implements IStorage {
     });
 
     return {
-      totalIncome,
+      totalIncome: totalIncomeSSP, // Only SSP for main income calculation
+      totalIncomeSSP,
+      totalIncomeUSD,
       totalExpenses,
       netIncome,
       departmentBreakdown,

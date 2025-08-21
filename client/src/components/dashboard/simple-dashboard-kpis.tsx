@@ -4,6 +4,8 @@ import { TrendingUp, TrendingDown, DollarSign, CreditCard, PiggyBank, Shield } f
 interface SimpleDashboardKPIsProps {
   data?: {
     totalIncome: string;
+    totalIncomeSSP: string;
+    totalIncomeUSD: string;
     totalExpenses: string;
     netIncome: string;
     insuranceBreakdown: Record<string, string>;
@@ -35,14 +37,12 @@ const Sparkline = ({ trend = 0 }: { trend?: number }) => {
 };
 
 export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) {
-  const totalInsurance = Object.values(data?.insuranceBreakdown || {})
-    .reduce((sum, amount) => sum + parseFloat(amount), 0);
-
-  const totalIncome = parseFloat(data?.totalIncome || '0');
+  // Use the backend-separated currency amounts
+  const sspIncome = parseFloat(data?.totalIncomeSSP || '0');
+  const usdIncome = parseFloat(data?.totalIncomeUSD || '0');
   const expenses = parseFloat(data?.totalExpenses || '0');
   
-  // Calculate SSP-only revenue (total minus USD insurance to prevent currency mixing)
-  const sspIncome = Math.max(0, totalIncome - totalInsurance);
+  // SSP calculations (no currency mixing)
   const sspNet = sspIncome - expenses;
   const margin = sspIncome > 0 ? (sspNet / sspIncome) * 100 : 0;
 
@@ -80,7 +80,7 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
     },
     {
       title: "Insurance",
-      value: `USD ${Math.round(totalInsurance).toLocaleString()}`,
+      value: `USD ${Math.round(usdIncome).toLocaleString()}`,
       icon: Shield,
       trend: 5.7,
       delta: "+5.7%",

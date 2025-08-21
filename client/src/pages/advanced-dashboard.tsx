@@ -555,21 +555,20 @@ export default function AdvancedDashboard() {
     );
   }
 
-  const totalIncome = parseFloat(dashboardData?.totalIncome || '0');
+  // Use the backend-separated currency amounts to prevent mixing
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || '0');
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || '0');
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || '0');
   const netIncome = parseFloat(dashboardData?.netIncome || '0');
-  const insuranceIncome = Object.values(dashboardData?.insuranceBreakdown || {})
-    .reduce((sum: number, amount: any) => sum + parseFloat(amount || '0'), 0);
   
-  // Calculate SSP-only revenue (total minus USD insurance to prevent currency mixing)
-  const sspRevenue = monthTotalSSP || Math.max(0, totalIncome - insuranceIncome);
+  const sspRevenue = monthTotalSSP || sspIncome;
   
   // Calculate correct SSP-only net income
   const sspNetIncome = sspRevenue - totalExpenses;
 
   const profitMargin = sspRevenue > 0 ? ((sspNetIncome / sspRevenue) * 100) : 0;
   // Remove hardcoded values - use real data only
-  const hasRealData = totalIncome > 0 || totalExpenses > 0;
+  const hasRealData = sspIncome > 0 || usdIncome > 0 || totalExpenses > 0;
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
@@ -745,7 +744,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
-                <p className="text-base font-semibold text-slate-900">USD {Math.round(insuranceIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900">USD {Math.round(usdIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
                   <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
                 </div>
@@ -988,7 +987,7 @@ export default function AdvancedDashboard() {
             {Array.isArray(departments) ? departments
               .map((dept: any) => {
                 const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || '0');
-                const percentage = totalIncome > 0 ? ((amount / totalIncome) * 100) : 0;
+                const percentage = sspRevenue > 0 ? ((amount / sspRevenue) * 100) : 0;
                 return { ...dept, amount, percentage };
               })
               .sort((a, b) => b.amount - a.amount) // Sort by revenue descending
