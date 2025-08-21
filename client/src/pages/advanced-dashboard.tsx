@@ -633,20 +633,20 @@ export default function AdvancedDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Income Breakdown */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Income Sources</h3>
+              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Income Sources</h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Direct Payments</span>
-                  <span className="font-semibold">SSP {Math.round(totalIncome - insuranceIncome).toLocaleString()}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">SSP {Math.round(totalIncome - insuranceIncome).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Insurance Claims</span>
-                  <span className="font-semibold">USD {Math.round(insuranceIncome).toLocaleString()}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">USD {Math.round(insuranceIncome).toLocaleString()}</span>
                 </div>
-                <div className="border-t pt-2">
-                  <div className="flex justify-between items-center font-semibold">
-                    <span>Total Revenue</span>
-                    <span className="text-emerald-600">SSP {Math.round(totalIncome).toLocaleString()}</span>
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-slate-900 dark:text-white">Total Revenue</span>
+                    <span className="font-bold text-lg text-emerald-600 dark:text-emerald-500">SSP {Math.round(totalIncome).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -654,20 +654,20 @@ export default function AdvancedDashboard() {
 
             {/* Expenses */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Expenses</h3>
+              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Expenses</h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Operational</span>
-                  <span className="font-semibold">SSP {Math.round(totalExpenses * 0.7).toLocaleString()}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">SSP {Math.round(totalExpenses * 0.7).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Administrative</span>
-                  <span className="font-semibold">SSP {Math.round(totalExpenses * 0.3).toLocaleString()}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">SSP {Math.round(totalExpenses * 0.3).toLocaleString()}</span>
                 </div>
-                <div className="border-t pt-2">
-                  <div className="flex justify-between items-center font-semibold">
-                    <span>Total Expenses</span>
-                    <span className="text-red-600">SSP {Math.round(totalExpenses).toLocaleString()}</span>
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-slate-900 dark:text-white">Total Expenses</span>
+                    <span className="font-bold text-lg text-red-600 dark:text-red-500">SSP {Math.round(totalExpenses).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -675,21 +675,28 @@ export default function AdvancedDashboard() {
 
             {/* Performance Metrics */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Performance</h3>
-              <div className="space-y-3">
+              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Performance</h3>
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Profit Margin</span>
-                  <Badge variant={profitMargin > 90 ? "default" : profitMargin > 70 ? "secondary" : "destructive"}>
+                  <Badge 
+                    variant={profitMargin > 90 ? "default" : profitMargin > 70 ? "secondary" : "destructive"}
+                    className="ml-2 font-semibold"
+                  >
                     {profitMargin.toFixed(1)}%
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Revenue Growth</span>
-                  <Badge variant="default">+{revenueGrowth}%</Badge>
+                  <Badge variant="default" className="ml-2 font-semibold text-green-700 bg-green-100">
+                    +{revenueGrowth}%
+                  </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600 dark:text-slate-300">Efficiency Score</span>
-                  <Badge variant="default">95%</Badge>
+                  <Badge variant="default" className="ml-2 font-semibold">
+                    95%
+                  </Badge>
                 </div>
               </div>
             </div>
