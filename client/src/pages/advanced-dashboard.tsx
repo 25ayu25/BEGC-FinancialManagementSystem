@@ -437,15 +437,14 @@ export default function AdvancedDashboard() {
     }
   }
   
-  // Compute summary stats from the same series
+  // Compute summary stats from the same series (currency-separated)
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
-  const monthTotal = incomeSeries.reduce((s, d) => s + d.amount, 0);
-  const nonzeroDays = incomeSeries.filter(d => d.amount > 0).length;
-  const monthlyAvg = nonzeroDays > 0 ? Math.round(monthTotalSSP / nonzeroDays) : 0;
-  const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
-  const peakDay = incomeSeries.find(d => d.amountSSP === peak);
-  const showAvgLine = nonzeroDays >= 2; // Only show if 2+ non-zero days
+  const nonzeroDaysSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
+  const monthlyAvgSSP = nonzeroDaysSSP > 0 ? Math.round(monthTotalSSP / nonzeroDaysSSP) : 0;
+  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
+  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
+  const showAvgLine = nonzeroDaysSSP >= 2; // Only show if 2+ non-zero days
   
   // Enhanced tooltip component with context
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -893,18 +892,18 @@ export default function AdvancedDashboard() {
                     </div>
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
-                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {peak.toLocaleString()}</span>
-                      {peakDay && <span className="text-xs text-slate-500 mt-1">{peakDay.fullDate}</span>}
+                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {peakSSP.toLocaleString()}</span>
+                      {peakDaySSP && <span className="text-xs text-slate-500 mt-1">{peakDaySSP.fullDate}</span>}
                     </div>
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
-                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {monthlyAvg.toLocaleString()}</span>
+                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {monthlyAvgSSP.toLocaleString()}</span>
                     </div>
                   </div>
                   
                   {/* Data Table Toggle */}
                   <div className="flex justify-center mt-4 pt-3 border-t border-slate-100">
-                    {monthTotal > 0 ? (
+                    {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
                       <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-data-table">
@@ -920,7 +919,7 @@ export default function AdvancedDashboard() {
                             </DialogDescription>
                           </DialogHeader>
                           <RevenueDataTable 
-                            data={incomeSeries.filter(d => d.amount > 0)} 
+                            data={incomeSeries.filter(d => d.amountSSP > 0 || d.amountUSD > 0)} 
                             selectedDepartment={selectedDepartment}
                             departments={Array.isArray(departments) ? departments : []}
                             monthName={monthName}

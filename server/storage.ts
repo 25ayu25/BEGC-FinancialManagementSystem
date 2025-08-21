@@ -359,7 +359,8 @@ export class DatabaseStorage implements IStorage {
     );
 
     const [expenseResult] = await db.select({
-      total: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`
+      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions).where(
       and(
         eq(transactions.type, "expense"),
@@ -370,8 +371,10 @@ export class DatabaseStorage implements IStorage {
 
     const totalIncomeSSP = incomeResult.totalSSP || "0";
     const totalIncomeUSD = incomeResult.totalUSD || "0";
-    const totalExpenses = expenseResult.total || "0";
-    const netIncome = (parseFloat(totalIncomeSSP) - parseFloat(totalExpenses)).toString();
+    const totalExpensesSSP = expenseResult.totalSSP || "0";
+    const totalExpensesUSD = expenseResult.totalUSD || "0";
+    const netIncomeSSP = (parseFloat(totalIncomeSSP) - parseFloat(totalExpensesSSP)).toString();
+    const netIncomeUSD = (parseFloat(totalIncomeUSD) - parseFloat(totalExpensesUSD)).toString();
 
     // Get department breakdown (SSP only to prevent currency mixing)
     const departmentData = await db.select({
@@ -394,10 +397,10 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Get insurance breakdown
+    // Get insurance breakdown (USD only for insurance payments)
     const insuranceData = await db.select({
       insuranceProviderId: transactions.insuranceProviderId,
-      total: sql<string>`SUM(${transactions.amount})`
+      total: sql<string>`SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END)`
     }).from(transactions)
     .where(
       and(
@@ -423,25 +426,30 @@ export class DatabaseStorage implements IStorage {
     });
 
     return {
-      totalIncome: totalIncomeSSP, // Only SSP for main income calculation
+      totalIncome: totalIncomeSSP, // Legacy field - only SSP to avoid currency mixing
       totalIncomeSSP,
       totalIncomeUSD,
-      totalExpenses,
-      netIncome,
+      totalExpenses: totalExpensesSSP, // Legacy field - only SSP to avoid currency mixing 
+      totalExpensesSSP,
+      totalExpensesUSD,
+      netIncome: netIncomeSSP, // Legacy field - only SSP to avoid currency mixing
+      netIncomeSSP,
+      netIncomeUSD,
       departmentBreakdown,
       insuranceBreakdown,
       recentTransactions
     };
   }
 
-  async getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>> {
+  async getIncomeTrends(days: number): Promise<Array<{ date: string, income: number, incomeUSD: number, incomeSSP: number }>> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const endDate = new Date();
 
     const incomeData = await db.select({
       date: sql<string>`DATE(${transactions.date})`,
-      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`
+      incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions)
     .where(
       and(
@@ -454,7 +462,7 @@ export class DatabaseStorage implements IStorage {
     .orderBy(sql`DATE(${transactions.date})`);
 
     // Fill in missing dates with 0 income
-    const result: Array<{ date: string, income: number }> = [];
+    const result: Array<{ date: string, income: number, incomeUSD: number, incomeSSP: number }> = [];
     const current = new Date(startDate);
     
     while (current <= endDate) {
@@ -463,7 +471,9 @@ export class DatabaseStorage implements IStorage {
       
       result.push({
         date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        income: existingData ? Number(existingData.income) : 0
+        income: 0, // Deprecated - do not use mixed currency total
+        incomeUSD: existingData ? Number(existingData.incomeUSD) : 0,
+        incomeSSP: existingData ? Number(existingData.incomeSSP) : 0
       });
       
       current.setDate(current.getDate() + 1);
@@ -481,7 +491,7 @@ export class DatabaseStorage implements IStorage {
       date: sql<string>`DATE(${transactions.date})`,
       incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`,
       incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)` // Keep total for backward compatibility
+      // Remove mixed currency total - only use separate SSP/USD amounts
     }).from(transactions)
     .where(
       and(
@@ -503,7 +513,7 @@ export class DatabaseStorage implements IStorage {
       
       result.push({
         date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        income: existingData ? Number(existingData.income) : 0,
+        income: 0, // Deprecated - do not use mixed currency total
         incomeUSD: existingData ? Number(existingData.incomeUSD) : 0,
         incomeSSP: existingData ? Number(existingData.incomeSSP) : 0
       });

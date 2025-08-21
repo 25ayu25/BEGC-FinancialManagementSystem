@@ -10,12 +10,12 @@ interface SimpleMonthlyFooterProps {
 }
 
 export default function SimpleMonthlyFooter({ data }: SimpleMonthlyFooterProps) {
-  const income = parseFloat(data?.totalIncome || '0');
-  const expenses = parseFloat(data?.totalExpenses || '0');
-  const net = parseFloat(data?.netIncome || '0');
-  const margin = income > 0 ? (net / income) * 100 : 0;
+  const incomeSSP = parseFloat(data?.totalIncomeSSP || data?.totalIncome || '0');
+  const expensesSSP = parseFloat(data?.totalExpensesSSP || data?.totalExpenses || '0');
+  const netSSP = parseFloat(data?.netIncomeSSP || data?.netIncome || '0');
+  const marginSSP = incomeSSP > 0 ? (netSSP / incomeSSP) * 100 : 0;
   
-  const totalInsurance = Object.values(data?.insuranceBreakdown || {})
+  const totalInsuranceUSD = Object.values(data?.insuranceBreakdown || {})
     .reduce((sum, amount) => sum + parseFloat(amount), 0);
 
   return (
@@ -25,31 +25,31 @@ export default function SimpleMonthlyFooter({ data }: SimpleMonthlyFooterProps) 
           <div>
             <p className="text-xs text-slate-600 font-medium uppercase tracking-wide">Total Income</p>
             <p className="text-xl font-bold text-emerald-600 mt-1">
-              SSP {Math.round(income).toLocaleString()}
+              SSP {Math.round(incomeSSP).toLocaleString()}
             </p>
           </div>
           
           <div>
             <p className="text-xs text-slate-600 font-medium uppercase tracking-wide">Total Expenses</p>
             <p className="text-xl font-bold text-red-500 mt-1">
-              SSP {Math.round(expenses).toLocaleString()}
+              SSP {Math.round(expensesSSP).toLocaleString()}
             </p>
           </div>
           
           <div>
             <p className="text-xs text-slate-600 font-medium uppercase tracking-wide">Net Income</p>
-            <p className={`text-xl font-bold mt-1 ${net >= 0 ? 'text-blue-600' : 'text-orange-500'}`}>
-              SSP {Math.round(net).toLocaleString()}
+            <p className={`text-xl font-bold mt-1 ${netSSP >= 0 ? 'text-blue-600' : 'text-orange-500'}`}>
+              SSP {Math.round(netSSP).toLocaleString()}
             </p>
           </div>
           
           <div>
             <p className="text-xs text-slate-600 font-medium uppercase tracking-wide">Insurance USD</p>
             <p className="text-xl font-bold text-purple-600 mt-1">
-              USD {Math.round(totalInsurance).toLocaleString()}
+              USD {Math.round(totalInsuranceUSD).toLocaleString()}
             </p>
             <p className="text-xs text-slate-500 mt-1">
-              {margin.toFixed(1)}% margin
+              {marginSSP.toFixed(1)}% margin
             </p>
           </div>
         </div>
