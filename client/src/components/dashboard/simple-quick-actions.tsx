@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Upload, DollarSign } from "lucide-react";
+import { Plus, DollarSign } from "lucide-react";
 
 export default function SimpleQuickActions() {
   return (
@@ -29,13 +29,7 @@ export default function SimpleQuickActions() {
             Add Expense
           </Button>
           
-          <Button 
-            className="w-full justify-start bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
-            variant="outline"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Upload Receipt
-          </Button>
+
         </div>
       </CardContent>
     </Card>

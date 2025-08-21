@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock, FileX, CreditCard } from "lucide-react";
+import { AlertTriangle, Clock, CreditCard } from "lucide-react";
 
 export default function SimpleAlerts() {
   const alerts = [
@@ -13,15 +13,7 @@ export default function SimpleAlerts() {
       description: "3 transactions pending sync",
       urgency: "medium"
     },
-    {
-      id: 2,
-      type: "info",
-      icon: FileX,
-      title: "Missing receipts",
-      count: 2,
-      description: "2 transactions need receipts",
-      urgency: "low"
-    },
+
     {
       id: 3,
       type: "error",
