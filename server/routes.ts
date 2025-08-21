@@ -703,9 +703,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Report not found" });
       }
       
-      // Use fresh data for accurate calculations
+      // Use fresh data for accurate calculations with currency separation
       const reportData = {
         ...report,
+        totalIncomeSSP: dashboardData.totalIncomeSSP,
+        totalIncomeUSD: dashboardData.totalIncomeUSD,
         totalIncome: dashboardData.totalIncome,
         totalExpenses: dashboardData.totalExpenses,
         netIncome: dashboardData.netIncome,
@@ -772,12 +774,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(12);
       
-      // Summary table
-      const summaryData = [
-        ['Total Income', `SSP ${parseFloat(reportData.totalIncome).toLocaleString()}`],
-        ['Total Expenses', `SSP ${parseFloat(reportData.totalExpenses).toLocaleString()}`],
-        ['Net Income', `SSP ${parseFloat(reportData.netIncome).toLocaleString()}`]
-      ];
+      // Summary table with currency separation
+      const summaryData = [];
+      
+      // Add SSP totals if they exist
+      if (parseFloat(reportData.totalIncomeSSP || "0") > 0) {
+        summaryData.push(['Total Income (SSP)', `SSP ${parseFloat(reportData.totalIncomeSSP || "0").toLocaleString()}`]);
+      }
+      
+      // Add USD totals if they exist  
+      if (parseFloat(reportData.totalIncomeUSD || "0") > 0) {
+        summaryData.push(['Total Income (USD)', `USD ${parseFloat(reportData.totalIncomeUSD || "0").toLocaleString()}`]);
+      }
+      
+      // Add expenses and net income (currently SSP only)
+      if (parseFloat(reportData.totalExpenses || "0") > 0) {
+        summaryData.push(['Total Expenses (SSP)', `SSP ${parseFloat(reportData.totalExpenses || "0").toLocaleString()}`]);
+      }
+      
+      summaryData.push(['Net Income (SSP)', `SSP ${parseFloat(reportData.netIncome || "0").toLocaleString()}`]);
       
       summaryData.forEach(([label, value], index) => {
         const isNetIncome = label === 'Net Income';
@@ -864,7 +879,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.setTextColor(100, 100, 100);
       doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY);
       doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
-      doc.text('Confidential - For Internal Use Only', pageWidth / 2, footerY, { align: 'center' });
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       
