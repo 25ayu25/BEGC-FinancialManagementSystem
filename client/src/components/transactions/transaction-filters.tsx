@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Filter, Download, Search, X, Calendar as CalendarIcon } from "lucide-react";
+import { Filter, Download, Search, X, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -161,15 +161,28 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
           )}
         </Button>
 
-        <Button
-          variant="outline"
-          onClick={handleExport}
-          data-testid="button-export-transactions"
-          className="flex items-center space-x-2"
-        >
-          <Download className="h-4 w-4" />
-          <span>Export CSV</span>
-        </Button>
+        <div className="flex items-center space-x-2">
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              onClick={clearFilters}
+              data-testid="button-reset-filters"
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Reset Filters</span>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            data-testid="button-export-transactions"
+            className="flex items-center space-x-2"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export CSV</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filter Panel */}
