@@ -117,14 +117,18 @@ export default function AdvancedDashboard() {
     }
     
     // Build series from the API data
-    incomeSeries = rawIncome.map((r, index) => ({
-      day: index + 1, // Sequential numbering for chart
-      amount: Number(r.income ?? r.amount ?? 0),
-      amountUSD: Number(r.incomeUSD ?? 0),
-      amountSSP: Number(r.incomeSSP ?? 0),
-      label: r.date, // "Jun 1", "Jul 15", etc.
-      fullDate: r.date,
-    }));
+    incomeSeries = rawIncome.map((r, index) => {
+      const totalIncome = Number(r.income ?? r.amount ?? 0);
+      return {
+        day: index + 1, // Sequential numbering for chart
+        amount: totalIncome,
+        // For custom date range, assume all income is SSP unless specified otherwise
+        amountUSD: Number(r.incomeUSD ?? 0),
+        amountSSP: Number(r.incomeSSP ?? totalIncome), // Default to SSP if no breakdown provided
+        label: r.date, // "Jun 1", "Jul 15", etc.
+        fullDate: r.date,
+      };
+    });
   } else {
     // For single month ranges, use the existing logic
     const displayYear = selectedYear;
