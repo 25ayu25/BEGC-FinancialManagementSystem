@@ -123,16 +123,28 @@ export default function Transactions() {
 
     // Convert to array and sort by month (newest first)
     return Object.entries(groups)
-      .map(([monthKey, transactions]) => ({
-        monthKey,
-        monthLabel: transactions[0].monthLabel,
-        transactions,
-        totalAmount: transactions.reduce((sum, t) => {
+      .map(([monthKey, transactions]) => {
+        // Calculate totals separately by currency
+        const totals = transactions.reduce((acc, t) => {
           const amount = parseFloat(t.amount) || 0;
-          return sum + (t.type === 'income' ? amount : -amount);
-        }, 0),
-        transactionCount: transactions.length
-      }))
+          const adjustedAmount = t.type === 'income' ? amount : -amount;
+          
+          if (t.currency === 'USD') {
+            acc.usd += adjustedAmount;
+          } else {
+            acc.ssp += adjustedAmount;
+          }
+          return acc;
+        }, { ssp: 0, usd: 0 });
+
+        return {
+          monthKey,
+          monthLabel: transactions[0].monthLabel,
+          transactions,
+          totals,
+          transactionCount: transactions.length
+        };
+      })
       .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   };
 
@@ -225,10 +237,17 @@ export default function Transactions() {
                             {monthGroup.transactionCount} transaction{monthGroup.transactionCount !== 1 ? 's' : ''}
                           </Badge>
                         </div>
-                        <div className="text-right">
-                          <span className={`text-lg font-semibold ${monthGroup.totalAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {monthGroup.totalAmount >= 0 ? '+' : '-'}${Math.abs(monthGroup.totalAmount).toLocaleString()}
-                          </span>
+                        <div className="text-right space-y-1">
+                          {monthGroup.totals.ssp !== 0 && (
+                            <div className={`text-sm font-semibold ${monthGroup.totals.ssp >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {monthGroup.totals.ssp >= 0 ? '+' : ''}SSP {monthGroup.totals.ssp.toLocaleString()}
+                            </div>
+                          )}
+                          {monthGroup.totals.usd !== 0 && (
+                            <div className={`text-sm font-semibold ${monthGroup.totals.usd >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {monthGroup.totals.usd >= 0 ? '+' : ''}USD {monthGroup.totals.usd.toLocaleString()}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CollapsibleTrigger>
