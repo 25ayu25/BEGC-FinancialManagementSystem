@@ -58,10 +58,11 @@
 
 /* Ensure popover content appears above everything */
 [data-radix-popover-content] {
-  z-index: 10000 !important;
+  z-index: 50000 !important;
   background: white !important;
   border: 1px solid #d1d5db !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  position: relative !important;
 }
 
 /* Fix calendar overlay issues - make more compact and professional */

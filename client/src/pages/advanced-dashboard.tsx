@@ -229,7 +229,7 @@ export default function AdvancedDashboard() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 p-6 dashboard-content">
       <header className="mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-end md:gap-x-8">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           {/* Left: title + subtitle */}
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
@@ -249,7 +249,7 @@ export default function AdvancedDashboard() {
           </div>
 
           {/* Right: controls (moved away from title) */}
-          <div className="mt-3 md:mt-0 flex flex-wrap items-center justify-end gap-2">
+          <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             {/* Period select */}
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="h-9 w-[120px]">
@@ -285,7 +285,7 @@ export default function AdvancedDashboard() {
                     align="start" 
                     sideOffset={12} 
                     className="p-2 w-[280px]"
-                    style={{ zIndex: 10000 }}
+                    style={{ zIndex: 50000 }}
                     avoidCollisions={true}
                     collisionPadding={15}
                   >
@@ -320,7 +320,7 @@ export default function AdvancedDashboard() {
                     align="start" 
                     sideOffset={12} 
                     className="p-2 w-[280px]"
-                    style={{ zIndex: 10000 }}
+                    style={{ zIndex: 50000 }}
                     avoidCollisions={true}
                     collisionPadding={15}
                   >
