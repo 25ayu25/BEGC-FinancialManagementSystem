@@ -17,12 +17,26 @@ export default function Dashboard() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'today' | '7d' | 'month'>('month');
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState(new Date());
 
-  const handleTimeRangeChange = (range: 'today' | '7d' | 'month') => {
+  const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
+    
+    // Auto-set dates based on preset selection
+    const now = new Date();
+    if (range === 'current-month') {
+      setSelectedYear(now.getFullYear());
+      setSelectedMonth(now.getMonth() + 1);
+    } else if (range === 'last-month') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+      setSelectedYear(lastMonth.getFullYear());
+      setSelectedMonth(lastMonth.getMonth() + 1);
+    } else if (range === 'year') {
+      setSelectedYear(now.getFullYear());
+      setSelectedMonth(1); // January for year view
+    }
   };
 
   const handleMonthChange = (year: number, month: number) => {
@@ -120,51 +134,54 @@ export default function Dashboard() {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Time Range Segmented Control */}
+            {/* Time Range Preset Buttons */}
             <div className="flex bg-slate-100 rounded-lg p-1">
-              {['today', '7d', 'month'].map((range) => (
+              {[
+                { key: 'current-month', label: 'Current Month' },
+                { key: 'last-month', label: 'Last Month' },
+                { key: 'last-3-months', label: 'Last 3 Months' },
+                { key: 'year', label: 'Year' },
+                { key: 'custom', label: 'Custom' }
+              ].map((range) => (
                 <button
-                  key={range}
-                  onClick={() => handleTimeRangeChange(range as any)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                    timeRange === range
+                  key={range.key}
+                  onClick={() => handleTimeRangeChange(range.key as any)}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                    timeRange === range.key
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {range === 'today' ? 'Today' : range === '7d' ? '7D' : 'Month'}
+                  {range.label}
                 </button>
               ))}
             </div>
 
-            {/* Month Dropdown */}
-            <select 
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-              value={`${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`}
-              onChange={(e) => {
-                const [year, month] = e.target.value.split('-');
-                handleMonthChange(parseInt(year), parseInt(month));
-              }}
-            >
-              {Array.from({ length: 12 }, (_, i) => {
-                const month = i + 1;
-                const value = `${selectedYear}-${month.toString().padStart(2, '0')}`;
-                const label = new Date(selectedYear, i).toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  year: 'numeric' 
-                });
-                return (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-
-            {/* Generate PDF Button */}
-            <Button variant="outline" size="sm" data-testid="button-generate-pdf">
-              Generate PDF
-            </Button>
+            {/* Custom Date Picker - Only show when Custom is selected */}
+            {timeRange === 'custom' && (
+              <select 
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                value={`${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`}
+                onChange={(e) => {
+                  const [year, month] = e.target.value.split('-');
+                  handleMonthChange(parseInt(year), parseInt(month));
+                }}
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const month = i + 1;
+                  const value = `${selectedYear}-${month.toString().padStart(2, '0')}`;
+                  const label = new Date(selectedYear, i).toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    year: 'numeric' 
+                  });
+                  return (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
 
             {/* Online Status Pill */}
             <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-2">
@@ -190,7 +207,7 @@ export default function Dashboard() {
           <SimpleDailyChart timeRange={timeRange} />
           <SimpleTopDepartments 
             data={dashboardData?.departmentBreakdown || {}} 
-            departments={departments || []}
+            departments={departments as any[] || []}
           />
         </div>
 
