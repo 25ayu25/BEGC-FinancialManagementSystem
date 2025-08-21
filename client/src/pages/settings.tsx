@@ -67,16 +67,21 @@ export default function Settings() {
   // Update form when user data loads
   useEffect(() => {
     if (user) {
-      const [firstName, lastName] = (user.fullName || "").split(" ");
-      form.reset({
-        firstName: firstName || "",
-        lastName: lastName || "",
+      const nameParts = (user.fullName || "").trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+      
+      const formData = {
+        firstName,
+        lastName,
         email: user.email || "",
-        location: user.location || "usa",
-        defaultCurrency: user.defaultCurrency || "SSP",
+        location: user.location === "usa" ? "usa" as const : "south-sudan" as const,
+        defaultCurrency: user.defaultCurrency === "USD" ? "USD" as const : "SSP" as const,
         emailNotifications: user.emailNotifications ?? true,
         reportAlerts: user.reportAlerts ?? true,
-      });
+      };
+      
+      form.reset(formData);
       setHasChanges(false);
     }
   }, [user, form]);
@@ -86,13 +91,16 @@ export default function Settings() {
   useEffect(() => {
     if (user) {
       const currentValues = form.getValues();
-      const [firstName, lastName] = (user.fullName || "").split(" ");
+      const nameParts = (user.fullName || "").trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+      
       const hasFormChanges = 
-        currentValues.firstName !== (firstName || "") ||
-        currentValues.lastName !== (lastName || "") ||
+        currentValues.firstName !== firstName ||
+        currentValues.lastName !== lastName ||
         currentValues.email !== (user.email || "") ||
-        currentValues.location !== (user.location || "usa") ||
-        currentValues.defaultCurrency !== (user.defaultCurrency || "SSP") ||
+        currentValues.location !== (user.location === "usa" ? "usa" : "south-sudan") ||
+        currentValues.defaultCurrency !== (user.defaultCurrency === "USD" ? "USD" : "SSP") ||
         currentValues.emailNotifications !== (user.emailNotifications ?? true) ||
         currentValues.reportAlerts !== (user.reportAlerts ?? true);
       
@@ -144,13 +152,16 @@ export default function Settings() {
 
   const handleCancel = () => {
     if (user) {
-      const [firstName, lastName] = (user.fullName || "").split(" ");
+      const nameParts = (user.fullName || "").trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+      
       form.reset({
-        firstName: firstName || "",
-        lastName: lastName || "",
+        firstName,
+        lastName,
         email: user.email || "",
-        location: user.location || "usa",
-        defaultCurrency: user.defaultCurrency || "SSP",
+        location: user.location === "usa" ? "usa" as const : "south-sudan" as const,
+        defaultCurrency: user.defaultCurrency === "USD" ? "USD" as const : "SSP" as const,
         emailNotifications: user.emailNotifications ?? true,
         reportAlerts: user.reportAlerts ?? true,
       });
