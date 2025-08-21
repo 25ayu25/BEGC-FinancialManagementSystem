@@ -4,12 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
   Users, 
   Calendar,
+  CalendarIcon,
   Building2,
   Shield,
   ArrowUpRight,
@@ -37,8 +42,8 @@ export default function AdvancedDashboard() {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -66,11 +71,11 @@ export default function AdvancedDashboard() {
   };
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange, customStartDate, customEndDate],
+    queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: () => {
       let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
-        url += `&startDate=${customStartDate}&endDate=${customEndDate}`;
+        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
       return fetch(url, { credentials: 'include' }).then(r => r.json());
     },
@@ -236,7 +241,7 @@ export default function AdvancedDashboard() {
               timeRange === 'last-3-months' ? 'Last 3 months overview' :
               timeRange === 'year' ? 'This year overview' :
               timeRange === 'custom' && customStartDate && customEndDate ? 
-                `${new Date(customStartDate).toLocaleDateString()} to ${new Date(customEndDate).toLocaleDateString()}` :
+                `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
                 'Custom period overview'
             }
           </p>
@@ -258,21 +263,53 @@ export default function AdvancedDashboard() {
           
           {timeRange === 'custom' && (
             <>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm h-9"
-                placeholder="Start Date"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[140px] h-9 justify-start text-left font-normal",
+                      !customStartDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DatePicker
+                    mode="single"
+                    selected={customStartDate}
+                    onSelect={setCustomStartDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              
               <span className="text-slate-400 text-sm">to</span>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm h-9"
-                placeholder="End Date"
-              />
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[140px] h-9 justify-start text-left font-normal",
+                      !customEndDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DatePicker
+                    mode="single"
+                    selected={customEndDate}
+                    onSelect={setCustomEndDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </>
           )}
         </div>
