@@ -27,6 +27,7 @@ export default function Transactions() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
+  const [appliedFilters, setAppliedFilters] = useState<any>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -69,7 +70,7 @@ export default function Transactions() {
     setShowEditModal(true);
   };
 
-  const { data: transactions, isLoading } = useQuery({
+  const { data: allTransactions, isLoading } = useQuery({
     queryKey: ["/api/transactions"],
   });
 
@@ -80,6 +81,35 @@ export default function Transactions() {
   const getDepartmentName = (departmentId: string) => {
     return (departments as any)?.find((d: any) => d.id === departmentId)?.name || 'Unknown';
   };
+
+  // Apply filters to transactions
+  const transactions = (allTransactions as any[])?.filter((transaction: any) => {
+    // Department filter
+    if (appliedFilters.departmentId && transaction.departmentId !== appliedFilters.departmentId) {
+      return false;
+    }
+    
+    // Insurance provider filter
+    if (appliedFilters.insuranceProviderId && transaction.insuranceProviderId !== appliedFilters.insuranceProviderId) {
+      return false;
+    }
+    
+    // Transaction type filter
+    if (appliedFilters.type && transaction.type !== appliedFilters.type) {
+      return false;
+    }
+    
+    // Search query filter
+    if (appliedFilters.searchQuery && appliedFilters.searchQuery.trim()) {
+      const searchTerm = appliedFilters.searchQuery.toLowerCase();
+      const description = transaction.description?.toLowerCase() || '';
+      if (!description.includes(searchTerm)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }) || [];
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -97,7 +127,10 @@ export default function Transactions() {
       <main className="flex-1 overflow-y-auto p-6">
         <div className="space-y-6">
           <TransactionFilters 
-            onFilterChange={(filters) => console.log('Filters:', filters)}
+            onFilterChange={(filters) => {
+              console.log('Filters:', filters);
+              setAppliedFilters(filters);
+            }}
             onExport={() => console.log('Export requested')}
           />
           <Card>
@@ -109,7 +142,7 @@ export default function Transactions() {
               <div className="text-center py-8">
                 <p className="text-gray-500">Loading transactions...</p>
               </div>
-            ) : !(transactions as any)?.length ? (
+            ) : !transactions?.length ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">No transactions found. Add your first transaction to get started.</p>
                 <Button className="mt-4" onClick={() => setShowAddModal(true)}>
@@ -143,7 +176,7 @@ export default function Transactions() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {(transactions as any)?.map((transaction: any) => (
+                    {transactions?.map((transaction: any) => (
                       <tr key={transaction.id} className="hover:bg-gray-50 transition-colors" data-testid={`row-transaction-${transaction.id}`}>
                         <td className="py-4 px-6 text-sm text-gray-900">
                           {new Date(transaction.date).toLocaleDateString()}
