@@ -58,7 +58,7 @@ export default function SimpleDailyChart({ timeRange, selectedYear, selectedMont
         ) : chartData && chartData.length > 0 ? (
           <div className="space-y-4">
             {/* Chart Area */}
-            <div className="h-64 relative bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4 overflow-hidden">
+            <div className="h-64 relative bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4 overflow-visible">
               {/* Grid Lines */}
               <div className="absolute inset-4 grid grid-cols-7 opacity-20">
                 {Array.from({ length: 7 }).map((_, i) => (
@@ -89,11 +89,11 @@ export default function SimpleDailyChart({ timeRange, selectedYear, selectedMont
                       }}
                     >
                       {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {item.date} — SSP {Math.round(item.income).toLocaleString()}
+                      <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 whitespace-nowrap">
+                        {item.date}: SSP {Math.round(item.income).toLocaleString()}
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500 mt-2 font-medium">
+                    <span className="text-xs text-slate-500 mt-1 font-medium">
                       {getDayLabel(item.date)}
                     </span>
                   </div>
