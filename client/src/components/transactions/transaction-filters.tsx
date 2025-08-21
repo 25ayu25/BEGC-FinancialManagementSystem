@@ -87,16 +87,45 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
     // Create CSV headers
     let csvContent = "Type,Department,Insurance,Amount,Currency,Description,Date\n";
     
-    // Add transaction data
+    // Initialize totals for each currency
+    const totals = {
+      SSP: { income: 0, expense: 0, net: 0 },
+      USD: { income: 0, expense: 0, net: 0 }
+    };
+    
+    // Add transaction data and calculate totals
     transactions.forEach((transaction: any) => {
       const departmentName = (departments as any[])?.find((d: any) => d.id === transaction.departmentId)?.name || 'Unknown';
       const insuranceName = (insuranceProviders as any[])?.find((p: any) => p.id === transaction.insuranceProviderId)?.name || 'None';
-      const amount = transaction.amount || '0';
+      const amount = parseFloat(transaction.amount) || 0;
       const currency = transaction.currency || 'SSP';
       const description = (transaction.description || '').replace(/,/g, ';'); // Replace commas to avoid CSV issues
       const date = new Date(transaction.date).toLocaleDateString();
       
-      csvContent += `${transaction.type},${departmentName},${insuranceName},${amount},${currency},"${description}",${date}\n`;
+      // Add to totals
+      if (!totals[currency]) {
+        totals[currency] = { income: 0, expense: 0, net: 0 };
+      }
+      
+      if (transaction.type === 'income') {
+        totals[currency].income += amount;
+      } else {
+        totals[currency].expense += amount;
+      }
+      totals[currency].net = totals[currency].income - totals[currency].expense;
+      
+      csvContent += `${transaction.type},${departmentName},${insuranceName},${amount.toFixed(2)},${currency},"${description}",${date}\n`;
+    });
+    
+    // Add totals summary at the bottom
+    csvContent += "\n"; // Empty line separator
+    csvContent += "SUMMARY TOTALS\n";
+    csvContent += "Currency,Total Income,Total Expenses,Net Amount\n";
+    
+    Object.entries(totals).forEach(([currency, amounts]) => {
+      if (amounts.income > 0 || amounts.expense > 0) {
+        csvContent += `${currency},${amounts.income.toFixed(2)},${amounts.expense.toFixed(2)},${amounts.net.toFixed(2)}\n`;
+      }
     });
     
     // Create and trigger download
