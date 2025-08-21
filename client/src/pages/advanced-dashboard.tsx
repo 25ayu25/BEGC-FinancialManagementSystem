@@ -8,6 +8,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -21,7 +37,10 @@ import {
   ArrowDownRight,
   Download,
   Filter,
-  RefreshCw
+  RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -35,7 +54,218 @@ import {
   Legend
 } from 'recharts';
 
-// Removed MonthSelector import - will create inline selector
+// Revenue Data Table Component
+interface RevenueDataTableProps {
+  data: Array<{
+    day: number;
+    amount: number;
+    amountSSP: number;
+    amountUSD: number;
+    label: string;
+    fullDate: string;
+  }>;
+  selectedDepartment: string | null;
+  departments: any[];
+  monthName: string;
+  onClose: () => void;
+}
+
+type SortField = 'date' | 'ssp' | 'usd' | 'total' | 'department';
+type SortDirection = 'asc' | 'desc';
+
+function RevenueDataTable({ data, selectedDepartment, departments, monthName, onClose }: RevenueDataTableProps) {
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedData = [...data].sort((a, b) => {
+    let aVal: any, bVal: any;
+    
+    switch (sortField) {
+      case 'date':
+        aVal = new Date(a.fullDate).getTime();
+        bVal = new Date(b.fullDate).getTime();
+        break;
+      case 'ssp':
+        aVal = a.amountSSP;
+        bVal = b.amountSSP;
+        break;
+      case 'usd':
+        aVal = a.amountUSD;
+        bVal = b.amountUSD;
+        break;
+      case 'total':
+        aVal = a.amount;
+        bVal = b.amount;
+        break;
+      default:
+        aVal = a.fullDate;
+        bVal = b.fullDate;
+    }
+
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const totals = {
+    ssp: data.reduce((sum, row) => sum + row.amountSSP, 0),
+    usd: data.reduce((sum, row) => sum + row.amountUSD, 0),
+    total: data.reduce((sum, row) => sum + row.amount, 0)
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-slate-400" />;
+    return sortDirection === 'asc' ? 
+      <ArrowUp className="h-3 w-3 text-slate-600" /> : 
+      <ArrowDown className="h-3 w-3 text-slate-600" />;
+  };
+
+  const exportCSV = () => {
+    const headers = selectedDepartment ? ['Department', 'Date', 'SSP', 'USD', 'Total'] : ['Date', 'SSP', 'USD', 'Total'];
+    const csvData = [
+      headers.join(','),
+      ...sortedData.map(row => {
+        const values = [
+          ...(selectedDepartment ? ['Department Name'] : []), // Would need to resolve department name
+          `"${row.fullDate}"`,
+          Math.round(row.amountSSP).toLocaleString(),
+          row.amountUSD.toLocaleString(),
+          Math.round(row.amount).toLocaleString()
+        ];
+        return values.join(',');
+      })
+    ].join('\n');
+
+    const blob = new Blob([csvData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `RevenueRows_${monthName.replace(/\s+/g, '_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  if (data.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-12">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Building2 className="h-7 w-7 text-slate-400" />
+          </div>
+          <p className="text-slate-600 text-sm font-medium mb-4">No rows for this range</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Change dates</Button>
+            <Button variant="outline" size="sm" onClick={() => {}}>Reset filters</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Table Container */}
+      <div className="flex-1 overflow-auto border border-slate-200 rounded-lg">
+        <Table>
+          <TableHeader className="sticky top-0 bg-white z-10">
+            <TableRow>
+              {selectedDepartment && (
+                <TableHead>
+                  <Button variant="ghost" size="sm" onClick={() => handleSort('department')} className="font-semibold h-8 p-1">
+                    Department {getSortIcon('department')}
+                  </Button>
+                </TableHead>
+              )}
+              <TableHead>
+                <Button variant="ghost" size="sm" onClick={() => handleSort('date')} className="font-semibold h-8 p-1">
+                  Date {getSortIcon('date')}
+                </Button>
+              </TableHead>
+              <TableHead className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => handleSort('ssp')} className="font-semibold h-8 p-1 ml-auto">
+                  SSP {getSortIcon('ssp')}
+                </Button>
+              </TableHead>
+              <TableHead className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => handleSort('usd')} className="font-semibold h-8 p-1 ml-auto">
+                  USD {getSortIcon('usd')}
+                </Button>
+              </TableHead>
+              <TableHead className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => handleSort('total')} className="font-semibold h-8 p-1 ml-auto">
+                  Total {getSortIcon('total')}
+                </Button>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedData.map((row, index) => (
+              <TableRow key={index} className="hover:bg-slate-50">
+                {selectedDepartment && (
+                  <TableCell className="text-sm">
+                    {departments?.find(d => d.id === selectedDepartment)?.name || 'Unknown'}
+                  </TableCell>
+                )}
+                <TableCell className="text-sm font-medium">{row.fullDate}</TableCell>
+                <TableCell className="text-sm font-mono tabular-nums text-right">
+                  {row.amountSSP > 0 ? Math.round(row.amountSSP).toLocaleString() : '—'}
+                </TableCell>
+                <TableCell className="text-sm font-mono tabular-nums text-right">
+                  {row.amountUSD > 0 ? row.amountUSD.toLocaleString() : '—'}
+                </TableCell>
+                <TableCell className="text-sm font-mono tabular-nums text-right font-semibold">
+                  {Math.round(row.amount).toLocaleString()}
+                </TableCell>
+              </TableRow>
+            ))}
+            
+            {/* Sticky Totals Row */}
+            <TableRow className="bg-slate-100 border-t-2 border-slate-300 font-semibold sticky bottom-0">
+              {selectedDepartment && <TableCell className="font-bold">Total</TableCell>}
+              <TableCell className="font-bold">Total</TableCell>
+              <TableCell className="text-sm font-mono tabular-nums text-right font-bold">
+                {Math.round(totals.ssp).toLocaleString()}
+              </TableCell>
+              <TableCell className="text-sm font-mono tabular-nums text-right font-bold">
+                {totals.usd.toLocaleString()}
+              </TableCell>
+              <TableCell className="text-sm font-mono tabular-nums text-right font-bold">
+                {Math.round(totals.total).toLocaleString()}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+      
+      {/* Footer Actions */}
+      <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+        <div className="text-sm text-slate-500">
+          {data.length} row{data.length !== 1 ? 's' : ''} • Total: SSP {Math.round(totals.total).toLocaleString()}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdvancedDashboard() {
   const currentDate = new Date();
@@ -45,6 +275,7 @@ export default function AdvancedDashboard() {
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [showDataTable, setShowDataTable] = useState(false);
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -647,10 +878,36 @@ export default function AdvancedDashboard() {
                   
                   {/* Data Table Toggle */}
                   <div className="flex justify-center mt-4 pt-3 border-t border-slate-100">
-                    <Button variant="outline" size="sm" className="text-slate-600">
-                      <Building2 className="h-4 w-4 mr-2" />
-                      View Data Table
-                    </Button>
+                    {monthTotal > 0 ? (
+                      <Dialog open={showDataTable} onOpenChange={setShowDataTable}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-slate-600" data-testid="button-data-table">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            View Data Table
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                          <DialogHeader>
+                            <DialogTitle>Revenue Data • {monthName}</DialogTitle>
+                            <DialogDescription>
+                              Daily revenue breakdown {selectedDepartment ? `(filtered by department)` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <RevenueDataTable 
+                            data={incomeSeries.filter(d => d.amount > 0)} 
+                            selectedDepartment={selectedDepartment}
+                            departments={Array.isArray(departments) ? departments : []}
+                            monthName={monthName}
+                            onClose={() => setShowDataTable(false)}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <Button variant="outline" size="sm" className="text-slate-400 cursor-not-allowed" disabled title="No data for this range">
+                        <Building2 className="h-4 w-4 mr-2" />
+                        View Data Table
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
