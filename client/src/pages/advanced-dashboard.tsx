@@ -37,6 +37,8 @@ export default function AdvancedDashboard() {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -64,11 +66,14 @@ export default function AdvancedDashboard() {
   };
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange],
-    queryFn: () =>
-      fetch(`/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`, {
-        credentials: 'include'
-      }).then(r => r.json()),
+    queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange, customStartDate, customEndDate],
+    queryFn: () => {
+      let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        url += `&startDate=${customStartDate}&endDate=${customEndDate}`;
+      }
+      return fetch(url, { credentials: 'include' }).then(r => r.json());
+    },
   });
 
   const { data: departments } = useQuery({
@@ -230,7 +235,9 @@ export default function AdvancedDashboard() {
               timeRange === 'last-month' ? 'Last month overview' :
               timeRange === 'last-3-months' ? 'Last 3 months overview' :
               timeRange === 'year' ? 'This year overview' :
-              'Custom period overview'
+              timeRange === 'custom' && customStartDate && customEndDate ? 
+                `${new Date(customStartDate).toLocaleDateString()} to ${new Date(customEndDate).toLocaleDateString()}` :
+                'Custom period overview'
             }
           </p>
         </div>
@@ -248,6 +255,26 @@ export default function AdvancedDashboard() {
               <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
+          
+          {timeRange === 'custom' && (
+            <>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm h-9"
+                placeholder="Start Date"
+              />
+              <span className="text-slate-400 text-sm">to</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm h-9"
+                placeholder="End Date"
+              />
+            </>
+          )}
         </div>
       </div>
 

@@ -203,7 +203,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(receipts).where(eq(receipts.transactionId, transactionId));
   }
 
-  async getDashboardData(year: number, month: number, range?: string): Promise<{
+  async getDashboardData(year: number, month: number, range?: string, customStartDate?: string, customEndDate?: string): Promise<{
     totalIncome: string;
     totalExpenses: string;
     netIncome: string;
@@ -233,6 +233,17 @@ export class DatabaseStorage implements IStorage {
       case 'year':
         startDate = new Date(now.getFullYear(), 0, 1); // January 1st
         endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59); // December 31st
+        break;
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999); // End of day
+        } else {
+          // Fallback to current month if no custom dates provided
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        }
         break;
       default:
         // Default to the original single month logic
