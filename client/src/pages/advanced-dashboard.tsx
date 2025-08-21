@@ -694,10 +694,7 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900">SSP {Math.round(sspRevenue).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-emerald-600">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  <span className="text-xs font-medium text-slate-500">N/A</span>
-                </div>
+
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
