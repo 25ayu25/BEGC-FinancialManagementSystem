@@ -278,10 +278,10 @@ export class DatabaseStorage implements IStorage {
     const totalExpenses = expenseResult.total || "0";
     const netIncome = (parseFloat(totalIncome) - parseFloat(totalExpenses)).toString();
 
-    // Get department breakdown
+    // Get department breakdown (SSP only to prevent currency mixing)
     const departmentData = await db.select({
       departmentId: transactions.departmentId,
-      total: sql<string>`SUM(${transactions.amount})`
+      total: sql<string>`SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END)`
     }).from(transactions)
     .where(
       and(
