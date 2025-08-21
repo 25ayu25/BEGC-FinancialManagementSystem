@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Wifi, WifiOff, Clock, Plus, Upload, AlertTriangle, CalendarIcon } from "lucide-react";
+import { Clock, Plus, Upload, AlertTriangle, CalendarIcon } from "lucide-react";
 import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
 import SimpleDailyChart from "@/components/dashboard/simple-daily-chart";
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
@@ -25,8 +25,6 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
-  const [isOnline, setIsOnline] = useState(true);
-  const [lastSync, setLastSync] = useState(new Date());
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -137,21 +135,23 @@ export default function Dashboard() {
     <div className="flex-1 flex flex-col h-full bg-slate-50">
       {/* Simplified Header with Time Range Controls */}
       <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Simple Dashboard</h1>
-            <p className="text-slate-600">
-              {timeRange === 'current-month' ? 'Current month overview' :
-               timeRange === 'last-month' ? 'Last month overview' :
-               timeRange === 'last-3-months' ? 'Last 3 months overview' :
-               timeRange === 'year' ? 'This year overview' :
-               timeRange === 'custom' && customStartDate && customEndDate ? 
-                 `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
-                 'Custom period overview'}
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900">Simple Dashboard</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Key financials · {
+                timeRange === 'current-month' ? 'Current month' :
+                timeRange === 'last-month' ? 'Last month' :
+                timeRange === 'last-3-months' ? 'Last 3 months' :
+                timeRange === 'year' ? 'This year' :
+                timeRange === 'custom' && customStartDate && customEndDate ? 
+                  `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
+                  'Custom period'
+              }
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             {/* Time Period Dropdown */}
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="h-9 w-[140px]">
@@ -238,17 +238,6 @@ export default function Dashboard() {
                 </Popover>
               </>
             )}
-
-            {/* Online Status Pill */}
-            <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-2">
-              {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {isOnline ? 'Online' : 'Offline'}
-              {isOnline && (
-                <span className="text-xs opacity-70">
-                  • {lastSync.toLocaleTimeString()}
-                </span>
-              )}
-            </Badge>
           </div>
         </div>
       </div>
