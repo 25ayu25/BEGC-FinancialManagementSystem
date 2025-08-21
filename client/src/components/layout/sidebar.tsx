@@ -69,7 +69,7 @@ export default function Sidebar() {
 
       {/* User Profile & Status */}
       <div className="p-4 border-t border-gray-200">
-        <UserProfileMenu userName="Admin User" userRole="USA Admin" />
+        <UserProfileMenu />
         
         {/* Sync Status */}
         <div className="flex items-center space-x-2 text-xs">
