@@ -233,8 +233,8 @@ export default function AdvancedDashboard() {
     .reduce((sum: number, amount: any) => sum + parseFloat(amount || '0'), 0);
 
   const profitMargin = totalIncome > 0 ? ((netIncome / totalIncome) * 100) : 0;
-  const revenueGrowth = 12.5; // This would come from backend calculation
-  const patientVolume = 456; // This would come from backend
+  // Remove hardcoded values - use real data only
+  const hasRealData = totalIncome > 0 || totalExpenses > 0;
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
@@ -361,7 +361,7 @@ export default function AdvancedDashboard() {
                 <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-emerald-600">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
-                  <span className="text-xs font-medium">+{revenueGrowth}%</span>
+                  <span className="text-xs font-medium text-slate-500">N/A</span>
                 </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
@@ -431,10 +431,9 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Patient Volume</p>
-                <p className="text-base font-semibold text-slate-900">{patientVolume}</p>
-                <div className="flex items-center mt-1 text-orange-600">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  <span className="text-xs font-medium">+8.3%</span>
+                <p className="text-base font-semibold text-slate-900 text-slate-500">N/A</p>
+                <div className="flex items-center mt-1 text-slate-500">
+                  <span className="text-xs font-medium">No data available</span>
                 </div>
               </div>
               <div className="bg-orange-50 p-1.5 rounded-lg">
@@ -636,9 +635,8 @@ export default function AdvancedDashboard() {
               <div className="text-2xl font-bold text-slate-900 font-mono text-right">
                 SSP {Math.round(netIncome).toLocaleString()}
               </div>
-              <div className="text-xs text-emerald-600 font-medium flex items-center justify-center mt-1">
-                <ArrowUpRight className="h-3 w-3 mr-1" />
-                vs last month +8.5%
+              <div className="text-xs text-slate-500 font-medium flex items-center justify-center mt-1">
+                {hasRealData ? "Current period" : "No data available"}
               </div>
             </div>
             <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 text-center">
@@ -646,9 +644,8 @@ export default function AdvancedDashboard() {
               <div className="text-xl font-semibold text-emerald-700 font-mono text-right">
                 SSP {Math.round(totalIncome).toLocaleString()}
               </div>
-              <div className="text-xs text-emerald-600 font-medium flex items-center justify-center mt-1">
-                <ArrowUpRight className="h-3 w-3 mr-1" />
-                vs last month +{revenueGrowth}%
+              <div className="text-xs text-slate-500 font-medium flex items-center justify-center mt-1">
+                {hasRealData ? "Total revenue" : "No transactions recorded"}
               </div>
             </div>
             <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-center">
@@ -656,9 +653,8 @@ export default function AdvancedDashboard() {
               <div className="text-xl font-semibold text-slate-700 font-mono text-right">
                 SSP {Math.round(totalExpenses).toLocaleString()}
               </div>
-              <div className="text-xs text-slate-600 font-medium flex items-center justify-center mt-1">
-                <ArrowDownRight className="h-3 w-3 mr-1" />
-                vs budget -2.1%
+              <div className="text-xs text-slate-500 font-medium flex items-center justify-center mt-1">
+                {hasRealData ? "Total expenses" : "No expenses recorded"}
               </div>
             </div>
           </div>
@@ -736,8 +732,8 @@ export default function AdvancedDashboard() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Revenue Growth</span>
                   <div className="flex items-center">
-                    <span className="font-semibold text-emerald-600 font-mono mr-2 text-right">+{revenueGrowth}%</span>
-                    <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+                    <span className="font-semibold text-slate-500 font-mono mr-2 text-right">N/A</span>
+                    <span className="text-xs text-slate-400">(insufficient data)</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center group">
@@ -746,8 +742,8 @@ export default function AdvancedDashboard() {
                     <div className="ml-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-help" title="Cost efficiency vs industry benchmark (Target: >90%)">ⓘ</div>
                   </div>
                   <div className="flex items-center">
-                    <span className="font-semibold text-slate-900 font-mono mr-2 text-right">95%</span>
-                    <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+                    <span className="font-semibold text-slate-500 font-mono mr-2 text-right">N/A</span>
+                    <span className="text-xs text-slate-400">(insufficient data)</span>
                   </div>
                 </div>
               </div>
