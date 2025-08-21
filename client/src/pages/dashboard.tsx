@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Clock, Plus, Upload, AlertTriangle, CalendarIcon } from "lucide-react";
 import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
-import SimpleDailyChart from "@/components/dashboard/simple-daily-chart";
+
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
 import SimpleQuickActions from "@/components/dashboard/simple-quick-actions";
 import SimpleAlerts from "@/components/dashboard/simple-alerts";
@@ -252,15 +252,8 @@ export default function Dashboard() {
         {/* KPI Band */}
         <SimpleDashboardKPIs data={dashboardData || {}} />
 
-        {/* Visuals Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SimpleDailyChart 
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            timeRange={timeRange}
-            customStartDate={customStartDate}
-            customEndDate={customEndDate}
-          />
+        {/* Departments Chart */}
+        <div className="grid grid-cols-1">
           <SimpleTopDepartments 
             data={dashboardData?.departmentBreakdown || {}} 
             departments={(departments as any) || []}
