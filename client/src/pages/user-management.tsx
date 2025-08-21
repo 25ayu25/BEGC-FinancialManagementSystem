@@ -209,11 +209,11 @@ export default function UserManagementPage() {
 
   const handleEditUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editUser.username || !editUser.email || !editUser.role || !editUser.location) {
+    if (!editUser.username || !editUser.email || !editUser.fullName || !editUser.role || !editUser.location) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please fill in all required fields."
+        description: "Please fill in all required fields including Full Name."
       });
       return;
     }
@@ -222,7 +222,7 @@ export default function UserManagementPage() {
     editUserMutation.mutate({
       ...editUser,
       permissions: selectedRole?.permissions || [],
-      fullName: editUser.fullName || null
+      fullName: editUser.fullName
     });
   };
 
@@ -242,11 +242,11 @@ export default function UserManagementPage() {
     e.preventDefault();
     console.log('Form submitted with data:', newUser);
     
-    if (!newUser.username || !newUser.email || !newUser.role || !newUser.location) {
+    if (!newUser.username || !newUser.email || !newUser.fullName || !newUser.role || !newUser.location) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please fill in all required fields."
+        description: "Please fill in all required fields including Full Name."
       });
       return;
     }
@@ -266,7 +266,7 @@ export default function UserManagementPage() {
     const userData = {
       ...newUser,
       permissions: selectedRole?.permissions || [],
-      fullName: newUser.fullName || null
+      fullName: newUser.fullName
     };
     
     console.log('Sending user data:', userData);
