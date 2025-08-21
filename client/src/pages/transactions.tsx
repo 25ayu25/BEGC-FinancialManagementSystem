@@ -87,20 +87,10 @@ export default function Transactions() {
         title="Transaction Management" 
         subtitle="Add and manage daily income and expense transactions"
         actions={
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
-          </div>
+          <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Transaction
+          </Button>
         }
       />
 

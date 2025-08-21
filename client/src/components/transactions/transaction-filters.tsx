@@ -25,9 +25,9 @@ interface TransactionFiltersProps {
 export default function TransactionFilters({ onFilterChange, onExport }: TransactionFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filters, setFilters] = useState({
-    type: "",
-    departmentId: "",
-    insuranceProviderId: "",
+    type: "all",
+    departmentId: "all",
+    insuranceProviderId: "all", 
     searchQuery: "",
   });
 
@@ -43,9 +43,9 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
-    // Convert empty strings to undefined for the API
+    // Convert empty strings and "all" to undefined for the API
     const apiFilters = Object.fromEntries(
-      Object.entries(newFilters).map(([k, v]) => [k, v === "" ? undefined : v])
+      Object.entries(newFilters).map(([k, v]) => [k, (v === "" || v === "all") ? undefined : v])
     );
     
     onFilterChange?.(apiFilters);
@@ -53,16 +53,16 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
 
   const clearFilters = () => {
     const clearedFilters = {
-      type: "",
-      departmentId: "",
-      insuranceProviderId: "",
+      type: "all",
+      departmentId: "all", 
+      insuranceProviderId: "all",
       searchQuery: "",
     };
     setFilters(clearedFilters);
     onFilterChange?.({});
   };
 
-  const hasActiveFilters = Object.values(filters).some(value => value !== "");
+  const hasActiveFilters = Object.values(filters).some(value => value !== "" && value !== "all");
 
   const handleExport = () => {
     // Create CSV content
@@ -157,7 +157,7 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
                 </SelectContent>
@@ -174,7 +174,7 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
                   <SelectValue placeholder="All departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All departments</SelectItem>
+                  <SelectItem value="all">All departments</SelectItem>
                   {(departments || []).map((dept: any) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
@@ -194,7 +194,7 @@ export default function TransactionFilters({ onFilterChange, onExport }: Transac
                   <SelectValue placeholder="All providers" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All providers</SelectItem>
+                  <SelectItem value="all">All providers</SelectItem>
                   {(insuranceProviders || []).map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {provider.name}
