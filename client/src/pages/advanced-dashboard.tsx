@@ -145,7 +145,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, se
   const totals = {
     ssp: tableData.reduce((sum, row) => sum + (row.currency === 'SSP' ? row.amount : 0), 0),
     usd: tableData.reduce((sum, row) => sum + (row.currency === 'USD' ? row.amount : 0), 0),
-    total: tableData.reduce((sum, row) => sum + row.amount, 0)
+    total: tableData.reduce((sum, row) => sum + (row.currency === 'SSP' ? row.amount : 0), 0) // Only SSP for total
   };
 
   const getSortIcon = (field: SortField) => {
@@ -167,7 +167,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, se
           `"${row.fullDate}"`,
           Math.round(sspAmount).toLocaleString(),
           usdAmount.toLocaleString(),
-          Math.round(row.amount).toLocaleString(),
+          Math.round(sspAmount + usdAmount).toLocaleString(),
           `"${row.description}"`
         ];
         return values.join(',');
@@ -281,7 +281,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, se
                 {totals.usd.toLocaleString()}
               </TableCell>
               <TableCell className="text-sm font-mono tabular-nums text-right font-bold">
-                {Math.round(totals.total).toLocaleString()}
+                {Math.round(totals.ssp).toLocaleString()}
               </TableCell>
             </TableRow>
           </TableBody>
@@ -291,7 +291,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, se
       {/* Footer Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
         <div className="text-sm text-slate-500">
-          {tableData.length} transaction{tableData.length !== 1 ? 's' : ''} • Total: SSP {Math.round(totals.total).toLocaleString()}
+          {tableData.length} transaction{tableData.length !== 1 ? 's' : ''} • SSP Total: {Math.round(totals.ssp).toLocaleString()} • USD Total: {totals.usd.toLocaleString()}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={exportCSV}>
