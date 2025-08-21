@@ -8,15 +8,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Filter, Download, Search, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Filter, Download, Search, X, Calendar as CalendarIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 
 interface TransactionFiltersProps {
   onFilterChange?: (filters: {
     type?: string;
     departmentId?: string;
     insuranceProviderId?: string;
-    dateRange?: { start: Date; end: Date };
+    startDate?: string;
+    endDate?: string;
     searchQuery?: string;
   }) => void;
   onExport?: () => void;
@@ -32,6 +36,8 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
     departmentId: "all",
     insuranceProviderId: "all", 
     searchQuery: "",
+    startDate: "",
+    endDate: "",
   });
 
   const { data: queryDepartments } = useQuery({
@@ -63,6 +69,8 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
       departmentId: "all", 
       insuranceProviderId: "all",
       searchQuery: "",
+      startDate: "",
+      endDate: "",
     };
     setFilters(clearedFilters);
     onFilterChange?.({});
@@ -222,6 +230,125 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Start Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Date
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    data-testid="button-start-date"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filters.startDate ? format(new Date(filters.startDate), "PPP") : "Select start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={filters.startDate ? new Date(filters.startDate) : undefined}
+                    onSelect={(date) => handleFilterChange("startDate", date ? date.toISOString().split('T')[0] : "")}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Date
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    data-testid="button-end-date"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filters.endDate ? format(new Date(filters.endDate), "PPP") : "Select end date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={filters.endDate ? new Date(filters.endDate) : undefined}
+                    onSelect={(date) => handleFilterChange("endDate", date ? date.toISOString().split('T')[0] : "")}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Quick Date Range Buttons */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Quick Date Ranges
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const today = new Date();
+                  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                  handleFilterChange("startDate", startOfMonth.toISOString().split('T')[0]);
+                  handleFilterChange("endDate", today.toISOString().split('T')[0]);
+                }}
+                data-testid="button-current-month"
+              >
+                Current Month
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const today = new Date();
+                  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                  const endLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                  handleFilterChange("startDate", lastMonth.toISOString().split('T')[0]);
+                  handleFilterChange("endDate", endLastMonth.toISOString().split('T')[0]);
+                }}
+                data-testid="button-last-month"
+              >
+                Last Month
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const today = new Date();
+                  const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+                  handleFilterChange("startDate", threeMonthsAgo.toISOString().split('T')[0]);
+                  handleFilterChange("endDate", today.toISOString().split('T')[0]);
+                }}
+                data-testid="button-last-3-months"
+              >
+                Last 3 Months
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const today = new Date();
+                  const yearStart = new Date(today.getFullYear(), 0, 1);
+                  handleFilterChange("startDate", yearStart.toISOString().split('T')[0]);
+                  handleFilterChange("endDate", today.toISOString().split('T')[0]);
+                }}
+                data-testid="button-this-year"
+              >
+                This Year
+              </Button>
             </div>
           </div>
         </div>
