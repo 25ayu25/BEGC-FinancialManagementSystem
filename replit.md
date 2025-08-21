@@ -34,9 +34,13 @@ Header layout preference: Clean 2-column grid layout with title/subtitle on left
 - **Connection Pooling**: Uses connection pooling for efficient database resource management
 
 ### Authentication and Authorization
-- **Current Implementation**: Simplified middleware-based authentication (placeholder for production-ready system)
+- **Current Implementation**: Robust cookie-based session authentication with Safari compatibility
 - **User Roles**: Admin and staff roles with location-based access (USA, South Sudan)
-- **Session Management**: Cookie-based sessions with credential inclusion for API requests
+- **Session Management**: Cookie-based sessions with Safari-compatible sameSite settings and credential inclusion
+- **Browser Compatibility**: Tested and working on Chrome, Safari, and other major browsers
+- **Default Credentials**: 
+  - USA Admin: admin / password123
+  - South Sudan Staff: staff / password123
 
 ### File Upload and Storage
 - **Cloud Storage**: Google Cloud Storage integration with Replit sidecar authentication

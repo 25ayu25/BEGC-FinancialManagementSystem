@@ -104,11 +104,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName: user.fullName
       };
 
-      // Set session cookie with proper settings for development
+      // Set session cookie with Safari-compatible settings for same-origin
       res.cookie('user_session', JSON.stringify(userSession), {
         httpOnly: true,
-        secure: false, // Set to true in production with HTTPS
-        sameSite: 'lax', // Important for cross-origin requests
+        secure: false, // Keep false for development (localhost)
+        sameSite: 'strict', // Safari-compatible for same-origin requests
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/' // Ensure cookie is available for all paths
       });
@@ -121,8 +121,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    // Clear session/cookies if using them
-    res.clearCookie('user_session');
+    // Clear session/cookies with same settings as when set
+    res.clearCookie('user_session', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'strict',
+      path: '/'
+    });
     res.clearCookie('session');
     res.json({ success: true, message: 'Logged out successfully' });
   });
