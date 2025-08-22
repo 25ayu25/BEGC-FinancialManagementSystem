@@ -75,11 +75,12 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
-  // Get patient volume data for the selected month
-  const { data: patientVolumeData = [] } = useQuery({
-    queryKey: ["/api/patient-volume", selectedYear, selectedMonth],
+  // Get today's patient volume data for header badge
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const { data: todayPatientVolume = [] } = useQuery({
+    queryKey: ["/api/patient-volume/date", today],
     queryFn: async () => {
-      const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
+      const res = await fetch(`/api/patient-volume/date/${today}?departmentId=all-departments`, {
         credentials: 'include'
       });
       if (!res.ok) return [];
@@ -154,17 +155,27 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900">Simple Dashboard</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Key financials · {
-                timeRange === 'current-month' ? 'Current month' :
-                timeRange === 'last-month' ? 'Last month' :
-                timeRange === 'last-3-months' ? 'Last 3 months' :
-                timeRange === 'year' ? 'This year' :
-                timeRange === 'custom' && customStartDate && customEndDate ? 
-                  `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
-                  'Custom period'
-              }
-            </p>
+            <div className="mt-1 flex items-center gap-4">
+              <p className="text-sm text-muted-foreground">
+                Key financials · {
+                  timeRange === 'current-month' ? 'Current month' :
+                  timeRange === 'last-month' ? 'Last month' :
+                  timeRange === 'last-3-months' ? 'Last 3 months' :
+                  timeRange === 'year' ? 'This year' :
+                  timeRange === 'custom' && customStartDate && customEndDate ? 
+                    `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
+                    'Custom period'
+                }
+              </p>
+              {/* Simple Patient Volume Badge */}
+              {todayPatientVolume.length > 0 && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-teal-50 rounded-md">
+                  <span className="text-teal-600 text-xs font-medium">
+                    Today: {todayPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
@@ -261,7 +272,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
-        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeData={patientVolumeData} />
+        <SimpleDashboardKPIs data={dashboardData || {}} />
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">

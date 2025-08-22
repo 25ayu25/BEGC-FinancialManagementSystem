@@ -18,7 +18,7 @@ interface SimpleDashboardKPIsProps {
     netIncome: string;
     insuranceBreakdown: Record<string, string>;
   };
-  patientVolumeData?: PatientVolume[];
+
 }
 
 const Sparkline = ({ trend = 0 }: { trend?: number }) => {
@@ -45,7 +45,7 @@ const Sparkline = ({ trend = 0 }: { trend?: number }) => {
   );
 };
 
-export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: SimpleDashboardKPIsProps) {
+export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) {
   // Use the backend-separated currency amounts
   const sspIncome = parseFloat(data?.totalIncomeSSP || '0');
   const usdIncome = parseFloat(data?.totalIncomeUSD || '0');
@@ -61,14 +61,7 @@ export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: Si
   const monthProgress = (currentDay / daysInMonth) * 100;
   const estimatedMonthlyIncome = sspIncome > 0 ? (sspIncome / currentDay) * daysInMonth : 0;
 
-  // Calculate patient volume metrics
-  const volumeArray = Array.isArray(patientVolumeData) ? patientVolumeData : [];
-  const totalPatients = volumeArray.reduce((sum, volume) => sum + (volume.patientCount || 0), 0);
-  const daysWithData = new Set(volumeArray.map(v => {
-    const dateStr = typeof v.date === 'string' ? v.date : new Date(v.date).toISOString();
-    return dateStr.split('T')[0];
-  })).size;
-  const avgPatientsPerDay = daysWithData > 0 ? totalPatients / daysWithData : 0;
+
 
   const kpis = [
     {
@@ -119,22 +112,11 @@ export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: Si
       textColor: "text-purple-600",
       lightBg: "bg-purple-50",
     },
-    {
-      title: "Patient Volume",
-      value: totalPatients.toLocaleString(),
-      subtitle: totalPatients > 0 ? `${daysWithData} days recorded` : "No data recorded",
-      context: avgPatientsPerDay > 0 ? `Avg: ${Math.round(avgPatientsPerDay)} patients/day` : "Start tracking patient visits",
-      icon: Users,
-      trend: avgPatientsPerDay > 0 ? 8.3 : 0,
-      delta: avgPatientsPerDay > 0 ? "+8.3%" : "0%",
-      bgColor: "bg-teal-500",
-      textColor: "text-teal-600",
-      lightBg: "bg-teal-50",
-    }
+
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {kpis.map((kpi) => (
         <Card key={kpi.title} className="border-0 shadow-md hover:shadow-lg transition-all duration-200">
           <CardContent className="p-4">
