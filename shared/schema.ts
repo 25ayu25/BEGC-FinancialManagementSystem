@@ -127,6 +127,8 @@ export const insertPatientVolumeSchema = createInsertSchema(patientVolume).omit(
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  date: z.string().transform((str) => new Date(str)),
 });
 
 // Types
