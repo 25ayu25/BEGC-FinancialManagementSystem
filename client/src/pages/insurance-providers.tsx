@@ -4,37 +4,93 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft, CalendarIcon } from "lucide-react";
 import { Link } from "wouter";
 
 export default function InsuranceProvidersPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("current");
-  
   const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+
+  const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
+    setTimeRange(range);
+    
+    const now = new Date();
+    switch(range) {
+      case 'current-month':
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(now.getMonth() + 1);
+        break;
+      case 'last-month':
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+        setSelectedYear(lastMonth.getFullYear());
+        setSelectedMonth(lastMonth.getMonth() + 1);
+        break;
+      case 'last-3-months':
+      case 'year':
+        setSelectedYear(now.getFullYear());
+        setSelectedMonth(now.getMonth() + 1);
+        break;
+    }
+  };
+
+  const currentYear = selectedYear;
+  const currentMonth = selectedMonth;
 
   // Calculate date ranges
   const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-  // Get current month data
-  const { data: currentDashboardData } = useQuery({
-    queryKey: ["/api/dashboard", currentYear, currentMonth],
-    enabled: true
+  // Get dashboard data for selected time range
+  const { data: dashboardData } = useQuery({
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryFn: async () => {
+      let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      }
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      return res.json();
+    }
   });
 
-  // Get last month's data
-  const { data: prevDashboardData } = useQuery({
-    queryKey: ["/api/dashboard", prevYear, prevMonth],
-    enabled: true
+  // Get comparison data (previous period)
+  const { data: comparisonData } = useQuery({
+    queryKey: ["/api/dashboard/comparison", selectedYear, selectedMonth, timeRange],
+    queryFn: async () => {
+      // For comparison, get the previous period
+      let compYear = selectedYear;
+      let compMonth = selectedMonth;
+      
+      if (timeRange === 'current-month') {
+        // Compare with last month
+        const lastMonth = new Date(selectedYear, selectedMonth - 2);
+        compYear = lastMonth.getFullYear();
+        compMonth = lastMonth.getMonth() + 1;
+      } else if (timeRange === 'last-month') {
+        // Compare with current month
+        compYear = new Date().getFullYear();
+        compMonth = new Date().getMonth() + 1;
+      }
+      // For other ranges, we'll compare against the same period
+      
+      const url = `/api/dashboard/${compYear}/${compMonth}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: timeRange === 'current-month' || timeRange === 'last-month'
   });
 
-  // Select data based on period
-  const selectedData = selectedPeriod === "current" ? currentDashboardData : prevDashboardData;
-  const comparisonData = selectedPeriod === "current" ? prevDashboardData : currentDashboardData;
-
-  const insuranceBreakdown = (selectedData as any)?.insuranceBreakdown || {};
+  const insuranceBreakdown = (dashboardData as any)?.insuranceBreakdown || {};
   const prevInsuranceBreakdown = (comparisonData as any)?.insuranceBreakdown || {};
   
   // Calculate totals
@@ -62,16 +118,92 @@ export default function InsuranceProvidersPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Select period" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="current">Current Month</SelectItem>
-                <SelectItem value="last">Last Month</SelectItem>
+                <SelectItem value="current-month">Current Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Custom Date Range Controls */}
+            {timeRange === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !customStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="bottom" 
+                    align="start" 
+                    sideOffset={12} 
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
+                    avoidCollisions={true}
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                <span aria-hidden="true" className="text-muted-foreground">to</span>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !customEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="bottom" 
+                    align="start" 
+                    sideOffset={12} 
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
+                    avoidCollisions={true}
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -113,7 +245,13 @@ export default function InsuranceProvidersPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">
-                  vs {selectedPeriod === "current" ? "Last Month" : "Current Month"}
+                  vs {
+                    timeRange === 'current-month' ? 'Last Month' :
+                    timeRange === 'last-month' ? 'Current Month' :
+                    timeRange === 'last-3-months' ? 'Previous Period' :
+                    timeRange === 'year' ? 'Previous Period' :
+                    'Previous Period'
+                  }
                 </p>
                 <p className={`text-xl font-bold ${overallChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {overallChange >= 0 ? '+' : ''}{overallChange.toFixed(1)}%
@@ -159,7 +297,13 @@ export default function InsuranceProvidersPage() {
                   
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-slate-600">
-                      vs {selectedPeriod === "current" ? "Last Month" : "Current Month"}
+                      vs {
+                        timeRange === 'current-month' ? 'Last Month' :
+                        timeRange === 'last-month' ? 'Current Month' :
+                        timeRange === 'last-3-months' ? 'Previous Period' :
+                        timeRange === 'year' ? 'Previous Period' :
+                        'Previous Period'
+                      }
                     </span>
                     <span className={`text-sm font-medium ${
                       change > 0 ? 'text-emerald-600' :
@@ -173,7 +317,11 @@ export default function InsuranceProvidersPage() {
                   {prevAmount > 0 && (
                     <div className="flex justify-between items-center pt-1 border-t border-slate-100">
                       <span className="text-xs text-slate-500">
-                        {selectedPeriod === "current" ? "Previous" : "Current"}
+                        {
+                          timeRange === 'current-month' ? 'Previous' :
+                          timeRange === 'last-month' ? 'Current' :
+                          'Previous Period'
+                        }
                       </span>
                       <span className="text-xs font-mono text-slate-500">
                         USD {Math.round(prevAmount).toLocaleString()}
