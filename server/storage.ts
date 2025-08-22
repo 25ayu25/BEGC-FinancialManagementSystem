@@ -1,8 +1,9 @@
 import { 
-  users, departments, insuranceProviders, transactions, monthlyReports, receipts,
+  users, departments, insuranceProviders, transactions, monthlyReports, receipts, patientVolume,
   type User, type InsertUser, type Department, type InsertDepartment,
   type InsuranceProvider, type InsertInsuranceProvider, type Transaction, type InsertTransaction,
-  type MonthlyReport, type InsertMonthlyReport, type Receipt, type InsertReceipt
+  type MonthlyReport, type InsertMonthlyReport, type Receipt, type InsertReceipt,
+  type PatientVolume, type InsertPatientVolume
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
@@ -62,6 +63,13 @@ export interface IStorage {
   // Receipts
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
   getReceiptsByTransaction(transactionId: string): Promise<Receipt[]>;
+
+  // Patient Volume
+  createPatientVolume(volume: InsertPatientVolume): Promise<PatientVolume>;
+  getPatientVolumeByDate(date: Date, departmentId?: string): Promise<PatientVolume[]>;
+  getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]>;
+  updatePatientVolume(id: string, updates: Partial<PatientVolume>): Promise<PatientVolume | undefined>;
+  deletePatientVolume(id: string): Promise<void>;
 
   // Analytics
   getDashboardData(year: number, month: number): Promise<{
@@ -606,6 +614,61 @@ export class DatabaseStorage implements IStorage {
     }
     
     return result;
+  }
+
+  // Patient Volume Methods
+  async createPatientVolume(volume: InsertPatientVolume): Promise<PatientVolume> {
+    const [newVolume] = await db.insert(patientVolume).values(volume).returning();
+    return newVolume;
+  }
+
+  async getPatientVolumeByDate(date: Date, departmentId?: string): Promise<PatientVolume[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const conditions = [
+      gte(patientVolume.date, startOfDay),
+      lte(patientVolume.date, endOfDay)
+    ];
+
+    if (departmentId) {
+      conditions.push(eq(patientVolume.departmentId, departmentId));
+    }
+
+    return await db.select().from(patientVolume)
+      .where(and(...conditions))
+      .orderBy(patientVolume.date);
+  }
+
+  async getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    return await db.select().from(patientVolume)
+      .where(
+        and(
+          gte(patientVolume.date, startDate),
+          lte(patientVolume.date, endDate)
+        )
+      )
+      .orderBy(patientVolume.date);
+  }
+
+  async updatePatientVolume(id: string, updates: Partial<PatientVolume>): Promise<PatientVolume | undefined> {
+    const [updated] = await db.update(patientVolume)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(patientVolume.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePatientVolume(id: string): Promise<void> {
+    await db.delete(patientVolume).where(eq(patientVolume.id, id));
   }
 }
 

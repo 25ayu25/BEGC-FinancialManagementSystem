@@ -75,6 +75,18 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
+  // Get patient volume data for the selected month
+  const { data: patientVolumeData = [] } = useQuery({
+    queryKey: ["/api/patient-volume", selectedYear, selectedMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
   if (error) {
     return (
       <div className="flex-1 flex flex-col h-full">
@@ -249,7 +261,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
-        <SimpleDashboardKPIs data={dashboardData || {}} />
+        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeData={patientVolumeData} />
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">

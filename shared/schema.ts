@@ -81,6 +81,17 @@ export const receipts = pgTable("receipts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const patientVolume = pgTable("patient_volume", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: timestamp("date").notNull(),
+  departmentId: varchar("department_id").references(() => departments.id),
+  patientCount: integer("patient_count").notNull().default(0),
+  notes: text("notes"), // Optional notes about the day
+  recordedBy: varchar("recorded_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -112,6 +123,12 @@ export const insertReceiptSchema = createInsertSchema(receipts).omit({
   createdAt: true,
 });
 
+export const insertPatientVolumeSchema = createInsertSchema(patientVolume).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -130,3 +147,6 @@ export type InsertMonthlyReport = z.infer<typeof insertMonthlyReportSchema>;
 
 export type Receipt = typeof receipts.$inferSelect;
 export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+
+export type PatientVolume = typeof patientVolume.$inferSelect;
+export type InsertPatientVolume = z.infer<typeof insertPatientVolumeSchema>;

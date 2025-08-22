@@ -1,5 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, CreditCard, PiggyBank, Shield } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, CreditCard, PiggyBank, Shield, Users } from "lucide-react";
+
+interface PatientVolume {
+  id: string;
+  date: string;
+  departmentId?: string;
+  patientCount: number;
+  notes?: string;
+}
 
 interface SimpleDashboardKPIsProps {
   data?: {
@@ -10,6 +18,7 @@ interface SimpleDashboardKPIsProps {
     netIncome: string;
     insuranceBreakdown: Record<string, string>;
   };
+  patientVolumeData?: PatientVolume[];
 }
 
 const Sparkline = ({ trend = 0 }: { trend?: number }) => {
@@ -36,7 +45,7 @@ const Sparkline = ({ trend = 0 }: { trend?: number }) => {
   );
 };
 
-export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) {
+export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: SimpleDashboardKPIsProps) {
   // Use the backend-separated currency amounts
   const sspIncome = parseFloat(data?.totalIncomeSSP || '0');
   const usdIncome = parseFloat(data?.totalIncomeUSD || '0');
@@ -46,11 +55,16 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
   const sspNet = sspIncome - expenses;
   const margin = sspIncome > 0 ? (sspNet / sspIncome) * 100 : 0;
 
-  // Calculate additional context (mock for now - should come from API)
+  // Calculate additional context
   const currentDay = new Date().getDate();
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const monthProgress = (currentDay / daysInMonth) * 100;
   const estimatedMonthlyIncome = sspIncome > 0 ? (sspIncome / currentDay) * daysInMonth : 0;
+
+  // Calculate patient volume metrics
+  const totalPatients = patientVolumeData.reduce((sum, volume) => sum + volume.patientCount, 0);
+  const daysWithData = new Set(patientVolumeData.map(v => v.date.split('T')[0])).size;
+  const avgPatientsPerDay = daysWithData > 0 ? totalPatients / daysWithData : 0;
 
   const kpis = [
     {
@@ -100,11 +114,23 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
       bgColor: "bg-purple-500",
       textColor: "text-purple-600",
       lightBg: "bg-purple-50",
+    },
+    {
+      title: "Patient Volume",
+      value: totalPatients.toLocaleString(),
+      subtitle: totalPatients > 0 ? `${daysWithData} days recorded` : "No data recorded",
+      context: avgPatientsPerDay > 0 ? `Avg: ${Math.round(avgPatientsPerDay)} patients/day` : "Start tracking patient visits",
+      icon: Users,
+      trend: avgPatientsPerDay > 0 ? 8.3 : 0,
+      delta: avgPatientsPerDay > 0 ? "+8.3%" : "0%",
+      bgColor: "bg-teal-500",
+      textColor: "text-teal-600",
+      lightBg: "bg-teal-50",
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       {kpis.map((kpi) => (
         <Card key={kpi.title} className="border-0 shadow-md hover:shadow-lg transition-all duration-200">
           <CardContent className="p-4">

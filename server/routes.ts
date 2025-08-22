@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertReceiptSchema } from "@shared/schema";
+import { insertTransactionSchema, insertReceiptSchema, insertPatientVolumeSchema } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 
@@ -942,6 +942,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error serving receipt:", error);
       res.status(404).json({ error: "Receipt not found" });
+    }
+  });
+
+  // Patient Volume routes
+  app.post("/api/patient-volume", requireAuth, async (req, res) => {
+    try {
+      const validatedData = insertPatientVolumeSchema.parse({
+        ...req.body,
+        recordedBy: req.user?.id
+      });
+
+      const volume = await storage.createPatientVolume(validatedData);
+      res.status(201).json(volume);
+    } catch (error) {
+      console.error("Error creating patient volume:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create patient volume record" });
+      }
+    }
+  });
+
+  app.get("/api/patient-volume/date/:date", requireAuth, async (req, res) => {
+    try {
+      const date = new Date(req.params.date);
+      const departmentId = req.query.departmentId as string;
+      
+      const volumes = await storage.getPatientVolumeByDate(date, departmentId);
+      res.json(volumes);
+    } catch (error) {
+      console.error("Error getting patient volume by date:", error);
+      res.status(500).json({ error: "Failed to get patient volume data" });
+    }
+  });
+
+  app.get("/api/patient-volume/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      const volumes = await storage.getPatientVolumeForMonth(year, month);
+      res.json(volumes);
+    } catch (error) {
+      console.error("Error getting patient volume for month:", error);
+      res.status(500).json({ error: "Failed to get patient volume data" });
+    }
+  });
+
+  app.put("/api/patient-volume/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const updated = await storage.updatePatientVolume(id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Patient volume record not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating patient volume:", error);
+      res.status(500).json({ error: "Failed to update patient volume record" });
+    }
+  });
+
+  app.delete("/api/patient-volume/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePatientVolume(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting patient volume:", error);
+      res.status(500).json({ error: "Failed to delete patient volume record" });
     }
   });
 
