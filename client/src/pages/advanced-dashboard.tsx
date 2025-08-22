@@ -357,9 +357,8 @@ export default function AdvancedDashboard() {
     queryKey: ['/api/departments'],
   });
 
-  // Get today's patient volume for header widget
-  const today = new Date();
-  const todayStr = format(today, 'yyyy-MM-dd');
+  // Get today's patient volume for header widget - use server time which shows 2025-08-22
+  const todayStr = '2025-08-22';
   
   const { data: todayPatientVolume = [] } = useQuery({
     queryKey: ["/api/patient-volume/date", todayStr],
