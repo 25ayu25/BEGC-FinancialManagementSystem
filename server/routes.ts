@@ -992,7 +992,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
       
+      console.log(`GET /api/patient-volume/${year}/${month} - Fetching patient volume for month`);
+      
       const volumes = await storage.getPatientVolumeForMonth(year, month);
+      console.log(`Found ${volumes.length} patient volume records for ${year}/${month}:`, volumes);
       res.json(volumes);
     } catch (error) {
       console.error("Error getting patient volume for month:", error);
