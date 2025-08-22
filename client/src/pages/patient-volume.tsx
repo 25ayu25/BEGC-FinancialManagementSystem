@@ -34,7 +34,7 @@ export default function PatientVolumePage() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
   const [newEntry, setNewEntry] = useState({
     date: new Date(),
-    departmentId: "general",
+    departmentId: "",
     patientCount: "",
     notes: ""
   });
@@ -94,7 +94,7 @@ export default function PatientVolumePage() {
 
     createVolumeMutation.mutate({
       date: newEntry.date.toISOString(),
-      departmentId: newEntry.departmentId || null,
+      departmentId: newEntry.departmentId === "general" ? null : newEntry.departmentId || null,
       patientCount: parseInt(newEntry.patientCount),
       notes: newEntry.notes || null
     });
