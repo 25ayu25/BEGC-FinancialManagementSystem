@@ -6,7 +6,7 @@ import {
   type PatientVolume, type InsertPatientVolume
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lte, lt, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -68,28 +68,10 @@ export interface IStorage {
   createPatientVolume(volume: InsertPatientVolume): Promise<PatientVolume>;
   getPatientVolumeByDate(date: Date, departmentId?: string): Promise<PatientVolume[]>;
   getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]>;
-  getPatientVolumeSummary(startDate: string, endDate: string): Promise<{
-    total_count: number;
-    days_reported: number;
-    avg_per_day: number;
-  }>;
   updatePatientVolume(id: string, updates: Partial<PatientVolume>): Promise<PatientVolume | undefined>;
   deletePatientVolume(id: string): Promise<void>;
 
   // Analytics
-  getDashboardSummary(startDate: string, endDate: string): Promise<{
-    totalIncome: string;
-    totalIncomeSSP: string;
-    totalIncomeUSD: string;
-    totalExpenses: string;
-    netIncome: string;
-    insuranceBreakdown: Record<string, string>;
-    patient_volume: {
-      total_count: number;
-      days_reported: number;
-      avg_per_day: number;
-    };
-  }>;
   getDashboardData(year: number, month: number): Promise<{
     totalIncome: string;
     totalIncomeSSP: string;
@@ -666,143 +648,6 @@ export class DatabaseStorage implements IStorage {
       
     console.log(`Found ${results.length} patient volume records`);
     return results;
-  }
-
-  async getDashboardSummary(startDate: string, endDate: string): Promise<{
-    totalIncome: string;
-    totalIncomeSSP: string;
-    totalIncomeUSD: string;
-    totalExpenses: string;
-    netIncome: string;
-    insuranceBreakdown: Record<string, string>;
-    patient_volume: {
-      total_count: number;
-      days_reported: number;
-      avg_per_day: number;
-    };
-  }> {
-    console.log(`Querying dashboard summary from ${startDate} to ${endDate}`);
-    
-    const start = new Date(startDate + 'T00:00:00.000Z');
-    const end = new Date(endDate + 'T00:00:00.000Z');
-    
-    // Get income data separated by currency
-    const [incomeResult] = await db.select({
-      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
-    }).from(transactions).where(
-      and(
-        eq(transactions.type, "income"),
-        gte(transactions.date, start),
-        lt(transactions.date, end)
-      )
-    );
-
-    // Get expenses data
-    const [expenseResult] = await db.select({
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`
-    }).from(transactions).where(
-      and(
-        eq(transactions.type, "expense"),
-        gte(transactions.date, start),
-        lt(transactions.date, end)
-      )
-    );
-
-    // Get insurance breakdown
-    const insuranceResults = await db.select({
-      providerName: insuranceProviders.name,
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`
-    }).from(transactions)
-      .leftJoin(insuranceProviders, eq(transactions.insuranceProviderId, insuranceProviders.id))
-      .where(
-        and(
-          eq(transactions.type, "income"),
-          gte(transactions.date, start),
-          lt(transactions.date, end)
-        )
-      )
-      .groupBy(insuranceProviders.name);
-
-    // Get patient volume data
-    const patientVolumeResults = await db.select().from(patientVolume)
-      .where(
-        and(
-          gte(patientVolume.date, start),
-          lt(patientVolume.date, end)
-        )
-      );
-
-    // Calculate values
-    const totalIncomeSSP = parseFloat(incomeResult?.totalSSP || "0");
-    const totalIncomeUSD = parseFloat(incomeResult?.totalUSD || "0");
-    const totalIncome = totalIncomeSSP + totalIncomeUSD;
-    const totalExpenses = parseFloat(expenseResult?.total || "0");
-    const netIncome = totalIncome - totalExpenses;
-
-    // Build insurance breakdown
-    const insuranceBreakdown: Record<string, string> = {};
-    insuranceResults.forEach(result => {
-      if (result.providerName) {
-        insuranceBreakdown[result.providerName] = parseFloat(result.total).toFixed(2);
-      }
-    });
-
-    // Calculate patient volume summary
-    const totalPatientCount = patientVolumeResults.reduce((sum, record) => sum + record.patientCount, 0);
-    const uniqueDates = new Set(patientVolumeResults.map(record => record.date.toISOString().split('T')[0]));
-    const daysReported = uniqueDates.size;
-    const avgPerDay = daysReported > 0 ? totalPatientCount / daysReported : 0;
-
-    const summary = {
-      totalIncome: totalIncome.toFixed(2),
-      totalIncomeSSP: totalIncomeSSP.toFixed(2),
-      totalIncomeUSD: totalIncomeUSD.toFixed(2),
-      totalExpenses: totalExpenses.toFixed(2),
-      netIncome: netIncome.toFixed(2),
-      insuranceBreakdown,
-      patient_volume: {
-        total_count: totalPatientCount,
-        days_reported: daysReported,
-        avg_per_day: Math.round(avgPerDay * 10) / 10
-      }
-    };
-
-    console.log(`Dashboard summary calculated:`, summary);
-    return summary;
-  }
-
-  async getPatientVolumeSummary(startDate: string, endDate: string): Promise<{
-    total_count: number;
-    days_reported: number;
-    avg_per_day: number;
-  }> {
-    console.log(`Querying patient volume summary from ${startDate} to ${endDate}`);
-    
-    const start = new Date(startDate + 'T00:00:00.000Z');
-    const end = new Date(endDate + 'T00:00:00.000Z');
-    
-    const results = await db.select().from(patientVolume)
-      .where(
-        and(
-          gte(patientVolume.date, start),
-          lt(patientVolume.date, end)
-        )
-      );
-    
-    const totalCount = results.reduce((sum, record) => sum + record.patientCount, 0);
-    const uniqueDates = new Set(results.map(record => record.date.toISOString().split('T')[0]));
-    const daysReported = uniqueDates.size;
-    const avgPerDay = daysReported > 0 ? totalCount / daysReported : 0;
-    
-    const summary = {
-      total_count: totalCount,
-      days_reported: daysReported,
-      avg_per_day: Math.round(avgPerDay * 10) / 10 // Round to 1 decimal place
-    };
-    
-    console.log(`Summary calculated:`, summary);
-    return summary;
   }
 
   async getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]> {

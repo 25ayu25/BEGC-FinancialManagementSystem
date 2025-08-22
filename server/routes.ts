@@ -987,58 +987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Consolidated dashboard summary endpoint
-  app.get("/api/dashboard/summary", requireAuth, async (req, res) => {
-    try {
-      const startDate = req.query.start as string;
-      const endDate = req.query.end as string;
-      
-      console.log(`GET /api/dashboard/summary - start: ${startDate}, end: ${endDate}`);
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ error: "start and end dates are required" });
-      }
-      
-      const summary = await storage.getDashboardSummary(startDate, endDate);
-      console.log(`Dashboard summary:`, summary);
-      res.json(summary);
-    } catch (error) {
-      console.error("Error getting dashboard summary:", error);
-      res.status(500).json({ error: "Failed to get dashboard summary" });
-    }
-  });
-
-  // Individual patient volume summary endpoint (kept for compatibility)
-  app.get("/api/patient-volume/summary", requireAuth, async (req, res) => {
-    try {
-      const startDate = req.query.start as string;
-      const endDate = req.query.end as string;
-      
-      console.log(`GET /api/patient-volume/summary - start: ${startDate}, end: ${endDate}`);
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ error: "start and end dates are required" });
-      }
-      
-      const summary = await storage.getPatientVolumeSummary(startDate, endDate);
-      console.log(`Patient volume summary:`, summary);
-      res.json(summary);
-    } catch (error) {
-      console.error("Error getting patient volume summary:", error);
-      res.status(500).json({ error: "Failed to get patient volume summary" });
-    }
-  });
-
-  // Keep existing month endpoint for compatibility
   app.get("/api/patient-volume/:year/:month", requireAuth, async (req, res) => {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
       
-      console.log(`GET /api/patient-volume/${year}/${month} - Fetching patient volume for month`);
-      
       const volumes = await storage.getPatientVolumeForMonth(year, month);
-      console.log(`Found ${volumes.length} patient volume records for ${year}/${month}:`, volumes);
       res.json(volumes);
     } catch (error) {
       console.error("Error getting patient volume for month:", error);

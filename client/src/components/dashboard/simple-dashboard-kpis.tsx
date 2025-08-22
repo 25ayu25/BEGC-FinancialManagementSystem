@@ -18,11 +18,7 @@ interface SimpleDashboardKPIsProps {
     netIncome: string;
     insuranceBreakdown: Record<string, string>;
   };
-  patientVolumeSummary?: {
-    total_count: number;
-    days_reported: number;
-    avg_per_day: number;
-  };
+  patientVolumeData?: PatientVolume[];
 }
 
 const Sparkline = ({ trend = 0 }: { trend?: number }) => {
@@ -49,7 +45,7 @@ const Sparkline = ({ trend = 0 }: { trend?: number }) => {
   );
 };
 
-export default function SimpleDashboardKPIs({ data, patientVolumeSummary }: SimpleDashboardKPIsProps) {
+export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: SimpleDashboardKPIsProps) {
   // Use the backend-separated currency amounts
   const sspIncome = parseFloat(data?.totalIncomeSSP || '0');
   const usdIncome = parseFloat(data?.totalIncomeUSD || '0');
@@ -65,10 +61,14 @@ export default function SimpleDashboardKPIs({ data, patientVolumeSummary }: Simp
   const monthProgress = (currentDay / daysInMonth) * 100;
   const estimatedMonthlyIncome = sspIncome > 0 ? (sspIncome / currentDay) * daysInMonth : 0;
 
-  // Calculate patient volume metrics from summary
-  const totalPatients = patientVolumeSummary?.total_count || 0;
-  const daysWithData = patientVolumeSummary?.days_reported || 0;
-  const avgPatientsPerDay = patientVolumeSummary?.avg_per_day || 0;
+  // Calculate patient volume metrics
+  const volumeArray = Array.isArray(patientVolumeData) ? patientVolumeData : [];
+  const totalPatients = volumeArray.reduce((sum, volume) => sum + (volume.patientCount || 0), 0);
+  const daysWithData = new Set(volumeArray.map(v => {
+    const dateStr = typeof v.date === 'string' ? v.date : new Date(v.date).toISOString();
+    return dateStr.split('T')[0];
+  })).size;
+  const avgPatientsPerDay = daysWithData > 0 ? totalPatients / daysWithData : 0;
 
   const kpis = [
     {

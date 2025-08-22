@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,22 +52,18 @@ export default function Dashboard() {
     }
   };
 
-  // Single consolidated dashboard query
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: [`dashboard:summary:${dateRange.start}:${dateRange.end}`],
+    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
-      console.log(`Dashboard: Fetching consolidated summary start=${dateRange.start}, end=${dateRange.end}`);
-      const res = await fetch(`/api/dashboard/summary?start=${dateRange.start}&end=${dateRange.end}`, {
+      let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      }
+      const res = await fetch(url, {
         credentials: 'include'
       });
-      console.log(`Dashboard: Summary API response status: ${res.status}`);
-      if (!res.ok) {
-        console.error(`Dashboard: Failed to fetch dashboard summary: ${res.status} ${res.statusText}`);
-        throw new Error('Failed to fetch dashboard summary');
-      }
-      const data = await res.json();
-      console.log(`Dashboard: Consolidated summary received:`, data);
-      return data;
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      return res.json();
     }
   });
 
@@ -79,47 +75,17 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
-  // Patient volume summary using the new summary endpoint
-  const getDateRange = (timeRange: string, year: number, month: number, customStartDate?: Date, customEndDate?: Date) => {
-    const now = new Date();
-    switch(timeRange) {
-      case 'current-month':
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        return {
-          start: start.toISOString().split('T')[0],
-          end: end.toISOString().split('T')[0]
-        };
-      case 'last-month':
-        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-        return {
-          start: lastMonthStart.toISOString().split('T')[0],
-          end: lastMonthEnd.toISOString().split('T')[0]
-        };
-      case 'custom':
-        if (customStartDate && customEndDate) {
-          return {
-            start: customStartDate.toISOString().split('T')[0],
-            end: new Date(customEndDate.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-          };
-        }
-        break;
-      default:
-        // Default to selected year/month
-        const defaultStart = new Date(year, month - 1, 1);
-        const defaultEnd = new Date(year, month, 1);
-        return {
-          start: defaultStart.toISOString().split('T')[0],
-          end: defaultEnd.toISOString().split('T')[0]
-        };
+  // Get patient volume data for the selected month
+  const { data: patientVolumeData = [] } = useQuery({
+    queryKey: ["/api/patient-volume", selectedYear, selectedMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) return [];
+      return res.json();
     }
-    return { start: '', end: '' };
-  };
-
-  const dateRange = getDateRange(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate);
-  
-
+  });
 
   if (error) {
     return (
@@ -295,7 +261,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
-        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeSummary={dashboardData?.patient_volume || { total_count: 0, days_reported: 0, avg_per_day: 0 }} />
+        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeData={patientVolumeData} />
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">

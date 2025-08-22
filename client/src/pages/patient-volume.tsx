@@ -65,8 +65,6 @@ export default function PatientVolumePage() {
       // Force refresh the data by clearing all patient volume queries
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
       queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
-      // Invalidate dashboard summary cache
-      queryClient.invalidateQueries({ queryKey: ["dashboard:summary"] });
       toast({ title: "Patient volume recorded successfully" });
       setShowAddForm(false);
       setNewEntry({ date: new Date(), departmentId: "", patientCount: "", notes: "" });
@@ -81,8 +79,6 @@ export default function PatientVolumePage() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/date"] });
-      // Invalidate dashboard summary cache
-      queryClient.invalidateQueries({ queryKey: ["dashboard:summary"] });
       toast({ title: "Patient volume record deleted" });
     },
     onError: () => {
