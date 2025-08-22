@@ -30,14 +30,26 @@ interface Department {
 }
 
 export default function PatientVolumePage() {
-  // Check URL parameters for initial date
+  // Check URL parameters for view mode and date parameters
   const urlParams = new URLSearchParams(window.location.search);
+  const viewMode = urlParams.get('view');
+  const yearParam = urlParams.get('year');
+  const monthParam = urlParams.get('month');
   const dateParam = urlParams.get('date');
-  // Parse date more safely to avoid timezone issues
-  const initialDate = dateParam ? new Date(dateParam + 'T12:00:00') : new Date();
+  
+  // Determine if we're in monthly view mode
+  const isMonthlyView = viewMode === 'monthly' && yearParam && monthParam;
+  
+  // Set initial date based on parameters
+  const initialDate = dateParam 
+    ? new Date(dateParam + 'T12:00:00')
+    : isMonthlyView 
+      ? new Date(parseInt(yearParam), parseInt(monthParam) - 1, 1)
+      : new Date();
   
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
+  const [viewType, setViewType] = useState<'daily' | 'monthly'>(isMonthlyView ? 'monthly' : 'daily');
   const [newEntry, setNewEntry] = useState({
     date: new Date(),
     departmentId: "",
@@ -48,36 +60,39 @@ export default function PatientVolumePage() {
 
   const queryClient = useQueryClient();
 
-  // Update selected date when URL parameters change
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const dateParam = urlParams.get('date');
-    if (dateParam) {
-      const parsedDate = new Date(dateParam + 'T12:00:00');
-      setSelectedDate(parsedDate);
-    }
-  }, []);
-
   // Get departments
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
   });
 
-  // Get patient volume data for selected date
+  // Get patient volume data - either daily or monthly
   const { data: volumeData = [], isLoading, error } = useQuery<PatientVolume[]>({
-    queryKey: ["/api/patient-volume/date", selectedDate.toISOString().split('T')[0], selectedDepartment],
+    queryKey: viewType === 'monthly' 
+      ? ["/api/patient-volume/period", selectedDate.getFullYear(), selectedDate.getMonth() + 1, selectedDepartment]
+      : ["/api/patient-volume/date", selectedDate.toISOString().split('T')[0], selectedDepartment],
     queryFn: async () => {
-      const params = selectedDepartment !== "all-departments" ? `?departmentId=${selectedDepartment}` : "?departmentId=all-departments";
-      const response = await fetch(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch patient volume data');
+      if (viewType === 'monthly') {
+        const response = await fetch(`/api/patient-volume/period/${selectedDate.getFullYear()}/${selectedDate.getMonth() + 1}`, {
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch monthly patient volume data');
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } else {
+        const params = selectedDepartment !== "all-departments" ? `?departmentId=${selectedDepartment}` : "?departmentId=all-departments";
+        const response = await fetch(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`, {
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch patient volume data');
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
       }
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
     },
-    staleTime: 0, // Always refetch when query key changes
+    staleTime: 0,
     refetchOnWindowFocus: false
   });
 
@@ -138,7 +153,11 @@ export default function PatientVolumePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-          <p className="text-slate-600">Record and monitor daily patient visits</p>
+          <p className="text-slate-600">
+            {viewType === 'monthly' 
+              ? `Monthly summary for ${format(selectedDate, 'MMMM yyyy')}` 
+              : 'Record and monitor daily patient visits'}
+          </p>
         </div>
         <Button 
           onClick={() => setShowAddForm(true)}
@@ -190,7 +209,9 @@ export default function PatientVolumePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Patient Volume - {format(selectedDate, "MMMM d, yyyy")}
+            {viewType === 'monthly' 
+              ? `Patient Volume - ${format(selectedDate, "MMMM yyyy")}` 
+              : `Patient Volume - ${format(selectedDate, "MMMM d, yyyy")}`}
           </CardTitle>
         </CardHeader>
             <CardContent>

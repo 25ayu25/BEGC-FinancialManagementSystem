@@ -326,11 +326,9 @@ export default function Dashboard() {
                     size="sm" 
                     className="text-teal-700 border-teal-200 hover:bg-teal-50" 
                     onClick={() => {
-                      // Navigate to patient volume page with current month context
+                      // Navigate to patient volume page with monthly grouping
                       if (timeRange === 'current-month') {
-                        // For current month, go to the first day of the month using a safer approach
-                        const dateStr = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-01`;
-                        window.location.href = `/patient-volume?date=${dateStr}&view=month`;
+                        window.location.href = `/patient-volume?year=${selectedYear}&month=${selectedMonth}&view=monthly`;
                       } else {
                         // For other periods, go to patient volume with summary view
                         window.location.href = '/patient-volume';
