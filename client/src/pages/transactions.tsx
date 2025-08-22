@@ -404,14 +404,13 @@ export default function Transactions() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            <button
               onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700 font-medium border-0"
-              style={{ color: '#ffffff', backgroundColor: '#dc2626' }}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md disabled:opacity-50"
               disabled={deleteTransactionMutation.isPending}
             >
               {deleteTransactionMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
+            </button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
