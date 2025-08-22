@@ -872,8 +872,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Payroll & Insurance (Monthly) Section
-      if (reportData.expenseBreakdown && Object.keys(reportData.expenseBreakdown).length > 0) {
+      // Payroll & Insurance (Monthly) Section - always show this section
+      {
         currentY += 20;
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
@@ -904,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Payroll & Insurance categories
         const payrollCategories = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
-        const payrollAmounts = payrollCategories.map(cat => parseFloat(reportData.expenseBreakdown[cat] || '0'));
+        const payrollAmounts = payrollCategories.map(cat => parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0'));
         const payrollTotal = payrollAmounts.reduce((sum, amount) => sum + amount, 0);
         
         // Data row
@@ -935,8 +935,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(0, 0, 0);
       }
       
-      // Monthly Operating Expenses Section
-      if (reportData.expenseBreakdown && Object.keys(reportData.expenseBreakdown).length > 0) {
+      // Monthly Operating Expenses Section - always show this section  
+      {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(20, 83, 75);
@@ -963,25 +963,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Operating expenses categories (excluding payroll categories)
         const operatingCategories = ['Staff Salaries', 'Drugs Purchased', 'Lab Reagents', 'Equipment', 'Landlord', 'Utilities', 'Sono Papers', 'X-Ray films', 'Other'];
-        const operatingExpenses = operatingCategories.filter(cat => reportData.expenseBreakdown[cat] && parseFloat(reportData.expenseBreakdown[cat]) > 0);
+        const operatingExpenses = operatingCategories.filter(cat => {
+          const amount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0');
+          return amount > 0;
+        });
         let operatingTotal = 0;
         
-        operatingExpenses.forEach((category, index) => {
-          const amount = parseFloat(reportData.expenseBreakdown[category] || '0');
-          operatingTotal += amount;
-          
-          // Alternating row colors
-          const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
-          doc.setFillColor(...bgColor);
+        if (operatingExpenses.length === 0) {
+          // Show "No operating expenses" row when there are no expenses
+          doc.setFillColor(249, 250, 251);
           doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
           
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('helvetica', 'italic');
           doc.setFontSize(11);
-          doc.text(category, margin + 5, currentY);
-          doc.text(`SSP ${Math.round(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+          doc.setTextColor(120, 120, 120);
+          doc.text('No operating expenses recorded for this period', margin + 5, currentY);
+          doc.setTextColor(0, 0, 0);
           
           currentY += 12;
-        });
+        } else {
+          operatingExpenses.forEach((category, index) => {
+            const amount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[category]) || '0');
+            operatingTotal += amount;
+            
+            // Alternating row colors
+            const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+            doc.setFillColor(...bgColor);
+            doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+            
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(11);
+            doc.text(category, margin + 5, currentY);
+            doc.text(`SSP ${Math.round(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+            
+            currentY += 12;
+          });
+        }
         
         // Operating expenses total row
         doc.setFillColor(20, 83, 75);
@@ -997,9 +1014,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(0, 0, 0);
         
         // Grand total expenses
-        const payrollCategories = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
-        const payrollTotal = payrollCategories.reduce((sum, cat) => sum + parseFloat(reportData.expenseBreakdown[cat] || '0'), 0);
-        const grandTotal = payrollTotal + operatingTotal;
+        const payrollCategoriesTotal = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
+        const payrollTotalCalc = payrollCategoriesTotal.reduce((sum, cat) => sum + parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0'), 0);
+        const grandTotal = payrollTotalCalc + operatingTotal;
         
         doc.setFillColor(200, 200, 200);
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
