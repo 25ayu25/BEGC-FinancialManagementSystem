@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Users, Calendar } from "lucide-react";
 import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
 
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
@@ -75,18 +75,20 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
-  // Get today's patient volume data for header badge
-  const today = format(new Date(), 'yyyy-MM-dd');
+  // Get today's patient volume for the Simple Dashboard
+  const todayStr = '2025-08-22';
   const { data: todayPatientVolume = [] } = useQuery({
-    queryKey: ["/api/patient-volume/date", today],
+    queryKey: ["/api/patient-volume/date", todayStr],
     queryFn: async () => {
-      const res = await fetch(`/api/patient-volume/date/${today}?departmentId=all-departments`, {
+      const res = await fetch(`/api/patient-volume/date/${todayStr}?departmentId=all-departments`, {
         credentials: 'include'
       });
       if (!res.ok) return [];
       return res.json();
     }
   });
+
+
 
   if (error) {
     return (
@@ -273,6 +275,46 @@ export default function Dashboard() {
       <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
         <SimpleDashboardKPIs data={dashboardData || {}} />
+
+        {/* Patient Volume Widget (when data exists) */}
+        {todayPatientVolume.length > 0 && (
+          <Card className="border border-teal-100 shadow-sm bg-gradient-to-r from-teal-50 to-emerald-50">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  <Users className="h-5 w-5 text-teal-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-semibold text-slate-900">Today's Patient Volume</CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">Current daily patient count</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="text-4xl font-bold text-teal-700 mb-2">
+                    {todayPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0)}
+                  </div>
+                  <div className="text-sm text-teal-600 font-medium">
+                    Patients seen today ({format(new Date(), 'EEEE, MMMM d')})
+                  </div>
+                </div>
+                <div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-teal-700 border-teal-200 hover:bg-teal-50" 
+                    onClick={() => window.location.href = '/patient-volume'}
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    View Details
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">

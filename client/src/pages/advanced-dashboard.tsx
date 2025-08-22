@@ -357,19 +357,7 @@ export default function AdvancedDashboard() {
     queryKey: ['/api/departments'],
   });
 
-  // Get today's patient volume for header widget - use server time which shows 2025-08-22
-  const todayStr = '2025-08-22';
-  
-  const { data: todayPatientVolume = [] } = useQuery({
-    queryKey: ["/api/patient-volume/date", todayStr],
-    queryFn: async () => {
-      const res = await fetch(`/api/patient-volume/date/${todayStr}?departmentId=all-departments`, {
-        credentials: 'include'
-      });
-      if (!res.ok) return [];
-      return res.json();
-    }
-  });
+
 
   const { data: rawIncome } = useQuery({
     queryKey: ['/api/income-trends', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
@@ -604,18 +592,7 @@ export default function AdvancedDashboard() {
                     'Custom period'
                 }
               </p>
-              {/* Professional Patient Volume Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-lg shadow-sm">
-                <Users className="h-3.5 w-3.5 text-teal-600" />
-                <div className="flex items-center gap-1">
-                  <span className="text-teal-700 text-sm font-semibold">
-                    {todayPatientVolume.length > 0 ? todayPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0) : 0}
-                  </span>
-                  <span className="text-teal-600 text-xs font-medium">
-                    patients today
-                  </span>
-                </div>
-              </div>
+
             </div>
           </div>
 
@@ -977,47 +954,7 @@ export default function AdvancedDashboard() {
 
 
         
-        {/* Patient Volume Widget (when data exists) */}
-        {todayPatientVolume.length > 0 && (
-          <Card className="border border-teal-100 shadow-sm bg-gradient-to-br from-teal-50 to-emerald-50">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-teal-100 rounded-lg">
-                    <Users className="h-5 w-5 text-teal-600" />
-                  </div>
-                  <CardTitle className="text-xl font-semibold text-slate-900">Patient Volume</CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-center p-4 bg-white rounded-lg border border-teal-100">
-                  <div className="text-3xl font-bold text-teal-700 mb-1">
-                    {todayPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0)}
-                  </div>
-                  <div className="text-sm text-teal-600 font-medium">Patients Today</div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    {format(new Date(), 'EEEE, MMMM d')}
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-teal-100">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full text-teal-700 border-teal-200 hover:bg-teal-50" 
-                    onClick={() => window.location.href = '/patient-volume'}
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    View Full Tracking
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Departments Widget (always show) */}
+        {/* Departments Widget */}
         <Card className="border border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
