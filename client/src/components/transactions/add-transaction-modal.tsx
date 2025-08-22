@@ -406,7 +406,7 @@ export default function AddTransactionModal({
           {/* Description */}
           <div>
             <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              {type === "income" && departments?.find((d: any) => d.id === departmentId)?.code === "OTHER" 
+              {type === "income" && Array.isArray(departments) && departments.find((d: any) => d.id === departmentId)?.code === "OTHER" 
                 ? "Description" 
                 : "Notes (Optional)"
               }
@@ -415,7 +415,7 @@ export default function AddTransactionModal({
               id="description"
               rows={3}
               placeholder={
-                type === "income" && departments?.find((d: any) => d.id === departmentId)?.code === "OTHER"
+                type === "income" && Array.isArray(departments) && departments.find((d: any) => d.id === departmentId)?.code === "OTHER"
                   ? "e.g., Minor surgery, dressing change, supplies, procedures, etc."
                   : "Enter daily consultation total or expense details (optional)..."
               }
