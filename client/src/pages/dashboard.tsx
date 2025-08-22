@@ -52,18 +52,22 @@ export default function Dashboard() {
     }
   };
 
+  // Single consolidated dashboard query
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: [`dashboard:summary:${dateRange.start}:${dateRange.end}`],
     queryFn: async () => {
-      let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
-      if (timeRange === 'custom' && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
-      }
-      const res = await fetch(url, {
+      console.log(`Dashboard: Fetching consolidated summary start=${dateRange.start}, end=${dateRange.end}`);
+      const res = await fetch(`/api/dashboard/summary?start=${dateRange.start}&end=${dateRange.end}`, {
         credentials: 'include'
       });
-      if (!res.ok) throw new Error('Failed to fetch dashboard data');
-      return res.json();
+      console.log(`Dashboard: Summary API response status: ${res.status}`);
+      if (!res.ok) {
+        console.error(`Dashboard: Failed to fetch dashboard summary: ${res.status} ${res.statusText}`);
+        throw new Error('Failed to fetch dashboard summary');
+      }
+      const data = await res.json();
+      console.log(`Dashboard: Consolidated summary received:`, data);
+      return data;
     }
   });
 
@@ -115,25 +119,7 @@ export default function Dashboard() {
 
   const dateRange = getDateRange(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate);
   
-  // Patient Volume Summary Query - ALWAYS executes
-  const { data: patientVolumeSummary, isLoading: isLoadingPatientVolume } = useQuery({
-    queryKey: [`patient-volume:summary:${dateRange.start}:${dateRange.end}`],
-    queryFn: async () => {
-      console.log(`Dashboard: Fetching patient volume summary start=${dateRange.start}, end=${dateRange.end}`);
-      const res = await fetch(`/api/patient-volume/summary?start=${dateRange.start}&end=${dateRange.end}`, {
-        credentials: 'include'
-      });
-      console.log(`Dashboard: Summary API response status: ${res.status}`);
-      if (!res.ok) {
-        console.error(`Dashboard: Failed to fetch patient volume summary: ${res.status} ${res.statusText}`);
-        return { total_count: 0, days_reported: 0, avg_per_day: 0 };
-      }
-      const data = await res.json();
-      console.log(`Dashboard: Patient volume summary received:`, data);
-      return data;
-    }
-    // NO enabled condition - query ALWAYS runs
-  });
+
 
   if (error) {
     return (
@@ -309,7 +295,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
-        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeSummary={patientVolumeSummary || { total_count: 0, days_reported: 0, avg_per_day: 0 }} />
+        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeSummary={dashboardData?.patient_volume || { total_count: 0, days_reported: 0, avg_per_day: 0 }} />
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">
