@@ -328,9 +328,8 @@ export default function Dashboard() {
                     onClick={() => {
                       // Navigate to patient volume page with current month context
                       if (timeRange === 'current-month') {
-                        // For current month, go to the first day of the month
-                        const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
-                        const dateStr = firstDayOfMonth.toISOString().split('T')[0];
+                        // For current month, go to the first day of the month using a safer approach
+                        const dateStr = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-01`;
                         window.location.href = `/patient-volume?date=${dateStr}&view=month`;
                       } else {
                         // For other periods, go to patient volume with summary view
