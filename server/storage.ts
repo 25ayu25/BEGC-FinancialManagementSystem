@@ -68,6 +68,11 @@ export interface IStorage {
   createPatientVolume(volume: InsertPatientVolume): Promise<PatientVolume>;
   getPatientVolumeByDate(date: Date, departmentId?: string): Promise<PatientVolume[]>;
   getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]>;
+  getPatientVolumeSummary(startDate: string, endDate: string): Promise<{
+    total_count: number;
+    days_reported: number;
+    avg_per_day: number;
+  }>;
   updatePatientVolume(id: string, updates: Partial<PatientVolume>): Promise<PatientVolume | undefined>;
   deletePatientVolume(id: string): Promise<void>;
 
