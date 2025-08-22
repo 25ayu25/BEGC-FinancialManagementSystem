@@ -689,14 +689,14 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(sspRevenue).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspRevenue).toLocaleString()}</p>
 
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
@@ -712,7 +712,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(totalExpenses).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-red-600">
                   <span className="text-xs font-medium">vs last month</span>
                 </div>
@@ -730,7 +730,7 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                <p className="text-base font-semibold text-slate-900">SSP {Math.round(sspNetIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspNetIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-blue-600">
                   <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
                 </div>
@@ -747,10 +747,10 @@ export default function AdvancedDashboard() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-xs font-medium">Insurance Revenue</p>
-                <p className="text-base font-semibold text-slate-900">USD {Math.round(usdIncome).toLocaleString()}</p>
+                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">USD {Math.round(usdIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
-                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers</span>
+                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}</span>
                 </div>
               </div>
               <div className="bg-purple-50 p-1.5 rounded-lg">
@@ -771,6 +771,21 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+                {selectedDepartment && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="bg-teal-100 text-teal-700 border-teal-200">
+                      {Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'Department' : 'Department'}
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedDepartment(null)}
+                      className="h-6 px-2 text-xs text-slate-500 hover:text-slate-700"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -788,7 +803,7 @@ export default function AdvancedDashboard() {
                   <div className="ml-8 h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
-                        data={incomeSeries} 
+                        data={incomeSeries}
                         margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
                         barCategoryGap="1%"
                       >
@@ -881,12 +896,18 @@ export default function AdvancedDashboard() {
                     </div>
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
-                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {peakSSP.toLocaleString()}</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {peakSSP.toLocaleString()}</span>
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200 text-xs px-1.5 py-0.5">Peak</Badge>
+                      </div>
                       {peakDaySSP && <span className="text-xs text-slate-500 mt-1">{peakDaySSP.fullDate}</span>}
                     </div>
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
-                      <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {monthlyAvgSSP.toLocaleString()}</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {monthlyAvgSSP.toLocaleString()}</span>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs px-1.5 py-0.5">Avg</Badge>
+                      </div>
                     </div>
                   </div>
                   
@@ -1095,17 +1116,21 @@ export default function AdvancedDashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Database</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">
                   Connected
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Last Sync</span>
-                <span className="text-sm text-slate-500">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+                  {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Active Users</span>
-                <span className="text-sm text-slate-500">1 online</span>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">
+                  1 online
+                </Badge>
               </div>
             </div>
           </CardContent>
