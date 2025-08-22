@@ -651,10 +651,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]> {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    // Create proper UTC date range for the entire month
+    const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
-    return await db.select().from(patientVolume)
+    console.log(`Searching patient volume for ${year}/${month} between ${startDate.toISOString()} and ${endDate.toISOString()}`);
+
+    const results = await db.select().from(patientVolume)
       .where(
         and(
           gte(patientVolume.date, startDate),
@@ -662,6 +665,9 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(patientVolume.date);
+      
+    console.log(`Found ${results.length} patient volume records for month ${month}/${year}`);
+    return results;
   }
 
   async updatePatientVolume(id: string, updates: Partial<PatientVolume>): Promise<PatientVolume | undefined> {

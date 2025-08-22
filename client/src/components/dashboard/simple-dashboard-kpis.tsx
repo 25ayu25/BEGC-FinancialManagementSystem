@@ -63,8 +63,11 @@ export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: Si
 
   // Calculate patient volume metrics
   const volumeArray = Array.isArray(patientVolumeData) ? patientVolumeData : [];
-  const totalPatients = volumeArray.reduce((sum, volume) => sum + volume.patientCount, 0);
-  const daysWithData = new Set(volumeArray.map(v => v.date.split('T')[0])).size;
+  const totalPatients = volumeArray.reduce((sum, volume) => sum + (volume.patientCount || 0), 0);
+  const daysWithData = new Set(volumeArray.map(v => {
+    const dateStr = typeof v.date === 'string' ? v.date : new Date(v.date).toISOString();
+    return dateStr.split('T')[0];
+  })).size;
   const avgPatientsPerDay = daysWithData > 0 ? totalPatients / daysWithData : 0;
 
   const kpis = [
