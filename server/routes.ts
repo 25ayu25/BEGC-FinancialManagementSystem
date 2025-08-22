@@ -873,6 +873,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Payroll & Insurance (Monthly) Section - always show this section
+      // Calculate payroll amounts first for grand total
+      const clinicAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Clinic Operations']) || '0');
+      const doctorsAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Doctor Payments']) || '0');
+      const labTechAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Lab Tech Payments']) || '0');
+      const radiographerAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Radiographer Payments']) || '0');
+      const insuranceAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Insurance Payments']) || '0');
+      const payrollTotal = clinicAmount + doctorsAmount + labTechAmount + radiographerAmount + insuranceAmount;
+
       {
         currentY += 20;
         doc.setFontSize(16);
@@ -902,13 +910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 15;
         doc.setTextColor(0, 0, 0);
         
-        // Payroll & Insurance categories with exact mapping
-        const clinicAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Clinic Operations']) || '0');
-        const doctorsAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Doctor Payments']) || '0');
-        const labTechAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Lab Tech Payments']) || '0');
-        const radiographerAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Radiographer Payments']) || '0');
-        const insuranceAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Insurance Payments']) || '0');
-        const payrollTotal = clinicAmount + doctorsAmount + labTechAmount + radiographerAmount + insuranceAmount;
+        // Data row using pre-calculated amounts
         
         // Data row
         doc.setFillColor(249, 250, 251);
