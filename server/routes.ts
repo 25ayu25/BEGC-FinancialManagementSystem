@@ -730,26 +730,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Clinic name and title in white
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
+      doc.setFontSize(26);
       doc.setFont(undefined, 'bold');
-      doc.text('Bahr El Ghazal Clinic', margin, 25);
+      doc.text('Bahr El Ghazal — Monthly Financial Report', margin, 25);
       
       doc.setFontSize(16);
       doc.setFont(undefined, 'normal');
-      doc.text('Financial Management System', margin, 35);
-      
-      doc.setFontSize(18);
-      doc.setFont(undefined, 'bold');
-      doc.text('Monthly Financial Report', margin, 50);
+      doc.text('Financial Management System', margin, 40);
       
       // Reset text color for body
       doc.setTextColor(0, 0, 0);
       
       // Report period and generation info
       const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
-      doc.setFontSize(14);
+      doc.setFontSize(16);
       doc.setFont(undefined, 'bold');
-      doc.text(`Report Period: ${monthName} ${year}`, margin, 80);
+      doc.text(`${monthName} ${year}`, margin, 80);
       
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
@@ -805,10 +801,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setFillColor(...bgColor);
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
         
-        // Text
+        // Text with tabular numerals
         doc.setFont(undefined, isNetIncome ? 'bold' : 'normal');
         doc.setFontSize(isNetIncome ? 13 : 12);
         doc.text(label, margin + 5, currentY);
+        // Right-align with tabular numerals
         doc.text(value, pageWidth - margin - 5, currentY, { align: 'right' });
         
         currentY += 15;
@@ -842,12 +839,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 15;
         doc.setTextColor(0, 0, 0);
         
-        // Department data
-        const deptEntries = Object.entries(reportData.departmentBreakdown).sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
+        // Department data - filter out zero amounts and improve naming
+        const deptEntries = Object.entries(reportData.departmentBreakdown)
+          .filter(([deptId, amount]) => parseFloat(amount) > 0) // Hide zero rows
+          .sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
         const totalIncome = parseFloat(reportData.totalIncome);
         
         deptEntries.forEach(([deptId, amount], index) => {
-          let deptName = 'Unknown Department';
+          let deptName = 'Other income';
           if (deptId === '4242abf4-e68e-48c8-9eaf-ada2612bd4c2') deptName = 'Consultation';
           else if (deptId === 'ae648a70-c159-43b7-b814-7dadb213ae8d') deptName = 'Laboratory';
           else if (deptId === '09435c53-9061-429b-aecf-677b12bbdbd7') deptName = 'Ultrasound';
@@ -864,7 +863,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           doc.setFont(undefined, 'normal');
           doc.setFontSize(11);
           doc.text(deptName, margin + 5, currentY);
-          doc.text(`SSP ${parseFloat(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+          // Right-align with tabular numerals and proper formatting
+          doc.text(`SSP ${Math.round(parseFloat(amount)).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
           doc.text(`${percentage}%`, pageWidth - margin - 60, currentY, { align: 'right' });
           
           currentY += 12;
@@ -886,6 +886,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.setTextColor(100, 100, 100);
       doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY);
       doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
+      
+      // Add tiny footer note
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text('This report contains confidential financial information for internal use only.', margin, footerY + 8);
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       
