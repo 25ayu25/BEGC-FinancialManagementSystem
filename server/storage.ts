@@ -623,23 +623,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientVolumeByDate(date: Date, departmentId?: string): Promise<PatientVolume[]> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Create date range for the entire day in UTC
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+    
+    const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
+    console.log(`Searching between ${startOfDay.toISOString()} and ${endOfDay.toISOString()}`);
 
     const conditions = [
       gte(patientVolume.date, startOfDay),
       lte(patientVolume.date, endOfDay)
     ];
 
-    if (departmentId) {
+    if (departmentId && departmentId !== 'all-departments') {
       conditions.push(eq(patientVolume.departmentId, departmentId));
     }
 
-    return await db.select().from(patientVolume)
+    const results = await db.select().from(patientVolume)
       .where(and(...conditions))
       .orderBy(patientVolume.date);
+      
+    console.log(`Found ${results.length} patient volume records`);
+    return results;
   }
 
   async getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]> {
