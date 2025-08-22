@@ -309,7 +309,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="text-4xl font-bold text-teal-700 mb-2">
-                    {periodPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0)}
+                    {periodPatientVolume.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0)}
                   </div>
                   <div className="text-sm text-teal-600 font-medium">
                     {timeRange === 'current-month' ? `Patients in ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy')}` :

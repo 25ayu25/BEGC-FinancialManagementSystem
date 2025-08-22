@@ -41,7 +41,12 @@ export default function SimpleRecentTransactions({ transactions }: SimpleRecentT
               <div className="w-8 h-8 bg-slate-300 rounded animate-pulse"></div>
             </div>
             <p className="text-slate-500 font-medium">No recent transactions</p>
-            <p className="text-slate-400 text-sm mt-1">Transactions will appear here</p>
+            <p className="text-slate-400 text-sm mt-1">Add your first transaction to see activity here</p>
+            <Link href="/transactions/add" className="mt-3">
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white">
+                Add Transaction
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
