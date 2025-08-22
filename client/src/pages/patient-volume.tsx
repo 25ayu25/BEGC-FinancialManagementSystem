@@ -62,7 +62,9 @@ export default function PatientVolumePage() {
   const createVolumeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/date"] });
+      // Force refresh the data by clearing all patient volume queries
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
+      queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
       toast({ title: "Patient volume recorded successfully" });
       setShowAddForm(false);
       setNewEntry({ date: new Date(), departmentId: "", patientCount: "", notes: "" });
@@ -94,7 +96,7 @@ export default function PatientVolumePage() {
 
     createVolumeMutation.mutate({
       date: newEntry.date.toISOString(),
-      departmentId: newEntry.departmentId === "general" ? null : newEntry.departmentId || null,
+      departmentId: null,
       patientCount: parseInt(newEntry.patientCount),
       notes: newEntry.notes || null
     });
@@ -107,7 +109,7 @@ export default function PatientVolumePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-          <p className="text-slate-600">Record and monitor daily patient visits by department</p>
+          <p className="text-slate-600">Record and monitor daily patient visits</p>
         </div>
         <Button 
           onClick={() => setShowAddForm(true)}
@@ -153,22 +155,7 @@ export default function PatientVolumePage() {
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label>Department Filter</Label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger data-testid="select-department-filter">
-                  <SelectValue placeholder="All departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all-departments">All Departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
 
             {/* Summary */}
             <div className="pt-4 border-t">
@@ -201,15 +188,14 @@ export default function PatientVolumePage() {
               ) : (
                 <div className="space-y-3">
                   {Array.isArray(volumeData) && volumeData.map((entry) => {
-                    const department = departments.find(d => d.id === entry.departmentId);
                     return (
                       <div key={entry.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                         <div className="flex-1">
                           <div className="font-medium">
-                            {department ? department.name : "General"}
+                            {entry.patientCount} patients
                           </div>
                           <div className="text-sm text-slate-600">
-                            {entry.patientCount} patients
+                            {format(new Date(entry.date), "PPP")}
                           </div>
                           {entry.notes && (
                             <div className="text-xs text-slate-500 mt-1">{entry.notes}</div>
@@ -267,22 +253,7 @@ export default function PatientVolumePage() {
                   </Popover>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Department</Label>
-                  <Select value={newEntry.departmentId} onValueChange={(value) => setNewEntry(prev => ({ ...prev, departmentId: value }))}>
-                    <SelectTrigger data-testid="select-department">
-                      <SelectValue placeholder="Select department (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General / All</SelectItem>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
 
                 <div className="space-y-2">
                   <Label>Patient Count</Label>

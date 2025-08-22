@@ -967,10 +967,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/patient-volume/date/:date", requireAuth, async (req, res) => {
     try {
-      const date = new Date(req.params.date);
+      const dateParam = req.params.date;
+      console.log("Date parameter received:", dateParam);
+      
+      const date = new Date(dateParam);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
       const departmentId = req.query.departmentId as string;
+      console.log("Searching for patient volume on date:", date, "department:", departmentId);
       
       const volumes = await storage.getPatientVolumeByDate(date, departmentId);
+      console.log("Found volumes:", volumes);
       res.json(volumes);
     } catch (error) {
       console.error("Error getting patient volume by date:", error);
