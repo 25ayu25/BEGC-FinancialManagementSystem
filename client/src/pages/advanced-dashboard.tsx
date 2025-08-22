@@ -312,6 +312,7 @@ export default function AdvancedDashboard() {
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
   const [showDataTable, setShowDataTable] = useState(false);
+  const [showAllDepartments, setShowAllDepartments] = useState(false);
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -1020,7 +1021,7 @@ export default function AdvancedDashboard() {
               return { ...dept, amount, percentage };
             })
             .sort((a, b) => b.amount - a.amount) // Sort by revenue descending
-            .slice(0, 5)
+            .slice(0, showAllDepartments ? departments.length : 5)
             .map((dept: any, index: number) => {
               const maxAmount = Math.max(...departments.map((d: any) => parseFloat(dashboardData?.departmentBreakdown?.[d.id] || '0')));
               const proportionWidth = maxAmount > 0 ? (dept.amount / maxAmount) * 100 : 0;
@@ -1060,8 +1061,14 @@ export default function AdvancedDashboard() {
           
           {/* View all departments button if more than 5 */}
           {Array.isArray(departments) && departments.length > 5 && (
-            <Button variant="ghost" size="sm" className="w-full mt-2 text-slate-600">
-              View all departments ({departments.length} total)
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full mt-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              onClick={() => setShowAllDepartments(!showAllDepartments)}
+              data-testid="button-view-all-departments"
+            >
+              {showAllDepartments ? 'Show less' : `View all departments (${departments.length} total)`}
             </Button>
           )}
           </CardContent>
