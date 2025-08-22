@@ -89,10 +89,10 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-slate-900">
+                    <div className="text-sm font-bold font-variant-numeric-tabular text-slate-900">
                       SSP {Math.round(department.amount).toLocaleString()}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs font-variant-numeric-tabular text-slate-500">
                       {department.percentage.toFixed(1)}% • Avg/day: SSP {Math.round(department.amount / new Date().getDate()).toLocaleString()}
                     </div>
                   </div>
