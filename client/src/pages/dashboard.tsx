@@ -16,6 +16,7 @@ import SimpleTopDepartments from "@/components/dashboard/simple-top-departments"
 
 import SimpleRecentTransactions from "@/components/dashboard/simple-recent-transactions";
 import SimpleMonthlyFooter from "@/components/dashboard/simple-monthly-footer";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const currentDate = new Date();
@@ -355,6 +356,44 @@ export default function Dashboard() {
         <div className="grid grid-cols-1">
           <SimpleRecentTransactions transactions={dashboardData?.recentTransactions || []} />
         </div>
+
+        {/* Quick Actions Card - to fill empty space */}
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Link href="/transactions/add">
+                <Button variant="outline" className="w-full justify-start h-auto py-4">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">Add Transaction</span>
+                    <span className="text-xs text-slate-500">Record new income or expense</span>
+                  </div>
+                </Button>
+              </Link>
+              <Link href="/patient-volume">
+                <Button variant="outline" className="w-full justify-start h-auto py-4">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">Patient Volume</span>
+                    <span className="text-xs text-slate-500">Update patient count</span>
+                  </div>
+                </Button>
+              </Link>
+              <Link href="/reports">
+                <Button variant="outline" className="w-full justify-start h-auto py-4">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">Monthly Reports</span>
+                    <span className="text-xs text-slate-500">View generated reports</span>
+                  </div>
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Footer Strip */}
         <SimpleMonthlyFooter data={dashboardData || {}} />
