@@ -940,7 +940,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(0, 0, 0);
       }
       
-      // Monthly Operating Expenses Section - always show this section  
+      // Monthly Operating Expenses Section - always show this section
+      // Calculate operating expenses (excluding payroll categories)
+      const operatingCategories = ['Staff Salaries', 'Drugs Purchased', 'Lab Reagents', 'Equipment', 'Landlord', 'Utilities', 'Sono Papers', 'X-Ray Films', 'Other'];
+      let operatingTotal = 0;
+      const operatingExpensesList = operatingCategories.map(cat => {
+        const amount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0');
+        operatingTotal += amount;
+        return { category: cat, amount };
+      }).filter(item => item.amount > 0); // Only show non-zero amounts
+
       {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
@@ -966,29 +975,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 15;
         doc.setTextColor(0, 0, 0);
         
-        // Operating expenses categories (excluding payroll categories)
-        const operatingCategories = ['Staff Salaries', 'Drugs Purchased', 'Lab Reagents', 'Equipment', 'Landlord', 'Utilities', 'Sono Papers', 'X-Ray films', 'Other'];
-        const operatingExpenses = operatingCategories.filter(cat => {
-          const amount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0');
-          return amount > 0;
-        });
+        // Operating expenses categories (exact strings as specified)
+        const operatingCategories = ['Staff Salaries', 'Drugs Purchased', 'Lab Reagents', 'Equipment', 'Landlord', 'Utilities', 'Sono Papers', 'X-Ray Films', 'Other'];
         let operatingTotal = 0;
         
-        if (operatingExpenses.length === 0) {
-          // Show "No operating expenses" row when there are no expenses
-          doc.setFillColor(249, 250, 251);
-          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        // Always show Equipment row as it has data
+        operatingCategories.forEach((category, index) => {
+          const amount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[category]) || '0');
           
-          doc.setFont('helvetica', 'italic');
-          doc.setFontSize(11);
-          doc.setTextColor(120, 120, 120);
-          doc.text('No operating expenses recorded for this period', margin + 5, currentY);
-          doc.setTextColor(0, 0, 0);
-          
-          currentY += 12;
-        } else {
-          operatingExpenses.forEach((category, index) => {
-            const amount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[category]) || '0');
+          // Only show categories with non-zero amounts
+          if (amount > 0) {
             operatingTotal += amount;
             
             // Alternating row colors
@@ -1002,7 +998,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             doc.text(`SSP ${Math.round(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
             
             currentY += 12;
-          });
+          }
+        });
+        
+        // If no operating expenses, show a message
+        if (operatingTotal === 0) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+          
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(11);
+          doc.setTextColor(120, 120, 120);
+          doc.text('No operating expenses recorded for this period', margin + 5, currentY);
+          doc.setTextColor(0, 0, 0);
+          
+          currentY += 12;
         }
         
         // Operating expenses total row
