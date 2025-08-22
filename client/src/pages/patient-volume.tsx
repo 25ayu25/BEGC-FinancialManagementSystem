@@ -236,8 +236,8 @@ export default function PatientVolumePage() {
 
       {/* Add New Entry Modal/Form */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md shadow-2xl border-0 bg-white dark:bg-slate-900">
             <CardHeader>
               <CardTitle>Add Patient Volume</CardTitle>
             </CardHeader>
