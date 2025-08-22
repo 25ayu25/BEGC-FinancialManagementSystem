@@ -90,8 +90,7 @@ export default function Dashboard() {
       const data = await res.json();
       console.log(`Patient volume data received:`, data);
       return data;
-    },
-    enabled: !isLoading && !!dashboardData
+    }
   });
 
   if (error) {
