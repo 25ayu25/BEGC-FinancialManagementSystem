@@ -37,10 +37,10 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-              <p className="text-base font-semibold text-slate-900 font-mono font-variant-numeric-tabular">SSP {Math.round(sspRevenue).toLocaleString()}</p>
+              <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspRevenue).toLocaleString()}</p>
               <div className="flex items-center mt-1">
                 {data?.changes?.incomeChangeSSP !== undefined ? (
-                  <span className={`text-xs font-medium font-variant-numeric-tabular ${
+                  <span className={`text-xs font-medium tabular-nums ${
                     data.changes.incomeChangeSSP > 0 ? 'text-emerald-700' :
                     data.changes.incomeChangeSSP < 0 ? 'text-red-700' : 
                     'text-slate-500'
@@ -69,10 +69,10 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-              <p className="text-base font-semibold text-slate-900 font-mono font-variant-numeric-tabular">SSP {Math.round(totalExpenses).toLocaleString()}</p>
+              <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(totalExpenses).toLocaleString()}</p>
               <div className="flex items-center mt-1">
                 {data?.changes?.expenseChangeSSP !== undefined ? (
-                  <span className={`text-xs font-medium font-variant-numeric-tabular ${
+                  <span className={`text-xs font-medium tabular-nums ${
                     data.changes.expenseChangeSSP > 0 ? 'text-red-700' :
                     data.changes.expenseChangeSSP < 0 ? 'text-emerald-700' : 
                     'text-slate-500'
@@ -101,10 +101,10 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-600 text-xs font-medium">Net Income</p>
-              <p className="text-base font-semibold text-slate-900 font-mono font-variant-numeric-tabular">SSP {Math.round(sspNetIncome).toLocaleString()}</p>
+              <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspNetIncome).toLocaleString()}</p>
               <div className="flex items-center mt-1">
                 {data?.changes?.netIncomeChangeSSP !== undefined ? (
-                  <span className={`text-xs font-medium font-variant-numeric-tabular ${
+                  <span className={`text-xs font-medium tabular-nums ${
                     data.changes.netIncomeChangeSSP > 0 ? 'text-emerald-700' :
                     data.changes.netIncomeChangeSSP < 0 ? 'text-red-700' : 
                     'text-slate-500'
@@ -134,10 +134,10 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                <p className="text-base font-semibold text-slate-900 font-mono font-variant-numeric-tabular">USD {Math.round(usdIncome).toLocaleString()}</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">USD {Math.round(usdIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.incomeChangeUSD !== undefined ? (
-                    <span className={`text-xs font-medium font-variant-numeric-tabular ${
+                    <span className={`text-xs font-medium tabular-nums ${
                       data.changes.incomeChangeUSD > 0 ? 'text-emerald-700' :
                       data.changes.incomeChangeUSD < 0 ? 'text-red-700' : 
                       'text-slate-500'

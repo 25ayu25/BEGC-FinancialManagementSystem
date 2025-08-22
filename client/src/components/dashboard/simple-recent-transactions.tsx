@@ -83,7 +83,7 @@ export default function SimpleRecentTransactions({ transactions }: SimpleRecentT
                   >
                     {transaction.type}
                   </Badge>
-                  <span className="text-xs text-slate-500 font-variant-numeric-tabular">
+                  <span className="text-xs text-slate-500 tabular-nums">
                     {new Date(transaction.date).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric' 
@@ -95,7 +95,7 @@ export default function SimpleRecentTransactions({ transactions }: SimpleRecentT
                 </p>
               </div>
               <div className="text-right ml-4">
-                <p className={`text-sm font-bold font-variant-numeric-tabular text-right ${
+                <p className={`text-sm font-bold tabular-nums text-right ${
                   transaction.type === 'income' ? 'text-emerald-700' : 'text-red-700'
                 }`}>
                   {transaction.type === 'income' ? '' : '-'}

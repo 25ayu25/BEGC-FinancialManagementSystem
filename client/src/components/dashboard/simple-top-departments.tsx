@@ -89,10 +89,10 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold font-variant-numeric-tabular text-slate-900">
+                    <div className="text-sm font-bold tabular-nums text-slate-900">
                       SSP {Math.round(department.amount).toLocaleString()}
                     </div>
-                    <div className="text-xs font-variant-numeric-tabular text-slate-500">
+                    <div className="text-xs tabular-nums text-slate-500">
                       {department.percentage.toFixed(1)}% • Avg/day: SSP {Math.round(department.amount / new Date().getDate()).toLocaleString()}
                     </div>
                   </div>
@@ -122,7 +122,7 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
                     <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
                     <span className="text-sm font-semibold text-teal-700">Total Revenue</span>
                   </div>
-                  <span className="text-xl font-bold font-variant-numeric-tabular text-teal-900">
+                  <span className="text-xl font-bold tabular-nums text-teal-900">
                     SSP {Math.round(total).toLocaleString()}
                   </span>
                 </div>
@@ -133,7 +133,7 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
                       {sortedDepartments.filter(d => d.amount > 0).length} active departments
                     </span>
                   </div>
-                  <span className="text-xs font-medium font-variant-numeric-tabular text-slate-600 bg-white/60 px-2 py-1 rounded-full">
+                  <span className="text-xs font-medium tabular-nums text-slate-600 bg-white/60 px-2 py-1 rounded-full">
                     Day {new Date().getDate()} of {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}
                   </span>
                 </div>
