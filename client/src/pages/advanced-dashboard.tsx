@@ -75,7 +75,6 @@ interface RevenueDataTableProps {
     label: string;
     fullDate: string;
   }>;
-  selectedDepartment: string | null;
   departments: any[];
   monthName: string;
   selectedYear: number;
@@ -86,7 +85,7 @@ interface RevenueDataTableProps {
 type SortField = 'date' | 'ssp' | 'usd' | 'total' | 'department';
 type SortDirection = 'asc' | 'desc';
 
-function RevenueDataTable({ data, selectedDepartment, departments, monthName, selectedYear, selectedMonth, onClose }: RevenueDataTableProps) {
+function RevenueDataTable({ data, departments, monthName, selectedYear, selectedMonth, onClose }: RevenueDataTableProps) {
   // Fetch detailed transaction data for the table
   const { data: detailedTransactions, isLoading: isLoadingDetailed } = useQuery({
     queryKey: ['/api/detailed-transactions', selectedYear, selectedMonth],
@@ -208,9 +207,6 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, se
           <p className="text-slate-600 text-sm font-medium mb-4">No rows for this range</p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>Change dates</Button>
-            {selectedDepartment && (
-              <Button variant="outline" size="sm" onClick={() => {}}>Reset filters</Button>
-            )}
           </div>
         </div>
       </div>
@@ -314,7 +310,6 @@ export default function AdvancedDashboard() {
   const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
-  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [showDataTable, setShowDataTable] = useState(false);
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
@@ -771,21 +766,6 @@ export default function AdvancedDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
-                {selectedDepartment && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="bg-teal-100 text-teal-700 border-teal-200">
-                      {Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'Department' : 'Department'}
-                    </Badge>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setSelectedDepartment(null)}
-                      className="h-6 px-2 text-xs text-slate-500 hover:text-slate-700"
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                )}
               </div>
 
             </div>
@@ -925,12 +905,11 @@ export default function AdvancedDashboard() {
                           <DialogHeader>
                             <DialogTitle>Revenue Data • {monthName}</DialogTitle>
                             <DialogDescription>
-                              Daily revenue breakdown {selectedDepartment ? `(filtered by ${Array.isArray(departments) ? departments.find((d: any) => d.id === selectedDepartment)?.name || 'department' : 'department'})` : ''} • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              Daily revenue breakdown • Updated {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </DialogDescription>
                           </DialogHeader>
                           <RevenueDataTable 
                             data={incomeSeries.filter(d => d.amountSSP > 0 || d.amountUSD > 0)} 
-                            selectedDepartment={selectedDepartment}
                             departments={Array.isArray(departments) ? departments : []}
                             monthName={monthName}
                             selectedYear={selectedYear}
@@ -978,19 +957,7 @@ export default function AdvancedDashboard() {
         {/* Departments Widget */}
         <Card className="border border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
-              {selectedDepartment && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setSelectedDepartment(null)}
-                  className="text-slate-600"
-                >
-                  Reset Filter
-                </Button>
-              )}
-            </div>
+            <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
           {Array.isArray(departments) ? departments
@@ -1002,22 +969,13 @@ export default function AdvancedDashboard() {
             .sort((a, b) => b.amount - a.amount) // Sort by revenue descending
             .slice(0, 5)
             .map((dept: any, index: number) => {
-              const isSelected = selectedDepartment === dept.id;
               const maxAmount = Math.max(...departments.map((d: any) => parseFloat(dashboardData?.departmentBreakdown?.[d.id] || '0')));
               const proportionWidth = maxAmount > 0 ? (dept.amount / maxAmount) * 100 : 0;
               
               return (
-                <button
+                <div
                   key={dept.id}
-                  onClick={() => setSelectedDepartment(isSelected ? null : dept.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') setSelectedDepartment(isSelected ? null : dept.id); }}
-                  className={cn(
-                    "w-full flex items-center justify-between p-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500",
-                    isSelected 
-                      ? "bg-teal-50 border-teal-200 shadow-sm" 
-                      : "bg-slate-50 border-slate-100 hover:bg-slate-100"
-                  )}
-                  tabIndex={0}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border bg-slate-50 border-slate-100"
                   data-testid={`row-department-${dept.id}`}
                 >
                   <div className="flex items-center space-x-3 flex-1">
@@ -1043,7 +1001,7 @@ export default function AdvancedDashboard() {
                       />
                     </div>
                   </div>
-                </button>
+                </div>
               );
             }) : []}
           
