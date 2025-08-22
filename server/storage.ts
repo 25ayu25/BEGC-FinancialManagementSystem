@@ -80,6 +80,7 @@ export interface IStorage {
     netIncome: string;
     departmentBreakdown: Record<string, string>;
     insuranceBreakdown: Record<string, string>;
+    expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }>;
   getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>>;
@@ -333,6 +334,7 @@ export class DatabaseStorage implements IStorage {
     netIncome: string;
     departmentBreakdown: Record<string, string>;
     insuranceBreakdown: Record<string, string>;
+    expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }> {
     let startDate: Date;
