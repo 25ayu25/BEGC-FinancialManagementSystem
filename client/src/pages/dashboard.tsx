@@ -281,77 +281,16 @@ export default function Dashboard() {
         {/* KPI Band */}
         <SimpleDashboardKPIs data={dashboardData || {}} />
 
-        {/* Patient Volume Widget */}
-          <Card className="border border-teal-100 shadow-sm bg-gradient-to-r from-teal-50 to-emerald-50">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-100 rounded-lg">
-                  <Users className="h-5 w-5 text-teal-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-semibold text-slate-900">
-                    {timeRange === 'current-month' ? 'Current Month' : 
-                     timeRange === 'last-month' ? 'Last Month' : 
-                     timeRange === 'last-3-months' ? 'Last 3 Months' :
-                     timeRange === 'year' ? 'This Year' : 'Custom Period'} Patient Volume
-                  </CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {timeRange === 'current-month' ? 'Patients this month' :
-                     timeRange === 'last-month' ? 'Patients last month' :
-                     timeRange === 'last-3-months' ? 'Patients in last 3 months' :
-                     timeRange === 'year' ? 'Patients this year' : 'Patients in selected period'}
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="text-4xl font-bold text-teal-700 mb-2">
-                    {periodPatientVolume.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0)}
-                  </div>
-                  <div className="text-sm text-teal-600 font-medium">
-                    {timeRange === 'current-month' ? `Patients in ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy')}` :
-                     timeRange === 'last-month' ? `Patients in ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy')}` :
-                     timeRange === 'last-3-months' ? 'Patients in last 3 months' :
-                     timeRange === 'year' ? `Patients in ${selectedYear}` : 
-                     customStartDate && customEndDate ? `${format(customStartDate, 'MMM d')} - ${format(customEndDate, 'MMM d, yyyy')}` :
-                     'Selected period'}
-                  </div>
-                </div>
-                <div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-teal-700 border-teal-200 hover:bg-teal-50" 
-                    onClick={() => {
-                      // Navigate to patient volume page with monthly grouping
-                      if (timeRange === 'current-month') {
-                        window.location.href = `/patient-volume?year=${selectedYear}&month=${selectedMonth}&view=monthly`;
-                      } else {
-                        // For other periods, go to patient volume with summary view
-                        window.location.href = '/patient-volume';
-                      }
-                    }}
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    View Details
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-        {/* Departments Chart */}
-        <div className="grid grid-cols-1">
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Departments Chart */}
           <SimpleTopDepartments 
             data={dashboardData?.departmentBreakdown || {}} 
             departments={(departments as any) || []}
           />
-        </div>
 
-        {/* Recent Transactions - Full Width */}
-        <div className="grid grid-cols-1">
+          {/* Recent Transactions */}
           <SimpleRecentTransactions transactions={dashboardData?.recentTransactions || []} />
         </div>
 
@@ -393,8 +332,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Footer Strip */}
-        <SimpleMonthlyFooter data={dashboardData || {}} />
       </main>
     </div>
   );
