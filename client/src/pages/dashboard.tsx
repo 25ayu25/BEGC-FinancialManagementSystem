@@ -98,7 +98,7 @@ export default function Dashboard() {
     return (
       <div className="flex-1 flex flex-col h-full">
         <div className="bg-white border-b border-slate-200 px-6 py-4">
-          <h1 className="text-2xl font-bold text-slate-900">Simple Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Overview</h1>
           <p className="text-slate-600">Daily operations at a glance</p>
         </div>
         <main className="flex-1 overflow-y-auto p-6">
@@ -122,7 +122,7 @@ export default function Dashboard() {
         <div className="bg-white border-b border-slate-200 px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-8 w-32 mb-2" />
               <Skeleton className="h-4 w-32" />
             </div>
             <div className="flex items-center space-x-4">
@@ -160,7 +160,7 @@ export default function Dashboard() {
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900">Simple Dashboard</h1>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900">Overview</h1>
             <div className="mt-1 flex items-center gap-4">
               <p className="text-sm text-muted-foreground">
                 Key financials · {
@@ -173,17 +173,15 @@ export default function Dashboard() {
                     'Custom period'
                 }
               </p>
-              {/* Patient Volume Badge */}
-              {periodPatientVolume.length > 0 && (
-                <div className="flex items-center gap-2 px-2 py-1 bg-teal-50 rounded-md">
-                  <span className="text-teal-600 text-xs font-medium">
-                    {timeRange === 'current-month' ? 'Current month' :
-                     timeRange === 'last-month' ? 'Last month' :
-                     timeRange === 'last-3-months' ? 'Last 3 months' :
-                     timeRange === 'year' ? 'This year' : 'Selected period'}: {periodPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
+              {/* Patient Volume Chip - Clickable */}
+              <Link href="/patient-volume" className="inline-block">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 rounded-md transition-colors cursor-pointer min-h-[44px]">
+                  <Users className="w-4 h-4 text-teal-600" />
+                  <span className="text-teal-600 text-sm font-medium font-variant-numeric-tabular">
+                    Current month: {periodPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
                   </span>
                 </div>
-              )}
+              </Link>
             </div>
           </div>
           
@@ -279,7 +277,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
         <SimpleDashboardKPIs data={dashboardData || {}} />
 

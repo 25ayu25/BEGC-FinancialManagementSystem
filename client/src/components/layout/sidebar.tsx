@@ -13,7 +13,7 @@ import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 
 const navigation = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
-  { name: "Simple Dashboard", href: "/simple", icon: BarChart3 },
+  { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },

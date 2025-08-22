@@ -267,4 +267,9 @@
   .border-info {
     border-color: hsl(var(--info));
   }
+
+  /* Tabular numerals for perfect alignment */
+  .font-variant-numeric-tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }

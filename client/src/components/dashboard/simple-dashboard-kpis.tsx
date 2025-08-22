@@ -79,14 +79,14 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
     {
       title: "Expenses", 
       value: `SSP ${Math.round(expenses).toLocaleString()}`,
-      subtitle: expenses > 0 ? `${((expenses / sspIncome) * 100).toFixed(1)}% of income` : "No expenses yet",
+      subtitle: "vs budget: neutral",
       context: `Avg per day: SSP ${currentDay > 0 ? Math.round(expenses / currentDay).toLocaleString() : 0}`,
       icon: CreditCard,
       trend: -8.2,
       delta: "-8.2%",
-      bgColor: "bg-red-500",
-      textColor: "text-red-600",
-      lightBg: "bg-red-50",
+      bgColor: "bg-slate-500",
+      textColor: "text-slate-600",
+      lightBg: "bg-slate-50",
     },
     {
       title: "Net",
@@ -116,7 +116,7 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {kpis.map((kpi) => (
         <Card key={kpi.title} className="border-0 shadow-md hover:shadow-lg transition-all duration-200">
           <CardContent className="p-4">
@@ -140,7 +140,7 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
             </div>
             
             <div className="space-y-1">
-              <h3 className={`text-2xl font-bold ${kpi.textColor}`} data-testid={`value-${kpi.title.toLowerCase()}`}>
+              <h3 className={`text-2xl font-bold font-variant-numeric-tabular ${kpi.textColor}`} data-testid={`value-${kpi.title.toLowerCase()}`}>
                 {kpi.value}
               </h3>
               <p className="text-slate-600 text-sm font-medium">{kpi.title}</p>
