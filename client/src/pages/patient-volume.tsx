@@ -31,10 +31,10 @@ interface Department {
 
 export default function PatientVolumePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
   const [newEntry, setNewEntry] = useState({
     date: new Date(),
-    departmentId: "",
+    departmentId: "general",
     patientCount: "",
     notes: ""
   });
@@ -160,7 +160,7 @@ export default function PatientVolumePage() {
                   <SelectValue placeholder="All departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
+                  <SelectItem value="all-departments">All Departments</SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
@@ -274,7 +274,7 @@ export default function PatientVolumePage() {
                       <SelectValue placeholder="Select department (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">General / All</SelectItem>
+                      <SelectItem value="general">General / All</SelectItem>
                       {departments.map((dept) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           {dept.name}
