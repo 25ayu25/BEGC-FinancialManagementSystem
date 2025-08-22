@@ -80,7 +80,6 @@ export interface IStorage {
     netIncome: string;
     departmentBreakdown: Record<string, string>;
     insuranceBreakdown: Record<string, string>;
-    expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }>;
   getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>>;
@@ -334,7 +333,6 @@ export class DatabaseStorage implements IStorage {
     netIncome: string;
     departmentBreakdown: Record<string, string>;
     insuranceBreakdown: Record<string, string>;
-    expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }> {
     let startDate: Date;
@@ -451,28 +449,6 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Get expense breakdown by category (SSP only to prevent currency mixing)
-    const expenseData = await db.select({
-      expenseCategory: transactions.expenseCategory,
-      total: sql<string>`SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END)`
-    }).from(transactions)
-    .where(
-      and(
-        eq(transactions.type, "expense"),
-        gte(transactions.date, startDate),
-        lte(transactions.date, endDate),
-        isNotNull(transactions.expenseCategory)
-      )
-    )
-    .groupBy(transactions.expenseCategory);
-
-    const expenseBreakdown: Record<string, string> = {};
-    expenseData.forEach(item => {
-      if (item.expenseCategory) {
-        expenseBreakdown[item.expenseCategory] = item.total;
-      }
-    });
-
     // Get recent transactions
     const recentTransactions = await this.getTransactions({
       startDate,
@@ -547,7 +523,6 @@ export class DatabaseStorage implements IStorage {
       netIncomeUSD,
       departmentBreakdown,
       insuranceBreakdown,
-      expenseBreakdown,
       recentTransactions,
       // Previous period data for comparisons
       previousPeriod: {
