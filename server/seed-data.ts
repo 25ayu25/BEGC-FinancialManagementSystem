@@ -13,7 +13,8 @@ export async function seedData() {
       { code: 'LAB', name: 'Laboratory' }, 
       { code: 'ULTRASOUND', name: 'Ultrasound' },
       { code: 'XRAY', name: 'X-Ray' },
-      { code: 'PHARMACY', name: 'Pharmacy' }
+      { code: 'PHARMACY', name: 'Pharmacy' },
+      { code: 'OTHER', name: 'Other' }
     ]).onConflictDoNothing();
 
     // Seed insurance providers
