@@ -121,68 +121,49 @@ export default function PatientVolumePage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Date and Filter Controls */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Date & Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Select Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                    data-testid="button-select-date"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent 
-                  className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl" 
-                  sideOffset={8}
-                  align="start"
-                  style={{ zIndex: 50 }}
-                >
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+      {/* Simple Date Selector */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                data-testid="button-select-date"
+              >
+                <CalendarIcon className="w-4 h-4" />
+                {format(selectedDate, "MMMM d, yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent 
+              className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl" 
+              sideOffset={8}
+              align="start"
+              style={{ zIndex: 50 }}
+            >
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          
+          <div className="text-sm text-slate-600">
+            Total: <span className="font-semibold text-teal-600" data-testid="text-total-patients">{totalPatients}</span> patients
+          </div>
+        </div>
+      </div>
 
-
-
-            {/* Summary */}
-            <div className="pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Total Patients:</span>
-                <span className="text-lg font-semibold text-teal-600" data-testid="text-total-patients">
-                  {totalPatients}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Patient Volume Data */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Patient Volume - {format(selectedDate, "MMMM d, yyyy")}
-              </CardTitle>
-            </CardHeader>
+      {/* Patient Volume Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Patient Volume - {format(selectedDate, "MMMM d, yyyy")}
+          </CardTitle>
+        </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="text-center py-8">Loading...</div>
@@ -220,10 +201,8 @@ export default function PatientVolumePage() {
                   })}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Add New Entry Modal/Form */}
       {showAddForm && (
