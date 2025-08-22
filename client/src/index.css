@@ -272,4 +272,10 @@
   .font-variant-numeric-tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Force tabular numerals everywhere */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: "tnum" !important;
+  }
 }
