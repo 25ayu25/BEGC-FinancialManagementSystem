@@ -125,7 +125,7 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
                 <kpi.icon className={`h-5 w-5 ${kpi.textColor}`} />
               </div>
               <div className="text-right">
-                <div className={`text-xs font-medium ${kpi.textColor} flex items-center gap-1`}>
+                <div className={`text-xs font-medium font-variant-numeric-tabular ${kpi.textColor} flex items-center gap-1`}>
                   {kpi.trend >= 0 ? (
                     <TrendingUp className="w-3 h-3" />
                   ) : (
@@ -145,10 +145,10 @@ export default function SimpleDashboardKPIs({ data }: SimpleDashboardKPIsProps) 
               </h3>
               <p className="text-slate-600 text-sm font-medium">{kpi.title}</p>
               {kpi.subtitle && (
-                <p className="text-slate-500 text-xs">{kpi.subtitle}</p>
+                <p className="text-slate-500 text-xs font-variant-numeric-tabular">{kpi.subtitle}</p>
               )}
               {kpi.context && (
-                <p className="text-slate-400 text-xs mt-1">{kpi.context}</p>
+                <p className="text-slate-400 text-xs font-variant-numeric-tabular mt-1">{kpi.context}</p>
               )}
             </div>
           </CardContent>
