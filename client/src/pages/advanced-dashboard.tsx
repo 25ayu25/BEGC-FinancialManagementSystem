@@ -1036,6 +1036,81 @@ export default function AdvancedDashboard() {
         </Card>
       </div>
 
+      {/* Quick Actions Card - to fill empty space */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <a href="/transactions/add" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Add Transaction</span>
+                    <span className="text-xs text-slate-500">Record new income or expense</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/patient-volume" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Patient Volume</span>
+                    <span className="text-xs text-slate-500">Update patient count</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/reports" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Monthly Reports</span>
+                    <span className="text-xs text-slate-500">View generated reports</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/users" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">User Management</span>
+                    <span className="text-xs text-slate-500">Manage user accounts</span>
+                  </div>
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System Status Card */}
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Database</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                  Connected
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Last Sync</span>
+                <span className="text-sm text-slate-500">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Active Users</span>
+                <span className="text-sm text-slate-500">1 online</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
     </div>
   );
