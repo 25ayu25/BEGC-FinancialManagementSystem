@@ -96,7 +96,7 @@ export default function SimpleRecentTransactions({ transactions }: SimpleRecentT
               </div>
               <div className="text-right ml-4">
                 <p className={`text-sm font-bold font-variant-numeric-tabular text-right ${
-                  transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+                  transaction.type === 'income' ? 'text-emerald-700' : 'text-red-700'
                 }`}>
                   {transaction.type === 'income' ? '' : '-'}
                   {formatCurrency(parseFloat(transaction.amount), transaction.currency)}

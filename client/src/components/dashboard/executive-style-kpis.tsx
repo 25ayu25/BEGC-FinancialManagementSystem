@@ -41,8 +41,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
               <div className="flex items-center mt-1">
                 {data?.changes?.incomeChangeSSP !== undefined ? (
                   <span className={`text-xs font-medium font-variant-numeric-tabular ${
-                    data.changes.incomeChangeSSP > 0 ? 'text-emerald-600' :
-                    data.changes.incomeChangeSSP < 0 ? 'text-red-600' : 
+                    data.changes.incomeChangeSSP > 0 ? 'text-emerald-700' :
+                    data.changes.incomeChangeSSP < 0 ? 'text-red-700' : 
                     'text-slate-500'
                   }`}>
                     {data.changes.incomeChangeSSP > 0 ? '+' : ''}{data.changes.incomeChangeSSP.toFixed(1)}% vs last month
@@ -73,8 +73,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
               <div className="flex items-center mt-1">
                 {data?.changes?.expenseChangeSSP !== undefined ? (
                   <span className={`text-xs font-medium font-variant-numeric-tabular ${
-                    data.changes.expenseChangeSSP > 0 ? 'text-red-600' :
-                    data.changes.expenseChangeSSP < 0 ? 'text-emerald-600' : 
+                    data.changes.expenseChangeSSP > 0 ? 'text-red-700' :
+                    data.changes.expenseChangeSSP < 0 ? 'text-emerald-700' : 
                     'text-slate-500'
                   }`}>
                     {data.changes.expenseChangeSSP > 0 ? '+' : ''}{data.changes.expenseChangeSSP.toFixed(1)}% vs last month
@@ -105,8 +105,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
               <div className="flex items-center mt-1">
                 {data?.changes?.netIncomeChangeSSP !== undefined ? (
                   <span className={`text-xs font-medium font-variant-numeric-tabular ${
-                    data.changes.netIncomeChangeSSP > 0 ? 'text-emerald-600' :
-                    data.changes.netIncomeChangeSSP < 0 ? 'text-red-600' : 
+                    data.changes.netIncomeChangeSSP > 0 ? 'text-emerald-700' :
+                    data.changes.netIncomeChangeSSP < 0 ? 'text-red-700' : 
                     'text-slate-500'
                   }`}>
                     {data.changes.netIncomeChangeSSP > 0 ? '+' : ''}{data.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
@@ -138,8 +138,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                 <div className="flex items-center mt-1">
                   {data?.changes?.incomeChangeUSD !== undefined ? (
                     <span className={`text-xs font-medium font-variant-numeric-tabular ${
-                      data.changes.incomeChangeUSD > 0 ? 'text-emerald-600' :
-                      data.changes.incomeChangeUSD < 0 ? 'text-red-600' : 
+                      data.changes.incomeChangeUSD > 0 ? 'text-emerald-700' :
+                      data.changes.incomeChangeUSD < 0 ? 'text-red-700' : 
                       'text-slate-500'
                     }`}>
                       {data.changes.incomeChangeUSD > 0 ? '+' : ''}{data.changes.incomeChangeUSD.toFixed(1)}% vs last month
