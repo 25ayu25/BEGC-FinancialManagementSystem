@@ -30,7 +30,8 @@ Security preference: Keep security features minimal for 3-person team - removed 
 
 ### Data Storage Solutions
 - **Primary Database**: PostgreSQL with Neon serverless adapter for scalable cloud deployment
-- **Schema Design**: Normalized relational structure with tables for users, departments, insurance providers, transactions, monthly reports, and receipts
+- **Schema Design**: Normalized relational structure with tables for users, departments, insurance providers, transactions, monthly reports, receipts, and patient_volume
+- **Patient Volume Schema**: Tracks daily patient counts by department with date, patient_count, notes, and user attribution
 - **Migrations**: Drizzle Kit for database schema versioning and migrations
 - **Connection Pooling**: Uses connection pooling for efficient database resource management
 
@@ -59,13 +60,16 @@ Security preference: Keep security features minimal for 3-person team - removed 
 - **Component Architecture**: Modular component structure with reusable UI primitives
 - **Responsive Design**: Mobile-first approach with breakpoint-aware components
 - **Data Visualization**: Custom chart components for financial data presentation
+- **Dashboard Layout**: 5-column KPI grid displaying financial metrics and patient volume statistics
 - **Date Selection**: Professional shadcn calendar components with clinic's teal branding for custom date ranges
+- **Modal Forms**: Clean overlay forms for data entry with proper validation and error handling
 
 ### Business Logic Implementation
 - **Multi-Currency Support**: USD and SSP with conversion utilities and proper formatting
 - **Department Tracking**: Consultation, Laboratory, Ultrasound, X-Ray, and Pharmacy departments
 - **Insurance Integration**: Support for multiple insurance providers (CIC, UAP, CIGNA, etc.)
 - **Transaction Types**: Income and expense tracking with detailed categorization
+- **Patient Volume Tracking**: Daily patient count recording by department with notes and comprehensive analytics
 - **Reporting System**: Monthly report generation with department and insurance breakdowns
 - **Time Period Analysis**: Flexible date filtering with Current Month, Last Month, Last 3 Months, This Year, and Custom date range options
 
