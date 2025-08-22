@@ -1068,7 +1068,7 @@ export default function AdvancedDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <a href="/transactions/add" className="block">
+              <a href="/transactions" className="block">
                 <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-slate-900">Add Transaction</span>
