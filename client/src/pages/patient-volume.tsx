@@ -242,7 +242,11 @@ export default function PatientVolumePage() {
                         {format(newEntry.date, "PPP")}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
+                    <PopoverContent 
+                      className="w-auto p-0 z-[60] bg-white border border-slate-200 shadow-2xl" 
+                      sideOffset={8}
+                      style={{ zIndex: 60 }}
+                    >
                       <Calendar
                         mode="single"
                         selected={newEntry.date}
