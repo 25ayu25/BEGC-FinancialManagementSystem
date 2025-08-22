@@ -75,12 +75,15 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
-  // Get today's patient volume for the Simple Dashboard
-  const todayStr = '2025-08-22';
-  const { data: todayPatientVolume = [] } = useQuery({
-    queryKey: ["/api/patient-volume/date", todayStr],
+  // Get patient volume for the selected time period
+  const { data: periodPatientVolume = [] } = useQuery({
+    queryKey: ["/api/patient-volume/period", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
-      const res = await fetch(`/api/patient-volume/date/${todayStr}?departmentId=all-departments`, {
+      let url = `/api/patient-volume/period/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      }
+      const res = await fetch(url, {
         credentials: 'include'
       });
       if (!res.ok) return [];
@@ -169,11 +172,14 @@ export default function Dashboard() {
                     'Custom period'
                 }
               </p>
-              {/* Simple Patient Volume Badge */}
-              {todayPatientVolume.length > 0 && (
+              {/* Patient Volume Badge */}
+              {periodPatientVolume.length > 0 && (
                 <div className="flex items-center gap-2 px-2 py-1 bg-teal-50 rounded-md">
                   <span className="text-teal-600 text-xs font-medium">
-                    Today: {todayPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
+                    {timeRange === 'current-month' ? 'Current month' :
+                     timeRange === 'last-month' ? 'Last month' :
+                     timeRange === 'last-3-months' ? 'Last 3 months' :
+                     timeRange === 'year' ? 'This year' : 'Selected period'}: {periodPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
                   </span>
                 </div>
               )}
@@ -277,7 +283,7 @@ export default function Dashboard() {
         <SimpleDashboardKPIs data={dashboardData || {}} />
 
         {/* Patient Volume Widget (when data exists) */}
-        {todayPatientVolume.length > 0 && (
+        {periodPatientVolume.length > 0 && (
           <Card className="border border-teal-100 shadow-sm bg-gradient-to-r from-teal-50 to-emerald-50">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
@@ -285,8 +291,18 @@ export default function Dashboard() {
                   <Users className="h-5 w-5 text-teal-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl font-semibold text-slate-900">Today's Patient Volume</CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">Current daily patient count</p>
+                  <CardTitle className="text-xl font-semibold text-slate-900">
+                    {timeRange === 'current-month' ? 'Current Month' : 
+                     timeRange === 'last-month' ? 'Last Month' : 
+                     timeRange === 'last-3-months' ? 'Last 3 Months' :
+                     timeRange === 'year' ? 'This Year' : 'Custom Period'} Patient Volume
+                  </CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {timeRange === 'current-month' ? 'Patients this month' :
+                     timeRange === 'last-month' ? 'Patients last month' :
+                     timeRange === 'last-3-months' ? 'Patients in last 3 months' :
+                     timeRange === 'year' ? 'Patients this year' : 'Patients in selected period'}
+                  </p>
                 </div>
               </div>
             </CardHeader>
@@ -294,10 +310,15 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="text-4xl font-bold text-teal-700 mb-2">
-                    {todayPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0)}
+                    {periodPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0)}
                   </div>
                   <div className="text-sm text-teal-600 font-medium">
-                    Patients seen today ({format(new Date(), 'EEEE, MMMM d')})
+                    {timeRange === 'current-month' ? `Patients in ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy')}` :
+                     timeRange === 'last-month' ? `Patients in ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy')}` :
+                     timeRange === 'last-3-months' ? 'Patients in last 3 months' :
+                     timeRange === 'year' ? `Patients in ${selectedYear}` : 
+                     customStartDate && customEndDate ? `${format(customStartDate, 'MMM d')} - ${format(customEndDate, 'MMM d, yyyy')}` :
+                     'Selected period'}
                   </div>
                 </div>
                 <div>

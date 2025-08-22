@@ -1000,6 +1000,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Patient volume by period (matches the time range filters)
+  app.get("/api/patient-volume/period/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const range = req.query.range as string || 'current-month';
+      
+      let volumes = [];
+      
+      switch(range) {
+        case 'current-month': {
+          volumes = await storage.getPatientVolumeForMonth(year, month);
+          break;
+        }
+        case 'last-month': {
+          volumes = await storage.getPatientVolumeForMonth(year, month);
+          break;
+        }
+        case 'last-3-months': {
+          // Get volumes for current month and 2 previous months
+          const months = [];
+          for (let i = 0; i < 3; i++) {
+            const date = new Date(year, month - 1 - i);
+            const monthVolumes = await storage.getPatientVolumeForMonth(date.getFullYear(), date.getMonth() + 1);
+            months.push(...monthVolumes);
+          }
+          volumes = months;
+          break;
+        }
+        case 'year': {
+          // Get all months in the year
+          const allMonths = [];
+          for (let m = 1; m <= 12; m++) {
+            const monthVolumes = await storage.getPatientVolumeForMonth(year, m);
+            allMonths.push(...monthVolumes);
+          }
+          volumes = allMonths;
+          break;
+        }
+        case 'custom': {
+          const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(year, month - 1, 1);
+          const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date(year, month, 0);
+          volumes = await storage.getPatientVolumeByDateRange(startDate, endDate);
+          break;
+        }
+        default: {
+          volumes = await storage.getPatientVolumeForMonth(year, month);
+        }
+      }
+      
+      res.json(volumes);
+    } catch (error) {
+      console.error("Error getting patient volume for period:", error);
+      res.status(500).json({ error: "Failed to get patient volume data" });
+    }
+  });
+
   app.put("/api/patient-volume/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;

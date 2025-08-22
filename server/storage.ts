@@ -670,6 +670,22 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
+  async getPatientVolumeByDateRange(startDate: Date, endDate: Date): Promise<PatientVolume[]> {
+    console.log(`Searching patient volume between ${startDate.toISOString()} and ${endDate.toISOString()}`);
+
+    const results = await db.select().from(patientVolume)
+      .where(
+        and(
+          gte(patientVolume.date, startDate),
+          lte(patientVolume.date, endDate)
+        )
+      )
+      .orderBy(patientVolume.date);
+      
+    console.log(`Found ${results.length} patient volume records for date range`);
+    return results;
+  }
+
   async updatePatientVolume(id: string, updates: Partial<PatientVolume>): Promise<PatientVolume | undefined> {
     const [updated] = await db.update(patientVolume)
       .set({
