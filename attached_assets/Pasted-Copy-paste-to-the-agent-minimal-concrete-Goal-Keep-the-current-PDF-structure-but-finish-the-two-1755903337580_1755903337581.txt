@@ -1,0 +1,36 @@
+Copy-paste to the agent (minimal, concrete)
+Goal: Keep the current PDF structure, but finish the two expense tables and tidy formatting. No new features. No daily tables.
+1) Data mapping (do not change names)
+Payroll & Insurance (Monthly) (single row of monthly sums):
+Clinic → sum of expense_category = "Clinic Operations"
+Doctors → sum of expense_category = "Doctor Payments"
+Lab Techs → sum of expense_category = "Lab Tech Payments"
+Radiographer → sum of expense_category = "Radiographer Payments"
+Insurance → sum of expense_category = "Insurance Payments"
+Section TOTAL = sum of the five cells above.
+Monthly Operating Expenses (one row per category; exclude the five above so we don’t double-count):
+Staff Salaries, Drugs Purchased, Lab Reagents, Equipment, Landlord, Utilities, Sono Papers, X-Ray Films, Other
+Show only categories that have a non-zero total for the month.
+Section TOTAL = sum of listed operating categories.
+Grand Total Expenses = Payroll & Insurance TOTAL + Operating Expenses TOTAL.
+(It should match “Total Expenses (SSP)” at the top of the report.)
+2) Formatting (keep it simple and consistent)
+Use tabular numerals on all numbers in the PDF (KPI tiles, both tables, totals) so columns align.
+Right-align all amounts in table cells.
+Always show thousand separators (e.g., SSP 26,900).
+Header labels: keep “Insurance” (not “Insurance %”) in the Payroll table.
+3) Layout rules
+The two tables must always render, even if some values are 0 (show SSP 0).
+Place Payroll & Insurance first, then Monthly Operating Expenses, then a single line Grand Total Expenses.
+Keep everything on one page when possible; if a page break is needed, do it between tables, not inside a table.
+4) Acceptance checks (verify before handing over)
+In my sample report, the data currently shows:
+Payroll row: Clinic SSP 200, Doctors SSP 4,300, Lab Techs SSP 7,500, Radiographer SSP 0, Insurance SSP 0, TOTAL = SSP 12,000.
+Operating Expenses: only Equipment SSP 500, TOTAL = SSP 500.
+GRAND TOTAL = SSP 12,500 and matches Total Expenses at the top.
+Keep these exact numbers when you re-generate the PDF so we can confirm alignment/formatting only. 
+Amounts are right-aligned and aligned visually (tabular numerals) in both tables.
+Section totals and the grand total are displayed and correct.
+No daily breakdowns appear anywhere.
+5) Please do NOT change:
+The report header, the KPI boxes, or any existing queries that drive totals—only add/format the two tables and totals as described.

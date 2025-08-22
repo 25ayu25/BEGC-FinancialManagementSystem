@@ -902,10 +902,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 15;
         doc.setTextColor(0, 0, 0);
         
-        // Payroll & Insurance categories
-        const payrollCategories = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
-        const payrollAmounts = payrollCategories.map(cat => parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0'));
-        const payrollTotal = payrollAmounts.reduce((sum, amount) => sum + amount, 0);
+        // Payroll & Insurance categories with exact mapping
+        const clinicAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Clinic Operations']) || '0');
+        const doctorsAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Doctor Payments']) || '0');
+        const labTechAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Lab Tech Payments']) || '0');
+        const radiographerAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Radiographer Payments']) || '0');
+        const insuranceAmount = parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown['Insurance Payments']) || '0');
+        const payrollTotal = clinicAmount + doctorsAmount + labTechAmount + radiographerAmount + insuranceAmount;
         
         // Data row
         doc.setFillColor(249, 250, 251);
@@ -913,11 +916,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.text(`SSP ${Math.round(payrollAmounts[0]).toLocaleString()}`, margin + 5, currentY, { align: 'left' });
-        doc.text(`SSP ${Math.round(payrollAmounts[1]).toLocaleString()}`, margin + 35, currentY, { align: 'left' });
-        doc.text(`SSP ${Math.round(payrollAmounts[2]).toLocaleString()}`, margin + 70, currentY, { align: 'left' });
-        doc.text(`SSP ${Math.round(payrollAmounts[3]).toLocaleString()}`, margin + 105, currentY, { align: 'left' });
-        doc.text(`SSP ${Math.round(payrollAmounts[4]).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        doc.text(`SSP ${Math.round(clinicAmount).toLocaleString()}`, margin + 30, currentY, { align: 'right' });
+        doc.text(`SSP ${Math.round(doctorsAmount).toLocaleString()}`, margin + 65, currentY, { align: 'right' });
+        doc.text(`SSP ${Math.round(labTechAmount).toLocaleString()}`, margin + 100, currentY, { align: 'right' });
+        doc.text(`SSP ${Math.round(radiographerAmount).toLocaleString()}`, margin + 140, currentY, { align: 'right' });
+        doc.text(`SSP ${Math.round(insuranceAmount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
         
         currentY += 15;
         
@@ -1014,9 +1017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(0, 0, 0);
         
         // Grand total expenses
-        const payrollCategoriesTotal = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
-        const payrollTotalCalc = payrollCategoriesTotal.reduce((sum, cat) => sum + parseFloat((reportData.expenseBreakdown && reportData.expenseBreakdown[cat]) || '0'), 0);
-        const grandTotal = payrollTotalCalc + operatingTotal;
+        const grandTotal = payrollTotal + operatingTotal;
         
         doc.setFillColor(200, 200, 200);
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
