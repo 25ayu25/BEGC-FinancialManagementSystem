@@ -715,7 +715,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalExpenses: dashboardData.totalExpenses,
         netIncome: dashboardData.netIncome,
         departmentBreakdown: dashboardData.departmentBreakdown,
-        insuranceBreakdown: dashboardData.insuranceBreakdown
+        insuranceBreakdown: dashboardData.insuranceBreakdown,
+        expenseBreakdown: dashboardData.expenseBreakdown
       };
       
       // Generate PDF using jsPDF
@@ -869,6 +870,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           currentY += 12;
         });
+      }
+      
+      // Payroll & Insurance (Monthly) Section
+      if (reportData.expenseBreakdown && Object.keys(reportData.expenseBreakdown).length > 0) {
+        currentY += 20;
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(20, 83, 75);
+        doc.text('Payroll & Insurance (Monthly)', margin, currentY);
+        
+        // Add underline
+        doc.line(margin, currentY + 2, margin + 100, currentY + 2);
+        
+        currentY += 20;
+        doc.setTextColor(0, 0, 0);
+        
+        // Payroll & Insurance table header
+        doc.setFillColor(20, 83, 75);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('Clinic', margin + 5, currentY);
+        doc.text('Doctors', margin + 35, currentY);
+        doc.text('Lab Techs', margin + 70, currentY);
+        doc.text('Radiographer', margin + 105, currentY);
+        doc.text('Insurance', pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 15;
+        doc.setTextColor(0, 0, 0);
+        
+        // Payroll & Insurance categories
+        const payrollCategories = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
+        const payrollAmounts = payrollCategories.map(cat => parseFloat(reportData.expenseBreakdown[cat] || '0'));
+        const payrollTotal = payrollAmounts.reduce((sum, amount) => sum + amount, 0);
+        
+        // Data row
+        doc.setFillColor(249, 250, 251);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`SSP ${Math.round(payrollAmounts[0]).toLocaleString()}`, margin + 5, currentY, { align: 'left' });
+        doc.text(`SSP ${Math.round(payrollAmounts[1]).toLocaleString()}`, margin + 35, currentY, { align: 'left' });
+        doc.text(`SSP ${Math.round(payrollAmounts[2]).toLocaleString()}`, margin + 70, currentY, { align: 'left' });
+        doc.text(`SSP ${Math.round(payrollAmounts[3]).toLocaleString()}`, margin + 105, currentY, { align: 'left' });
+        doc.text(`SSP ${Math.round(payrollAmounts[4]).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 15;
+        
+        // Payroll & Insurance total row
+        doc.setFillColor(20, 83, 75);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('TOTAL', margin + 5, currentY);
+        doc.text(`SSP ${Math.round(payrollTotal).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 25;
+        doc.setTextColor(0, 0, 0);
+      }
+      
+      // Monthly Operating Expenses Section
+      if (reportData.expenseBreakdown && Object.keys(reportData.expenseBreakdown).length > 0) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(20, 83, 75);
+        doc.text('Monthly Operating Expenses', margin, currentY);
+        
+        // Add underline
+        doc.line(margin, currentY + 2, margin + 100, currentY + 2);
+        
+        currentY += 20;
+        doc.setTextColor(0, 0, 0);
+        
+        // Operating Expenses table header
+        doc.setFillColor(20, 83, 75);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Category', margin + 5, currentY);
+        doc.text('Amount', pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 15;
+        doc.setTextColor(0, 0, 0);
+        
+        // Operating expenses categories (excluding payroll categories)
+        const operatingCategories = ['Staff Salaries', 'Drugs Purchased', 'Lab Reagents', 'Equipment', 'Landlord', 'Utilities', 'Sono Papers', 'X-Ray films', 'Other'];
+        const operatingExpenses = operatingCategories.filter(cat => reportData.expenseBreakdown[cat] && parseFloat(reportData.expenseBreakdown[cat]) > 0);
+        let operatingTotal = 0;
+        
+        operatingExpenses.forEach((category, index) => {
+          const amount = parseFloat(reportData.expenseBreakdown[category] || '0');
+          operatingTotal += amount;
+          
+          // Alternating row colors
+          const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+          doc.setFillColor(...bgColor);
+          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+          
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(11);
+          doc.text(category, margin + 5, currentY);
+          doc.text(`SSP ${Math.round(amount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+          
+          currentY += 12;
+        });
+        
+        // Operating expenses total row
+        doc.setFillColor(20, 83, 75);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('TOTAL', margin + 5, currentY);
+        doc.text(`SSP ${Math.round(operatingTotal).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 20;
+        doc.setTextColor(0, 0, 0);
+        
+        // Grand total expenses
+        const payrollCategories = ['Clinic Operations', 'Doctor Payments', 'Lab Tech Payments', 'Radiographer Payments', 'Insurance Payments'];
+        const payrollTotal = payrollCategories.reduce((sum, cat) => sum + parseFloat(reportData.expenseBreakdown[cat] || '0'), 0);
+        const grandTotal = payrollTotal + operatingTotal;
+        
+        doc.setFillColor(200, 200, 200);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.text('GRAND TOTAL EXPENSES', margin + 5, currentY);
+        doc.text(`SSP ${Math.round(grandTotal).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 25;
       }
       
       // Add some spacing before footer
