@@ -290,7 +290,7 @@ function RevenueDataTable({ data, selectedDepartment, departments, monthName, se
       
       {/* Footer Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <div className="text-sm text-slate-500">
+        <div className="text-sm text-slate-500 font-mono tabular-nums">
           {tableData.length} transaction{tableData.length !== 1 ? 's' : ''} • SSP Total: {Math.round(totals.ssp).toLocaleString()} • USD Total: {totals.usd.toLocaleString()}
         </div>
         <div className="flex gap-2">
@@ -469,7 +469,7 @@ export default function AdvancedDashboard() {
           {totalAmount > 0 && (
             <div className="mt-2 pt-2 border-t border-slate-100">
               <p className="text-xs text-slate-500">Share of period: {shareOfMonth.toFixed(1)}%</p>
-              <p className="text-xs text-slate-500">MTD total: SSP {mtdTotal.toLocaleString()}</p>
+              <p className="text-xs text-slate-500 font-mono tabular-nums">MTD total: SSP {mtdTotal.toLocaleString()}</p>
             </div>
           )}
           {!hasSSP && !hasUSD && <p className="text-sm text-slate-500">No transactions</p>}
@@ -697,7 +697,9 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspRevenue).toLocaleString()}</p>
-
+                <div className="flex items-center mt-1 text-emerald-600">
+                  <span className="text-xs font-medium">vs last month</span>
+                </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
@@ -713,7 +715,7 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(totalExpenses).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-red-600">
+                <div className="flex items-center mt-1 text-slate-600">
                   <span className="text-xs font-medium">vs last month</span>
                 </div>
               </div>
@@ -750,7 +752,9 @@ export default function AdvancedDashboard() {
                 <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">USD {Math.round(usdIncome).toLocaleString()}</p>
                 <div className="flex items-center mt-1 text-purple-600">
-                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}</span>
+                  <a href="/transactions" className="text-xs font-medium hover:underline cursor-pointer">
+                    {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                  </a>
                 </div>
               </div>
               <div className="bg-purple-50 p-1.5 rounded-lg">
