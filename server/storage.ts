@@ -6,7 +6,7 @@ import {
   type PatientVolume, type InsertPatientVolume
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, lt, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -648,6 +648,39 @@ export class DatabaseStorage implements IStorage {
       
     console.log(`Found ${results.length} patient volume records`);
     return results;
+  }
+
+  async getPatientVolumeSummary(startDate: string, endDate: string): Promise<{
+    total_count: number;
+    days_reported: number;
+    avg_per_day: number;
+  }> {
+    console.log(`Querying patient volume summary from ${startDate} to ${endDate}`);
+    
+    const start = new Date(startDate + 'T00:00:00.000Z');
+    const end = new Date(endDate + 'T00:00:00.000Z');
+    
+    const results = await db.select().from(patientVolume)
+      .where(
+        and(
+          gte(patientVolume.date, start),
+          lt(patientVolume.date, end)
+        )
+      );
+    
+    const totalCount = results.reduce((sum, record) => sum + record.patientCount, 0);
+    const uniqueDates = new Set(results.map(record => record.date.toISOString().split('T')[0]));
+    const daysReported = uniqueDates.size;
+    const avgPerDay = daysReported > 0 ? totalCount / daysReported : 0;
+    
+    const summary = {
+      total_count: totalCount,
+      days_reported: daysReported,
+      avg_per_day: Math.round(avgPerDay * 10) / 10 // Round to 1 decimal place
+    };
+    
+    console.log(`Summary calculated:`, summary);
+    return summary;
   }
 
   async getPatientVolumeForMonth(year: number, month: number): Promise<PatientVolume[]> {

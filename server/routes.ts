@@ -987,6 +987,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New summary endpoint for dashboard
+  app.get("/api/patient-volume/summary", requireAuth, async (req, res) => {
+    try {
+      const startDate = req.query.start as string;
+      const endDate = req.query.end as string;
+      
+      console.log(`GET /api/patient-volume/summary - start: ${startDate}, end: ${endDate}`);
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "start and end dates are required" });
+      }
+      
+      const summary = await storage.getPatientVolumeSummary(startDate, endDate);
+      console.log(`Patient volume summary:`, summary);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error getting patient volume summary:", error);
+      res.status(500).json({ error: "Failed to get patient volume summary" });
+    }
+  });
+
+  // Keep existing month endpoint for compatibility
   app.get("/api/patient-volume/:year/:month", requireAuth, async (req, res) => {
     try {
       const year = parseInt(req.params.year);

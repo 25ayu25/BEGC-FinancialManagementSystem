@@ -75,37 +75,64 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
-  // Force patient volume data fetch with direct state management
-  const [patientVolumeData, setPatientVolumeData] = useState([]);
-  const [isLoadingPatientVolume, setIsLoadingPatientVolume] = useState(false);
-
-  useEffect(() => {
-    const fetchPatientVolumeData = async () => {
-      setIsLoadingPatientVolume(true);
-      try {
-        console.log(`Dashboard: Force fetching patient volume data for ${selectedYear}/${selectedMonth}`);
-        const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
-          credentials: 'include'
-        });
-        console.log(`Dashboard: API response status: ${res.status}`);
-        if (res.ok) {
-          const data = await res.json();
-          console.log(`Dashboard: Patient volume data received:`, data);
-          setPatientVolumeData(data || []);
-        } else {
-          console.error(`Dashboard: Failed to fetch patient volume: ${res.status} ${res.statusText}`);
-          setPatientVolumeData([]);
+  // Patient volume summary using the new summary endpoint
+  const getDateRange = (timeRange: string, year: number, month: number, customStartDate?: Date, customEndDate?: Date) => {
+    const now = new Date();
+    switch(timeRange) {
+      case 'current-month':
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        return {
+          start: start.toISOString().split('T')[0],
+          end: end.toISOString().split('T')[0]
+        };
+      case 'last-month':
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+        return {
+          start: lastMonthStart.toISOString().split('T')[0],
+          end: lastMonthEnd.toISOString().split('T')[0]
+        };
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return {
+            start: customStartDate.toISOString().split('T')[0],
+            end: new Date(customEndDate.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          };
         }
-      } catch (error) {
-        console.error('Dashboard: Error fetching patient volume:', error);
-        setPatientVolumeData([]);
-      } finally {
-        setIsLoadingPatientVolume(false);
-      }
-    };
+        break;
+      default:
+        // Default to selected year/month
+        const defaultStart = new Date(year, month - 1, 1);
+        const defaultEnd = new Date(year, month, 1);
+        return {
+          start: defaultStart.toISOString().split('T')[0],
+          end: defaultEnd.toISOString().split('T')[0]
+        };
+    }
+    return { start: '', end: '' };
+  };
 
-    fetchPatientVolumeData();
-  }, [selectedYear, selectedMonth]);
+  const dateRange = getDateRange(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate);
+  
+  const { data: patientVolumeSummary, isLoading: isLoadingPatientVolume } = useQuery({
+    queryKey: [`patient-volume:summary:${dateRange.start}:${dateRange.end}`],
+    queryFn: async () => {
+      console.log(`Dashboard: Fetching patient volume summary start=${dateRange.start}, end=${dateRange.end}`);
+      const res = await fetch(`/api/patient-volume/summary?start=${dateRange.start}&end=${dateRange.end}`, {
+        credentials: 'include'
+      });
+      console.log(`Dashboard: Summary API response status: ${res.status}`);
+      if (!res.ok) {
+        console.error(`Dashboard: Failed to fetch patient volume summary: ${res.status} ${res.statusText}`);
+        return { total_count: 0, days_reported: 0, avg_per_day: 0 };
+      }
+      const data = await res.json();
+      console.log(`Dashboard: Patient volume summary received:`, data);
+      return data;
+    },
+    enabled: !!dateRange.start && !!dateRange.end
+  });
 
   if (error) {
     return (
@@ -281,7 +308,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8 max-w-7xl mx-auto w-full">
         {/* KPI Band */}
-        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeData={patientVolumeData} />
+        <SimpleDashboardKPIs data={dashboardData || {}} patientVolumeSummary={patientVolumeSummary || { total_count: 0, days_reported: 0, avg_per_day: 0 }} />
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">
