@@ -149,7 +149,9 @@ export default function AddTransactionModal({
     }
 
     // For income transactions, department is required only if no insurance provider is selected
-    if (type === "income" && !departmentId && (!insuranceProviderId || insuranceProviderId === "no-insurance")) {
+    const hasValidInsurance = insuranceProviderId && insuranceProviderId !== "" && insuranceProviderId !== "no-insurance";
+    
+    if (type === "income" && !departmentId && !hasValidInsurance) {
       toast({
         title: "Validation Error",
         description: "Please select a department for income transactions",
