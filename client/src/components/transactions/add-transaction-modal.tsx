@@ -406,12 +406,19 @@ export default function AddTransactionModal({
           {/* Description */}
           <div>
             <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              Notes (Optional)
+              {type === "income" && departments?.find((d: any) => d.id === departmentId)?.code === "OTHER" 
+                ? "Description" 
+                : "Notes (Optional)"
+              }
             </Label>
             <Textarea
               id="description"
               rows={3}
-              placeholder="Enter daily consultation total or expense details (optional)..."
+              placeholder={
+                type === "income" && departments?.find((d: any) => d.id === departmentId)?.code === "OTHER"
+                  ? "e.g., Minor surgery, dressing change, supplies, procedures, etc."
+                  : "Enter daily consultation total or expense details (optional)..."
+              }
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               data-testid="textarea-description"

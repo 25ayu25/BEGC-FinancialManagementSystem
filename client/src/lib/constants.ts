@@ -4,6 +4,7 @@ export const DEPARTMENTS = {
   ULTRASOUND: { name: "Ultrasound", code: "ULTRASOUND" },
   XRAY: { name: "X-Ray", code: "XRAY" },
   PHARMACY: { name: "Pharmacy", code: "PHARMACY" },
+  OTHER: { name: "Other", code: "OTHER" },
 } as const;
 
 export const INSURANCE_PROVIDERS = {

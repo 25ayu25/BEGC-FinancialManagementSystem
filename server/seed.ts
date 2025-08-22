@@ -11,6 +11,7 @@ async function seedDatabase() {
       { code: "ULTRASOUND", name: "Ultrasound" },
       { code: "XRAY", name: "X-Ray" },
       { code: "PHARMACY", name: "Pharmacy" },
+      { code: "OTHER", name: "Other" },
     ];
 
     for (const dept of departments) {
