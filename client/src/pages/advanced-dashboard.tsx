@@ -776,34 +776,36 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Insurance Revenue */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">USD {Math.round(usdIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-1">
-                  {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
-                    <span className={`text-xs font-medium ${
-                      dashboardData.changes.incomeChangeUSD > 0 ? 'text-emerald-600' :
-                      dashboardData.changes.incomeChangeUSD < 0 ? 'text-red-600' : 
-                      'text-slate-500'
-                    }`}>
-                      {dashboardData.changes.incomeChangeUSD > 0 ? '+' : ''}{dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                    </span>
-                  ) : (
-                    <span className="text-xs font-medium text-purple-600">
-                      {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
-                    </span>
-                  )}
+        <Link href="/insurance-providers">
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">USD {Math.round(usdIncome).toLocaleString()}</p>
+                  <div className="flex items-center mt-1">
+                    {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                      <span className={`text-xs font-medium ${
+                        dashboardData.changes.incomeChangeUSD > 0 ? 'text-emerald-600' :
+                        dashboardData.changes.incomeChangeUSD < 0 ? 'text-red-600' : 
+                        'text-slate-500'
+                      }`}>
+                        {dashboardData.changes.incomeChangeUSD > 0 ? '+' : ''}{dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-purple-600">
+                        {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-purple-50 p-1.5 rounded-lg">
+                  <Shield className="h-4 w-4 text-purple-600" />
                 </div>
               </div>
-              <div className="bg-purple-50 p-1.5 rounded-lg">
-                <Shield className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
 
       </div>
