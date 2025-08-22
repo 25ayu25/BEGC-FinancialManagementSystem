@@ -62,8 +62,9 @@ export default function SimpleDashboardKPIs({ data, patientVolumeData = [] }: Si
   const estimatedMonthlyIncome = sspIncome > 0 ? (sspIncome / currentDay) * daysInMonth : 0;
 
   // Calculate patient volume metrics
-  const totalPatients = patientVolumeData.reduce((sum, volume) => sum + volume.patientCount, 0);
-  const daysWithData = new Set(patientVolumeData.map(v => v.date.split('T')[0])).size;
+  const volumeArray = Array.isArray(patientVolumeData) ? patientVolumeData : [];
+  const totalPatients = volumeArray.reduce((sum, volume) => sum + volume.patientCount, 0);
+  const daysWithData = new Set(volumeArray.map(v => v.date.split('T')[0])).size;
   const avgPatientsPerDay = daysWithData > 0 ? totalPatients / daysWithData : 0;
 
   const kpis = [

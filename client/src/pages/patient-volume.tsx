@@ -100,7 +100,7 @@ export default function PatientVolumePage() {
     });
   };
 
-  const totalPatients = volumeData.reduce((sum, entry) => sum + entry.patientCount, 0);
+  const totalPatients = Array.isArray(volumeData) ? volumeData.reduce((sum, entry) => sum + entry.patientCount, 0) : 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -200,7 +200,7 @@ export default function PatientVolumePage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {volumeData.map((entry) => {
+                  {Array.isArray(volumeData) && volumeData.map((entry) => {
                     const department = departments.find(d => d.id === entry.departmentId);
                     return (
                       <div key={entry.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
