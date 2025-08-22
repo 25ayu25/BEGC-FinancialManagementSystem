@@ -144,7 +144,12 @@ export default function PatientVolumePage() {
                     {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent 
+                  className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl" 
+                  sideOffset={8}
+                  align="start"
+                  style={{ zIndex: 50 }}
+                >
                   <Calendar
                     mode="single"
                     selected={selectedDate}
