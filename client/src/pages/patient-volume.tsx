@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,8 @@ export default function PatientVolumePage() {
   // Check URL parameters for initial date
   const urlParams = new URLSearchParams(window.location.search);
   const dateParam = urlParams.get('date');
-  const initialDate = dateParam ? new Date(dateParam) : new Date();
+  // Parse date more safely to avoid timezone issues
+  const initialDate = dateParam ? new Date(dateParam + 'T12:00:00') : new Date();
   
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
@@ -46,6 +47,16 @@ export default function PatientVolumePage() {
   const [showAddForm, setShowAddForm] = useState(false);
 
   const queryClient = useQueryClient();
+
+  // Update selected date when URL parameters change
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dateParam = urlParams.get('date');
+    if (dateParam) {
+      const parsedDate = new Date(dateParam + 'T12:00:00');
+      setSelectedDate(parsedDate);
+    }
+  }, []);
 
   // Get departments
   const { data: departments = [] } = useQuery<Department[]>({
