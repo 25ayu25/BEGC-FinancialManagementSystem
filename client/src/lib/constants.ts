@@ -31,6 +31,9 @@ export const EXPENSE_CATEGORIES = [
   "Drugs Purchased",
   "Lab Reagents",
   "Equipment",
+  "Landlord",
+  "Sono Papers",
+  "X-Ray films",
   "Utilities",
   "Other",
 ] as const;
