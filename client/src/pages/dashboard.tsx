@@ -115,11 +115,15 @@ export default function Dashboard() {
 
   const dateRange = getDateRange(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate);
   
+  // FORCE QUERY TO EXECUTE - temporary debug
   const { data: patientVolumeSummary, isLoading: isLoadingPatientVolume } = useQuery({
-    queryKey: [`patient-volume:summary:${dateRange.start}:${dateRange.end}`],
+    queryKey: [`patient-volume-summary`, timeRange, selectedYear, selectedMonth],
     queryFn: async () => {
-      console.log(`Dashboard: Fetching patient volume summary start=${dateRange.start}, end=${dateRange.end}`);
-      const res = await fetch(`/api/patient-volume/summary?start=${dateRange.start}&end=${dateRange.end}`, {
+      // Force current month for now to debug
+      const start = '2025-08-01';
+      const end = '2025-09-01';
+      console.log(`Dashboard: FORCE Fetching patient volume summary start=${start}, end=${end}`);
+      const res = await fetch(`/api/patient-volume/summary?start=${start}&end=${end}`, {
         credentials: 'include'
       });
       console.log(`Dashboard: Summary API response status: ${res.status}`);
@@ -130,8 +134,7 @@ export default function Dashboard() {
       const data = await res.json();
       console.log(`Dashboard: Patient volume summary received:`, data);
       return data;
-    },
-    enabled: !!dateRange.start && !!dateRange.end
+    }
   });
 
   if (error) {
