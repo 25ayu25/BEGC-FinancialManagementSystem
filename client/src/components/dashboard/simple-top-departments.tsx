@@ -107,18 +107,36 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
             ))}
           </div>
 
-          {/* Total Summary */}
+          {/* Total Summary - Enhanced Professional Style */}
           <div className="pt-4 border-t border-slate-200">
-            <div className="p-3 bg-slate-50 rounded-lg space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-slate-700">Total Revenue</span>
-                <span className="text-lg font-bold text-slate-900">
-                  SSP {Math.round(total).toLocaleString()}
-                </span>
+            <div className="relative p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-xl shadow-sm overflow-hidden">
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="w-full h-full bg-gradient-to-br from-teal-200 via-transparent to-emerald-200"></div>
               </div>
-              <div className="flex justify-between items-center text-xs text-slate-500">
-                <span>{sortedDepartments.filter(d => d.amount > 0).length} active departments</span>
-                <span>Day {new Date().getDate()} of {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}</span>
+              
+              {/* Content */}
+              <div className="relative z-10 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                    <span className="text-sm font-semibold text-teal-700">Total Revenue</span>
+                  </div>
+                  <span className="text-xl font-bold font-variant-numeric-tabular text-teal-900">
+                    SSP {Math.round(total).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                    <span className="text-xs font-medium text-emerald-600">
+                      {sortedDepartments.filter(d => d.amount > 0).length} active departments
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium font-variant-numeric-tabular text-slate-600 bg-white/60 px-2 py-1 rounded-full">
+                    Day {new Date().getDate()} of {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
