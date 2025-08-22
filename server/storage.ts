@@ -6,7 +6,7 @@ import {
   type PatientVolume, type InsertPatientVolume
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -407,22 +407,24 @@ export class DatabaseStorage implements IStorage {
 
     // Get insurance breakdown (USD only for insurance payments)
     const insuranceData = await db.select({
-      insuranceProviderId: transactions.insuranceProviderId,
+      providerName: insuranceProviders.name,
       total: sql<string>`SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END)`
     }).from(transactions)
+    .innerJoin(insuranceProviders, eq(transactions.insuranceProviderId, insuranceProviders.id))
     .where(
       and(
         eq(transactions.type, "income"),
         gte(transactions.date, startDate),
-        lte(transactions.date, endDate)
+        lte(transactions.date, endDate),
+        isNotNull(transactions.insuranceProviderId)
       )
     )
-    .groupBy(transactions.insuranceProviderId);
+    .groupBy(insuranceProviders.name);
 
     const insuranceBreakdown: Record<string, string> = {};
     insuranceData.forEach(item => {
-      if (item.insuranceProviderId) {
-        insuranceBreakdown[item.insuranceProviderId] = item.total;
+      if (item.providerName) {
+        insuranceBreakdown[item.providerName] = item.total;
       }
     });
 
