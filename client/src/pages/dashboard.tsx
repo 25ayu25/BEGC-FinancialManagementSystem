@@ -76,15 +76,22 @@ export default function Dashboard() {
   });
 
   // Get patient volume data for the selected month
-  const { data: patientVolumeData = [] } = useQuery({
+  const { data: patientVolumeData = [], isLoading: isLoadingPatientVolume } = useQuery({
     queryKey: ["/api/patient-volume", selectedYear, selectedMonth],
     queryFn: async () => {
+      console.log(`Fetching patient volume data for ${selectedYear}/${selectedMonth}`);
       const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
         credentials: 'include'
       });
-      if (!res.ok) return [];
-      return res.json();
-    }
+      if (!res.ok) {
+        console.error(`Failed to fetch patient volume: ${res.status} ${res.statusText}`);
+        return [];
+      }
+      const data = await res.json();
+      console.log(`Patient volume data received:`, data);
+      return data;
+    },
+    enabled: !isLoading && !!dashboardData
   });
 
   if (error) {
