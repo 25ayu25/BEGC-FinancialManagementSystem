@@ -282,8 +282,7 @@ export default function Dashboard() {
         {/* KPI Band */}
         <SimpleDashboardKPIs data={dashboardData || {}} />
 
-        {/* Patient Volume Widget (when data exists) */}
-        {periodPatientVolume.length > 0 && (
+        {/* Patient Volume Widget */}
           <Card className="border border-teal-100 shadow-sm bg-gradient-to-r from-teal-50 to-emerald-50">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
@@ -335,7 +334,6 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-        )}
 
         {/* Departments Chart */}
         <div className="grid grid-cols-1">
