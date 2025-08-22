@@ -285,7 +285,10 @@ export default function Transactions() {
                                     {new Date(transaction.date).toLocaleDateString()}
                                   </td>
                                   <td className="py-3 px-4 text-sm text-gray-900">
-                                    {transaction.description}
+                                    {transaction.insuranceProviderName 
+                                      ? `${transaction.insuranceProviderName} ${transaction.description || 'Income'}`
+                                      : (transaction.description || (transaction.type === 'income' ? 'Income' : 'Expense'))
+                                    }
                                   </td>
                                   <td className="py-3 px-4">
                                     <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>

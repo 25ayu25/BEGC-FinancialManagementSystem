@@ -225,8 +225,29 @@ export class DatabaseStorage implements IStorage {
     }
     const [{ count: total }] = await countQuery;
 
-    // Get paginated results
-    let dataQuery = db.select().from(transactions);
+    // Get paginated results with insurance provider and department names
+    let dataQuery = db.select({
+      id: transactions.id,
+      type: transactions.type,
+      departmentId: transactions.departmentId,
+      amount: transactions.amount,
+      currency: transactions.currency,
+      description: transactions.description,
+      date: transactions.date,
+      receiptPath: transactions.receiptPath,
+      insuranceProviderId: transactions.insuranceProviderId,
+      expenseCategory: transactions.expenseCategory,
+      staffType: transactions.staffType,
+      createdBy: transactions.createdBy,
+      syncStatus: transactions.syncStatus,
+      createdAt: transactions.createdAt,
+      updatedAt: transactions.updatedAt,
+      departmentName: departments.name,
+      insuranceProviderName: insuranceProviders.name,
+    }).from(transactions)
+    .leftJoin(departments, eq(transactions.departmentId, departments.id))
+    .leftJoin(insuranceProviders, eq(transactions.insuranceProviderId, insuranceProviders.id));
+    
     if (conditions.length > 0) {
       dataQuery = dataQuery.where(and(...conditions));
     }
