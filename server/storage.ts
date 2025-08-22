@@ -433,6 +433,61 @@ export class DatabaseStorage implements IStorage {
       limit: 10
     });
 
+    // Calculate previous period data for comparison
+    let prevStartDate: Date;
+    let prevEndDate: Date;
+    
+    switch(range) {
+      case 'current-month':
+        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        break;
+      case 'last-month':
+        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        prevEndDate = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59);
+        break;
+      default:
+        // For other ranges, calculate previous period of same length
+        const rangeDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        prevEndDate = new Date(startDate.getTime() - 1);
+        prevStartDate = new Date(prevEndDate.getTime() - (rangeDays * 24 * 60 * 60 * 1000));
+        break;
+    }
+
+    // Get previous period data for comparison
+    const [prevIncomeResult] = await db.select({
+      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+    }).from(transactions).where(
+      and(
+        eq(transactions.type, "income"),
+        gte(transactions.date, prevStartDate),
+        lte(transactions.date, prevEndDate)
+      )
+    );
+
+    const [prevExpenseResult] = await db.select({
+      totalSSP: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      totalUSD: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`
+    }).from(transactions).where(
+      and(
+        eq(transactions.type, "expense"),
+        gte(transactions.date, prevStartDate),
+        lte(transactions.date, prevEndDate)
+      )
+    );
+
+    const prevIncomeSSP = parseFloat(prevIncomeResult?.totalSSP || '0');
+    const prevExpenseSSP = parseFloat(prevExpenseResult?.totalSSP || '0');
+    const prevNetIncomeSSP = prevIncomeSSP - prevExpenseSSP;
+    const prevIncomeUSD = parseFloat(prevIncomeResult?.totalUSD || '0');
+
+    // Calculate percentage changes
+    const incomeChangeSSP = prevIncomeSSP > 0 ? ((parseFloat(totalIncomeSSP) - prevIncomeSSP) / prevIncomeSSP) * 100 : 0;
+    const expenseChangeSSP = prevExpenseSSP > 0 ? ((parseFloat(totalExpensesSSP) - prevExpenseSSP) / prevExpenseSSP) * 100 : 0;
+    const netIncomeChangeSSP = prevNetIncomeSSP !== 0 ? ((parseFloat(netIncomeSSP) - prevNetIncomeSSP) / Math.abs(prevNetIncomeSSP)) * 100 : 0;
+    const incomeChangeUSD = prevIncomeUSD > 0 ? ((parseFloat(totalIncomeUSD) - prevIncomeUSD) / prevIncomeUSD) * 100 : 0;
+
     return {
       totalIncome: totalIncomeSSP, // Legacy field - only SSP to avoid currency mixing
       totalIncomeSSP,
@@ -445,7 +500,21 @@ export class DatabaseStorage implements IStorage {
       netIncomeUSD,
       departmentBreakdown,
       insuranceBreakdown,
-      recentTransactions
+      recentTransactions,
+      // Previous period data for comparisons
+      previousPeriod: {
+        totalIncomeSSP: prevIncomeSSP,
+        totalExpensesSSP: prevExpenseSSP,
+        netIncomeSSP: prevNetIncomeSSP,
+        totalIncomeUSD: prevIncomeUSD
+      },
+      // Percentage changes
+      changes: {
+        incomeChangeSSP: Math.round(incomeChangeSSP * 10) / 10, // Round to 1 decimal
+        expenseChangeSSP: Math.round(expenseChangeSSP * 10) / 10,
+        netIncomeChangeSSP: Math.round(netIncomeChangeSSP * 10) / 10,
+        incomeChangeUSD: Math.round(incomeChangeUSD * 10) / 10
+      }
     };
   }
 

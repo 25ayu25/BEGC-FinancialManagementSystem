@@ -692,10 +692,24 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspRevenue).toLocaleString()}</p>
-
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeSSP > 0 ? 'text-emerald-600' :
+                      dashboardData.changes.incomeChangeSSP < 0 ? 'text-red-600' : 
+                      'text-slate-500'
+                    }`}>
+                      {dashboardData.changes.incomeChangeSSP > 0 ? '+' : ''}{dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
+                {dashboardData?.changes?.incomeChangeSSP !== undefined && dashboardData.changes.incomeChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                )}
               </div>
             </div>
           </CardContent>
@@ -708,12 +722,24 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(totalExpenses).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-red-600">
-                  <span className="text-xs font-medium">vs last month</span>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.expenseChangeSSP > 0 ? 'text-red-600' :
+                      dashboardData.changes.expenseChangeSSP < 0 ? 'text-emerald-600' : 
+                      'text-slate-500'
+                    }`}>
+                      {dashboardData.changes.expenseChangeSSP > 0 ? '+' : ''}{dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="bg-red-50 p-1.5 rounded-lg">
-                <TrendingDown className="h-4 w-4 text-red-600" />
+                {dashboardData?.changes?.expenseChangeSSP !== undefined && dashboardData.changes.expenseChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 text-red-600" />
+                )}
               </div>
             </div>
           </CardContent>
@@ -726,12 +752,24 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">SSP {Math.round(sspNetIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-blue-600">
-                  <span className="text-xs font-medium">{profitMargin.toFixed(1)}% margin</span>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.netIncomeChangeSSP > 0 ? 'text-emerald-600' :
+                      dashboardData.changes.netIncomeChangeSSP < 0 ? 'text-red-600' : 
+                      'text-slate-500'
+                    }`}>
+                      {dashboardData.changes.netIncomeChangeSSP > 0 ? '+' : ''}{dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="bg-blue-50 p-1.5 rounded-lg">
-                <DollarSign className="h-4 w-4 text-blue-600" />
+                {dashboardData?.changes?.netIncomeChangeSSP !== undefined && dashboardData.changes.netIncomeChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                ) : (
+                  <DollarSign className="h-4 w-4 text-blue-600" />
+                )}
               </div>
             </div>
           </CardContent>
@@ -744,8 +782,20 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">USD {Math.round(usdIncome).toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-purple-600">
-                  <span className="text-xs font-medium">{Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}</span>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeUSD > 0 ? 'text-emerald-600' :
+                      dashboardData.changes.incomeChangeUSD < 0 ? 'text-red-600' : 
+                      'text-slate-500'
+                    }`}>
+                      {dashboardData.changes.incomeChangeUSD > 0 ? '+' : ''}{dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-purple-600">
+                      {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1 ? '1 provider' : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="bg-purple-50 p-1.5 rounded-lg">
