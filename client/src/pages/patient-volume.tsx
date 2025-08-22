@@ -30,7 +30,12 @@ interface Department {
 }
 
 export default function PatientVolumePage() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Check URL parameters for initial date
+  const urlParams = new URLSearchParams(window.location.search);
+  const dateParam = urlParams.get('date');
+  const initialDate = dateParam ? new Date(dateParam) : new Date();
+  
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
   const [newEntry, setNewEntry] = useState({
     date: new Date(),

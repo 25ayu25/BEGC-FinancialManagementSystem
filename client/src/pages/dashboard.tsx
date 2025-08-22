@@ -325,7 +325,18 @@ export default function Dashboard() {
                     variant="outline" 
                     size="sm" 
                     className="text-teal-700 border-teal-200 hover:bg-teal-50" 
-                    onClick={() => window.location.href = '/patient-volume'}
+                    onClick={() => {
+                      // Navigate to patient volume page with current month context
+                      if (timeRange === 'current-month') {
+                        // For current month, go to the first day of the month
+                        const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+                        const dateStr = firstDayOfMonth.toISOString().split('T')[0];
+                        window.location.href = `/patient-volume?date=${dateStr}&view=month`;
+                      } else {
+                        // For other periods, go to patient volume with summary view
+                        window.location.href = '/patient-volume';
+                      }
+                    }}
                   >
                     <Calendar className="h-4 w-4 mr-2" />
                     View Details
