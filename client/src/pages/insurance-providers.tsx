@@ -14,30 +14,35 @@ export default function InsuranceProvidersPage() {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  // Get dashboard data to show insurance breakdown
-  const { data: dashboardData } = useQuery({
-    queryKey: ["/api/dashboard", currentYear, currentMonth],
-    enabled: selectedPeriod === "current"
-  });
-
-  // Get last month's data for comparison
+  // Calculate date ranges
   const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-  
-  const { data: prevDashboardData } = useQuery({
-    queryKey: ["/api/dashboard", prevYear, prevMonth],
-    enabled: selectedPeriod === "current"
+
+  // Get current month data
+  const { data: currentDashboardData } = useQuery({
+    queryKey: ["/api/dashboard", currentYear, currentMonth],
+    enabled: true
   });
 
-  const insuranceBreakdown = (dashboardData as any)?.insuranceBreakdown || {};
-  const prevInsuranceBreakdown = (prevDashboardData as any)?.insuranceBreakdown || {};
+  // Get last month's data
+  const { data: prevDashboardData } = useQuery({
+    queryKey: ["/api/dashboard", prevYear, prevMonth],
+    enabled: true
+  });
+
+  // Select data based on period
+  const selectedData = selectedPeriod === "current" ? currentDashboardData : prevDashboardData;
+  const comparisonData = selectedPeriod === "current" ? prevDashboardData : currentDashboardData;
+
+  const insuranceBreakdown = (selectedData as any)?.insuranceBreakdown || {};
+  const prevInsuranceBreakdown = (comparisonData as any)?.insuranceBreakdown || {};
   
   // Calculate totals
-  const totalCurrentUSD = Object.values(insuranceBreakdown).reduce((sum: number, value) => sum + parseFloat(value as string), 0);
-  const totalPrevUSD = Object.values(prevInsuranceBreakdown).reduce((sum: number, value) => sum + parseFloat(value as string), 0);
+  const totalSelectedUSD = Object.values(insuranceBreakdown).reduce((sum: number, value) => sum + parseFloat(value as string), 0);
+  const totalComparisonUSD = Object.values(prevInsuranceBreakdown).reduce((sum: number, value) => sum + parseFloat(value as string), 0);
   
   // Calculate overall change
-  const overallChange = totalPrevUSD > 0 ? ((totalCurrentUSD - totalPrevUSD) / totalPrevUSD) * 100 : 0;
+  const overallChange = totalComparisonUSD > 0 ? ((totalSelectedUSD - totalComparisonUSD) / totalComparisonUSD) * 100 : 0;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -84,7 +89,7 @@ export default function InsuranceProvidersPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">Total Revenue</p>
-                <p className="text-xl font-bold text-slate-900">USD {Math.round(totalCurrentUSD as number).toLocaleString()}</p>
+                <p className="text-xl font-bold text-slate-900">USD {Math.round(totalSelectedUSD as number).toLocaleString()}</p>
               </div>
             </div>
             
@@ -107,7 +112,9 @@ export default function InsuranceProvidersPage() {
                 )}
               </div>
               <div>
-                <p className="text-sm text-slate-600">vs Last Month</p>
+                <p className="text-sm text-slate-600">
+                  vs {selectedPeriod === "current" ? "Last Month" : "Current Month"}
+                </p>
                 <p className={`text-xl font-bold ${overallChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {overallChange >= 0 ? '+' : ''}{overallChange.toFixed(1)}%
                 </p>
@@ -123,7 +130,7 @@ export default function InsuranceProvidersPage() {
           const currentAmount = parseFloat(amount as string);
           const prevAmount = parseFloat(prevInsuranceBreakdown[provider] as string || '0');
           const change = prevAmount > 0 ? ((currentAmount - prevAmount) / prevAmount) * 100 : 0;
-          const percentage = (totalCurrentUSD as number) > 0 ? (currentAmount / (totalCurrentUSD as number)) * 100 : 0;
+          const percentage = (totalSelectedUSD as number) > 0 ? (currentAmount / (totalSelectedUSD as number)) * 100 : 0;
           
           return (
             <Card key={provider} className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
@@ -151,7 +158,9 @@ export default function InsuranceProvidersPage() {
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">vs Last Month</span>
+                    <span className="text-sm text-slate-600">
+                      vs {selectedPeriod === "current" ? "Last Month" : "Current Month"}
+                    </span>
                     <span className={`text-sm font-medium ${
                       change > 0 ? 'text-emerald-600' :
                       change < 0 ? 'text-red-600' : 
@@ -163,7 +172,9 @@ export default function InsuranceProvidersPage() {
                   
                   {prevAmount > 0 && (
                     <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                      <span className="text-xs text-slate-500">Previous</span>
+                      <span className="text-xs text-slate-500">
+                        {selectedPeriod === "current" ? "Previous" : "Current"}
+                      </span>
                       <span className="text-xs font-mono text-slate-500">
                         USD {Math.round(prevAmount).toLocaleString()}
                       </span>
