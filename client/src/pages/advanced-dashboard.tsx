@@ -684,7 +684,7 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-3">
@@ -755,23 +755,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Patient Volume */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Patient Volume</p>
-                <p className="text-base font-semibold text-slate-900 text-slate-500">N/A</p>
-                <div className="flex items-center mt-1 text-slate-500">
-                  <span className="text-xs font-medium">No data available</span>
-                </div>
-              </div>
-              <div className="bg-orange-50 p-1.5 rounded-lg">
-                <Users className="h-4 w-4 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Charts and Analytics Row */}
