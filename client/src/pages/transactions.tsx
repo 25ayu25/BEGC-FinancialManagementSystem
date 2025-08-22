@@ -406,7 +406,7 @@ export default function Transactions() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium"
+              className="bg-red-600 hover:bg-red-700 !text-white font-medium border-0"
               disabled={deleteTransactionMutation.isPending}
             >
               {deleteTransactionMutation.isPending ? "Deleting..." : "Delete"}
