@@ -60,7 +60,7 @@ export default function PatientVolumePage() {
 
   // Create patient volume mutation
   const createVolumeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/patient-volume", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/date"] });
       toast({ title: "Patient volume recorded successfully" });
@@ -74,7 +74,7 @@ export default function PatientVolumePage() {
 
   // Delete patient volume mutation
   const deleteVolumeMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/patient-volume/${id}`, "DELETE"),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/date"] });
       toast({ title: "Patient volume record deleted" });
