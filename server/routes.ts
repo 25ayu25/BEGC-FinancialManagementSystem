@@ -731,11 +731,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clinic name and title in white
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(26);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('Bahr El Ghazal — Monthly Financial Report', margin, 25);
       
       doc.setFontSize(16);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text('Financial Management System', margin, 40);
       
       // Reset text color for body
@@ -744,11 +744,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Report period and generation info
       const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
       doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text(`${monthName} ${year}`, margin, 80);
       
       doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
         year: 'numeric', 
         month: 'long', 
@@ -760,7 +760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Financial Summary Section
       let currentY = 110;
       doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.setTextColor(20, 83, 75);
       doc.text('Financial Summary', margin, currentY);
       
@@ -802,7 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
         
         // Text with tabular numerals
-        doc.setFont(undefined, isNetIncome ? 'bold' : 'normal');
+        doc.setFont('helvetica', isNetIncome ? 'bold' : 'normal');
         doc.setFontSize(isNetIncome ? 13 : 12);
         doc.text(label, margin + 5, currentY);
         // Right-align with tabular numerals
@@ -815,7 +815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (reportData.departmentBreakdown && Object.keys(reportData.departmentBreakdown).length > 0) {
         currentY += 10;
         doc.setFontSize(16);
-        doc.setFont(undefined, 'bold');
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(20, 83, 75);
         doc.text('Department Performance', margin, currentY);
         
@@ -830,7 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
         
         doc.setTextColor(255, 255, 255);
-        doc.setFont(undefined, 'bold');
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
         doc.text('Department', margin + 5, currentY);
         doc.text('Revenue', pageWidth - margin - 5, currentY, { align: 'right' });
@@ -860,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           doc.setFillColor(...bgColor);
           doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
           
-          doc.setFont(undefined, 'normal');
+          doc.setFont('helvetica', 'normal');
           doc.setFontSize(11);
           doc.text(deptName, margin + 5, currentY);
           // Right-align with tabular numerals and proper formatting
@@ -882,7 +882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
       
       doc.setFontSize(9);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
       doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY);
       doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
