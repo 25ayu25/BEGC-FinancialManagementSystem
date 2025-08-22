@@ -69,10 +69,11 @@ export default function PatientVolumePage() {
   const createVolumeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
     onSuccess: () => {
-      // Force refresh all patient volume data
+      // Force refresh all patient volume data and dashboard
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
       queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
       queryClient.removeQueries({ queryKey: ["/api/patient-volume/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Patient volume recorded successfully" });
       setShowAddForm(false);
       setNewEntry({ date: new Date(), departmentId: "", patientCount: "", notes: "" });
@@ -86,7 +87,11 @@ export default function PatientVolumePage() {
   const deleteVolumeMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/date"] });
+      // Invalidate ALL patient volume related queries including dashboard
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
+      queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
+      queryClient.removeQueries({ queryKey: ["/api/patient-volume/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Patient volume record deleted" });
     },
     onError: () => {
