@@ -358,11 +358,13 @@ export default function AdvancedDashboard() {
   });
 
   // Get today's patient volume for header widget
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  
   const { data: todayPatientVolume = [] } = useQuery({
-    queryKey: ["/api/patient-volume/date", today],
+    queryKey: ["/api/patient-volume/date", todayStr],
     queryFn: async () => {
-      const res = await fetch(`/api/patient-volume/date/${today}?departmentId=all-departments`, {
+      const res = await fetch(`/api/patient-volume/date/${todayStr}?departmentId=all-departments`, {
         credentials: 'include'
       });
       if (!res.ok) return [];
@@ -604,19 +606,17 @@ export default function AdvancedDashboard() {
                 }
               </p>
               {/* Professional Patient Volume Badge */}
-              {todayPatientVolume.length > 0 && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-lg shadow-sm">
-                  <Users className="h-3.5 w-3.5 text-teal-600" />
-                  <div className="flex items-center gap-1">
-                    <span className="text-teal-700 text-sm font-semibold">
-                      {todayPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)}
-                    </span>
-                    <span className="text-teal-600 text-xs font-medium">
-                      patients today
-                    </span>
-                  </div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-lg shadow-sm">
+                <Users className="h-3.5 w-3.5 text-teal-600" />
+                <div className="flex items-center gap-1">
+                  <span className="text-teal-700 text-sm font-semibold">
+                    {todayPatientVolume.length > 0 ? todayPatientVolume.reduce((sum: any, v: any) => sum + (v.patientCount || 0), 0) : 0}
+                  </span>
+                  <span className="text-teal-600 text-xs font-medium">
+                    patients today
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
