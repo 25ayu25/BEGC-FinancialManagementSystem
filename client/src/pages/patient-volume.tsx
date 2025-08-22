@@ -48,23 +48,31 @@ export default function PatientVolumePage() {
   });
 
   // Get patient volume data for selected date
-  const { data: volumeData = [], isLoading } = useQuery<PatientVolume[]>({
+  const { data: volumeData = [], isLoading, error } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/date", selectedDate.toISOString().split('T')[0], selectedDepartment],
-    queryFn: () => {
-      const params = selectedDepartment !== "all" ? `?departmentId=${selectedDepartment}` : "";
-      return fetch(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`, {
+    queryFn: async () => {
+      const params = selectedDepartment !== "all-departments" ? `?departmentId=${selectedDepartment}` : "?departmentId=all-departments";
+      const response = await fetch(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`, {
         credentials: 'include'
-      }).then(res => res.json());
-    }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient volume data');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 0, // Always refetch when query key changes
+    refetchOnWindowFocus: false
   });
 
   // Create patient volume mutation
   const createVolumeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
     onSuccess: () => {
-      // Force refresh the data by clearing all patient volume queries
+      // Force refresh all patient volume data
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
       queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
+      queryClient.removeQueries({ queryKey: ["/api/patient-volume/period"] });
       toast({ title: "Patient volume recorded successfully" });
       setShowAddForm(false);
       setNewEntry({ date: new Date(), departmentId: "", patientCount: "", notes: "" });
