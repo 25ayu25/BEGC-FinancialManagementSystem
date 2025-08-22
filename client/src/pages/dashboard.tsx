@@ -10,7 +10,7 @@ import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon, Users, Calendar } from "lucide-react";
-import SimpleDashboardKPIs from "@/components/dashboard/simple-dashboard-kpis";
+import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
 
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
 
@@ -278,8 +278,8 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* KPI Band */}
-        <SimpleDashboardKPIs data={dashboardData || {}} />
+        {/* KPI Band - Executive Style */}
+        <ExecutiveStyleKPIs data={dashboardData || {}} />
 
 
         {/* Main Content Grid */}
