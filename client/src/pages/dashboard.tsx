@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,26 +75,37 @@ export default function Dashboard() {
     queryKey: ["/api/insurance-providers"],
   });
 
-  // Get patient volume data for the selected month - FORCE QUERY TO RUN
-  const { data: patientVolumeData = [], isLoading: isLoadingPatientVolume } = useQuery({
-    queryKey: ["/api/patient-volume", selectedYear, selectedMonth],
-    queryFn: async () => {
-      console.log(`Dashboard: Fetching patient volume data for ${selectedYear}/${selectedMonth}`);
-      const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
-        credentials: 'include'
-      });
-      console.log(`Dashboard: API response status: ${res.status}`);
-      if (!res.ok) {
-        console.error(`Dashboard: Failed to fetch patient volume: ${res.status} ${res.statusText}`);
-        return [];
+  // Force patient volume data fetch with direct state management
+  const [patientVolumeData, setPatientVolumeData] = useState([]);
+  const [isLoadingPatientVolume, setIsLoadingPatientVolume] = useState(false);
+
+  useEffect(() => {
+    const fetchPatientVolumeData = async () => {
+      setIsLoadingPatientVolume(true);
+      try {
+        console.log(`Dashboard: Force fetching patient volume data for ${selectedYear}/${selectedMonth}`);
+        const res = await fetch(`/api/patient-volume/${selectedYear}/${selectedMonth}`, {
+          credentials: 'include'
+        });
+        console.log(`Dashboard: API response status: ${res.status}`);
+        if (res.ok) {
+          const data = await res.json();
+          console.log(`Dashboard: Patient volume data received:`, data);
+          setPatientVolumeData(data || []);
+        } else {
+          console.error(`Dashboard: Failed to fetch patient volume: ${res.status} ${res.statusText}`);
+          setPatientVolumeData([]);
+        }
+      } catch (error) {
+        console.error('Dashboard: Error fetching patient volume:', error);
+        setPatientVolumeData([]);
+      } finally {
+        setIsLoadingPatientVolume(false);
       }
-      const data = await res.json();
-      console.log(`Dashboard: Patient volume data received:`, data);
-      return data;
-    },
-    staleTime: 0,
-    refetchOnMount: true
-  });
+    };
+
+    fetchPatientVolumeData();
+  }, [selectedYear, selectedMonth]);
 
   if (error) {
     return (
