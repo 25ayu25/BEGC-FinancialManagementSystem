@@ -40,16 +40,22 @@ export default function PatientVolumePage() {
   // Determine if we're in monthly view mode
   const isMonthlyView = viewMode === 'monthly' && yearParam && monthParam;
   
-  // Set initial date based on parameters
+  // Set initial date and view type based on parameters
+  // Default to monthly view showing current month when no specific parameters are provided
+  const shouldDefaultToMonthly = !dateParam && !isMonthlyView;
+  const initialViewType = isMonthlyView ? 'monthly' : (shouldDefaultToMonthly ? 'monthly' : 'daily');
+  
   const initialDate = dateParam 
     ? new Date(dateParam + 'T12:00:00')
     : isMonthlyView 
       ? new Date(parseInt(yearParam), parseInt(monthParam) - 1, 1)
-      : new Date();
+      : shouldDefaultToMonthly 
+        ? new Date() // For monthly view, current date is fine as it will show the whole month
+        : new Date();
   
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
-  const [viewType, setViewType] = useState<'daily' | 'monthly'>(isMonthlyView ? 'monthly' : 'daily');
+  const [viewType, setViewType] = useState<'daily' | 'monthly'>(initialViewType);
   const [newEntry, setNewEntry] = useState({
     date: new Date(),
     departmentId: "",
