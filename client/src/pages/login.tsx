@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
   
   const [credentials, setCredentials] = useState({
     username: "",
@@ -25,13 +26,10 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(""); // Clear previous errors
     
     if (!credentials.username || !credentials.password) {
-      toast({
-        variant: "destructive",
-        title: "Missing Credentials",
-        description: "Please enter both username and password."
-      });
+      setLoginError("Please enter both username and password.");
       return;
     }
 
@@ -67,11 +65,7 @@ export default function LoginPage() {
       // Redirect to dashboard with full page refresh to ensure proper state
       window.location.href = '/';
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: error.message || "Please check your credentials and try again."
-      });
+      setLoginError("Incorrect username or password");
     } finally {
       setIsLoading(false);
     }
@@ -117,8 +111,10 @@ export default function LoginPage() {
                   value={credentials.username}
                   onChange={(e) => setCredentials(prev => ({ ...prev, username: e.target.value }))}
                   required
+                  autoFocus
+                  autoComplete="username"
                   data-testid="input-username"
-                  className="h-11"
+                  className={`h-11 ${loginError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                 />
               </div>
 
@@ -132,8 +128,9 @@ export default function LoginPage() {
                     value={credentials.password}
                     onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
                     required
+                    autoComplete="current-password"
                     data-testid="input-password"
-                    className="h-11 pr-10"
+                    className={`h-11 pr-10 ${loginError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                   />
                   <Button
                     type="button"
@@ -145,7 +142,28 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-sm text-teal-600 hover:text-teal-700 hover:underline focus:outline-none focus:underline"
+                    onClick={() => {
+                      // TODO: Implement forgot password functionality
+                      toast({
+                        title: "Forgot Password",
+                        description: "Please contact your system administrator to reset your password."
+                      });
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
+
+              {loginError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-sm text-red-700">{loginError}</p>
+                </div>
+              )}
 
               <Button 
                 type="submit" 
