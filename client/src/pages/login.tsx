@@ -84,7 +84,7 @@ export default function LoginPage() {
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg bg-white p-1">
+            <div className="w-32 h-32 rounded-2xl overflow-hidden shadow-lg bg-white p-2">
               <img 
                 src={clinicLogo} 
                 alt="Bahr El Ghazal Clinic Logo" 
