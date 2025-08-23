@@ -800,7 +800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const bgColor = isNetIncome ? (parseFloat(reportData.netIncome) >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
         
         // Row background
-        doc.setFillColor(...bgColor);
+        doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
         
         // Text with tabular numerals
@@ -854,7 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Alternating row colors (white background for clean look)
           const bgColor = index % 2 === 0 ? [255, 255, 255] : [249, 250, 251];
-          doc.setFillColor(...bgColor);
+          doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
           doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
           
           doc.setFont('helvetica', 'normal');
