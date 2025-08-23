@@ -715,7 +715,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalExpenses: dashboardData.totalExpenses,
         netIncome: dashboardData.netIncome,
         departmentBreakdown: dashboardData.departmentBreakdown,
-        insuranceBreakdown: dashboardData.insuranceBreakdown
+        insuranceBreakdown: dashboardData.insuranceBreakdown,
+        expenseBreakdown: dashboardData.expenseBreakdown
       };
       
       // Generate PDF using jsPDF
@@ -811,13 +812,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 15;
       });
       
-      // Department Breakdown Section
-      if (reportData.departmentBreakdown && Object.keys(reportData.departmentBreakdown).length > 0) {
-        currentY += 10;
+      // Monthly Expenditure Section (South Sudan format)
+      if (reportData.expenseBreakdown && Object.keys(reportData.expenseBreakdown).length > 0) {
+        currentY += 20;
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(20, 83, 75);
-        doc.text('Department Performance', margin, currentY);
+        doc.text('Monthly Expenditure', margin, currentY);
         
         // Add underline
         doc.line(margin, currentY + 2, margin + 80, currentY + 2);
@@ -825,50 +826,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentY += 20;
         doc.setTextColor(0, 0, 0);
         
-        // Department table header
+        // Expense table header with 3 columns: Date (empty), Description, Amount
         doc.setFillColor(20, 83, 75);
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
         
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
-        doc.text('Department', margin + 5, currentY);
-        doc.text('Revenue', pageWidth - margin - 5, currentY, { align: 'right' });
-        doc.text('% of Total', pageWidth - margin - 60, currentY, { align: 'right' });
+        doc.text('Date', margin + 5, currentY);
+        doc.text('Description', margin + 40, currentY);
+        doc.text('Amount', pageWidth - margin - 5, currentY, { align: 'right' });
         
         currentY += 15;
         doc.setTextColor(0, 0, 0);
         
-        // Department data - filter out zero amounts and improve naming
-        const deptEntries = Object.entries(reportData.departmentBreakdown)
-          .filter(([deptId, amount]) => parseFloat(amount) > 0) // Hide zero rows
+        // Expense data - filter out zero amounts and sort by amount descending
+        const expenseEntries = Object.entries(reportData.expenseBreakdown)
+          .filter(([category, amount]) => parseFloat(amount) > 0)
           .sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
-        const totalIncome = parseFloat(reportData.totalIncome);
         
-        deptEntries.forEach(([deptId, amount], index) => {
-          let deptName = 'Other income';
-          if (deptId === '4242abf4-e68e-48c8-9eaf-ada2612bd4c2') deptName = 'Consultation';
-          else if (deptId === 'ae648a70-c159-43b7-b814-7dadb213ae8d') deptName = 'Laboratory';
-          else if (deptId === '09435c53-9061-429b-aecf-677b12bbdbd7') deptName = 'Ultrasound';
-          else if (deptId === '6a06d917-a94a-4637-b1f6-a3fd6855ddd6') deptName = 'X-Ray';
-          else if (deptId === '8fb395f9-ae59-4ddc-9ad3-e56b7fda161c') deptName = 'Pharmacy';
+        let totalExpenses = 0;
+        expenseEntries.forEach(([category, amount], index) => {
+          const numAmount = parseFloat(amount);
+          totalExpenses += numAmount;
           
-          const percentage = totalIncome > 0 ? ((parseFloat(amount) / totalIncome) * 100).toFixed(1) : '0.0';
-          
-          // Alternating row colors
-          const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+          // Alternating row colors (white background for clean look)
+          const bgColor = index % 2 === 0 ? [255, 255, 255] : [249, 250, 251];
           doc.setFillColor(...bgColor);
           doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
           
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(11);
-          doc.text(deptName, margin + 5, currentY);
-          // Right-align with tabular numerals and proper formatting
-          doc.text(`SSP ${Math.round(parseFloat(amount)).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
-          doc.text(`${percentage}%`, pageWidth - margin - 60, currentY, { align: 'right' });
+          
+          // Leave Date column empty (as shown in your image)
+          doc.text('', margin + 5, currentY);
+          // Category name in Description column
+          doc.text(category, margin + 40, currentY);
+          // Amount right-aligned with proper formatting
+          doc.text(`${Math.round(numAmount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
           
           currentY += 12;
         });
+        
+        // Add TOTAL SUM row (like in your South Sudan report)
+        doc.setFillColor(255, 192, 203); // Light pink background for total
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(220, 20, 60); // Dark red for TOTAL SUM
+        doc.text('TOTAL SUM', margin + 40, currentY);
+        doc.text(`${Math.round(totalExpenses).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        
+        currentY += 25;
+      }
+      
+      // Daily Expenditure Section (ONLY totals as requested)
+      if (reportData.departmentBreakdown && Object.keys(reportData.departmentBreakdown).length > 0) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(20, 83, 75);
+        doc.text('Daily Expenditure', margin, currentY);
+        
+        // Add underline
+        doc.line(margin, currentY + 2, margin + 70, currentY + 2);
+        
+        currentY += 20;
+        doc.setTextColor(0, 0, 0);
+        
+        // Daily expenditure header with department columns
+        doc.setFillColor(144, 238, 144); // Light green header (like in your image)
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        
+        // Column headers: Clinic, Doctors, Lab Techs, Radiographer, Insurance %
+        const colWidth = (pageWidth - 2 * margin) / 5;
+        doc.text('Clinic', margin + 5, currentY);
+        doc.text('Doctors', margin + colWidth + 5, currentY);  
+        doc.text('Lab Techs', margin + 2 * colWidth + 5, currentY);
+        doc.text('Radiographer', margin + 3 * colWidth + 5, currentY);
+        doc.text('Insurance %', margin + 4 * colWidth + 5, currentY);
+        
+        currentY += 15;
+        
+        // Calculate totals for each "department" (mapping your departments to their roles)
+        let clinicTotal = 0, doctorsTotal = 0, labTechsTotal = 0, radiographerTotal = 0, insuranceTotal = 0;
+        
+        Object.entries(reportData.departmentBreakdown).forEach(([deptId, amount]) => {
+          const numAmount = parseFloat(amount);
+          
+          // Map your departments to the South Sudan format roles
+          if (deptId === '4242abf4-e68e-48c8-9eaf-ada2612bd4c2') { // Consultation
+            clinicTotal += numAmount;
+          } else if (deptId === 'ae648a70-c159-43b7-b814-7dadb213ae8d') { // Laboratory  
+            labTechsTotal += numAmount;
+          } else if (deptId === '6a06d917-a94a-4637-b1f6-a3fd6855ddd6') { // X-Ray
+            radiographerTotal += numAmount;
+          } else if (deptId === '09435c53-9061-429b-aecf-677b12bbdbd7') { // Ultrasound
+            radiographerTotal += numAmount;
+          } else if (deptId === '8fb395f9-ae59-4ddc-9ad3-e56b7fda161c') { // Pharmacy
+            clinicTotal += numAmount;
+          } else {
+            clinicTotal += numAmount; // Other income goes to clinic
+          }
+        });
+        
+        // Add insurance total from USD income 
+        insuranceTotal = parseFloat(reportData.totalIncomeUSD || "0");
+        
+        // Display ONLY the totals row (as requested - no daily breakdown rows)
+        doc.setFillColor(255, 255, 255); // White background for totals
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(220, 20, 60); // Red color for totals (like in your image)
+        
+        // Display totals in each column
+        doc.text(`${Math.round(clinicTotal).toLocaleString()}`, margin + colWidth - 20, currentY, { align: 'right' });
+        doc.text(`${Math.round(doctorsTotal).toLocaleString()}`, margin + 2 * colWidth - 20, currentY, { align: 'right' });
+        doc.text(`${Math.round(labTechsTotal).toLocaleString()}`, margin + 3 * colWidth - 20, currentY, { align: 'right' });
+        doc.text(`${Math.round(radiographerTotal).toLocaleString()}`, margin + 4 * colWidth - 20, currentY, { align: 'right' });
+        doc.text(`${Math.round(insuranceTotal).toLocaleString()}`, margin + 5 * colWidth - 20, currentY, { align: 'right' });
+        
+        currentY += 20;
+        
+        // Add grand total in green box (like in your image)
+        const grandTotal = clinicTotal + doctorsTotal + labTechsTotal + radiographerTotal + insuranceTotal;
+        doc.setFillColor(144, 238, 144); // Light green background
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(0, 100, 0); // Dark green for grand total
+        doc.text(`${Math.round(grandTotal).toLocaleString()}`, pageWidth / 2, currentY, { align: 'center' });
+        
+        currentY += 25;
       }
       
       // Add some spacing before footer

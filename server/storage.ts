@@ -77,9 +77,14 @@ export interface IStorage {
     totalIncomeSSP: string;
     totalIncomeUSD: string;
     totalExpenses: string;
+    totalExpensesSSP: string;
+    totalExpensesUSD: string;
     netIncome: string;
+    netIncomeSSP: string;
+    netIncomeUSD: string;
     departmentBreakdown: Record<string, string>;
     insuranceBreakdown: Record<string, string>;
+    expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }>;
   getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>>;
@@ -330,9 +335,14 @@ export class DatabaseStorage implements IStorage {
     totalIncomeSSP: string;
     totalIncomeUSD: string;
     totalExpenses: string;
+    totalExpensesSSP: string;
+    totalExpensesUSD: string;
     netIncome: string;
+    netIncomeSSP: string;
+    netIncomeUSD: string;
     departmentBreakdown: Record<string, string>;
     insuranceBreakdown: Record<string, string>;
+    expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
   }> {
     let startDate: Date;
@@ -397,6 +407,27 @@ export class DatabaseStorage implements IStorage {
         lte(transactions.date, endDate)
       )
     );
+
+    // Get expense breakdown by category (SSP only for consistent reporting)
+    const expenseData = await db.select({
+      category: transactions.expenseCategory,
+      total: sql<string>`SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END)`
+    }).from(transactions)
+    .where(
+      and(
+        eq(transactions.type, "expense"),
+        gte(transactions.date, startDate),
+        lte(transactions.date, endDate)
+      )
+    )
+    .groupBy(transactions.expenseCategory);
+
+    const expenseBreakdown: Record<string, string> = {};
+    expenseData.forEach(item => {
+      if (item.category) {
+        expenseBreakdown[item.category] = item.total;
+      }
+    });
 
     const totalIncomeSSP = incomeResult.totalSSP || "0";
     const totalIncomeUSD = incomeResult.totalUSD || "0";
@@ -523,6 +554,7 @@ export class DatabaseStorage implements IStorage {
       netIncomeUSD,
       departmentBreakdown,
       insuranceBreakdown,
+      expenseBreakdown,
       recentTransactions,
       // Previous period data for comparisons
       previousPeriod: {
@@ -681,7 +713,7 @@ export class DatabaseStorage implements IStorage {
         currency: row.currency,
         departmentId: row.departmentId || '',
         departmentName,
-        description: row.description
+        description: row.description || ''
       };
     });
   }
