@@ -53,6 +53,31 @@ export default function Dashboard() {
     }
   };
 
+  // Function to determine the correct year/month for patient volume navigation
+  const getPatientVolumeNavigation = () => {
+    const now = new Date();
+    switch(timeRange) {
+      case 'current-month':
+        return { year: now.getFullYear(), month: now.getMonth() + 1 };
+      case 'last-month':
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+        return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
+      case 'last-3-months':
+        // Navigate to the start of the 3-month period (3 months ago)
+        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2);
+        return { year: threeMonthsAgo.getFullYear(), month: threeMonthsAgo.getMonth() + 1 };
+      case 'year':
+        return { year: now.getFullYear(), month: 1 }; // January
+      case 'custom':
+        if (customStartDate) {
+          return { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 };
+        }
+        return { year: now.getFullYear(), month: now.getMonth() + 1 };
+      default:
+        return { year: selectedYear, month: selectedMonth };
+    }
+  };
+
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
@@ -174,7 +199,7 @@ export default function Dashboard() {
                 }
               </p>
               {/* Patient Volume Chip - Clickable */}
-              <Link href={`/patient-volume?view=monthly&year=${selectedYear}&month=${selectedMonth}`} className="inline-block">
+              <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}`} className="inline-block">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 rounded-md transition-colors cursor-pointer min-h-[44px]">
                   <Users className="w-4 h-4 text-teal-600" />
                   <span className="text-teal-600 text-sm font-medium font-variant-numeric-tabular">
