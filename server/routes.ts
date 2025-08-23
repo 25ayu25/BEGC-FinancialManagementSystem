@@ -765,10 +765,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.setTextColor(20, 83, 75);
       doc.text('Financial Summary', margin, currentY);
       
-      // Add professional underline
+      // Add underline
       doc.setDrawColor(20, 83, 75);
       doc.setLineWidth(0.5);
-      doc.line(margin, currentY + 2, margin + 80, currentY + 2);
+      doc.line(margin, currentY + 2, margin + 60, currentY + 2);
       
       currentY += 15;
       doc.setTextColor(0, 0, 0);
@@ -777,22 +777,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Summary table with currency separation
       const summaryData = [];
       
-      // Add SSP totals if they exist - Remove duplicate currency labels
+      // Add SSP totals if they exist
       if (parseFloat(reportData.totalIncomeSSP || "0") > 0) {
-        summaryData.push(['Total Income (SSP)', `${Math.round(parseFloat(reportData.totalIncomeSSP || "0")).toLocaleString()}`]);
+        summaryData.push(['Total Income (SSP)', `SSP ${parseFloat(reportData.totalIncomeSSP || "0").toLocaleString()}`]);
       }
       
-      // Add USD totals if they exist - Remove duplicate currency labels 
+      // Add USD totals if they exist  
       if (parseFloat(reportData.totalIncomeUSD || "0") > 0) {
-        summaryData.push(['Total Income (USD)', `${Math.round(parseFloat(reportData.totalIncomeUSD || "0")).toLocaleString()}`]);
+        summaryData.push(['Total Income (USD)', `USD ${parseFloat(reportData.totalIncomeUSD || "0").toLocaleString()}`]);
       }
       
-      // Add expenses and net income (currently SSP only) - Remove duplicate currency labels
+      // Add expenses and net income (currently SSP only)
       if (parseFloat(reportData.totalExpenses || "0") > 0) {
-        summaryData.push(['Total Expenses (SSP)', `${Math.round(parseFloat(reportData.totalExpenses || "0")).toLocaleString()}`]);
+        summaryData.push(['Total Expenses (SSP)', `SSP ${parseFloat(reportData.totalExpenses || "0").toLocaleString()}`]);
       }
       
-      summaryData.push(['Net Income (SSP)', `${Math.round(parseFloat(reportData.netIncome || "0")).toLocaleString()}`]);
+      summaryData.push(['Net Income (SSP)', `SSP ${parseFloat(reportData.netIncome || "0").toLocaleString()}`]);
       
       summaryData.forEach(([label, value], index) => {
         const isNetIncome = label === 'Net Income';
@@ -820,8 +820,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(20, 83, 75);
         doc.text('Monthly Expenditure', margin, currentY);
         
-        // Add professional underline for Monthly Expenditure
-        doc.line(margin, currentY + 2, margin + 110, currentY + 2);
+        // Add underline
+        doc.line(margin, currentY + 2, margin + 80, currentY + 2);
         
         currentY += 20;
         doc.setTextColor(0, 0, 0);
@@ -868,14 +868,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentY += 12;
         });
         
-        // Add MONTHLY TOTAL row (professional CEO format)
+        // Add TOTAL SUM row (like in your South Sudan report)
         doc.setFillColor(255, 192, 203); // Light pink background for total
         doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
         
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
-        doc.setTextColor(220, 20, 60); // Dark red for MONTHLY TOTAL
-        doc.text('MONTHLY TOTAL', margin + 40, currentY);
+        doc.setTextColor(220, 20, 60); // Dark red for TOTAL SUM
+        doc.text('TOTAL SUM', margin + 40, currentY);
         doc.text(`${Math.round(totalExpenses).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
         
         currentY += 25;
@@ -888,8 +888,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.setTextColor(20, 83, 75);
         doc.text('Daily Expenditure', margin, currentY);
         
-        // Add professional underline for Daily Expenditure
-        doc.line(margin, currentY + 2, margin + 95, currentY + 2);
+        // Add underline
+        doc.line(margin, currentY + 2, margin + 70, currentY + 2);
         
         currentY += 20;
         doc.setTextColor(0, 0, 0);
