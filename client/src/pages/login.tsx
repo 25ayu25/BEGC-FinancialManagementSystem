@@ -147,14 +147,13 @@ export default function LoginPage() {
                     type="button"
                     className="text-sm text-teal-600 hover:text-teal-700 hover:underline focus:outline-none focus:underline"
                     onClick={() => {
-                      // TODO: Implement forgot password functionality
                       toast({
-                        title: "Forgot Password",
+                        title: "Password Reset",
                         description: "Please contact your system administrator to reset your password."
                       });
                     }}
                   >
-                    Forgot password?
+                    Forgot password? Contact the administrator
                   </button>
                 </div>
               </div>
