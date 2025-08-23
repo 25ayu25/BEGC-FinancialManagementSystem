@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 
 import { 
   Eye, 
-  EyeOff, 
-  Building2
+  EyeOff
 } from "lucide-react";
+import clinicLogo from "@/assets/clinic-logo.jpeg";
 import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
@@ -84,8 +84,12 @@ export default function LoginPage() {
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <Building2 className="w-8 h-8 text-white" />
+            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg bg-white p-1">
+              <img 
+                src={clinicLogo} 
+                alt="Bahr El Ghazal Clinic Logo" 
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
           </div>
           <div>
