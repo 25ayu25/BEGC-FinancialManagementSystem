@@ -86,6 +86,19 @@ export interface IStorage {
     insuranceBreakdown: Record<string, string>;
     expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
+    totalPatients: number;
+    previousPeriod: {
+      totalIncomeSSP: number;
+      totalExpensesSSP: number;
+      netIncomeSSP: number;
+      totalIncomeUSD: number;
+    };
+    changes: {
+      incomeChangeSSP: number;
+      expenseChangeSSP: number;
+      netIncomeChangeSSP: number;
+      incomeChangeUSD: number;
+    };
   }>;
   getIncomeTrends(days: number): Promise<Array<{ date: string, income: number }>>;
   getIncomeTrendsForMonth(year: number, month: number): Promise<Array<{ date: string, income: number }>>;
@@ -344,6 +357,7 @@ export class DatabaseStorage implements IStorage {
     insuranceBreakdown: Record<string, string>;
     expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
+    totalPatients: number;
   }> {
     let startDate: Date;
     let endDate: Date;
@@ -542,6 +556,19 @@ export class DatabaseStorage implements IStorage {
     const netIncomeChangeSSP = prevNetIncomeSSP !== 0 ? ((parseFloat(netIncomeSSP) - prevNetIncomeSSP) / Math.abs(prevNetIncomeSSP)) * 100 : 0;
     const incomeChangeUSD = prevIncomeUSD > 0 ? ((parseFloat(totalIncomeUSD) - prevIncomeUSD) / prevIncomeUSD) * 100 : 0;
 
+    // Get total patient volume for the period
+    const [patientVolumeResult] = await db.select({
+      total: sql<number>`COALESCE(SUM(${patientVolume.patientCount}), 0)`
+    }).from(patientVolume)
+    .where(
+      and(
+        gte(patientVolume.date, startDate),
+        lte(patientVolume.date, endDate)
+      )
+    );
+    
+    const totalPatients = Number(patientVolumeResult.total || 0);
+
     return {
       totalIncome: totalIncomeSSP, // Legacy field - only SSP to avoid currency mixing
       totalIncomeSSP,
@@ -556,6 +583,7 @@ export class DatabaseStorage implements IStorage {
       insuranceBreakdown,
       expenseBreakdown,
       recentTransactions,
+      totalPatients,
       // Previous period data for comparisons
       previousPeriod: {
         totalIncomeSSP: prevIncomeSSP,

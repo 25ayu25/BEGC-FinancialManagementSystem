@@ -205,7 +205,7 @@ export default function Dashboard() {
                   <span className="text-teal-600 text-sm font-medium font-variant-numeric-tabular">
                     {timeRange === 'current-month' ? 'Current month' : 
                      timeRange === 'last-month' ? 'Last month' : 
-                     'Selected period'}: {periodPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
+                     'Selected period'}: {periodPatientVolume.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0)} patients
                   </span>
                 </div>
               </Link>
