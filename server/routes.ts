@@ -731,9 +731,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Clinic name and title in white
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(26);
+      doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text('Bahr El Ghazal — Monthly Financial Report', margin, 25);
+      doc.text('Bahr El Ghazal Clinic — Monthly Financial Report', margin, 25);
       
       doc.setFontSize(16);
       doc.setFont('helvetica', 'normal');
