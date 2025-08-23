@@ -291,10 +291,6 @@ function RevenueDataTable({ data, departments, monthName, selectedYear, selected
           {tableData.length} transaction{tableData.length !== 1 ? 's' : ''} • SSP Total: {Math.round(totals.ssp).toLocaleString()} • USD Total: {totals.usd.toLocaleString()}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
           <Button variant="outline" size="sm" onClick={onClose}>
             Close
           </Button>
