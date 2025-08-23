@@ -785,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add USD totals if they exist  
       if (parseFloat(reportData.totalIncomeUSD || "0") > 0) {
-        summaryData.push(['Total Income', `USD ${parseFloat(reportData.totalIncomeUSD || "0").toLocaleString()}`]);
+        summaryData.push(['Total Income (Insurance)', `USD ${parseFloat(reportData.totalIncomeUSD || "0").toLocaleString()}`]);
       }
       
       // Add expenses and net income (currently SSP only)
