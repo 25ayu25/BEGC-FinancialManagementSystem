@@ -329,6 +329,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reset user password (admin only)
+  app.patch("/api/users/:id/reset-password", requireAuth, async (req, res) => {
+    try {
+      // Only admins can reset passwords
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const userId = req.params.id;
+      const { newPassword } = req.body;
+
+      if (!newPassword) {
+        return res.status(400).json({ error: "New password is required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters long" });
+      }
+
+      // Validate user exists
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Update password
+      const updatedUser = await storage.updateUser(userId, { 
+        password: newPassword
+      });
+      
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Failed to update password" });
+      }
+
+      console.log(`Password reset successfully for user ${userId} by admin ${req.user.id}`);
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   app.post("/api/users", requireAuth, async (req, res) => {
     try {
       // Only admins can create users
@@ -361,9 +403,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle database constraint violations
       if (error.code === '23505') { // Unique constraint violation
         if (error.constraint === 'users_username_key') {
-          return res.status(400).json({ error: `Username "${username}" already exists. Please choose a different username.` });
+          return res.status(400).json({ error: `Username "${req.body.username}" already exists. Please choose a different username.` });
         } else if (error.constraint === 'users_email_key') {
-          return res.status(400).json({ error: `Email "${email}" is already registered. Please use a different email address.` });
+          return res.status(400).json({ error: `Email "${req.body.email}" is already registered. Please use a different email address.` });
         }
       }
       

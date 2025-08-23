@@ -60,7 +60,12 @@ export default function UserManagementPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [resetPasswordData, setResetPasswordData] = useState({
+    newPassword: "",
+    confirmPassword: ""
+  });
   const [editUser, setEditUser] = useState({
     username: "",
     email: "",
@@ -73,6 +78,66 @@ export default function UserManagementPage() {
   
   const [filterRole, setFilterRole] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const response = await fetch(`/api/users/${userId}/reset-password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ newPassword })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to reset password');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Reset Successful",
+        description: "The user's password has been updated successfully."
+      });
+      setIsResetPasswordOpen(false);
+      setResetPasswordData({ newPassword: "", confirmPassword: "" });
+      setSelectedUser(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Password Reset Failed",
+        description: error.message
+      });
+    }
+  });
+
+  const handleResetPassword = () => {
+    if (!selectedUser) return;
+
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Password Mismatch",
+        description: "New password and confirmation do not match."
+      });
+      return;
+    }
+
+    if (resetPasswordData.newPassword.length < 8) {
+      toast({
+        variant: "destructive",
+        title: "Password Too Short",
+        description: "Password must be at least 8 characters long."
+      });
+      return;
+    }
+
+    resetPasswordMutation.mutate({
+      userId: selectedUser.id,
+      newPassword: resetPasswordData.newPassword
+    });
+  };
   const [filterLocation, setFilterLocation] = useState("");
   
   const [newUser, setNewUser] = useState({
@@ -633,7 +698,7 @@ export default function UserManagementPage() {
             <Card 
               className="cursor-pointer hover:shadow-lg hover:border-purple-300 transition-all duration-200 group"
               onClick={() => {
-                const locations = [...new Set(users?.map(user => user.location))];
+                const locations = [...new Set(users?.map((user: User) => user.location))];
                 const locationNames = locations.map(loc => loc === 'usa' ? 'USA' : 'South Sudan');
                 toast({
                   title: "Active Locations",
@@ -646,7 +711,7 @@ export default function UserManagementPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-3xl font-bold text-slate-900 group-hover:text-purple-600 transition-colors">
-                      {new Set(users?.map(user => user.location)).size || 0}
+                      {new Set(users?.map((user: User) => user.location)).size || 0}
                     </p>
                     <p className="text-sm text-slate-600 mb-1">Locations</p>
                     <p className="text-xs text-slate-400">Click to view details</p>
@@ -799,7 +864,11 @@ export default function UserManagementPage() {
                               </>
                             )}
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedUser(user);
+                            setIsResetPasswordOpen(true);
+                            setResetPasswordData({ newPassword: "", confirmPassword: "" });
+                          }}>
                             <Key className="w-4 h-4 mr-2" />
                             Reset Password
                           </DropdownMenuItem>
@@ -825,6 +894,61 @@ export default function UserManagementPage() {
           </Card>
 
         </div>
+
+        {/* Reset Password Dialog */}
+        <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+              <p className="text-sm text-slate-600">
+                Set a new password for <strong>{selectedUser?.fullName}</strong> ({selectedUser?.username})
+              </p>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={resetPasswordData.newPassword}
+                  onChange={(e) => setResetPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={resetPasswordData.confirmPassword}
+                  onChange={(e) => setResetPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsResetPasswordOpen(false);
+                    setResetPasswordData({ newPassword: "", confirmPassword: "" });
+                    setSelectedUser(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleResetPassword}
+                  disabled={!resetPasswordData.newPassword || !resetPasswordData.confirmPassword || resetPasswordMutation.isPending}
+                  className="bg-teal-600 hover:bg-teal-700"
+                >
+                  {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
