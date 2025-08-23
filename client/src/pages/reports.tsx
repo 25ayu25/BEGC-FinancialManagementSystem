@@ -85,27 +85,9 @@ export default function Reports() {
     try {
       console.log('Downloading report:', pdfPath, filename);
       
+      // Simply redirect to the download URL - backend handles the download with Content-Disposition header
       const downloadUrl = `/api${pdfPath}`;
-      const response = await fetch(downloadUrl, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download report: ${response.status} ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename || 'report.pdf';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }, 1000);
+      window.location.href = downloadUrl;
       
       toast({
         title: "Download Started",
