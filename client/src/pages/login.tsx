@@ -93,8 +93,8 @@ export default function LoginPage() {
             </div>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Bahr El Ghazal Clinic</h1>
-            <p className="text-slate-600">Financial Management System</p>
+            <h1 className="text-2xl font-bold text-blue-700">Bahr El Ghazal Clinic</h1>
+            <p className="text-teal-600 font-medium">Financial Management System</p>
           </div>
         </div>
 
