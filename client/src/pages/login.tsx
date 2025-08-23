@@ -97,7 +97,7 @@ export default function LoginPage() {
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-xl text-center">Welcome Back</CardTitle>
             <p className="text-sm text-slate-600 text-center">
-              Sign in to access your financial dashboard
+              Sign in
             </p>
           </CardHeader>
           <CardContent>
