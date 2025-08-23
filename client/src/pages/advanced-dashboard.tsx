@@ -350,7 +350,49 @@ export default function AdvancedDashboard() {
     queryKey: ['/api/departments'],
   });
 
-
+  // Function to determine the correct navigation for patient volume based on time range
+  const getPatientVolumeNavigation = () => {
+    const currentDate = new Date();
+    
+    switch(timeRange) {
+      case 'current-month':
+        return { 
+          year: currentDate.getFullYear(), 
+          month: currentDate.getMonth() + 1 
+        };
+      case 'last-month':
+        const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
+        return { 
+          year: lastMonth.getFullYear(), 
+          month: lastMonth.getMonth() + 1 
+        };
+      case 'last-3-months':
+        // Go to the start of the 3-month period (June)
+        const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2);
+        return { 
+          year: threeMonthsAgo.getFullYear(), 
+          month: threeMonthsAgo.getMonth() + 1 
+        };
+      case 'year':
+        return { 
+          year: currentDate.getFullYear(), 
+          month: 1 // January
+        };
+      case 'custom':
+        return customStartDate ? { 
+          year: customStartDate.getFullYear(), 
+          month: customStartDate.getMonth() + 1 
+        } : { 
+          year: currentDate.getFullYear(), 
+          month: currentDate.getMonth() + 1 
+        };
+      default:
+        return { 
+          year: currentDate.getFullYear(), 
+          month: currentDate.getMonth() + 1 
+        };
+    }
+  };
 
   const { data: rawIncome } = useQuery({
     queryKey: ['/api/income-trends', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
@@ -806,7 +848,7 @@ export default function AdvancedDashboard() {
         </Link>
 
         {/* Patient Volume */}
-        <Link href="/patient-volume">
+        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${timeRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
