@@ -174,11 +174,13 @@ export default function Dashboard() {
                 }
               </p>
               {/* Patient Volume Chip - Clickable */}
-              <Link href="/patient-volume" className="inline-block">
+              <Link href={`/patient-volume?view=monthly&year=${selectedYear}&month=${selectedMonth}`} className="inline-block">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 rounded-md transition-colors cursor-pointer min-h-[44px]">
                   <Users className="w-4 h-4 text-teal-600" />
                   <span className="text-teal-600 text-sm font-medium font-variant-numeric-tabular">
-                    Current month: {periodPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
+                    {timeRange === 'current-month' ? 'Current month' : 
+                     timeRange === 'last-month' ? 'Last month' : 
+                     'Selected period'}: {periodPatientVolume.reduce((sum, v) => sum + (v.patientCount || 0), 0)} patients
                   </span>
                 </div>
               </Link>
