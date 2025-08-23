@@ -127,11 +127,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
-    const [user] = await db.update(users).set({
-      ...updates,
-      updatedAt: new Date()
-    }).where(eq(users.id, id)).returning();
-    return user;
+    try {
+      const [user] = await db.update(users).set({
+        ...updates,
+        updatedAt: new Date()
+      }).where(eq(users.id, id)).returning();
+      
+      // Verify the update actually happened
+      if (user && updates.password) {
+        console.log(`Password updated for user ${id}: ${user.password === updates.password ? 'SUCCESS' : 'FAILED'}`);
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Error in updateUser:', error);
+      throw error;
+    }
   }
 
   async deleteUser(id: string): Promise<void> {
