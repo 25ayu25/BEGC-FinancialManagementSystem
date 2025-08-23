@@ -897,34 +897,34 @@ export default function UserManagementPage() {
 
         {/* Reset Password Dialog */}
         <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-slate-900">Reset Password</DialogTitle>
-              <p className="text-sm text-slate-700">
-                Set a new password for <strong className="text-slate-900">{selectedUser?.fullName}</strong> ({selectedUser?.username})
+          <DialogContent className="max-w-md bg-white border-2 border-slate-200 shadow-2xl">
+            <DialogHeader className="border-b border-slate-200 pb-4">
+              <DialogTitle className="text-xl font-bold text-black">Reset Password</DialogTitle>
+              <p className="text-base text-black mt-2">
+                Set a new password for <strong className="text-black">{selectedUser?.fullName}</strong> ({selectedUser?.username})
               </p>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-slate-900 font-semibold">New Password</Label>
+            <div className="space-y-6 pt-6 bg-white">
+              <div className="space-y-3">
+                <Label htmlFor="new-password" className="text-lg font-bold text-black block">New Password</Label>
                 <Input
                   id="new-password"
                   type="password"
                   placeholder="Enter new password"
                   value={resetPasswordData.newPassword}
                   onChange={(e) => setResetPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                  className="h-11 bg-white border-slate-300"
+                  className="h-12 bg-white border-2 border-slate-400 text-black placeholder:text-slate-500 focus:border-teal-500"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password" className="text-slate-900 font-semibold">Confirm Password</Label>
+              <div className="space-y-3">
+                <Label htmlFor="confirm-password" className="text-lg font-bold text-black block">Confirm Password</Label>
                 <Input
                   id="confirm-password"
                   type="password"
                   placeholder="Confirm new password"
                   value={resetPasswordData.confirmPassword}
                   onChange={(e) => setResetPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  className="h-11 bg-white border-slate-300"
+                  className="h-12 bg-white border-2 border-slate-400 text-black placeholder:text-slate-500 focus:border-teal-500"
                 />
               </div>
               <div className="flex justify-end space-x-3 pt-4">
