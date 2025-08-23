@@ -658,20 +658,32 @@ export class DatabaseStorage implements IStorage {
     )
     .orderBy(transactions.date);
 
-    return transactionData.map(row => ({
-      id: row.id,
-      date: new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      fullDate: new Date(row.fullDate).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      }),
-      amount: Number(row.amount),
-      currency: row.currency,
-      departmentId: row.departmentId || '',
-      departmentName: row.departmentName || 'Unknown',
-      description: row.description
-    }));
+    return transactionData.map(row => {
+      // Map department names properly, including handling the "Other" department
+      let departmentName = row.departmentName || 'Other income';
+      if (row.departmentId === '4242abf4-e68e-48c8-9eaf-ada2612bd4c2') departmentName = 'Consultation';
+      else if (row.departmentId === 'ae648a70-c159-43b7-b814-7dadb213ae8d') departmentName = 'Laboratory';
+      else if (row.departmentId === '09435c53-9061-429b-aecf-677b12bbdbd7') departmentName = 'Ultrasound';
+      else if (row.departmentId === '6a06d917-a94a-4637-b1f6-a3fd6855ddd6') departmentName = 'X-Ray';
+      else if (row.departmentId === '8fb395f9-ae59-4ddc-9ad3-e56b7fda161c') departmentName = 'Pharmacy';
+      // Handle the OTHER department specifically
+      else if (row.departmentName === 'Other' || !row.departmentName) departmentName = 'Other';
+      
+      return {
+        id: row.id,
+        date: new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        fullDate: new Date(row.fullDate).toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric' 
+        }),
+        amount: Number(row.amount),
+        currency: row.currency,
+        departmentId: row.departmentId || '',
+        departmentName,
+        description: row.description
+      };
+    });
   }
 
   async getIncomeTrendsForDateRange(startDate: Date, endDate: Date): Promise<Array<{ date: string, income: number }>> {
