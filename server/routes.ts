@@ -363,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Failed to update password" });
       }
 
-      console.log(`Password reset successfully for user ${userId} by admin ${req.user.id}`);
+      console.log(`Password reset successfully for user ${userId} by admin ${req.user?.id}`);
       res.json({ success: true, message: "Password reset successfully" });
     } catch (error) {
       console.error("Error resetting password:", error);
