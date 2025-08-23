@@ -899,32 +899,32 @@ export default function UserManagementPage() {
         <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Reset Password</DialogTitle>
-              <p className="text-sm text-slate-600">
-                Set a new password for <strong>{selectedUser?.fullName}</strong> ({selectedUser?.username})
+              <DialogTitle className="text-slate-900">Reset Password</DialogTitle>
+              <p className="text-sm text-slate-700">
+                Set a new password for <strong className="text-slate-900">{selectedUser?.fullName}</strong> ({selectedUser?.username})
               </p>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
+                <Label htmlFor="new-password" className="text-slate-800 font-medium">New Password</Label>
                 <Input
                   id="new-password"
                   type="password"
                   placeholder="Enter new password"
                   value={resetPasswordData.newPassword}
                   onChange={(e) => setResetPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                  className="h-11"
+                  className="h-11 bg-white border-slate-300"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Label htmlFor="confirm-password" className="text-slate-800 font-medium">Confirm Password</Label>
                 <Input
                   id="confirm-password"
                   type="password"
                   placeholder="Confirm new password"
                   value={resetPasswordData.confirmPassword}
                   onChange={(e) => setResetPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  className="h-11"
+                  className="h-11 bg-white border-slate-300"
                 />
               </div>
               <div className="flex justify-end space-x-3 pt-4">
