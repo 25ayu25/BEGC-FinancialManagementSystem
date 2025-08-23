@@ -682,7 +682,7 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-3">
@@ -805,6 +805,27 @@ export default function AdvancedDashboard() {
           </Card>
         </Link>
 
+        {/* Patient Volume */}
+        <Link href="/patient-volume">
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Total Patients</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">{(dashboardData?.totalPatients || 0).toLocaleString()}</p>
+                  <div className="flex items-center mt-1">
+                    <span className="text-xs font-medium text-teal-600">
+                      Current period
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-teal-50 p-1.5 rounded-lg">
+                  <Users className="h-4 w-4 text-teal-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
       </div>
 
