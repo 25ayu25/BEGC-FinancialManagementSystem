@@ -906,7 +906,7 @@ export default function UserManagementPage() {
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-slate-800 font-medium">New Password</Label>
+                <Label htmlFor="new-password" className="text-slate-900 font-semibold">New Password</Label>
                 <Input
                   id="new-password"
                   type="password"
@@ -917,7 +917,7 @@ export default function UserManagementPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password" className="text-slate-800 font-medium">Confirm Password</Label>
+                <Label htmlFor="confirm-password" className="text-slate-900 font-semibold">Confirm Password</Label>
                 <Input
                   id="confirm-password"
                   type="password"
