@@ -120,6 +120,32 @@ app.get("/api/health", (_req, res) => {
       log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
     });
 
+    // Keep process alive and handle graceful shutdown
+    process.on('SIGTERM', () => {
+      log('SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      log('SIGINT received, shutting down gracefully');
+      server.close(() => {
+        process.exit(0);
+      });
+    });
+
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      // Don't exit, just log the error
+    });
+
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught Exception:', error);
+      // Don't exit, just log the error
+    });
+
   } catch (error) {
     console.error("[startup-error]", error);
     process.exit(1);
