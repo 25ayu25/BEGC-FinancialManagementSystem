@@ -118,55 +118,47 @@ process.on('uncaughtException', (error) => {
   // Don't exit, just log the error
 });
 
-// Initialize and start server
-async function startServer() {
+// Initialize server immediately
+const port = parseInt(process.env.PORT || "5000", 10);
+
+// Start everything synchronously to avoid async completion
+(async () => {
   try {
-    // Seed database with initial data (but don't crash if it fails)
-    try {
-      await seedData();
+    // Seed database (non-blocking)
+    seedData().then(() => {
       log("Database seeded successfully");
-    } catch (seedError) {
+    }).catch((seedError) => {
       console.error("Seeding failed (app will continue):", seedError);
       log("App starting without seeding - database may need setup");
-    }
+    });
     
-    // Register all API routes
+    // Register routes
     await registerRoutes(app);
     
-    // Start HTTP server and keep it running
-    const port = parseInt(process.env.PORT || "5000", 10);
-    const server = createServer(app);
-    
-    return new Promise<void>((resolve, reject) => {
-      server.listen(port, "0.0.0.0", (error?: Error) => {
-        if (error) {
-          reject(error);
-        } else {
-          log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
-          resolve();
-        }
-      });
-      
-      // Keep server reference alive
-      process.on('SIGTERM', () => {
-        log('SIGTERM received, shutting down gracefully');
-        server.close(() => process.exit(0));
-      });
-      
-      process.on('SIGINT', () => {
-        log('SIGINT received, shutting down gracefully');  
-        server.close(() => process.exit(0));
-      });
-    });
-
   } catch (error) {
-    console.error("[startup-error]", error);
-    process.exit(1);
+    console.error("[route-setup-error]", error);
   }
-}
+})();
 
-// Start the server and keep process alive
-startServer().catch((error) => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
+// Start server immediately - this will keep process alive
+const server = app.listen(port, "0.0.0.0", () => {
+  log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
+});
+
+// Keep server alive with setInterval
+const keepAlive = setInterval(() => {
+  // This keeps the event loop active
+}, 30000);
+
+// Cleanup on shutdown
+process.on('SIGTERM', () => {
+  log('SIGTERM received, shutting down gracefully');
+  clearInterval(keepAlive);
+  server.close(() => process.exit(0));
+});
+
+process.on('SIGINT', () => {
+  log('SIGINT received, shutting down gracefully');
+  clearInterval(keepAlive);
+  server.close(() => process.exit(0));
 });
