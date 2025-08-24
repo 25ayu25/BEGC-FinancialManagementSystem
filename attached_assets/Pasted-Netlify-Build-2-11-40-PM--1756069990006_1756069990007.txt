@@ -1,0 +1,96 @@
+Netlify Build                                                 
+2:11:40 PM: ────────────────────────────────────────────────────────────────
+2:11:40 PM: ​
+2:11:40 PM: ❯ Version
+2:11:40 PM:   @netlify/build 35.1.2
+2:11:40 PM: ​
+2:11:40 PM: ❯ Flags
+2:11:40 PM:   accountId: 67b373cdcebd6283c9258fce
+2:11:40 PM:   baseRelDir: true
+2:11:40 PM:   buildId: 68ab7ff698c62a806c5e6fd3
+2:11:40 PM:   deployId: 68ab7ff698c62a806c5e6fd5
+2:11:40 PM: ​
+2:11:40 PM: ❯ Current directory
+2:11:40 PM:   /opt/build/repo
+2:11:40 PM: ​
+2:11:40 PM: ❯ Config file
+2:11:40 PM:   /opt/build/repo/netlify.toml
+2:11:40 PM: ​
+2:11:40 PM: ❯ Context
+2:11:40 PM:   production
+2:11:40 PM: ​
+2:11:40 PM: build.command from netlify.toml                               
+2:11:40 PM: ────────────────────────────────────────────────────────────────
+2:11:40 PM: ​
+2:11:40 PM: $ npm install && npm run build
+2:11:41 PM: up to date, audited 647 packages in 1s
+2:11:41 PM: 84 packages are looking for funding
+2:11:41 PM:   run `npm fund` for details
+2:11:41 PM: 11 vulnerabilities (3 low, 8 moderate)
+2:11:41 PM: To address issues that do not require attention, run:
+2:11:41 PM:   npm audit fix
+2:11:41 PM: To address all issues (including breaking changes), run:
+2:11:41 PM:   npm audit fix --force
+2:11:41 PM: Run `npm audit` for details.
+2:11:42 PM: > rest-express@1.0.0 build
+2:11:42 PM: > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+2:11:42 PM: vite v5.4.19 building for production...
+2:11:42 PM: transforming...
+2:11:42 PM: Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+2:11:42 PM:   npx update-browserslist-db@latest
+2:11:42 PM:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2:11:47 PM: ✓ 3376 modules transformed.
+2:11:47 PM: rendering chunks...
+2:11:47 PM: computing gzip size...
+2:11:47 PM: ../dist/public/index.html                            2.25 kB │ gzip:   0.90 kB
+2:11:47 PM: ../dist/public/assets/clinic-logo-qYF8jzm7.jpeg     78.27 kB
+2:11:47 PM: ../dist/public/assets/index-CytYkZnL.css            86.31 kB │ gzip:  14.23 kB
+2:11:47 PM: ../dist/public/assets/index-yIe-6WR8.js          1,030.55 kB │ gzip: 291.66 kB
+2:11:47 PM: 
+2:11:47 PM: (!) Some chunks are larger than 500 kB after minification. Consider:
+2:11:47 PM: - Using dynamic import() to code-split the application
+2:11:47 PM: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2:11:47 PM: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2:11:47 PM: ✓ built in 5.45s
+2:11:47 PM:   dist/index.js  84.3kb
+2:11:47 PM: ⚡ Done in 8ms
+2:11:47 PM: ​
+2:11:47 PM: (build.command completed in 7.1s)
+2:11:47 PM: ​
+2:11:47 PM: Functions bundling                                            
+2:11:47 PM: ────────────────────────────────────────────────────────────────
+2:11:47 PM: ​
+2:11:47 PM: Packaging Functions from netlify/functions directory:
+2:11:47 PM:  - api.js
+2:11:47 PM: ​
+2:11:47 PM: ​
+2:11:47 PM: Dependencies installation error                               
+2:11:47 PM: ────────────────────────────────────────────────────────────────
+2:11:47 PM: ​
+2:11:47 PM:   Error message
+2:11:47 PM:   A Netlify Function failed to require one of its dependencies.
+2:11:47 PM:   Please make sure it is present in the site's top-level "package.json".
+​
+2:11:47 PM:   In file "/opt/build/repo/netlify/functions/api.js"
+2:11:47 PM:   Cannot find module './routes' from '/opt/build/repo/server'
+2:11:47 PM: ​
+2:11:47 PM:   Resolved config
+2:11:47 PM:   build:
+2:11:47 PM:     command: npm install && npm run build
+2:11:47 PM:     commandOrigin: config
+2:11:47 PM:     environment:
+2:11:47 PM:       - VITE_API_URL
+2:11:47 PM:       - VITE_ENVIRONMENT
+2:11:47 PM:       - NODE_VERSION
+2:11:47 PM:     publish: /opt/build/repo/dist/public
+2:11:47 PM:     publishOrigin: config
+2:11:47 PM:   functionsDirectory: /opt/build/repo/netlify/functions
+2:11:47 PM:   redirects:
+2:11:48 PM: Failed during stage 'building site': Build script returned non-zero exit code: 2
+2:11:48 PM:     - from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+2:11:48 PM: Build failed due to a user error: Build script returned non-zero exit code: 2
+2:11:48 PM: Failing build: Failed to build site
+2:11:48 PM: Finished processing build request in 28.416s

@@ -5,6 +5,10 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# No functions directory - backend is on Render
+[functions]
+  directory = "nonexistent"
+
 # SPA fallback for client-side routing
 [[redirects]]
   from = "/*"
