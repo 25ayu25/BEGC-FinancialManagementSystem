@@ -1,0 +1,66 @@
+1:56:17 PM: Netlify Build                                                 
+1:56:17 PM: ────────────────────────────────────────────────────────────────
+1:56:17 PM: ​
+1:56:17 PM: ❯ Version
+1:56:17 PM:   @netlify/build 35.1.2
+1:56:17 PM: ​
+1:56:17 PM: ❯ Flags
+1:56:17 PM:   accountId: 67b373cdcebd6283c9258fce
+1:56:17 PM:   baseRelDir: true
+1:56:17 PM:   buildId: 68ab7c595737709ca1e929b4
+1:56:17 PM:   deployId: 68ab7c595737709ca1e929b6
+1:56:17 PM: ​
+1:56:17 PM: ❯ Current directory
+1:56:17 PM:   /opt/build/repo
+1:56:17 PM: ​
+1:56:17 PM: ❯ Config file
+1:56:17 PM:   /opt/build/repo/netlify.toml
+1:56:17 PM: ​
+1:56:17 PM: ❯ Context
+1:56:17 PM:   production
+1:56:17 PM: ​
+1:56:17 PM: build.command from netlify.toml                               
+1:56:17 PM: ────────────────────────────────────────────────────────────────
+1:56:17 PM: ​
+1:56:17 PM: $ cd client && npm install && npm run build
+1:56:25 PM: added 152 packages, and audited 153 packages in 7s
+1:56:25 PM: 31 packages are looking for funding
+1:56:25 PM:   run `npm fund` for details
+1:56:25 PM: 2 moderate severity vulnerabilities
+1:56:25 PM: To address all issues (including breaking changes), run:
+1:56:25 PM:   npm audit fix --force
+1:56:25 PM: Run `npm audit` for details.
+1:56:25 PM: > bahr-el-ghazal-clinic-frontend@0.0.0 build
+1:56:25 PM: > tsc -b && vite build
+1:56:25 PM: error TS5083: Cannot read file '/opt/build/repo/client/tsconfig.json'.
+1:56:25 PM: ​
+1:56:25 PM: "build.command" failed                                        
+1:56:25 PM: ────────────────────────────────────────────────────────────────
+1:56:25 PM: ​
+1:56:25 PM:   Error message
+1:56:25 PM:   Command failed with exit code 1: cd client && npm install && npm run build (https://ntl.fyi/exit-code-1)
+1:56:25 PM: ​
+1:56:25 PM:   Error location
+1:56:25 PM:   In build.command from netlify.toml:
+1:56:25 PM:   cd client && npm install && npm run build
+1:56:25 PM: ​
+1:56:25 PM:   Resolved config
+1:56:25 PM:   build:
+1:56:25 PM:     command: cd client && npm install && npm run build
+1:56:25 PM:     commandOrigin: config
+1:56:25 PM:     environment:
+1:56:25 PM:       - VITE_API_URL
+1:56:25 PM:       - VITE_ENVIRONMENT
+1:56:25 PM:       - NODE_VERSION
+1:56:25 PM:     publish: /opt/build/repo/client/dist
+1:56:25 PM:     publishOrigin: config
+1:56:25 PM:   functionsDirectory: /opt/build/repo/netlify/functions
+1:56:25 PM:   redirects:
+1:56:26 PM: Failed during stage 'building site': Build script returned non-zero exit code: 2 (https://ntl.fyi/exit-code-2)
+1:56:26 PM:     - from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+1:56:26 PM: Build failed due to a user error: Build script returned non-zero exit code: 2
+1:56:26 PM: Failing build: Failed to build site
+1:56:26 PM: Finished processing build request in 24.876s
