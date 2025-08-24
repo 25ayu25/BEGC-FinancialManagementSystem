@@ -1,0 +1,58 @@
+==> Cloning from https://github.com/25ayu25/BEGC-FinancialManagementSystem
+==> Checking out commit e44e34c29c40c4cf61ac3e2928af2e58f34a2bfa in branch main
+==> Using Node.js version 22.16.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'npm ci && npx esbuild server/app.ts --platform=node --packages=external --bundle --format=esm --outdir=dist'...
+added 547 packages, and audited 548 packages in 6s
+72 packages are looking for funding
+  run `npm fund` for details
+3 low severity vulnerabilities
+To address all issues, run:
+  npm audit fix
+Run `npm audit` for details.
+  dist/app.js  81.1kb
+⚡ Done in 8ms
+==> Uploading build...
+==> Uploaded in 6.6s. Compression took 3.4s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+node:internal/modules/cjs/loader:1404
+  throw err;
+  ^
+Error: Cannot find module '/opt/render/project/src/dist/index.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+Node.js v22.16.0
+==> Exited with status 1
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+node:internal/modules/cjs/loader:1404
+  throw err;
+  ^
+Error: Cannot find module '/opt/render/project/src/dist/index.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+Node.js v22.16.0
