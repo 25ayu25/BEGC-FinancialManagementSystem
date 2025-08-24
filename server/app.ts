@@ -87,9 +87,14 @@ app.get("/api/health", (_req, res) => {
 // Start the server
 (async () => {
   try {
-    // Seed database with initial data
-    await seedData();
-    log("Database seeded successfully");
+    // Seed database with initial data (but don't crash if it fails)
+    try {
+      await seedData();
+      log("Database seeded successfully");
+    } catch (seedError) {
+      console.error("Seeding failed (app will continue):", seedError);
+      log("App starting without seeding - database may need setup");
+    }
     
     // Register all API routes
     await registerRoutes(app);

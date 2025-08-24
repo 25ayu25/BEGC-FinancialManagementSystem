@@ -1,0 +1,124 @@
+Cloning from https://github.com/25ayu25/BEGC-FinancialManagementSystem
+==> Checking out commit 01d134cd0057547067fe581261b8e029e8a43b53 in branch main
+==> Using Node.js version 22.16.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'npm ci && npx esbuild server/app.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js'...
+added 547 packages, and audited 548 packages in 7s
+72 packages are looking for funding
+  run `npm fund` for details
+3 low severity vulnerabilities
+To address all issues, run:
+  npm audit fix
+Run `npm audit` for details.
+  dist/index.js  81.5kb
+⚡ Done in 7ms
+==> Uploading build...
+==> Uploaded in 6.8s. Compression took 3.2s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+Seeding initial data...
+Seeding initial data...
+Seeding error: ErrorEvent {
+  [Symbol(kTarget)]: WebSocket {
+    _events: [Object: null prototype] {
+      error: [Function],
+      message: [Function],
+      close: [Function],
+      open: [Function]
+    },
+    _eventsCount: 4,
+    _maxListeners: undefined,
+    _binaryType: 'arraybuffer',
+    _closeCode: 1006,
+    _closeFrameReceived: false,
+    _closeFrameSent: false,
+    _closeMessage: <Buffer >,
+    _closeTimer: null,
+    _errorEmitted: true,
+    _extensions: {},
+    _paused: false,
+    _protocol: '',
+    _readyState: 3,
+    _receiver: null,
+    _sender: null,
+    _socket: null,
+    _bufferedAmount: 0,
+    _isServer: false,
+    _redirects: 0,
+    _autoPong: true,
+    _url: 'wss://db.yobupoxmlieomwtpqvop.supabase.co/v2',
+    _req: null,
+    [Symbol(shapeMode)]: false,
+    [Symbol(kCapture)]: false
+  },
+  [Symbol(kType)]: 'error',
+  [Symbol(kError)]: Error: connect ENETUNREACH 2a05:d014:1c06:5f02:2c58:61bc:c434:33:443 - Local (:::0)
+      at internalConnect (node:net:1115:16)
+      at defaultTriggerAsyncIdScope (node:internal/async_hooks:464:18)
+      at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1522:9)
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8) {
+    errno: -101,
+    code: 'ENETUNREACH',
+    syscall: 'connect',
+    address: '2a05:d014:1c06:5f02:2c58:61bc:c434:33',
+    port: 443
+  },
+  [Symbol(kMessage)]: 'connect ENETUNREACH 2a05:d014:1c06:5f02:2c58:61bc:c434:33:443 - Local (:::0)'
+}
+==> Application exited early
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+Seeding initial data...
+Seeding initial data...
+Seeding error: ErrorEvent {
+  [Symbol(kTarget)]: WebSocket {
+    _events: [Object: null prototype] {
+      error: [Function],
+      message: [Function],
+      close: [Function],
+      open: [Function]
+    },
+    _eventsCount: 4,
+    _maxListeners: undefined,
+    _binaryType: 'arraybuffer',
+    _closeCode: 1006,
+    _closeFrameReceived: false,
+    _closeFrameSent: false,
+    _closeMessage: <Buffer >,
+    _closeTimer: null,
+    _errorEmitted: true,
+    _extensions: {},
+    _paused: false,
+    _protocol: '',
+    _readyState: 3,
+    _receiver: null,
+    _sender: null,
+    _socket: null,
+    _bufferedAmount: 0,
+    _isServer: false,
+    _redirects: 0,
+    _autoPong: true,
+    _url: 'wss://db.yobupoxmlieomwtpqvop.supabase.co/v2',
+    _req: null,
+    [Symbol(shapeMode)]: false,
+    [Symbol(kCapture)]: false
+  },
+  [Symbol(kType)]: 'error',
+  [Symbol(kError)]: Error: connect ENETUNREACH 2a05:d014:1c06:5f02:2c58:61bc:c434:33:443 - Local (:::0)
+      at internalConnect (node:net:1115:16)
+      at defaultTriggerAsyncIdScope (node:internal/async_hooks:464:18)
+      at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1522:9)
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8) {
+    errno: -101,
+    code: 'ENETUNREACH',
+    syscall: 'connect',
+    address: '2a05:d014:1c06:5f02:2c58:61bc:c434:33',
+    port: 443
+  },
+  [Symbol(kMessage)]: 'connect ENETUNREACH 2a05:d014:1c06:5f02:2c58:61bc:c434:33:443 - Local (:::0)'
+}
