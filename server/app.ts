@@ -84,8 +84,42 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Start the server
-(async () => {
+// Error handler middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err?.status || err?.statusCode || 500;
+  const message = err?.message || "Internal Server Error";
+  console.error("[api-error]", status, message);
+  res.status(status).json({ message });
+});
+
+// Catch-all for API endpoints
+app.get("*", (_req, res) => {
+  res.status(404).json({ error: "API endpoint not found" });
+});
+
+// Handle process signals
+process.on('SIGTERM', () => {
+  log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  log('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit, just log the error
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit, just log the error
+});
+
+// Initialize and start server
+async function startServer() {
   try {
     // Seed database with initial data (but don't crash if it fails)
     try {
@@ -99,55 +133,40 @@ app.get("/api/health", (_req, res) => {
     // Register all API routes
     await registerRoutes(app);
     
-    // Error handler middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err?.status || err?.statusCode || 500;
-      const message = err?.message || "Internal Server Error";
-      console.error("[api-error]", status, message);
-      res.status(status).json({ message });
-    });
-
-    // Catch-all for API endpoints
-    app.get("*", (_req, res) => {
-      res.status(404).json({ error: "API endpoint not found" });
-    });
-
-    // Start HTTP server
+    // Start HTTP server and keep it running
     const port = parseInt(process.env.PORT || "5000", 10);
     const server = createServer(app);
     
-    server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
-      log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
-    });
-
-    // Keep process alive and handle graceful shutdown
-    process.on('SIGTERM', () => {
-      log('SIGTERM received, shutting down gracefully');
-      server.close(() => {
-        process.exit(0);
+    return new Promise<void>((resolve, reject) => {
+      server.listen(port, "0.0.0.0", (error?: Error) => {
+        if (error) {
+          reject(error);
+        } else {
+          log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
+          resolve();
+        }
       });
-    });
-
-    process.on('SIGINT', () => {
-      log('SIGINT received, shutting down gracefully');
-      server.close(() => {
-        process.exit(0);
+      
+      // Keep server reference alive
+      process.on('SIGTERM', () => {
+        log('SIGTERM received, shutting down gracefully');
+        server.close(() => process.exit(0));
       });
-    });
-
-    // Handle unhandled promise rejections
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-      // Don't exit, just log the error
-    });
-
-    process.on('uncaughtException', (error) => {
-      console.error('Uncaught Exception:', error);
-      // Don't exit, just log the error
+      
+      process.on('SIGINT', () => {
+        log('SIGINT received, shutting down gracefully');  
+        server.close(() => process.exit(0));
+      });
     });
 
   } catch (error) {
     console.error("[startup-error]", error);
     process.exit(1);
   }
-})();
+}
+
+// Start the server and keep process alive
+startServer().catch((error) => {
+  console.error("Failed to start server:", error);
+  process.exit(1);
+});
