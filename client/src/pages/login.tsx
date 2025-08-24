@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import clinicLogo from "@/assets/clinic-logo.jpeg";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/queryClient";
 
 export default function LoginPage() {
   const { toast } = useToast();
@@ -36,23 +37,13 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      // Call the actual login API
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          username: credentials.username,
-          password: credentials.password
-        })
+      // Call the actual login API using axios
+      const response = await api.post('/api/auth/login', {
+        username: credentials.username,
+        password: credentials.password
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Login failed');
-      }
-
-      const user = await response.json();
+      const user = response.data;
       
       // Safari fallback: store session in localStorage as backup
       localStorage.setItem('user_session_backup', JSON.stringify(user));

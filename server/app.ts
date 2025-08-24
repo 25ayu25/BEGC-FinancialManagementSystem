@@ -2,7 +2,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
-// Manual CORS implementation (no external cors package needed)
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed-data";
 
@@ -27,30 +27,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// Manual CORS implementation - Allow your Netlify domains
+// CORS configuration for cross-site authentication
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Allow in development or if no specific origins set
-  if (!origin || process.env.NODE_ENV !== "production" || allowedOrigins.length === 0) {
-    res.header("Access-Control-Allow-Origin", origin || "*");
-  } else if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
-  
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma,x-session-token");
-  
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    res.sendStatus(204);
-    return;
-  }
-  
-  next();
-});
+
+function isAllowed(origin?: string) {
+  if (!origin) return true; // same-origin requests
+  if (allowedOrigins.includes(origin)) return true;
+  if (origin.endsWith('.netlify.app')) return true; // deploy previews
+  return false;
+}
+
+app.use(cors({
+  origin: (origin, cb) => cb(isAllowed(origin) ? null : new Error('Not allowed by CORS'), isAllowed(origin)),
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-token'],
+}));
 
 // Simple request logger
 app.use((req, res, next) => {

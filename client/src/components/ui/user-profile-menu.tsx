@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -51,17 +52,10 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
 
   const handleSignOut = async () => {
     try {
-      const res = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        // Clear any cached user data and redirect to login page
-        window.location.href = '/login';
-      } else {
-        console.error('Failed to sign out');
-      }
+      await api.post('/api/auth/logout');
+      // Clear any cached user data and redirect to login page
+      localStorage.removeItem('user_session_backup');
+      window.location.href = '/login';
     } catch (error) {
       console.error('Sign out error:', error);
     }

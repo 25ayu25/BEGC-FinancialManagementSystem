@@ -118,15 +118,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         fullName: user.fullName
       };
 
-      // Production-secure cookie settings
+      // Cross-site cookie settings for Netlify → Render
       const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('user_session', JSON.stringify(userSession), {
         httpOnly: true, // Security: prevent XSS
         secure: isProduction, // HTTPS only in production
-        sameSite: isProduction ? 'lax' : false, // CSRF protection in production
+        sameSite: isProduction ? 'none' : 'lax', // REQUIRED for cross-site requests
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/', // Available for all paths
-        // domain: '.bahrelghazalclinic.com' // Set ONLY after custom domains are live
       });
 
       res.json(userSession);
@@ -138,10 +137,11 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.post("/api/auth/logout", (req, res) => {
     // Clear session/cookies with same settings as when set
+    const isProduction = process.env.NODE_ENV === 'production';
     res.clearCookie('user_session', {
       httpOnly: true, // Security: prevent XSS
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'lax' : false, // CSRF protection in production
+      secure: isProduction, // HTTPS only in production
+      sameSite: isProduction ? 'none' : 'lax', // MUST match login cookie settings
       path: '/'
     });
     res.clearCookie('session');
