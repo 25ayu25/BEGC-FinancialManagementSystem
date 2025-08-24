@@ -1,5 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { createServer, type Server } from "http";
+// Removed unused imports
 import { storage } from "./storage";
 import { insertTransactionSchema, insertReceiptSchema, insertPatientVolumeSchema } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
@@ -20,7 +20,7 @@ declare global {
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   
   // Authentication middleware with Safari fallback support
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -118,13 +118,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName: user.fullName
       };
 
-      // Set session cookie with minimal restrictions for Safari compatibility
+      // Production-secure cookie settings
+      const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('user_session', JSON.stringify(userSession), {
-        httpOnly: false, // Allow client-side access for Safari compatibility
-        secure: false, // Keep false for development (localhost)
-        sameSite: false, // Most permissive setting for Safari
+        httpOnly: true, // Security: prevent XSS
+        secure: isProduction, // HTTPS only in production
+        sameSite: isProduction ? 'lax' : false, // CSRF protection in production
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        path: '/' // Ensure cookie is available for all paths
+        path: '/', // Available for all paths
+        // domain: '.bahrelghazalclinic.com' // Set ONLY after custom domains are live
       });
 
       res.json(userSession);
@@ -137,9 +139,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", (req, res) => {
     // Clear session/cookies with same settings as when set
     res.clearCookie('user_session', {
-      httpOnly: false,
-      secure: false,
-      sameSite: false,
+      httpOnly: true, // Security: prevent XSS
+      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      sameSite: process.env.NODE_ENV === 'production' ? 'lax' : false, // CSRF protection in production
       path: '/'
     });
     res.clearCookie('session');
@@ -1231,6 +1233,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // Routes registered successfully
 }
