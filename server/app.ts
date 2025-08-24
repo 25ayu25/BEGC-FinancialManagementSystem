@@ -2,7 +2,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
-import cors from "cors";
+// Manual CORS implementation (no external cors package needed)
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed-data";
 
@@ -27,17 +27,30 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// CORS - Allow your Netlify domains
+// Manual CORS implementation - Allow your Netlify domains
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || process.env.NODE_ENV !== "production") return cb(null, true);
-    if (allowedOrigins.length === 0) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-}));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Allow in development or if no specific origins set
+  if (!origin || process.env.NODE_ENV !== "production" || allowedOrigins.length === 0) {
+    res.header("Access-Control-Allow-Origin", origin || "*");
+  } else if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma");
+  
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  
+  next();
+});
 
 // Simple request logger
 app.use((req, res, next) => {
