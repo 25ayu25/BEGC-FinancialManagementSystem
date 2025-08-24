@@ -1,0 +1,189 @@
+// server/index.ts
+import express, { type Request, type Response, type NextFunction } from "express";
+import cors from "cors";
+import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
+import { createServer } from "http";
+import { registerRoutes } from "./routes";
+import { seedData } from "./seed-data";
+
+/** Simple timestamped logger */
+function log(message: string, source = "api") {
+  const t = new Date().toLocaleTimeString("en-US", {
+// Simple logger for production
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    minute: "2-digit", 
+    second: "2-digit",
+    hour12: true,
+  });
+  // eslint-disable-next-line no-console
+  console.log(`${t} [${source}] ${message}`);
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+const app = express();
+const server = createServer(app);
+const isProd = process.env.NODE_ENV === "production";
+const PORT = Number(process.env.PORT || 5000);
+
+// Trust proxy (so secure cookies & IP work behind Render’s proxy)
+app.set("trust proxy", 1);
+
+// ---- Core middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Configure cookie parser with proper settings
+app.use(cookieParser());
+
+// ---- CORS (allow your frontend; supports multiple origins via comma list)
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+/**
+ * Examples:
+ * process.env.ALLOWED_ORIGINS = "https://your-site.netlify.app,https://app.yourdomain.com"
+ */
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Allow non-browser requests (no Origin) and all origins in dev
+      if (!origin || (!isProd && origin)) return cb(null, true);
+      if (allowedOrigins.length === 0) return cb(null, true); // permissive until you set ALLOWED_ORIGINS
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
+// Trust proxy for correct cookie handling in development
+app.set('trust proxy', 1);
+
+// ---- Lightweight API request logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  let captured: unknown;
+  const orig = res.json.bind(res);
+  (res as Response).json = ((body: unknown) => {
+    captured = body;
+    return orig(body);
+  }) as Response["json"];
+  const path = req.path;
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+  const originalResJson = res.json;
+  res.json = function (bodyJson, ...args) {
+    capturedJsonResponse = bodyJson;
+    return originalResJson.apply(res, [bodyJson, ...args]);
+  };
+
+  res.on("finish", () => {
+    if (req.path.startsWith("/api")) {
+      let line = `${req.method} ${req.path} ${res.statusCode} in ${Date.now() - start}ms`;
+      if (captured !== undefined) {
+        const s = JSON.stringify(captured);
+        line += ` :: ${s.length > 120 ? s.slice(0, 119) + "…" : s}`;
+    const duration = Date.now() - start;
+    if (path.startsWith("/api")) {
+      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      }
+      log(line);
+
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
+
+      log(logLine);
+    }
+  });
+
+  next();
+});
+
+// ---- Health check (used by Render and for quick tests)
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({ status: "ok", service: "BGC API", time: new Date().toISOString() });
+});
+
+(async () => {
+  // ---- Optional: seed on boot (set SEED_ON_BOOT=true in env to enable)
+  if (process.env.SEED_ON_BOOT === "true") {
+    try {
+      await seedData();
+      log("seedData completed", "startup");
+    } catch (e: any) {
+      log(`seedData failed: ${e?.message || e}`, "startup");
+    }
+  }
+
+  // ---- Register all API routes
+  // Seed database with initial data
+  await seedData();
+  
+  await registerRoutes(app);
+  const server = createServer(app);
+
+  // ---- Error handler (must be AFTER routes). Do not throw after responding.
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err?.status || err?.statusCode || 500;
+    const message = err?.message || "Internal Server Error";
+    // eslint-disable-next-line no-console
+    console.error("[api-error]", status, message);
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+
+    res.status(status).json({ message });
+    throw err;
+  });
+
+  // ---- Frontend handling
+  if (!isProd) {
+    // Dev: mount Vite dev middleware without bundling it into production
+    try {
+      const { setupVite } = await import("./vite");
+      await setupVite(app, server);
+      log("Vite dev middleware attached", "startup");
+    } catch {
+      log("Vite not available; running API only in dev", "startup");
+    }
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  if (app.get("env") === "development") {
+    const { setupVite } = await import("./vite");
+    await setupVite(app, server);
+  } else {
+    // Prod: API only (no static frontend served by the API)
+    app.get("*", (_req, res) => res.status(404).json({ error: "API endpoint not found" }));
+    // In production, just serve API routes (no static files needed)
+    app.get('*', (req, res) => {
+      res.status(404).json({ error: 'API endpoint not found' });
+    });
+  }
+
+  // ---- Start HTTP server (0.0.0.0 for Render)
+  server.listen(
+    { port: PORT, host: "0.0.0.0", reusePort: true },
+    () => log(`listening on port ${PORT}`, "startup")
+  );
+})().catch((e) => {
+  // eslint-disable-next-line no-console
+  console.error("[fatal-startup]", e);
+  process.exit(1);
+});
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || '5000', 10);
+  server.listen({
+    port,
+    host: "0.0.0.0",
+    reusePort: true,
+  }, () => {
+    log(`serving on port ${port}`);
+  });
+})();
