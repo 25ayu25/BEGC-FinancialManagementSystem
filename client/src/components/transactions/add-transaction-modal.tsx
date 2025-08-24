@@ -289,8 +289,7 @@ export default function AddTransactionModal({
               <SelectContent>
                 {(departments as any)?.map((dept: any) => (
                   <SelectItem key={dept.id} value={dept.id}>
-                    <span className="font-medium">{dept.name}</span>
-                    <span className="text-xs text-teal-600 ml-2">({dept.code})</span>
+                    {dept.name} ({dept.code})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -355,8 +354,7 @@ export default function AddTransactionModal({
                   </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
-                      <span className="font-medium">{provider.name}</span>
-                      <span className="text-xs text-teal-600 ml-2">({provider.code})</span>
+                      {provider.name} ({provider.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
