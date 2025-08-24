@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: bahr-el-ghazal-api
+    env: node
+    buildCommand: npm install && npm run build:api
+    startCommand: npm run start:api
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard
+    healthCheckPath: /api/health

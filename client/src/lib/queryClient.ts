@@ -7,6 +7,11 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Get API base URL from environment
+const getApiBaseUrl = () => {
+  return import.meta.env.VITE_API_URL || '';
+};
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -20,7 +25,10 @@ export async function apiRequest(
     headers['x-session-token'] = sessionBackup;
   }
   
-  const res = await fetch(url, {
+  // Use production API URL if available
+  const apiUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
+  
+  const res = await fetch(apiUrl, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
@@ -45,7 +53,8 @@ export const getQueryFn: <T>(options: {
       headers['x-session-token'] = sessionBackup;
     }
     
-    const res = await fetch(queryKey.join("/") as string, {
+    const apiUrl = `${getApiBaseUrl()}${queryKey.join("/")}`;
+    const res = await fetch(apiUrl, {
       credentials: "include",
       headers,
     });
