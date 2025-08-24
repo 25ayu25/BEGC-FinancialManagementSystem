@@ -32,7 +32,7 @@ export async function seedData() {
   }
 }
 
-// Only run when called directly
+// Only run when called directly (CLI usage only)
 if (import.meta.url === `file://${process.argv[1]}`) {
-  seedData().then(() => process.exit(0));
+  seedData();
 }

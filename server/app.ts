@@ -97,68 +97,35 @@ app.get("*", (_req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
 
-// Handle process signals
-process.on('SIGTERM', () => {
-  log('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  log('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit, just log the error
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  // Don't exit, just log the error
-});
-
-// Initialize server immediately
-const port = parseInt(process.env.PORT || "5000", 10);
-
-// Start everything synchronously to avoid async completion
+// Register routes first
 (async () => {
   try {
-    // Seed database (non-blocking)
-    seedData().then(() => {
-      log("Database seeded successfully");
-    }).catch((seedError) => {
-      console.error("Seeding failed (app will continue):", seedError);
-      log("App starting without seeding - database may need setup");
-    });
-    
-    // Register routes
     await registerRoutes(app);
-    
   } catch (error) {
     console.error("[route-setup-error]", error);
   }
 })();
 
-// Start server immediately - this will keep process alive
-const server = app.listen(port, "0.0.0.0", () => {
+// Start server - this keeps process alive automatically
+const port = parseInt(process.env.PORT || "5000", 10);
+app.listen(port, "0.0.0.0", () => {
   log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
+  
+  // Optional seeding - fire and forget, no await, no exit
+  if (process.env.SEED_ON_START !== "false") {
+    seedData()
+      .then(() => log("Database seeded successfully"))
+      .catch((e) => console.error("Seeding error:", e));
+  }
 });
 
-// Keep server alive with setInterval
-const keepAlive = setInterval(() => {
-  // This keeps the event loop active
-}, 30000);
-
-// Cleanup on shutdown
+// Clean shutdown handlers  
 process.on('SIGTERM', () => {
   log('SIGTERM received, shutting down gracefully');
-  clearInterval(keepAlive);
-  server.close(() => process.exit(0));
+  process.exit(0);
 });
 
 process.on('SIGINT', () => {
   log('SIGINT received, shutting down gracefully');
-  clearInterval(keepAlive);
-  server.close(() => process.exit(0));
+  process.exit(0);
 });

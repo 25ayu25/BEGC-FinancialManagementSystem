@@ -1,0 +1,57 @@
+The logs show the real culprit:
+Database seeded successfully! … then Application exited early
+That almost always happens when your seeding code calls process.exit() (a common pattern when seed scripts are written to be run from the CLI). When the seed finishes, Node exits ⇒ Render restarts ⇒ you see the “exited early” loop.
+Let’s fix it cleanly and permanently.
+What to change (2 small edits)
+1) server/seed-data.ts
+Remove any process.exit(...) or return process.exit(...) lines.
+Make sure the function just resolves and never terminates the process.
+// seed-data.ts
+export async function seedData(): Promise<void> {
+  try {
+    // ... your insert/seed logic ...
+    console.log("Seeding initial data...");
+    // NO process.exit() here
+  } catch (err) {
+    console.error("Seeding failed:", err);
+    // still NO process.exit()
+  }
+}
+2) server/app.ts
+Start the server first.
+Only trigger seeding if an env flag is set, and don’t await it.
+Keep your /api/health route.
+import express from "express";
+import cookieParser from "cookie-parser";
+import { seedData } from "./seed-data";
+
+const app = express();
+app.set("trust proxy", 1);
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+// Health check
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "Bahr El Ghazal Clinic API",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// TODO: registerRoutes(app) if you haven't already
+
+const port = parseInt(process.env.PORT || "5000", 10);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`🚀 API running on port ${port}`);
+
+  // Optional one-time seed on deploy:
+  if (process.env.SEED_ON_START === "true") {
+    // Fire-and-forget; do NOT await and do NOT exit
+    seedData()
+      .then(() => console.log("Database seeded successfully"))
+      .catch((e) => console.error("Seeding error:", e));
+  }
+});
+You don’t need any setInterval keepalive hacks. An Express server with app.listen(...) keeps the process alive.
