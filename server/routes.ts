@@ -221,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       // Get current user to verify current password
-      const currentUser = await storage.getUser(req.user.id);
+      const currentUser = await storage.getUser(req.user!.id);
       if (!currentUser) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -240,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(500).json({ error: "Failed to update password" });
       }
 
-      console.log(`Password successfully changed for user ${req.user.id}`);
+      console.log(`Password successfully changed for user ${req.user!.id}`);
       res.json({ success: true, message: 'Password updated successfully' });
     } catch (error) {
       console.error("Error changing password:", error);
@@ -427,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const { id } = req.params;
       
       // Prevent deleting yourself
-      if (id === req.user.id) {
+      if (id === req.user!.id) {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
 
@@ -1066,7 +1066,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const validatedData = insertReceiptSchema.parse({
         ...req.body,
-        uploadedBy: req.user.id
+        uploadedBy: req.user!.id
       });
 
       const receipt = await storage.createReceipt(validatedData);
