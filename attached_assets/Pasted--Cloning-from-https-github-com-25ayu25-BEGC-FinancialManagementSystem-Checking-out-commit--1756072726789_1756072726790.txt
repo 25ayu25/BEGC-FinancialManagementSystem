@@ -1,0 +1,76 @@
+==> Cloning from https://github.com/25ayu25/BEGC-FinancialManagementSystem
+==> Checking out commit 6377a9c692f8da18c6a11c8845be05d4dfa1fd27 in branch main
+==> Downloading cache...
+==> Transferred 165MB in 8s. Extraction took 6s.
+==> Using Node.js version 22.16.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'npm ci && npx esbuild server/app.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js'...
+added 547 packages, and audited 548 packages in 7s
+72 packages are looking for funding
+  run `npm fund` for details
+3 low severity vulnerabilities
+To address all issues, run:
+  npm audit fix
+Run `npm audit` for details.
+  dist/index.js  81.6kb
+⚡ Done in 8ms
+==> Uploading build...
+==> Uploaded in 6.9s. Compression took 3.6s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+Seeding initial data...
+9:47:23 PM [api] 🚀 Bahr El Ghazal Clinic API running on port 10000
+Seeding initial data...
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://bgc-financialmanagementsystem.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+Database seeded successfully!
+9:47:26 PM [api] Database seeded successfully
+Database seeded successfully!
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:51 PM [api] GET /api/departments 401 in 2ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:51 PM [api] GET /api/insurance-providers 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:54 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:54 PM [api] GET /api/insurance-providers 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:56 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:58 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:47:58 PM [api] GET /api/insurance-providers 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:49:24 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:49:24 PM [api] GET /api/insurance-providers 401 in 0ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+9:49:45 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
