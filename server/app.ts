@@ -92,15 +92,15 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ message });
 });
 
-// Catch-all for API endpoints
-app.get("*", (_req, res) => {
-  res.status(404).json({ error: "API endpoint not found" });
-});
-
 // Register routes first
 (async () => {
   try {
     await registerRoutes(app);
+    
+    // Catch-all for API endpoints - MUST be after all routes
+    app.get("*", (_req, res) => {
+      res.status(404).json({ error: "API endpoint not found" });
+    });
   } catch (error) {
     console.error("[route-setup-error]", error);
   }
