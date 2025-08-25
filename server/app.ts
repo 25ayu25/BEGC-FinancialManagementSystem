@@ -37,6 +37,7 @@ function isAllowed(origin?: string) {
   if (!origin) return true; // same-origin/curl
   if (allowList.includes(origin)) return true;
   if (origin.endsWith(".netlify.app")) return true; // allow deploy previews too
+  if (origin.endsWith(".bahrelghazalclinic.com")) return true; // allow custom domain
   return false;
 }
 
