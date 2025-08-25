@@ -1,10 +1,12 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import axios from 'axios';
 
-// Force the API base URL - no fallback to window.location.origin
+// Hard fallback prevents accidental Netlify calls
 const baseURL =
   import.meta.env.VITE_API_URL ??
-  "https://bgc-financialmanagementsystem.onrender.com"; // hard fallback
+  "https://bgc-financialmanagementsystem.onrender.com";
+
+console.info("[CFG] API base URL =", baseURL); // <-- leaves a breadcrumb in DevTools
 
 // Create axios instance with credentials
 export const api = axios.create({

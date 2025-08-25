@@ -41,6 +41,7 @@ import {
   Building2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
 interface User {
@@ -154,9 +155,8 @@ export default function UserManagementPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["/api/users"],
     queryFn: async () => {
-      const res = await fetch('/api/users', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch users');
-      return res.json();
+      const res = await api.get('/api/users');
+      return res.data;
     }
   });
 
@@ -164,22 +164,9 @@ export default function UserManagementPage() {
   const createUserMutation = useMutation({
     mutationFn: async (userData: any) => {
       console.log('Creating user with data:', userData);
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(userData)
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Create user error response:', errorData);
-        throw new Error(errorData.error || 'Failed to create user');
-      }
-      
-      const result = await res.json();
-      console.log('User created successfully:', result);
-      return result;
+      const res = await api.post('/api/users', userData);
+      console.log('User created successfully:', res.data);
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });

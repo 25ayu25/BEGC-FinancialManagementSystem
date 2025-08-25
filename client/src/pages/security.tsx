@@ -14,6 +14,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/queryClient";
 
 export default function SecurityPage() {
   const { toast } = useToast();
@@ -52,20 +53,12 @@ export default function SecurityPage() {
     setIsLoading(true);
     
     try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
+      await api.post('/api/auth/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
       });
 
-      if (res.ok) {
-        toast({
+      toast({
           title: "Password Updated",
           description: "Your password has been changed successfully."
         });
@@ -74,19 +67,11 @@ export default function SecurityPage() {
           newPassword: "",
           confirmPassword: ""
         });
-      } else {
-        const error = await res.json();
-        toast({
-          variant: "destructive", 
-          title: "Failed to Update Password",
-          description: error.message || "Please check your current password and try again."
-        });
-      }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to update password. Please try again."
+        title: "Failed to Update Password", 
+        description: error.response?.data?.message || "Please check your current password and try again."
       });
     } finally {
       setIsLoading(false);
