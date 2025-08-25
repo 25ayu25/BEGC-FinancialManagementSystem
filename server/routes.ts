@@ -767,273 +767,476 @@ export async function registerRoutes(app: Express): Promise<void> {
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
-      const margin = 20;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 25;
       
-      // Add header background and logo area
-      doc.setFillColor(20, 83, 75); // Teal header background
-      doc.rect(0, 0, pageWidth, 60, 'F');
+      // Executive Header Design
+      doc.setFillColor(20, 83, 75); // Professional teal header
+      doc.rect(0, 0, pageWidth, 70, 'F');
       
-      // Clinic name and title in white
+      // Clinic Branding (Executive Style)
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
+      doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      doc.text('Bahr El Ghazal Clinic — Monthly Financial Report', margin, 25);
+      doc.text('BAHR EL GHAZAL CLINIC', margin, 30);
       
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'normal');
-      doc.text('Financial Management System', margin, 40);
+      doc.text('EXECUTIVE FINANCIAL REPORT', margin, 45);
       
-      // Reset text color for body
-      doc.setTextColor(0, 0, 0);
-      
-      // Report period and generation info
+      // Professional Date Box
       const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${monthName} ${year}`, margin, 80);
+      doc.setFillColor(255, 255, 255, 0.9);
+      doc.rect(pageWidth - 80, 15, 70, 40, 'F');
       
-      doc.setFontSize(10);
+      doc.setTextColor(20, 83, 75);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${monthName.toUpperCase()}`, pageWidth - 75, 32);
+      doc.text(`${year}`, pageWidth - 75, 47);
+      
+      // Reset for body content
+      doc.setTextColor(33, 37, 41);
+      
+      // Executive Summary Header with Professional Spacing
+      let currentY = 95;
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(20, 83, 75);
+      doc.text('EXECUTIVE SUMMARY', margin, currentY);
+      
+      // Professional underline
+      doc.setDrawColor(20, 83, 75);
+      doc.setLineWidth(1);
+      doc.line(margin, currentY + 3, margin + 85, currentY + 3);
+      
+      // Generation timestamp (smaller, professional)
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+      doc.setTextColor(108, 117, 125);
+      doc.text(`Report generated: ${new Date().toLocaleDateString('en-US', { 
         year: 'numeric', 
-        month: 'long', 
+        month: 'short', 
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      })}`, margin, 90);
+      })}`, pageWidth - margin, currentY, { align: 'right' });
       
-      // Financial Summary Section
-      let currentY = 110;
-      doc.setFontSize(16);
+      // Executive KPI Cards
+      currentY += 25;
+      
+      // Calculate key metrics for executive display
+      const totalRevenue = parseFloat(reportData.totalIncomeSSP || "0") + parseFloat(reportData.totalIncomeUSD || "0") * 600; // Convert USD to SSP
+      const totalExpenses = parseFloat(reportData.totalExpenses || "0");
+      const netIncome = parseFloat(reportData.netIncome || "0");
+      const profitMargin = totalRevenue > 0 ? ((netIncome / totalRevenue) * 100) : 0;
+      
+      // Executive KPI Cards Layout
+      const cardWidth = (pageWidth - 2 * margin - 30) / 3;
+      const cardHeight = 35;
+      
+      // Revenue Card
+      doc.setFillColor(33, 150, 243); // Professional blue
+      doc.rect(margin, currentY, cardWidth, cardHeight, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(20, 83, 75);
-      doc.text('Financial Summary', margin, currentY);
+      doc.text(`SSP ${Math.round(totalRevenue).toLocaleString()}`, margin + cardWidth/2, currentY + 15, { align: 'center' });
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text('TOTAL REVENUE', margin + cardWidth/2, currentY + 28, { align: 'center' });
       
-      // Add underline that matches text width
-      doc.setDrawColor(20, 83, 75);
-      doc.setLineWidth(0.5);
-      const summaryTextWidth = doc.getTextWidth('Financial Summary');
-      doc.line(margin, currentY + 2, margin + summaryTextWidth, currentY + 2);
+      // Expenses Card
+      doc.setFillColor(244, 67, 54); // Professional red
+      doc.rect(margin + cardWidth + 15, currentY, cardWidth, cardHeight, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`SSP ${Math.round(totalExpenses).toLocaleString()}`, margin + cardWidth + 15 + cardWidth/2, currentY + 15, { align: 'center' });
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text('TOTAL EXPENSES', margin + cardWidth + 15 + cardWidth/2, currentY + 28, { align: 'center' });
+      
+      // Net Income Card
+      const netIncomeColor = netIncome >= 0 ? [76, 175, 80] : [244, 67, 54]; // Green for positive, red for negative
+      doc.setFillColor(netIncomeColor[0], netIncomeColor[1], netIncomeColor[2]);
+      doc.rect(margin + 2 * (cardWidth + 15), currentY, cardWidth, cardHeight, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`SSP ${Math.round(netIncome).toLocaleString()}`, margin + 2 * (cardWidth + 15) + cardWidth/2, currentY + 15, { align: 'center' });
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text('NET INCOME', margin + 2 * (cardWidth + 15) + cardWidth/2, currentY + 28, { align: 'center' });
+      
+      currentY += cardHeight + 20;
+      
+      // Profit Margin Indicator
+      doc.setTextColor(33, 37, 41);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Profit Margin:', margin, currentY);
+      
+      // Profit margin with color coding
+      const marginColor = profitMargin >= 20 ? [76, 175, 80] : profitMargin >= 10 ? [255, 193, 7] : [244, 67, 54];
+      doc.setTextColor(marginColor[0], marginColor[1], marginColor[2]);
+      doc.setFontSize(16);
+      doc.text(`${profitMargin.toFixed(1)}%`, margin + 50, currentY);
+      
+      // Performance indicator
+      const performanceText = profitMargin >= 20 ? '⬆ Excellent' : profitMargin >= 10 ? '→ Good' : '⬇ Needs Attention';
+      doc.setFontSize(12);
+      doc.text(performanceText, margin + 90, currentY);
+      
+      currentY += 20;
+      
+      // Executive Financial Breakdown
+      doc.setTextColor(33, 37, 41);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('FINANCIAL BREAKDOWN', margin, currentY);
       
       currentY += 15;
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(12);
       
-      // Summary table with currency separation
-      const summaryData = [];
+      // Professional table for detailed breakdown
+      const tableData = [];
       
-      // Add SSP totals if they exist
+      // Revenue breakdown
       if (parseFloat(reportData.totalIncomeSSP || "0") > 0) {
-        summaryData.push(['Total Income', `SSP ${parseFloat(reportData.totalIncomeSSP || "0").toLocaleString()}`]);
+        tableData.push(['Direct Revenue (SSP)', `SSP ${parseFloat(reportData.totalIncomeSSP || "0").toLocaleString()}`, 'primary']);
       }
       
-      // Add USD totals if they exist  
       if (parseFloat(reportData.totalIncomeUSD || "0") > 0) {
-        summaryData.push(['Total Income (Insurance)', `USD ${parseFloat(reportData.totalIncomeUSD || "0").toLocaleString()}`]);
+        tableData.push(['Insurance Revenue (USD)', `USD ${parseFloat(reportData.totalIncomeUSD || "0").toLocaleString()}`, 'secondary']);
       }
       
-      // Add expenses and net income (currently SSP only)
       if (parseFloat(reportData.totalExpenses || "0") > 0) {
-        summaryData.push(['Total Expenses', `SSP ${parseFloat(reportData.totalExpenses || "0").toLocaleString()}`]);
+        tableData.push(['Operating Expenses', `SSP ${parseFloat(reportData.totalExpenses || "0").toLocaleString()}`, 'expense']);
       }
       
-      summaryData.push(['Net Income', `SSP ${parseFloat(reportData.netIncome || "0").toLocaleString()}`]);
+      tableData.push(['Net Operating Income', `SSP ${Math.round(netIncome).toLocaleString()}`, netIncome >= 0 ? 'profit' : 'loss']);
       
-      summaryData.forEach(([label, value], index) => {
-        const isNetIncome = label === 'Net Income';
-        const bgColor = isNetIncome ? (parseFloat(reportData.netIncome) >= 0 ? [220, 252, 231] : [254, 226, 226]) : [249, 250, 251];
+      // Render executive table
+      tableData.forEach(([label, value, type], index) => {
+        let bgColor, textColor;
         
-        // Row background
+        switch (type) {
+          case 'primary':
+            bgColor = [227, 242, 253];
+            textColor = [21, 101, 192];
+            break;
+          case 'secondary':
+            bgColor = [230, 247, 255];
+            textColor = [2, 136, 209];
+            break;
+          case 'expense':
+            bgColor = [255, 235, 238];
+            textColor = [183, 28, 28];
+            break;
+          case 'profit':
+            bgColor = [232, 245, 233];
+            textColor = [27, 94, 32];
+            break;
+          case 'loss':
+            bgColor = [255, 235, 238];
+            textColor = [183, 28, 28];
+            break;
+          default:
+            bgColor = [248, 249, 250];
+            textColor = [33, 37, 41];
+        }
+        
+        // Professional row styling
         doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        doc.rect(margin, currentY - 6, pageWidth - 2 * margin, 16, 'F');
         
-        // Text with tabular numerals
-        doc.setFont('helvetica', isNetIncome ? 'bold' : 'normal');
-        doc.setFontSize(isNetIncome ? 13 : 12);
-        doc.text(label, margin + 5, currentY);
-        // Right-align with tabular numerals
-        doc.text(value, pageWidth - margin - 5, currentY, { align: 'right' });
+        // Add subtle border
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.rect(margin, currentY - 6, pageWidth - 2 * margin, 16);
         
-        currentY += 15;
+        // Text styling
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.setFont('helvetica', type === 'profit' || type === 'loss' ? 'bold' : 'normal');
+        doc.setFontSize(type === 'profit' || type === 'loss' ? 13 : 12);
+        
+        doc.text(label, margin + 8, currentY + 3);
+        doc.text(value, pageWidth - margin - 8, currentY + 3, { align: 'right' });
+        
+        currentY += 18;
       });
       
-      // Monthly Expenditure Section (South Sudan format)
+      // Executive Expenditure Analysis
       if (reportData.expenseBreakdown && Object.keys(reportData.expenseBreakdown).length > 0) {
-        currentY += 20;
+        currentY += 25;
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(20, 83, 75);
-        doc.text('Monthly Expenditure', margin, currentY);
+        doc.text('EXPENDITURE ANALYSIS', margin, currentY);
         
-        // Add underline that matches text width
-        const expenditureTextWidth = doc.getTextWidth('Monthly Expenditure');
-        doc.line(margin, currentY + 2, margin + expenditureTextWidth, currentY + 2);
+        // Professional underline
+        doc.setDrawColor(20, 83, 75);
+        doc.setLineWidth(1);
+        doc.line(margin, currentY + 3, margin + 95, currentY + 3);
         
-        currentY += 20;
-        doc.setTextColor(0, 0, 0);
+        currentY += 25;
         
-        // Expense table header with 3 columns: Date (empty), Description, Amount
-        doc.setFillColor(20, 83, 75);
-        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+        // Executive-style expense table header
+        doc.setFillColor(37, 47, 63); // Executive dark blue
+        doc.rect(margin, currentY - 10, pageWidth - 2 * margin, 18, 'F');
         
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
-        doc.text('Date', margin + 5, currentY);
-        doc.text('Description', margin + 40, currentY);
-        doc.text('Amount', pageWidth - margin - 5, currentY, { align: 'right' });
+        doc.text('EXPENSE CATEGORY', margin + 10, currentY);
+        doc.text('AMOUNT (SSP)', pageWidth - margin - 80, currentY);
+        doc.text('% OF TOTAL', pageWidth - margin - 15, currentY, { align: 'right' });
         
-        currentY += 15;
-        doc.setTextColor(0, 0, 0);
+        currentY += 20;
         
-        // Expense data - filter out zero amounts and sort by amount descending
+        // Calculate total for percentages
         const expenseEntries = Object.entries(reportData.expenseBreakdown)
           .filter(([category, amount]) => parseFloat(amount) > 0)
           .sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
         
-        let totalExpenses = 0;
+        const totalExpenseAmount = expenseEntries.reduce((sum, [, amount]) => sum + parseFloat(amount), 0);
+        
+        // Render expense data with executive styling
         expenseEntries.forEach(([category, amount], index) => {
           const numAmount = parseFloat(amount);
-          totalExpenses += numAmount;
+          const percentage = ((numAmount / totalExpenseAmount) * 100).toFixed(1);
           
-          // Alternating row colors (white background for clean look)
-          const bgColor = index % 2 === 0 ? [255, 255, 255] : [249, 250, 251];
+          // Executive row colors
+          const bgColor = index % 2 === 0 ? [248, 249, 250] : [255, 255, 255];
           doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
+          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 16, 'F');
           
+          // Subtle borders
+          doc.setDrawColor(230, 230, 230);
+          doc.setLineWidth(0.2);
+          doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 16);
+          
+          // Text styling
+          doc.setTextColor(33, 37, 41);
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(11);
           
-          // Leave Date column empty (as shown in your image)
-          doc.text('', margin + 5, currentY);
-          // Category name in Description column
-          doc.text(category, margin + 40, currentY);
-          // Amount right-aligned with proper formatting
-          doc.text(`${Math.round(numAmount).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+          doc.text(category.toUpperCase(), margin + 10, currentY);
+          doc.text(`SSP ${Math.round(numAmount).toLocaleString()}`, pageWidth - margin - 80, currentY);
+          doc.text(`${percentage}%`, pageWidth - margin - 15, currentY, { align: 'right' });
           
-          currentY += 12;
+          currentY += 16;
         });
         
-        // Add TOTAL SUM row (like in your South Sudan report)
-        doc.setFillColor(255, 192, 203); // Light pink background for total
-        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
+        // Executive Summary Total
+        doc.setFillColor(20, 83, 75); // Professional teal
+        doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 20, 'F');
         
+        doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(220, 20, 60); // Dark red for TOTAL SUM
-        doc.text('TOTAL SUM', margin + 40, currentY);
-        doc.text(`${Math.round(totalExpenses).toLocaleString()}`, pageWidth - margin - 5, currentY, { align: 'right' });
+        doc.setFontSize(13);
+        doc.text('TOTAL EXPENDITURE', margin + 10, currentY + 5);
+        doc.text(`SSP ${Math.round(totalExpenseAmount).toLocaleString()}`, pageWidth - margin - 80, currentY + 5);
+        doc.text('100.0%', pageWidth - margin - 15, currentY + 5, { align: 'right' });
         
-        currentY += 25;
+        currentY += 30;
       }
       
-      // Daily Expenditure Section (ONLY totals as requested)
+      // Calculate departmental revenue for analysis (outside conditional scope)
+      let clinicRevenue = 0, physiciansRevenue = 0, laboratoryRevenue = 0, radiologyRevenue = 0, insuranceRevenue = 0;
+      const colWidth = (pageWidth - 2 * margin) / 5; // Define colWidth outside conditional scope
+      
+      // Executive Department Performance Analysis
       if (reportData.departmentBreakdown && Object.keys(reportData.departmentBreakdown).length > 0) {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(20, 83, 75);
-        doc.text('Daily Expenditure', margin, currentY);
+        doc.text('DEPARTMENT PERFORMANCE', margin, currentY);
         
-        // Add underline that matches text width
-        const dailyExpenditureTextWidth = doc.getTextWidth('Daily Expenditure');
-        doc.line(margin, currentY + 2, margin + dailyExpenditureTextWidth, currentY + 2);
+        // Professional underline
+        doc.setDrawColor(20, 83, 75);
+        doc.setLineWidth(1);
+        doc.line(margin, currentY + 3, margin + 120, currentY + 3);
+        
+        currentY += 25;
+        
+        // Executive department header
+        doc.setFillColor(37, 47, 63); // Executive dark blue
+        doc.rect(margin, currentY - 10, pageWidth - 2 * margin, 18, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        
+        // Professional column headers
+        doc.text('CLINIC', margin + colWidth/2, currentY, { align: 'center' });
+        doc.text('PHYSICIANS', margin + colWidth + colWidth/2, currentY, { align: 'center' });  
+        doc.text('LABORATORY', margin + 2 * colWidth + colWidth/2, currentY, { align: 'center' });
+        doc.text('RADIOLOGY', margin + 3 * colWidth + colWidth/2, currentY, { align: 'center' });
+        doc.text('INSURANCE', margin + 4 * colWidth + colWidth/2, currentY, { align: 'center' });
         
         currentY += 20;
-        doc.setTextColor(0, 0, 0);
         
-        // Daily expenditure header with department columns
-        doc.setFillColor(144, 238, 144); // Light green header (like in your image)
-        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
-        
-        doc.setTextColor(0, 0, 0);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        
-        // Column headers: Clinic, Doctors, Lab Techs, Radiographer, Insurance %
-        const colWidth = (pageWidth - 2 * margin) / 5;
-        doc.text('Clinic', margin + 5, currentY);
-        doc.text('Doctors', margin + colWidth + 5, currentY);  
-        doc.text('Lab Techs', margin + 2 * colWidth + 5, currentY);
-        doc.text('Radiographer', margin + 3 * colWidth + 5, currentY);
-        doc.text('Insurance %', margin + 4 * colWidth + 5, currentY);
-        
-        currentY += 15;
-        
-        // Calculate totals for each "department" (mapping your departments to their roles)
-        let clinicTotal = 0, doctorsTotal = 0, labTechsTotal = 0, radiographerTotal = 0, insuranceTotal = 0;
-        
+        // Calculate revenue breakdown
         Object.entries(reportData.departmentBreakdown).forEach(([deptId, amount]) => {
           const numAmount = parseFloat(amount);
           
-          // Map your departments to the South Sudan format roles
+          // Professional department mapping
           if (deptId === '4242abf4-e68e-48c8-9eaf-ada2612bd4c2') { // Consultation
-            clinicTotal += numAmount;
+            clinicRevenue += numAmount;
           } else if (deptId === 'ae648a70-c159-43b7-b814-7dadb213ae8d') { // Laboratory  
-            labTechsTotal += numAmount;
+            laboratoryRevenue += numAmount;
           } else if (deptId === '6a06d917-a94a-4637-b1f6-a3fd6855ddd6') { // X-Ray
-            radiographerTotal += numAmount;
+            radiologyRevenue += numAmount;
           } else if (deptId === '09435c53-9061-429b-aecf-677b12bbdbd7') { // Ultrasound
-            radiographerTotal += numAmount;
+            radiologyRevenue += numAmount;
           } else if (deptId === '8fb395f9-ae59-4ddc-9ad3-e56b7fda161c') { // Pharmacy
-            clinicTotal += numAmount;
+            clinicRevenue += numAmount;
           } else {
-            clinicTotal += numAmount; // Other income goes to clinic
+            clinicRevenue += numAmount;
           }
         });
-        
-        // Add insurance total from USD income 
-        insuranceTotal = parseFloat(reportData.totalIncomeUSD || "0");
-        
-        // Display ONLY the totals row (as requested - no daily breakdown rows)
-        doc.setFillColor(255, 255, 255); // White background for totals
-        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 12, 'F');
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(220, 20, 60); // Red color for totals (like in your image)
-        
-        // Display totals in each column
-        doc.text(`${Math.round(clinicTotal).toLocaleString()}`, margin + colWidth - 20, currentY, { align: 'right' });
-        doc.text(`${Math.round(doctorsTotal).toLocaleString()}`, margin + 2 * colWidth - 20, currentY, { align: 'right' });
-        doc.text(`${Math.round(labTechsTotal).toLocaleString()}`, margin + 3 * colWidth - 20, currentY, { align: 'right' });
-        doc.text(`${Math.round(radiographerTotal).toLocaleString()}`, margin + 4 * colWidth - 20, currentY, { align: 'right' });
-        doc.text(`${Math.round(insuranceTotal).toLocaleString()}`, margin + 5 * colWidth - 20, currentY, { align: 'right' });
-        
-        currentY += 20;
-        
-        // Add grand total in green box (like in your image)
-        const grandTotal = clinicTotal + doctorsTotal + labTechsTotal + radiographerTotal + insuranceTotal;
-        doc.setFillColor(144, 238, 144); // Light green background
-        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 14, 'F');
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(0, 100, 0); // Dark green for grand total
-        doc.text(`${Math.round(grandTotal).toLocaleString()}`, pageWidth / 2, currentY, { align: 'center' });
-        
-        currentY += 25;
       }
       
-      // Add some spacing before footer
+      // Insurance revenue (USD converted) - calculate outside conditional
+      insuranceRevenue = parseFloat(reportData.totalIncomeUSD || "0") * 600; // Convert to SSP for comparison
+      
+      // Continue with department performance display if data exists
+      if (reportData.departmentBreakdown && Object.keys(reportData.departmentBreakdown).length > 0) {
+        
+        // Executive performance display
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 20, 'F');
+        
+        // Add subtle border
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 20);
+        
+        doc.setTextColor(33, 37, 41);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        
+        // Performance values with professional formatting
+        const values = [clinicRevenue, physiciansRevenue, laboratoryRevenue, radiologyRevenue, insuranceRevenue];
+        values.forEach((value, index) => {
+          const x = margin + index * colWidth + colWidth/2;
+          const displayValue = Math.round(value).toLocaleString();
+          
+          // Color code based on performance
+          if (value > 0) {
+            doc.setTextColor(27, 94, 32); // Success green
+          } else {
+            doc.setTextColor(108, 117, 125); // Muted gray
+          }
+          
+          doc.text(value > 0 ? displayValue : '—', x, currentY + 2, { align: 'center' });
+        });
+        
+        currentY += 30;
+        
+        // Executive Total Revenue Summary
+        const totalDepartmentRevenue = clinicRevenue + physiciansRevenue + laboratoryRevenue + radiologyRevenue + insuranceRevenue;
+        
+        doc.setFillColor(20, 83, 75); // Professional teal
+        doc.rect(margin, currentY - 8, pageWidth - 2 * margin, 22, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('TOTAL DEPARTMENTAL REVENUE', margin + 10, currentY + 2);
+        doc.text(`SSP ${Math.round(totalDepartmentRevenue).toLocaleString()}`, pageWidth - margin - 10, currentY + 2, { align: 'right' });
+        
+        currentY += 35;
+      }
+      
+      // Executive Insights Section
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(20, 83, 75);
+      doc.text('EXECUTIVE INSIGHTS', margin, currentY);
+      
+      // Professional underline
+      doc.setDrawColor(20, 83, 75);
+      doc.setLineWidth(1);
+      doc.line(margin, currentY + 3, margin + 85, currentY + 3);
+      
       currentY += 20;
       
-      // Footer section - ensure it doesn't overlap with content
-      const minFooterY = currentY + 20;
-      const footerY = Math.max(doc.internal.pageSize.height - 30, minFooterY);
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.5);
-      doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+      // Key insights with professional styling
+      const insights = [];
       
-      doc.setFontSize(9);
+      // Performance analysis
+      if (profitMargin >= 20) {
+        insights.push('• Strong profitability with healthy profit margins');
+      } else if (profitMargin >= 10) {
+        insights.push('• Moderate profitability - opportunities for optimization');
+      } else if (profitMargin >= 0) {
+        insights.push('• Break-even operations - review cost structure');
+      } else {
+        insights.push('• Operating at a loss - immediate attention required');
+      }
+      
+      // Department performance
+      const topDepartment = Math.max(clinicRevenue, laboratoryRevenue, radiologyRevenue);
+      if (topDepartment === laboratoryRevenue && laboratoryRevenue > 0) {
+        insights.push('• Laboratory services driving primary revenue growth');
+      } else if (topDepartment === radiologyRevenue && radiologyRevenue > 0) {
+        insights.push('• Radiology department showing strong performance');
+      } else if (topDepartment === clinicRevenue && clinicRevenue > 0) {
+        insights.push('• General clinic services remain core revenue driver');
+      }
+      
+      // Insurance revenue analysis
+      if (parseFloat(reportData.totalIncomeUSD || "0") > 0) {
+        const usdPercentage = ((parseFloat(reportData.totalIncomeUSD || "0") * 600) / totalRevenue * 100);
+        insights.push(`• Insurance revenue represents ${usdPercentage.toFixed(1)}% of total income`);
+      }
+      
+      // Expense ratio
+      const expenseRatio = (totalExpenses / totalRevenue) * 100;
+      if (expenseRatio <= 60) {
+        insights.push('• Efficient cost management with low expense ratio');
+      } else if (expenseRatio <= 80) {
+        insights.push('• Moderate expense levels - monitor cost efficiency');
+      } else {
+        insights.push('• High expense ratio - cost reduction opportunities available');
+      }
+      
+      // Render insights with executive styling
+      doc.setTextColor(33, 37, 41);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text('Bahr El Ghazal Clinic Financial Management System', margin, footerY);
-      doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
+      doc.setFontSize(11);
       
-      // Add tiny footer note
+      insights.forEach((insight, index) => {
+        doc.text(insight, margin + 5, currentY);
+        currentY += 12;
+      });
+      
+      currentY += 20;
+      
+      // Executive Footer
+      const minFooterY = currentY + 15;
+      const footerY = Math.max(pageHeight - 40, minFooterY);
+      
+      // Professional footer line
+      doc.setDrawColor(20, 83, 75);
+      doc.setLineWidth(0.8);
+      doc.line(margin, footerY - 15, pageWidth - margin, footerY - 15);
+      
+      // Executive footer content
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(20, 83, 75);
+      doc.text('BAHR EL GHAZAL CLINIC', margin, footerY - 3);
+      doc.text('CONFIDENTIAL EXECUTIVE REPORT', pageWidth - margin, footerY - 3, { align: 'right' });
+      
+      // Confidentiality notice
       doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
-      doc.text('This report contains confidential financial information for internal use only.', margin, footerY + 8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(108, 117, 125);
+      doc.text('This document contains confidential financial information. Distribution limited to authorized executive personnel only.', 
+               pageWidth / 2, footerY + 8, { align: 'center' });
       
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
       
