@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,21 +9,35 @@ import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft, CalendarIcon } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function InsuranceProvidersPage() {
-  // Check URL parameters for initial values
-  const urlParams = new URLSearchParams(window.location.search);
-  const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
-  const yearParam = urlParams.get('year');
-  const monthParam = urlParams.get('month');
-  
+  const [location] = useLocation();
   const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState(yearParam ? parseInt(yearParam) : currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(monthParam ? parseInt(monthParam) : currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>(rangeParam || 'current-month');
+  
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+
+  // Parse URL parameters on mount and when location changes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.split('?')[1] || '');
+    const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
+    const yearParam = urlParams.get('year');
+    const monthParam = urlParams.get('month');
+    
+    if (rangeParam) {
+      setTimeRange(rangeParam);
+    }
+    if (yearParam) {
+      setSelectedYear(parseInt(yearParam));
+    }
+    if (monthParam) {
+      setSelectedMonth(parseInt(monthParam));
+    }
+  }, [location]);
 
   // Determine if we're in multi-period view (last-3-months or year)
   const isMultiPeriodView = timeRange === 'last-3-months' || timeRange === 'year';
