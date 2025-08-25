@@ -382,14 +382,14 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const { username, email, fullName, role, location, password, permissions } = req.body;
       
-      if (!username || !email || !role || !location) {
-        return res.status(400).json({ error: "Missing required fields" });
+      if (!username || !email || !fullName || !role || !location) {
+        return res.status(400).json({ error: "Missing required fields: username, email, fullName, role, and location are required" });
       }
 
       const userData = {
         username,
         email,
-        fullName: fullName || null,
+        fullName: fullName || "", // Ensure fullName is never null - database requires NOT NULL
         role,
         location,
         password: password || "defaultPassword123", // In production, generate secure password
