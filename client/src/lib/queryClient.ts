@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Get API base URL from environment
 const getApiBaseUrl = () => {
-  return import.meta.env.VITE_API_URL || '';
+  return import.meta.env.VITE_API_URL || 'https://bgc-financialmanagementsystem.onrender.com';
 };
 
 // Create axios instance with credentials

@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  VITE_API_URL = "https://bgc-financialmanagementsystem.onrender.com"
 
 # No functions directory - backend is on Render
 [functions]
