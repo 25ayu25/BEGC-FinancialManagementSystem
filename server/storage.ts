@@ -374,24 +374,31 @@ export class DatabaseStorage implements IStorage {
     let endDate: Date;
 
     // Calculate date range based on the range parameter
-    const now = new Date();
+    // Use the provided year and month as the reference point, not current date
+    const referenceDate = new Date(year, month - 1); // month is 1-indexed, convert to 0-indexed
     
     switch(range) {
       case 'current-month':
+        // Use current date for current month
+        const now = new Date();
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         break;
       case 'last-month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        // Use current date for last month
+        const currentDate = new Date();
+        startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+        endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0, 23, 59, 59);
         break;
       case 'last-3-months':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1); // 3 months ago
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); // end of current month
+        // Use the provided year/month as the end point, calculate 3 months back
+        startDate = new Date(year, month - 3, 1); // 3 months before the reference month
+        endDate = new Date(year, month, 0, 23, 59, 59); // end of the reference month
         break;
       case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1); // January 1st
-        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59); // December 31st
+        // Use the provided year, from January to the reference month
+        startDate = new Date(year, 0, 1); // January 1st of the reference year
+        endDate = new Date(year, month, 0, 23, 59, 59); // end of the reference month
         break;
       case 'custom':
         if (customStartDate && customEndDate) {
@@ -399,9 +406,9 @@ export class DatabaseStorage implements IStorage {
           endDate = new Date(customEndDate);
           endDate.setHours(23, 59, 59, 999); // End of day
         } else {
-          // Fallback to current month if no custom dates provided
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+          // Fallback to reference month if no custom dates provided
+          startDate = new Date(year, month - 1, 1);
+          endDate = new Date(year, month, 0, 23, 59, 59);
         }
         break;
       default:
