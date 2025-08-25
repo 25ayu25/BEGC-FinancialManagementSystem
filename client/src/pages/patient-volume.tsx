@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { CalendarIcon, Users, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, api } from "@/lib/queryClient";
 
 interface PatientVolume {
   id: string;
@@ -106,14 +106,9 @@ export default function PatientVolumePage() {
         const allData: PatientVolume[] = [];
         for (const { year, month } of monthsToFetch) {
           try {
-            const response = await fetch(`/api/patient-volume/period/${year}/${month}`, {
-              credentials: 'include'
-            });
-            if (response.ok) {
-              const data = await response.json();
-              if (Array.isArray(data)) {
-                allData.push(...data);
-              }
+            const response = await api.get(`/api/patient-volume/period/${year}/${month}`);
+            if (Array.isArray(response.data)) {
+              allData.push(...response.data);
             }
           } catch (error) {
             console.warn(`Failed to fetch data for ${year}/${month}:`, error);
@@ -122,24 +117,12 @@ export default function PatientVolumePage() {
         
         return allData;
       } else if (viewType === 'monthly') {
-        const response = await fetch(`/api/patient-volume/period/${selectedDate.getFullYear()}/${selectedDate.getMonth() + 1}`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error('Failed to fetch monthly patient volume data');
-        }
-        const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        const response = await api.get(`/api/patient-volume/period/${selectedDate.getFullYear()}/${selectedDate.getMonth() + 1}`);
+        return Array.isArray(response.data) ? response.data : [];
       } else {
         const params = selectedDepartment !== "all-departments" ? `?departmentId=${selectedDepartment}` : "?departmentId=all-departments";
-        const response = await fetch(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error('Failed to fetch patient volume data');
-        }
-        const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        const response = await api.get(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`);
+        return Array.isArray(response.data) ? response.data : [];
       }
     },
     staleTime: 0,

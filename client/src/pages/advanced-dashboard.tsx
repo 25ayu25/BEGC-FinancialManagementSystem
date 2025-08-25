@@ -43,6 +43,7 @@ import {
   ArrowUp,
   ArrowDown
 } from "lucide-react";
+import { api } from "@/lib/queryClient";
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -337,12 +338,13 @@ export default function AdvancedDashboard() {
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
-    queryFn: () => {
+    queryFn: async () => {
       let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
-      return fetch(url, { credentials: 'include' }).then(r => r.json());
+      const response = await api.get(url);
+      return response.data;
     },
   });
 
@@ -396,12 +398,13 @@ export default function AdvancedDashboard() {
 
   const { data: rawIncome } = useQuery({
     queryKey: ['/api/income-trends', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
-    queryFn: () => {
+    queryFn: async () => {
       let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${timeRange}`;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
-      return fetch(url, { credentials: 'include' }).then(r => r.json());
+      const response = await api.get(url);
+      return response.data;
     },
   });
 

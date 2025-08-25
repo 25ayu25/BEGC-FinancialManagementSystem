@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Plus, Filter, Download, Edit, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, api } from "@/lib/queryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,11 +86,8 @@ export default function Transactions() {
   const { data: transactionData, isLoading } = useQuery({
     queryKey: ["/api/transactions", queryParams.toString()],
     queryFn: async () => {
-      const response = await fetch(`/api/transactions?${queryParams}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch transactions');
-      return response.json();
+      const response = await api.get(`/api/transactions?${queryParams}`);
+      return response.data;
     },
   });
 
