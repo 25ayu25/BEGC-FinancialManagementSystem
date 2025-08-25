@@ -1,15 +1,15 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import axios from 'axios';
 
-// Get API base URL from environment
-const getApiBaseUrl = () => {
-  return import.meta.env.VITE_API_URL || 'https://bgc-financialmanagementsystem.onrender.com';
-};
+// Force the API base URL - no fallback to window.location.origin
+const baseURL =
+  import.meta.env.VITE_API_URL ??
+  "https://bgc-financialmanagementsystem.onrender.com"; // hard fallback
 
 // Create axios instance with credentials
 export const api = axios.create({
-  baseURL: getApiBaseUrl(),
-  withCredentials: true,  // REQUIRED for cross-site cookies
+  baseURL,
+  withCredentials: true,  // send cookies cross-site
   headers: {
     'Content-Type': 'application/json',
   },

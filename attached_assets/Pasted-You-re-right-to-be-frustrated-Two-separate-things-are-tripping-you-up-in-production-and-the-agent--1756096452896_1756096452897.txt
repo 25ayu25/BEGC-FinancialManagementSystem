@@ -1,0 +1,76 @@
+You’re right to be frustrated. Two separate things are tripping you up in production, and the agent kept fixing them one-by-one instead of closing both at the same time:
+What the agent kept missing
+Your frontend is sometimes calling Netlify instead of your Render API.
+When that happens the response is Netlify’s HTML (<!doctype html>…), and your code tries to JSON.parse it — hence the error:
+“Unexpected token ‘<’, ‘<!DOCTYPE’… is not valid JSON”
+This is a build-time config issue (bad/missing VITE_API_URL) or a bad default that falls back to window.location.origin. The requests then go to https://…netlify.app/api/... instead of https://bgc-financialmanagementsystem.onrender.com/api/....
+Even when the requests do hit your Render API, the session cookie isn’t sent cross-site.
+Your cookie is sameSite: 'lax', so browsers do not include it for cross-site XHR/fetch (Netlify → Render). That produces the 401s you saw on /api/departments and /api/insurance-providers.
+Fix both and everything (dropdowns, overview, user creation) works.
+Do these 6 fixes exactly
+1) Frontend: force the API base URL (no fallback to window)
+File: client/src/lib/queryClient.ts (or where you create your axios/fetch client)
+import axios from "axios";
+
+const baseURL =
+  import.meta.env.VITE_API_URL ??
+  "https://bgc-financialmanagementsystem.onrender.com"; // hard fallback
+
+export const api = axios.create({
+  baseURL,
+  withCredentials: true, // send cookies
+});
+If you have any other clients, make them all use this same api.
+2) Netlify: environment variables
+In Site settings → Build & deploy → Environment, set:
+VITE_API_URL = https://bgc-financialmanagementsystem.onrender.com
+VITE_ENVIRONMENT = production
+Click Save, then Trigger deploy (redeploy the site).
+3) Backend: cookie options for cross-site
+Where you set the login cookie (auth route):
+import type { CookieOptions } from "express";
+const isProd = process.env.NODE_ENV === "production";
+
+const cookieOpts: CookieOptions = {
+  httpOnly: true,
+  secure: isProd,       // Render is HTTPS
+  sameSite: "none",     // <-- REQUIRED for Netlify -> Render
+  path: "/",
+  maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+  // If later you move both to one domain, set COOKIE_DOMAIN and use:
+  // domain: process.env.COOKIE_DOMAIN
+};
+
+res.cookie("user_session", sessionToken, cookieOpts);
+Logout must clear with the same attributes:
+res.clearCookie("user_session", { ...cookieOpts, maxAge: undefined });
+res.json({ ok: true });
+And keep:
+app.set("trust proxy", 1);
+4) Backend: CORS that truly allows Netlify + credentials
+In server/app.ts:
+import cors from "cors";
+
+const allowList = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
+function isAllowed(origin?: string) {
+  if (!origin) return true; // same-origin/curl
+  if (allowList.includes(origin)) return true;
+  if (origin.endsWith(".netlify.app")) return true; // allow deploy previews too
+  return false;
+}
+
+app.use(cors({
+  origin: (origin, cb) => cb(isAllowed(origin) ? null : new Error("Not allowed by CORS"), isAllowed(origin)),
+  credentials: true,
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-session-token"],
+}));
+5) Render: environment variable
+In Render → your service → Environment add/confirm:
+ALLOWED_ORIGINS = https://begc-financialmanagementsystem.netlify.app
+(Your exact Netlify URL; you can add more, comma-separated)
+Then click Save and Manual Deploy.

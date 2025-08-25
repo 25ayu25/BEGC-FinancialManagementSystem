@@ -119,14 +119,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       };
 
       // Cross-site cookie settings for Netlify → Render
-      const isProduction = process.env.NODE_ENV === 'production';
-      res.cookie('user_session', JSON.stringify(userSession), {
-        httpOnly: true, // Security: prevent XSS
-        secure: isProduction, // HTTPS only in production
-        sameSite: isProduction ? 'none' : 'lax', // REQUIRED for cross-site requests
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        path: '/', // Available for all paths
-      });
+      const isProd = process.env.NODE_ENV === 'production';
+      const cookieOpts = {
+        httpOnly: true,
+        secure: isProd,       // Render is HTTPS
+        sameSite: "none" as const,     // REQUIRED for Netlify -> Render
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      };
+      
+      res.cookie('user_session', JSON.stringify(userSession), cookieOpts);
 
       res.json(userSession);
     } catch (error) {
@@ -137,13 +139,15 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.post("/api/auth/logout", (req, res) => {
     // Clear session/cookies with same settings as when set
-    const isProduction = process.env.NODE_ENV === 'production';
-    res.clearCookie('user_session', {
-      httpOnly: true, // Security: prevent XSS
-      secure: isProduction, // HTTPS only in production
-      sameSite: isProduction ? 'none' : 'lax', // MUST match login cookie settings
-      path: '/'
-    });
+    const isProd = process.env.NODE_ENV === 'production';
+    const cookieOpts = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "none" as const,
+      path: "/",
+    };
+    
+    res.clearCookie('user_session', cookieOpts);
     res.clearCookie('session');
     res.json({ success: true, message: 'Logged out successfully' });
   });

@@ -28,20 +28,23 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // CORS configuration for cross-site authentication
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+const allowList = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 
 function isAllowed(origin?: string) {
-  if (!origin) return true; // same-origin requests
-  if (allowedOrigins.includes(origin)) return true;
-  if (origin.endsWith('.netlify.app')) return true; // deploy previews
+  if (!origin) return true; // same-origin/curl
+  if (allowList.includes(origin)) return true;
+  if (origin.endsWith(".netlify.app")) return true; // allow deploy previews too
   return false;
 }
 
 app.use(cors({
-  origin: (origin, cb) => cb(isAllowed(origin) ? null : new Error('Not allowed by CORS'), isAllowed(origin)),
+  origin: (origin, cb) => cb(isAllowed(origin) ? null : new Error("Not allowed by CORS"), isAllowed(origin)),
   credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-token'],
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-session-token"],
 }));
 
 // Simple request logger
