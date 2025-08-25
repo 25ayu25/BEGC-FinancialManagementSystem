@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, api } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,16 +53,9 @@ export default function Reports() {
 
   const generateReport = async (year: number, month: number) => {
     try {
-      const response = await fetch(`/api/reports/generate/${year}/${month}`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+      const response = await api.post(`/api/reports/generate/${year}/${month}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to generate report');
-      }
-      
-      const result = await response.json();
+      const result = response.data;
       
       // Refresh the reports list to show the newly generated report
       await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
@@ -109,14 +102,7 @@ export default function Reports() {
     }
     
     try {
-      const response = await fetch(`/api/reports/${reportId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete report');
-      }
+      await api.delete(`/api/reports/${reportId}`);
       
       // Refresh the reports list
       await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
