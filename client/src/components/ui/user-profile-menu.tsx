@@ -26,18 +26,18 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
   const { data: currentUser, isLoading } = useQuery({
     queryKey: ['/api/auth/user'],
     queryFn: async () => {
-      const res = await fetch('/api/auth/user', {
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        if (res.status === 401) {
+      try {
+        const response = await api.get('/api/auth/user');
+        return response.data;
+      } catch (error: any) {
+        if (error.response?.status === 401) {
           // Redirect to login if not authenticated
+          localStorage.removeItem('user_session_backup');
           window.location.href = '/login';
           throw new Error('Authentication required');
         }
-        throw new Error('Failed to fetch user');
+        throw error;
       }
-      return res.json();
     },
     staleTime: 0, // Always refetch
     gcTime: 0  // Don't cache (updated property name for TanStack Query v5)
