@@ -9,6 +9,7 @@ export async function seedData() {
     await db.insert(users).values([
       {
         username: 'admin',
+        email: 'admin@bahrelghazalclinic.com',
         password: 'admin123', // Change this after first login
         fullName: 'System Administrator',
         role: 'admin',
