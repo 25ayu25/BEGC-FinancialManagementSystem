@@ -395,9 +395,9 @@ export class DatabaseStorage implements IStorage {
         endDate = new Date(year, month, 0, 23, 59, 59); // end of the reference month
         break;
       case 'year':
-        // Use the provided year, from January to the reference month
+        // Use the provided year, full year from January to December
         startDate = new Date(year, 0, 1); // January 1st of the reference year
-        endDate = new Date(year, month, 0, 23, 59, 59); // end of the reference month
+        endDate = new Date(year, 11, 31, 23, 59, 59); // December 31st of the reference year
         break;
       case 'custom':
         if (customStartDate && customEndDate) {
