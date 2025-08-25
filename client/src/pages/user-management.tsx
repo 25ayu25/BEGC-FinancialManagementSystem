@@ -189,14 +189,8 @@ export default function UserManagementPage() {
   // Update user status
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      const res = await fetch(`/api/users/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates)
-      });
-      if (!res.ok) throw new Error('Failed to update user');
-      return res.json();
+      const res = await api.patch(`/api/users/${id}`, updates);
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });

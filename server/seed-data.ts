@@ -5,18 +5,7 @@ export async function seedData() {
   try {
     console.log("Seeding initial data...");
     
-    // Create default admin user for initial access
-    await db.insert(users).values([
-      {
-        username: 'admin',
-        email: 'admin@bahrelghazalclinic.com',
-        password: 'admin123', // Change this after first login
-        fullName: 'System Administrator',
-        role: 'admin',
-        location: 'usa',
-        status: 'active'
-      }
-    ]).onConflictDoNothing();
+    // Note: No default admin user - create via registration process
 
     // Seed departments
     await db.insert(departments).values([
