@@ -83,17 +83,8 @@ export default function UserManagementPage() {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
-      const response = await fetch(`/api/users/${userId}/reset-password`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ newPassword })
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to reset password');
-      }
-      return response.json();
+      const response = await api.patch(`/api/users/${userId}/reset-password`, { newPassword });
+      return response.data;
     },
     onSuccess: () => {
       toast({

@@ -44,7 +44,7 @@ function isAllowed(origin?: string) {
 app.use(cors({
   origin: (origin, cb) => cb(isAllowed(origin) ? null : new Error("Not allowed by CORS"), isAllowed(origin)),
   credentials: true,
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-session-token"],
 }));
 
