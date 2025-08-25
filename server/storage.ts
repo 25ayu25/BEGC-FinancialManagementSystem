@@ -376,19 +376,18 @@ export class DatabaseStorage implements IStorage {
     // Calculate date range based on the range parameter
     // Use the provided year and month as the reference point, not current date
     const referenceDate = new Date(year, month - 1); // month is 1-indexed, convert to 0-indexed
+    const now = new Date(); // Declare once at the top for reuse
     
     switch(range) {
       case 'current-month':
         // Use current date for current month
-        const now = new Date();
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         break;
       case 'last-month':
         // Use current date for last month
-        const currentDate = new Date();
-        startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-        endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0, 23, 59, 59);
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
         break;
       case 'last-3-months':
         // Use the provided year/month as the end point, calculate 3 months back
