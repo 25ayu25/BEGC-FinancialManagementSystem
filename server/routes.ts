@@ -384,10 +384,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      const { username, email, fullName, role, location, password, permissions } = req.body;
+      const { username, email, fullName, role, password, permissions } = req.body;
+      const location = "clinic"; // Default location for all users
       
-      if (!username || !email || !fullName || !role || !location) {
-        return res.status(400).json({ error: "Missing required fields: username, email, fullName, role, and location are required" });
+      if (!username || !email || !fullName || !role) {
+        return res.status(400).json({ error: "Missing required fields: username, email, fullName, and role are required" });
       }
 
       const userData = {
@@ -550,9 +551,8 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       // Convert date string to Date object if it's a string
       // Handle insurance provider - convert "no-insurance" to null
-      // Set sync status based on user location - USA users get "synced", South Sudan users get "pending"
-      const userLocation = (req as any).user.location;
-      const syncStatus = userLocation === "usa" ? "synced" : "pending";
+      // Set all transactions as synced by default
+      const syncStatus = "synced";
       
       const bodyWithDate = {
         ...req.body,
