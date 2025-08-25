@@ -10,6 +10,7 @@ import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon, Users, Calendar } from "lucide-react";
+import { api } from "@/lib/queryClient";
 import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
 
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
@@ -85,11 +86,8 @@ export default function Dashboard() {
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
-      const res = await fetch(url, {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Failed to fetch dashboard data');
-      return res.json();
+      const response = await api.get(url);
+      return response.data;
     }
   });
 
@@ -109,11 +107,12 @@ export default function Dashboard() {
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
-      const res = await fetch(url, {
-        credentials: 'include'
-      });
-      if (!res.ok) return [];
-      return res.json();
+      try {
+        const response = await api.get(url);
+        return response.data;
+      } catch (error) {
+        return [];
+      }
     }
   });
 
