@@ -78,9 +78,22 @@ export default function Reports() {
     try {
       console.log('Downloading report:', pdfPath, filename);
       
-      // Simply redirect to the download URL - backend handles the download with Content-Disposition header
+      // Use axios to download with proper authentication
       const downloadUrl = `/api${pdfPath}`;
-      window.location.href = downloadUrl;
+      const response = await api.get(downloadUrl, {
+        responseType: 'blob' // Important for binary data
+      });
+      
+      // Create a blob URL and trigger download
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
       toast({
         title: "Download Started",
