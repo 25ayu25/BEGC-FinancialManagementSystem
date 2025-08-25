@@ -238,17 +238,8 @@ export default function UserManagementPage() {
   // Edit user mutation
   const editUserMutation = useMutation({
     mutationFn: async (updates: any) => {
-      const res = await fetch(`/api/users/${selectedUser?.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates)
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to update user');
-      }
-      return res.json();
+      const res = await api.patch(`/api/users/${selectedUser?.id}`, updates);
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -260,10 +251,12 @@ export default function UserManagementPage() {
       });
     },
     onError: (error: any) => {
+      console.error("Update user error:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update user. Please try again."
+        title: "Failed to Update User",
+        description: error.response?.data?.error || error.message || "Failed to update user. Please try again.",
+        duration: 6000, // Show error longer for visibility
       });
     }
   });

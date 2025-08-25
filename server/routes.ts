@@ -421,6 +421,39 @@ export async function registerRoutes(app: Express): Promise<void> {
 
 
 
+  // Update user route - MISSING PATCH ROUTE
+  app.patch("/api/users/:id", requireAuth, async (req, res) => {
+    try {
+      // Only admins can update users  
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+
+      // Ensure we don't update sensitive fields directly
+      delete updates.id;
+      delete updates.password; // Use separate password reset endpoint
+
+      const updatedUser = await storage.updateUser(id, updates);
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      
+      // Handle database constraint violations
+      if (error.code === '23505') { // Unique constraint violation
+        if (error.constraint === 'users_username_key') {
+          return res.status(400).json({ error: `Username "${req.body.username}" already exists. Please choose a different username.` });
+        } else if (error.constraint === 'users_email_key') {
+          return res.status(400).json({ error: `Email "${req.body.email}" is already registered. Please use a different email address.` });
+        }
+      }
+      
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
       // Only admins can delete users
