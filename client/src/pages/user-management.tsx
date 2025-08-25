@@ -163,14 +163,23 @@ export default function UserManagementPage() {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: any) => {
+      console.log('Creating user with data:', userData);
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(userData)
       });
-      if (!res.ok) throw new Error('Failed to create user');
-      return res.json();
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Create user error response:', errorData);
+        throw new Error(errorData.error || 'Failed to create user');
+      }
+      
+      const result = await res.json();
+      console.log('User created successfully:', result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
