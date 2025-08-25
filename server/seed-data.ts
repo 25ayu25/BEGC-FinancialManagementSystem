@@ -5,7 +5,17 @@ export async function seedData() {
   try {
     console.log("Seeding initial data...");
     
-    // No default demo users - users should be created through proper registration
+    // Create default admin user for initial access
+    await db.insert(users).values([
+      {
+        username: 'admin',
+        password: 'admin123', // Change this after first login
+        fullName: 'System Administrator',
+        role: 'admin',
+        location: 'usa',
+        status: 'active'
+      }
+    ]).onConflictDoNothing();
 
     // Seed departments
     await db.insert(departments).values([
