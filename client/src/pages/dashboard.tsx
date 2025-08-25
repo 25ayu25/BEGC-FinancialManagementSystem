@@ -305,7 +305,12 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
         {/* KPI Band - Executive Style */}
-        <ExecutiveStyleKPIs data={dashboardData || {}} />
+        <ExecutiveStyleKPIs 
+          data={dashboardData || {}} 
+          timeRange={timeRange}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+        />
 
 
         {/* Main Content Grid */}

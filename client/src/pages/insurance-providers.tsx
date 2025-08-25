@@ -12,12 +12,21 @@ import { Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft, CalendarIcon }
 import { Link } from "wouter";
 
 export default function InsuranceProvidersPage() {
+  // Check URL parameters for initial values
+  const urlParams = new URLSearchParams(window.location.search);
+  const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
+  const yearParam = urlParams.get('year');
+  const monthParam = urlParams.get('month');
+  
   const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
+  const [selectedYear, setSelectedYear] = useState(yearParam ? parseInt(yearParam) : currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(monthParam ? parseInt(monthParam) : currentDate.getMonth() + 1);
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>(rangeParam || 'current-month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+
+  // Determine if we're in multi-period view (last-3-months or year)
+  const isMultiPeriodView = timeRange === 'last-3-months' || timeRange === 'year';
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -99,6 +108,9 @@ export default function InsuranceProvidersPage() {
   
   // Calculate overall change
   const overallChange = totalComparisonUSD > 0 ? ((totalSelectedUSD - totalComparisonUSD) / totalComparisonUSD) * 100 : 0;
+
+  // For multi-period views, group data by month (similar to patient volume)
+  const groupedByMonth = isMultiPeriodView ? {} : null;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">

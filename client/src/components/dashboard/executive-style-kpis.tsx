@@ -21,9 +21,12 @@ interface ExecutiveStyleKPIsProps {
       incomeChangeUSD?: number;
     };
   };
+  timeRange?: string;
+  selectedYear?: number;
+  selectedMonth?: number;
 }
 
-export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
+export default function ExecutiveStyleKPIs({ data, timeRange, selectedYear, selectedMonth }: ExecutiveStyleKPIsProps) {
   const sspRevenue = parseFloat(data?.totalIncomeSSP || '0');
   const totalExpenses = parseFloat(data?.totalExpenses || '0');
   const sspNetIncome = parseFloat(data?.netIncome || '0');
@@ -128,7 +131,7 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
       </Card>
 
       {/* Insurance Revenue */}
-      <Link href="/insurance-providers">
+      <Link href={`/insurance-providers?range=${timeRange || 'current-month'}&year=${selectedYear || new Date().getFullYear()}&month=${selectedMonth || new Date().getMonth() + 1}`}>
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
