@@ -41,11 +41,12 @@ function Router() {
             logoutNow,
             formatTime
           } = useIdleTimeout({
-            timeoutMinutes: 30, // 30 minutes of inactivity
-            warningMinutes: 5,  // 5 minute warning
+            timeoutMinutes: 15, // 15 minutes of inactivity  
+            warningMinutes: 3,  // 3 minute warning
             enabled: !isOnLoginPage,
             onTimeout: () => {
-              setLocation('/login');
+              // Add timeout message to URL params so login page can show it
+              setLocation('/login?timeout=true');
             },
             onWarning: (seconds) => {
               console.log(`Session timeout warning: ${seconds} seconds remaining`);

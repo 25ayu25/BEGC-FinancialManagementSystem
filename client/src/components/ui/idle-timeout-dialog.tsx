@@ -56,7 +56,7 @@ export function IdleTimeoutDialog({
               </div>
               
               <p className="text-sm text-gray-600">
-                Click "Stay Logged In" to continue your session, or you'll be automatically logged out for security.
+                Click "Stay Logged In" to continue your session, or you'll be automatically logged out in <strong>{formatTime(remainingSeconds)}</strong> for security.
               </p>
             </div>
           </AlertDialogDescription>

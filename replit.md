@@ -40,7 +40,7 @@ Interface consistency: Filter scopes must match data being displayed - no more "
 - **Current Implementation**: Robust cookie-based session authentication with Safari compatibility
 - **User Roles**: Admin and staff roles with location-based access (USA, South Sudan)
 - **Session Management**: Cookie-based sessions with Safari-compatible sameSite settings and credential inclusion
-- **Auto-Logout Security**: 30-minute idle timeout with 5-minute warning dialog for financial data protection
+- **Auto-Logout Security**: 15-minute idle timeout with 3-minute warning dialog for financial data protection
 - **Activity Monitoring**: Tracks user interactions (mouse, keyboard, touch) to prevent unauthorized access
 - **Browser Compatibility**: Tested and working on Chrome, Safari, and other major browsers
 - **User Management**: Demo accounts removed - users must be created through proper registration or admin interface

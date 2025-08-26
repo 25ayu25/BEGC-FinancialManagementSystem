@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,22 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [timeoutMessage, setTimeoutMessage] = useState("");
   
   const [credentials, setCredentials] = useState({
     username: "",
     password: ""
   });
+
+  useEffect(() => {
+    // Check if user was auto-logged out due to timeout
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('timeout') === 'true') {
+      setTimeoutMessage("You were signed out due to inactivity. Please log in again.");
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, '/login');
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +61,7 @@ export default function LoginPage() {
       
       toast({
         title: "Login Successful",
-        description: `Welcome back, ${user.fullName || user.username}!`
+        description: `Welcome, ${user.fullName || user.username}!`
       });
       
       // Redirect to dashboard with full page refresh to ensure proper state
@@ -86,7 +97,7 @@ export default function LoginPage() {
         {/* Login Card */}
         <Card className="shadow-xl border-0">
           <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-xl text-center">Welcome Back</CardTitle>
+            <CardTitle className="text-xl text-center">Welcome</CardTitle>
             <p className="text-sm text-slate-600 text-center">
               Sign in to access the financial dashboard
             </p>
@@ -149,6 +160,17 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {/* Timeout Message */}
+              {timeoutMessage && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                    <p className="text-sm text-amber-800 font-medium">{timeoutMessage}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Login Error */}
               {loginError && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3">
                   <p className="text-sm text-red-700">{loginError}</p>
