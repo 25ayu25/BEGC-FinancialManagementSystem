@@ -50,17 +50,9 @@ export default function AddTransactionModal({
   });
 
   const { data: insuranceProviders } = useQuery({
-    queryKey: ["insurance-providers"],
-    queryFn: async () => {
-      const res = await api.get("/api/insurance-providers", {
-        headers: { "Cache-Control": "no-cache" },
-      });
-      return res.data;
-    },
-    staleTime: 0,
-    gcTime: 0, // TanStack Query v5 uses gcTime instead of cacheTime
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    queryKey: ["/api/insurance-providers"],
+    staleTime: 0, // Always fresh data
+    gcTime: 0 // No cache storage
   });
 
   const createTransactionMutation = useMutation({
