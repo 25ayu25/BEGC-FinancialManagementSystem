@@ -492,6 +492,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/insurance-providers", requireAuth, async (req, res) => {
     try {
       const providers = await storage.getInsuranceProviders();
+      // Prevent any stale caching by browser/CDN
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.set("Pragma", "no-cache");
+      res.set("Expires", "0");
       res.json(providers);
     } catch (error) {
       console.error("Error fetching insurance providers:", error);

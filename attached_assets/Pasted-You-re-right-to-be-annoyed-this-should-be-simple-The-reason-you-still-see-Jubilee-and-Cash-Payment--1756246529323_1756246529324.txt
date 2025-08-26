@@ -1,0 +1,103 @@
+You’re right to be annoyed—this should be simple. The reason you still see Jubilee and Cash Payment is almost always one (or both) of these:
+the data is still coming from somewhere other than the DB (hard-coded list or stale frontend cache), and/or
+the API response is being cached by the browser/Netlify.
+Below is a complete, end-to-end fix so the dropdown shows only:
+ALIMA, Amanah Insurance, CIC Insurance, CIGNA Insurance, New Sudan Insurance, UAP Insurance, Other
+and never shows “Jubilee”, “Cash Payment”, or “No Insurance”.
+1) Database: clean & ensure the correct set
+Run once (in psql/SQL client):
+-- remove unwanted providers if they exist
+DELETE FROM insurance_providers 
+WHERE code IN ('JUBILEE','CASH','NOINS') 
+   OR name ILIKE '%Jubilee%' 
+   OR name ILIKE '%Cash%';
+
+-- fix spelling
+UPDATE insurance_providers
+SET name = 'Amanah Insurance'
+WHERE name ILIKE 'Amaanah%';
+
+-- ensure the wanted set exists
+INSERT INTO insurance_providers (code, name) VALUES
+  ('ALIMA','ALIMA'),
+  ('AMANAH','Amanah Insurance'),
+  ('CIC','CIC Insurance'),
+  ('CIGNA','CIGNA Insurance'),
+  ('NSI','New Sudan Insurance'),
+  ('UAP','UAP Insurance'),
+  ('OTHER','Other')
+ON CONFLICT (code) DO NOTHING;
+If you seed the DB on deploy, update your seed-data to match this exact list so it stays clean.
+seed-data.ts (excerpt)
+await db.insert(insuranceProviders).values([
+  { code: 'ALIMA',  name: 'ALIMA' },
+  { code: 'AMANAH', name: 'Amanah Insurance' },
+  { code: 'CIC',    name: 'CIC Insurance' },
+  { code: 'CIGNA',  name: 'CIGNA Insurance' },
+  { code: 'NSI',    name: 'New Sudan Insurance' },
+  { code: 'UAP',    name: 'UAP Insurance' },
+  { code: 'OTHER',  name: 'Other' },
+]).onConflictDoNothing();
+2) Backend route: no cache + DB only
+Make sure your API returns only what’s in the DB and disables caching.
+server/routes.ts (or where you define routes)
+app.get("/api/insurance-providers", requireAuth, async (_req, res) => {
+  try {
+    const list = await db.select().from(insuranceProviders).orderBy(asc(insuranceProviders.name));
+    // prevent any stale caching by browser/CDN
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to load insurance providers" });
+  }
+});
+Also make sure when you create a transaction you don’t special-case a “no-insurance” value:
+// when saving transaction:
+const insuranceProviderId = req.body.insuranceProviderId || null; // null if none chosen
+(That removes the old “no-insurance” sentinel.)
+3) Frontend: fetch fresh, never from a hard-coded list
+In your add-transaction modal (or wherever you load providers), use the shared axios client api and disable caching on the query. Example with React Query:
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/queryClient";
+
+function useInsuranceProviders() {
+  return useQuery({
+    queryKey: ["insurance-providers"],
+    queryFn: async () => {
+      const res = await api.get("/api/insurance-providers", {
+        headers: { "Cache-Control": "no-cache" },
+      });
+      return res.data as Array<{ id: string; code: string; name: string }>;
+    },
+    staleTime: 0,
+    cacheTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+  });
+}
+Render the dropdown strictly from that query:
+const { data: providers = [], isLoading } = useInsuranceProviders();
+
+<Select value={form.insuranceProviderId ?? ""} onValueChange={(v) => setForm(f => ({...f, insuranceProviderId: v || null}))}>
+  <SelectTrigger>
+    <SelectValue placeholder="Select Insurance Provider" />
+  </SelectTrigger>
+  <SelectContent>
+    {isLoading ? (
+      <div className="p-2 text-sm text-gray-500">Loading…</div>
+    ) : providers.length === 0 ? (
+      <div className="p-2 text-sm text-gray-500">No providers found</div>
+    ) : (
+      providers.map(p => (
+        <SelectItem key={p.id} value={p.id}>
+          {p.name} ({p.code})
+        </SelectItem>
+      ))
+    )}
+  </SelectContent>
+</Select>
+Important:
+Remove any leftover hard-coded arrays (e.g., “Jubilee”, “Cash Payment”, “No Insurance”) from the frontend.
+Make sure there isn’t a “fallback list” used when the query fails.

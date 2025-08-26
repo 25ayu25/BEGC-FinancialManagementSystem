@@ -7,14 +7,8 @@ export const DEPARTMENTS = {
   OTHER: { name: "Other", code: "OTHER" },
 } as const;
 
-export const INSURANCE_PROVIDERS = {
-  CIC: { name: "CIC Insurance", code: "CIC" },
-  UAP: { name: "UAP Insurance", code: "UAP" },
-  CIGNA: { name: "CIGNA", code: "CIGNA" },
-  NILE_INTERNATIONAL: { name: "Nile International", code: "NILE" },
-  NEW_SUDAN: { name: "New Sudan Insurance", code: "NEW_SUDAN" },
-  AMAANAH: { name: "Amaanah Insurance", code: "AMAANAH" },
-} as const;
+// Insurance providers are now loaded from the database via API
+// No more hardcoded list to avoid inconsistencies
 
 export const CURRENCIES = {
   USD: { symbol: "$", name: "US Dollar" },
