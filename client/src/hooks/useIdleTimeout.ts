@@ -76,7 +76,8 @@ export function useIdleTimeout({
     } finally {
       // Clear session and redirect
       localStorage.removeItem('user_session_backup');
-      onTimeout();
+      // Force a full page redirect to ensure proper navigation
+      window.location.href = '/login?timeout=true';
     }
   };
 

@@ -45,8 +45,8 @@ function Router() {
             warningMinutes: 3,  // 3 minute warning
             enabled: !isOnLoginPage,
             onTimeout: () => {
-              // Add timeout message to URL params so login page can show it
-              setLocation('/login?timeout=true');
+              // Force full page redirect for reliable navigation
+              window.location.href = '/login?timeout=true';
             },
             onWarning: (seconds) => {
               console.log(`Session timeout warning: ${seconds} seconds remaining`);

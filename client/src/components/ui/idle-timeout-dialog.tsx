@@ -27,7 +27,7 @@ export function IdleTimeoutDialog({
 }: IdleTimeoutDialogProps) {
   return (
     <AlertDialog open={isOpen}>
-      <AlertDialogContent className="sm:max-w-md">
+      <AlertDialogContent className="sm:max-w-md bg-white border-2 shadow-2xl z-[100]">
         <AlertDialogHeader>
           <div className="flex items-center space-x-2">
             <div className="bg-amber-100 p-2 rounded-full">
