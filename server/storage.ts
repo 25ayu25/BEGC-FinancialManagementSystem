@@ -763,10 +763,11 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getIncomeTrendsForDateRange(startDate: Date, endDate: Date): Promise<Array<{ date: string, income: number }>> {
+  async getIncomeTrendsForDateRange(startDate: Date, endDate: Date): Promise<Array<{ date: string, income: number, incomeUSD: number, incomeSSP: number }>> {
     const incomeData = await db.select({
       date: sql<string>`DATE(${transactions.date})`,
-      income: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`
+      incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.currency} = 'SSP' THEN ${transactions.amount} ELSE 0 END), 0)`
     }).from(transactions)
     .where(
       and(
@@ -779,7 +780,7 @@ export class DatabaseStorage implements IStorage {
     .orderBy(sql`DATE(${transactions.date})`);
 
     // Fill in missing dates with 0 income
-    const result: Array<{ date: string, income: number }> = [];
+    const result: Array<{ date: string, income: number, incomeUSD: number, incomeSSP: number }> = [];
     const current = new Date(startDate);
     
     while (current <= endDate) {
@@ -788,7 +789,9 @@ export class DatabaseStorage implements IStorage {
       
       result.push({
         date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        income: existingData ? Number(existingData.income) : 0
+        income: 0, // Deprecated - do not use mixed currency total
+        incomeUSD: existingData ? Number(existingData.incomeUSD) : 0,
+        incomeSSP: existingData ? Number(existingData.incomeSSP) : 0
       });
       
       current.setDate(current.getDate() + 1);

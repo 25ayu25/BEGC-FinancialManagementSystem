@@ -672,6 +672,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         const startDate = new Date(endDate);
         startDate.setMonth(startDate.getMonth() - 3);
         data = await storage.getIncomeTrendsForDateRange(startDate, endDate);
+      } else if (range === 'year') {
+        // Get full year data from January to December
+        const startDate = new Date(year, 0, 1); // January 1st
+        const endDate = new Date(year, 11, 31); // December 31st
+        data = await storage.getIncomeTrendsForDateRange(startDate, endDate);
       } else {
         // For other ranges, use the existing month-based logic
         data = await storage.getIncomeTrendsForMonth(year, month);
