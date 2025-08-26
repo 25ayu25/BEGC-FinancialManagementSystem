@@ -16,6 +16,9 @@ import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 import { useState } from "react";
+import { useIdleTimeout } from "@/hooks/useIdleTimeout";
+import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
+import { useLocation } from "wouter";
 
 function Router() {
   return (
@@ -27,6 +30,27 @@ function Router() {
       <Route>
         {(params) => {
           const [sidebarOpen, setSidebarOpen] = useState(false);
+          const [location, setLocation] = useLocation();
+          
+          // Auto-logout functionality (only enabled when not on login page)
+          const isOnLoginPage = location === '/login';
+          const {
+            isWarning,
+            remainingSeconds,
+            extendSession,
+            logoutNow,
+            formatTime
+          } = useIdleTimeout({
+            timeoutMinutes: 30, // 30 minutes of inactivity
+            warningMinutes: 5,  // 5 minute warning
+            enabled: !isOnLoginPage,
+            onTimeout: () => {
+              setLocation('/login');
+            },
+            onWarning: (seconds) => {
+              console.log(`Session timeout warning: ${seconds} seconds remaining`);
+            }
+          });
           return (
           <div className="flex h-screen bg-gray-50">
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -60,6 +84,15 @@ function Router() {
                 <Route component={NotFound} />
               </Switch>
             </div>
+            
+            {/* Auto-logout warning dialog */}
+            <IdleTimeoutDialog
+              isOpen={isWarning}
+              remainingSeconds={remainingSeconds}
+              onExtend={extendSession}
+              onLogout={logoutNow}
+              formatTime={formatTime}
+            />
           </div>
           );
         }}
