@@ -31,6 +31,8 @@ import {
   MoreVertical,
   Edit,
   Trash2,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/queryClient";
@@ -145,6 +147,28 @@ export default function UserManagementPage() {
       toast({
         title: "User Deleted",
         description: "User has been removed successfully."
+      });
+    }
+  });
+
+  // Toggle user status mutation
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: async ({ id, newStatus }: { id: string; newStatus: string }) => {
+      const res = await api.patch(`/api/users/${id}`, { status: newStatus });
+      return res.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: `User ${variables.newStatus === 'active' ? 'Activated' : 'Deactivated'}`,
+        description: `User has been ${variables.newStatus === 'active' ? 'activated' : 'deactivated'} successfully.`
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to Update Status",
+        description: error.response?.data?.error || error.message || "Failed to update user status."
       });
     }
   });
@@ -387,6 +411,35 @@ export default function UserManagementPage() {
                             <Edit className="w-4 h-4 mr-2" />
                             Edit User
                           </DropdownMenuItem>
+                          
+                          {user.status === 'active' ? (
+                            <DropdownMenuItem 
+                              className="text-orange-600"
+                              onClick={() => {
+                                toggleUserStatusMutation.mutate({ 
+                                  id: user.id, 
+                                  newStatus: 'inactive' 
+                                });
+                              }}
+                            >
+                              <UserX className="w-4 h-4 mr-2" />
+                              Deactivate User
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              className="text-green-600"
+                              onClick={() => {
+                                toggleUserStatusMutation.mutate({ 
+                                  id: user.id, 
+                                  newStatus: 'active' 
+                                });
+                              }}
+                            >
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Activate User
+                            </DropdownMenuItem>
+                          )}
+                          
                           <DropdownMenuItem 
                             className="text-red-600"
                             onClick={() => {
