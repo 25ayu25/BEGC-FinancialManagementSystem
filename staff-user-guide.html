@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bahr El Ghazal Clinic - Financial Management System User Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+            color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(13, 148, 136, 0.2);
+        }
+        
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        
+        .header p {
+            margin: 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            background: white;
+            margin: 30px 0;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #14b8a6;
+        }
+        
+        .section h2 {
+            color: #0d9488;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        .section h3 {
+            color: #475569;
+            margin: 25px 0 15px 0;
+            font-size: 1.3em;
+        }
+        
+        .step {
+            background: #f1f5f9;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .step h4 {
+            color: #1e40af;
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .highlight {
+            background: #fef3c7;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+            margin: 15px 0;
+        }
+        
+        .warning {
+            background: #fee2e2;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ef4444;
+            margin: 15px 0;
+        }
+        
+        .tip {
+            background: #dcfce7;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #22c55e;
+            margin: 15px 0;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .feature-card {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            text-align: center;
+        }
+        
+        .feature-card h4 {
+            color: #0d9488;
+            margin-bottom: 10px;
+        }
+        
+        .code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        
+        .menu-item {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        .currency-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 0 5px;
+        }
+        
+        ol, ul {
+            padding-left: 25px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        .table-of-contents {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 30px 0;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .table-of-contents h3 {
+            color: #0d9488;
+            margin-top: 0;
+        }
+        
+        .table-of-contents a {
+            color: #475569;
+            text-decoration: none;
+            display: block;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .table-of-contents a:hover {
+            color: #0d9488;
+            background: #f1f5f9;
+            padding-left: 10px;
+            transition: all 0.2s;
+        }
+        
+        @media print {
+            body { background: white; }
+            .section { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📊 Bahr El Ghazal Clinic</h1>
+    <p>Financial Management System - Staff User Guide</p>
+</div>
+
+<div class="table-of-contents">
+    <h3>📋 Table of Contents</h3>
+    <a href="#getting-started">1. Getting Started</a>
+    <a href="#dashboard">2. Dashboard Overview</a>
+    <a href="#transactions">3. Managing Transactions</a>
+    <a href="#reports">4. Monthly Reports</a>
+    <a href="#patient-volume">5. Patient Volume Tracking</a>
+    <a href="#user-management">6. User Management (Admin Only)</a>
+    <a href="#settings">7. Settings & Profile</a>
+    <a href="#troubleshooting">8. Troubleshooting</a>
+</div>
+
+<div class="section" id="getting-started">
+    <h2>🚀 1. Getting Started</h2>
+    
+    <h3>Logging In</h3>
+    <div class="step">
+        <h4>Step 1: Access the System</h4>
+        <p>Open your web browser and go to: <span class="code">finance.bahrelghazalclinic.com</span></p>
+    </div>
+    
+    <div class="step">
+        <h4>Step 2: Enter Your Credentials</h4>
+        <p>Enter your username and password provided by your administrator</p>
+    </div>
+    
+    <div class="tip">
+        <strong>💡 Tip:</strong> The system works on both desktop and mobile devices. On mobile, tap the hamburger menu (☰) to access navigation.
+    </div>
+    
+    <h3>Navigation Menu</h3>
+    <p>After logging in, you'll see the main navigation menu with these options:</p>
+    
+    <div class="menu-item">📊 Executive Dashboard - Main financial overview</div>
+    <div class="menu-item">📈 Overview - Simplified dashboard view</div>
+    <div class="menu-item">➕ Add Transaction - Record income or expenses</div>
+    <div class="menu-item">📄 Monthly Reports - View generated reports</div>
+    <div class="menu-item">👥 Patient Volume - Track daily patient numbers</div>
+    <div class="menu-item">👤 User Management - Manage clinic users (Admin only)</div>
+    <div class="menu-item">⚙️ Settings - Update your profile and preferences</div>
+</div>
+
+<div class="section" id="dashboard">
+    <h2>📊 2. Dashboard Overview</h2>
+    
+    <h3>Key Financial Metrics</h3>
+    <p>The dashboard shows 5 main financial indicators:</p>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h4>💰 Total Revenue</h4>
+            <p>All income in <span class="currency-badge">SSP</span></p>
+        </div>
+        <div class="feature-card">
+            <h4>💸 Total Expenses</h4>
+            <p>All spending in <span class="currency-badge">SSP</span></p>
+        </div>
+        <div class="feature-card">
+            <h4>💵 Net Income</h4>
+            <p>Profit calculation in <span class="currency-badge">SSP</span></p>
+        </div>
+        <div class="feature-card">
+            <h4>🛡️ Insurance Revenue</h4>
+            <p>Insurance payments in <span class="currency-badge">USD</span></p>
+        </div>
+        <div class="feature-card">
+            <h4>👥 Total Patients</h4>
+            <p>Patient count for selected period</p>
+        </div>
+    </div>
+    
+    <h3>Time Period Selection</h3>
+    <div class="step">
+        <h4>Change Time Range</h4>
+        <p>Use the dropdown in the top-right to view different periods:</p>
+        <ul>
+            <li><strong>Current Month</strong> - This month's data</li>
+            <li><strong>Last Month</strong> - Previous month's data</li>
+            <li><strong>Last 3 Months</strong> - Three-month overview</li>
+            <li><strong>This Year</strong> - Full year data</li>
+            <li><strong>Custom Range</strong> - Pick specific dates</li>
+        </ul>
+    </div>
+    
+    <div class="tip">
+        <strong>💡 Tip:</strong> Click on the Insurance or Patient cards to view detailed breakdowns.
+    </div>
+</div>
+
+<div class="section" id="transactions">
+    <h2>➕ 3. Managing Transactions</h2>
+    
+    <h3>Adding a New Transaction</h3>
+    
+    <div class="step">
+        <h4>Step 1: Navigate to Add Transaction</h4>
+        <p>Click "Add Transaction" in the sidebar menu</p>
+    </div>
+    
+    <div class="step">
+        <h4>Step 2: Choose Transaction Type</h4>
+        <p>Select either:</p>
+        <ul>
+            <li><strong>Income</strong> - Money received (consultations, lab tests, etc.)</li>
+            <li><strong>Expense</strong> - Money spent (supplies, salaries, utilities, etc.)</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Step 3: Fill in Transaction Details</h4>
+        <ul>
+            <li><strong>Amount:</strong> Enter the transaction amount</li>
+            <li><strong>Currency:</strong> Choose <span class="currency-badge">SSP</span> or <span class="currency-badge">USD</span></li>
+            <li><strong>Department:</strong> Select the relevant department</li>
+            <li><strong>Description:</strong> Brief description of the transaction</li>
+            <li><strong>Date:</strong> Transaction date (defaults to today)</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Step 4: Add Insurance (for Income)</h4>
+        <p>If this is insurance-related income:</p>
+        <ul>
+            <li>Check "Insurance Transaction"</li>
+            <li>Select the insurance provider</li>
+            <li>Enter policy or claim number if available</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Step 5: Upload Receipt (Optional)</h4>
+        <p>Drag and drop or click to upload receipt images for record keeping</p>
+    </div>
+    
+    <div class="step">
+        <h4>Step 6: Save Transaction</h4>
+        <p>Click "Add Transaction" to save</p>
+    </div>
+    
+    <div class="highlight">
+        <strong>⚠️ Important:</strong> Always double-check the amount and currency before saving. Transactions can be edited later, but it's best to enter them correctly the first time.
+    </div>
+    
+    <h3>Department Categories</h3>
+    <ul>
+        <li><strong>Consultation</strong> - Doctor visits and consultations</li>
+        <li><strong>Laboratory</strong> - Lab tests and diagnostics</li>
+        <li><strong>Ultrasound</strong> - Ultrasound examinations</li>
+        <li><strong>X-Ray</strong> - X-ray services</li>
+        <li><strong>Pharmacy</strong> - Medicine and pharmaceutical sales</li>
+        <li><strong>Other</strong> - Miscellaneous income/expenses</li>
+    </ul>
+    
+    <h3>Common Transaction Examples</h3>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h4>💰 Patient Consultation</h4>
+            <p><strong>Type:</strong> Income<br>
+            <strong>Department:</strong> Consultation<br>
+            <strong>Currency:</strong> SSP or USD</p>
+        </div>
+        <div class="feature-card">
+            <h4>🧪 Lab Test</h4>
+            <p><strong>Type:</strong> Income<br>
+            <strong>Department:</strong> Laboratory<br>
+            <strong>Insurance:</strong> If applicable</p>
+        </div>
+        <div class="feature-card">
+            <h4>💊 Medicine Purchase</h4>
+            <p><strong>Type:</strong> Expense<br>
+            <strong>Department:</strong> Pharmacy<br>
+            <strong>Description:</strong> Supplier details</p>
+        </div>
+        <div class="feature-card">
+            <h4>⚡ Utility Bill</h4>
+            <p><strong>Type:</strong> Expense<br>
+            <strong>Department:</strong> Other<br>
+            <strong>Description:</strong> Electricity/Water</p>
+        </div>
+    </div>
+</div>
+
+<div class="section" id="reports">
+    <h2>📄 4. Monthly Reports</h2>
+    
+    <h3>Viewing Reports</h3>
+    <div class="step">
+        <h4>Access Monthly Reports</h4>
+        <p>Click "Monthly Reports" in the sidebar to see all generated reports</p>
+    </div>
+    
+    <div class="step">
+        <h4>Understanding Report Data</h4>
+        <p>Each report shows:</p>
+        <ul>
+            <li>Total income and expenses by department</li>
+            <li>Insurance breakdown by provider</li>
+            <li>Net income calculations</li>
+            <li>Department performance rankings</li>
+            <li>Monthly comparisons and trends</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Download Reports</h4>
+        <p>Click the "Download PDF" button to save reports for printing or sharing</p>
+    </div>
+    
+    <div class="tip">
+        <strong>💡 Tip:</strong> Reports are automatically generated monthly, but you can also generate custom reports for specific date ranges from the dashboard.
+    </div>
+</div>
+
+<div class="section" id="patient-volume">
+    <h2>👥 5. Patient Volume Tracking</h2>
+    
+    <h3>Recording Daily Patient Numbers</h3>
+    
+    <div class="step">
+        <h4>Step 1: Navigate to Patient Volume</h4>
+        <p>Click "Patient Volume" in the sidebar menu</p>
+    </div>
+    
+    <div class="step">
+        <h4>Step 2: Add Today's Patient Count</h4>
+        <p>Click the "+" button to add new patient volume data</p>
+    </div>
+    
+    <div class="step">
+        <h4>Step 3: Enter Details</h4>
+        <ul>
+            <li><strong>Date:</strong> Select the date (defaults to today)</li>
+            <li><strong>Department:</strong> Choose the department</li>
+            <li><strong>Patient Count:</strong> Number of patients seen</li>
+            <li><strong>Notes:</strong> Any additional information</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Step 4: Save the Record</h4>
+        <p>Click "Save Patient Volume" to record the data</p>
+    </div>
+    
+    <h3>Viewing Patient Statistics</h3>
+    <p>The patient volume page shows:</p>
+    <ul>
+        <li>Daily patient counts by department</li>
+        <li>Monthly summaries and totals</li>
+        <li>Department-wise patient distribution</li>
+        <li>Historical trends and comparisons</li>
+    </ul>
+    
+    <div class="highlight">
+        <strong>📊 Analytics:</strong> Patient volume data helps correlate with revenue trends and identify busy periods in different departments.
+    </div>
+</div>
+
+<div class="section" id="user-management">
+    <h2>👤 6. User Management (Admin Only)</h2>
+    
+    <div class="warning">
+        <strong>⚠️ Admin Access Required:</strong> These features are only available to users with administrator privileges.
+    </div>
+    
+    <h3>Managing Clinic Users</h3>
+    
+    <div class="step">
+        <h4>Adding New Staff</h4>
+        <ol>
+            <li>Click "User Management" in the sidebar</li>
+            <li>Click "Add New User" button</li>
+            <li>Fill in staff details (name, email, role)</li>
+            <li>Choose role: <strong>Admin</strong> or <strong>Staff</strong></li>
+            <li>Set initial password</li>
+            <li>Save the new user</li>
+        </ol>
+    </div>
+    
+    <div class="step">
+        <h4>User Roles</h4>
+        <ul>
+            <li><strong>Admin:</strong> Full access including user management and system settings</li>
+            <li><strong>Staff:</strong> Can add transactions, view reports, and manage patient volume</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Deactivating Users</h4>
+        <p>To temporarily disable a user account:</p>
+        <ol>
+            <li>Find the user in the user list</li>
+            <li>Click the three-dot menu</li>
+            <li>Select "Deactivate"</li>
+        </ol>
+    </div>
+    
+    <div class="tip">
+        <strong>💡 Security Tip:</strong> Regularly review user accounts and deactivate accounts for staff who no longer work at the clinic.
+    </div>
+</div>
+
+<div class="section" id="settings">
+    <h2>⚙️ 7. Settings & Profile</h2>
+    
+    <h3>Updating Your Profile</h3>
+    
+    <div class="step">
+        <h4>Access Settings</h4>
+        <p>Click "Settings" in the sidebar or your profile icon</p>
+    </div>
+    
+    <div class="step">
+        <h4>Update Personal Information</h4>
+        <ul>
+            <li>First and Last Name</li>
+            <li>Email address</li>
+            <li>Contact information</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Change Password</h4>
+        <ol>
+            <li>Enter your current password</li>
+            <li>Enter your new password</li>
+            <li>Confirm the new password</li>
+            <li>Click "Update Password"</li>
+        </ol>
+    </div>
+    
+    <div class="highlight">
+        <strong>🔒 Password Requirements:</strong> Use a strong password with at least 8 characters, including letters, numbers, and special characters.
+    </div>
+</div>
+
+<div class="section" id="troubleshooting">
+    <h2>🔧 8. Troubleshooting</h2>
+    
+    <h3>Common Issues & Solutions</h3>
+    
+    <div class="step">
+        <h4>Cannot Log In</h4>
+        <ul>
+            <li>Check username and password spelling</li>
+            <li>Ensure Caps Lock is off</li>
+            <li>Contact your administrator for password reset</li>
+            <li>Try refreshing the page</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Page Not Loading</h4>
+        <ul>
+            <li>Check your internet connection</li>
+            <li>Refresh the browser page (F5 or Ctrl+R)</li>
+            <li>Clear browser cache and cookies</li>
+            <li>Try a different browser</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Transaction Not Saving</h4>
+        <ul>
+            <li>Check all required fields are filled</li>
+            <li>Ensure amount is a valid number</li>
+            <li>Check internet connection</li>
+            <li>Try logging out and back in</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h4>Mobile Navigation Issues</h4>
+        <ul>
+            <li>Tap the hamburger menu (☰) to open sidebar</li>
+            <li>Tap outside the sidebar to close it</li>
+            <li>Refresh the page if menu is unresponsive</li>
+        </ul>
+    </div>
+    
+    <h3>Getting Help</h3>
+    <div class="tip">
+        <strong>📞 Support Contact:</strong> If you encounter issues not covered in this guide, contact your system administrator or IT support team for assistance.
+    </div>
+    
+    <h3>Best Practices</h3>
+    <ul>
+        <li><strong>Daily Data Entry:</strong> Enter transactions daily for accurate reporting</li>
+        <li><strong>Regular Backups:</strong> Monthly reports serve as data backups</li>
+        <li><strong>Consistent Categories:</strong> Use the same departments for similar transactions</li>
+        <li><strong>Receipt Storage:</strong> Upload receipts when possible for audit trails</li>
+        <li><strong>Currency Accuracy:</strong> Double-check currency selection for each transaction</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>✅ Quick Reference</h2>
+    
+    <h3>Daily Tasks Checklist</h3>
+    <ul>
+        <li>□ Record all patient consultations and payments</li>
+        <li>□ Enter laboratory test income</li>
+        <li>□ Log any expenses (supplies, utilities, etc.)</li>
+        <li>□ Update patient volume for your department</li>
+        <li>□ Upload receipts for major expenses</li>
+    </ul>
+    
+    <h3>Weekly Tasks</h3>
+    <ul>
+        <li>□ Review dashboard for data accuracy</li>
+        <li>□ Check insurance payment processing</li>
+        <li>□ Verify all departments have updated patient volumes</li>
+    </ul>
+    
+    <h3>Monthly Tasks</h3>
+    <ul>
+        <li>□ Generate and review monthly reports</li>
+        <li>□ Download PDF reports for record keeping</li>
+        <li>□ Review user accounts (Admin only)</li>
+        <li>□ Update any necessary settings or preferences</li>
+    </ul>
+</div>
+
+<div class="header" style="margin-top: 40px; background: linear-gradient(135deg, #475569 0%, #64748b 100%);">
+    <h2 style="margin: 0;">📞 Need Help?</h2>
+    <p style="margin: 10px 0 0 0;">Contact your system administrator or IT support team</p>
+    <p style="margin: 5px 0 0 0; font-size: 0.9em;">This guide covers version 1.0 of the Financial Management System</p>
+</div>
+
+</body>
+</html>
