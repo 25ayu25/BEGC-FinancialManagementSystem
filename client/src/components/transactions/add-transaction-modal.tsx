@@ -49,11 +49,20 @@ export default function AddTransactionModal({
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: insuranceProviders } = useQuery({
+  const { data: insuranceProviders, refetch: refetchProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
-    staleTime: 0, // Always fresh data
-    gcTime: 0 // No cache storage
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true
   });
+
+  // Force refetch when modal opens to ensure fresh data
+  useEffect(() => {
+    if (open) {
+      refetchProviders();
+    }
+  }, [open, refetchProviders]);
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: any) => {
