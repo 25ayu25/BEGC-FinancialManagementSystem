@@ -727,10 +727,10 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
+          <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
@@ -760,7 +760,7 @@ export default function AdvancedDashboard() {
 
         {/* Total Expenses */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
+          <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
@@ -790,7 +790,7 @@ export default function AdvancedDashboard() {
 
         {/* Net Income */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
+          <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
@@ -821,7 +821,7 @@ export default function AdvancedDashboard() {
         {/* Insurance Revenue */}
         <Link href={`/insurance-providers?range=${timeRange}${timeRange === 'custom' && customStartDate && customEndDate ? `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}` : ''}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-3">
+            <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
@@ -853,7 +853,7 @@ export default function AdvancedDashboard() {
         {/* Patient Volume */}
         <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${timeRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-3">
+            <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Total Patients</p>

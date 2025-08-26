@@ -7,9 +7,11 @@ import {
   Settings, 
   Building2,
   Users,
-  Activity
+  Activity,
+  X
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
+import { useEffect } from "react";
 
 const navigation = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
@@ -21,11 +23,54 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
 
+  // Close sidebar when clicking outside on mobile
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen, onClose]);
+
   return (
-    <div className="w-64 bg-white shadow-xl flex flex-col border-r border-gray-100" data-testid="sidebar-navigation">
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <div className={cn(
+        "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white shadow-xl flex flex-col border-r border-gray-100 transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )} data-testid="sidebar-navigation">
+        
+        {/* Mobile close button */}
+        <div className="lg:hidden absolute top-4 right-4">
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            data-testid="button-close-sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       {/* Logo and Clinic Info */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mx-4 mt-4 shadow-sm">
         <div className="flex items-center space-x-3">
@@ -69,6 +114,7 @@ export default function Sidebar() {
         
 
       </div>
-    </div>
+      </div>
+    </>
   );
 }
