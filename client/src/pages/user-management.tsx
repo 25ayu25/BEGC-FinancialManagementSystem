@@ -175,9 +175,7 @@ export default function UserManagementPage() {
 
   const roles = [
     { value: "admin", label: "Administrator", permissions: ["all"] },
-    { value: "manager", label: "Manager", permissions: ["view", "create", "edit", "reports"] },
-    { value: "staff", label: "Staff", permissions: ["view", "create"] },
-    { value: "viewer", label: "Viewer", permissions: ["view"] }
+    { value: "staff", label: "Staff", permissions: ["view", "create", "edit"] }
   ];
 
   const handleCreateUser = (e: React.FormEvent) => {
