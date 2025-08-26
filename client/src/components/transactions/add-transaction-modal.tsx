@@ -49,20 +49,10 @@ export default function AddTransactionModal({
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: insuranceProviders, refetch: refetchProviders } = useQuery({
+  const { data: insuranceProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
-
-  // Force refetch when modal opens to ensure fresh data
-  useEffect(() => {
-    if (open) {
-      refetchProviders();
-    }
-  }, [open, refetchProviders]);
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -139,7 +129,7 @@ export default function AddTransactionModal({
 
   // Auto-switch currency when insurance provider is selected
   useEffect(() => {
-    if (insuranceProviderId && insuranceProviderId !== "") {
+    if (insuranceProviderId && insuranceProviderId !== "no-insurance") {
       setCurrency("USD");
     } else {
       setCurrency("SSP");
@@ -159,7 +149,7 @@ export default function AddTransactionModal({
     }
 
     // For income transactions, department is required only if no insurance provider is selected
-    const hasValidInsurance = insuranceProviderId && insuranceProviderId !== "";
+    const hasValidInsurance = insuranceProviderId && insuranceProviderId !== "" && insuranceProviderId !== "no-insurance";
     
     if (type === "income" && !departmentId && !hasValidInsurance) {
       toast({
@@ -359,6 +349,9 @@ export default function AddTransactionModal({
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="no-insurance">
+                    <span className="text-gray-500 italic">No Insurance</span>
+                  </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {provider.name} ({provider.code})

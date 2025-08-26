@@ -46,9 +46,6 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
 
   const { data: queryInsuranceProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always'
   });
 
   const departments = propDepartments || queryDepartments;

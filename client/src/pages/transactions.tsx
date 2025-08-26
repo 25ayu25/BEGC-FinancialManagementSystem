@@ -97,9 +97,6 @@ export default function Transactions() {
 
   const { data: insuranceProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always'
   });
 
   const getDepartmentName = (departmentId: string) => {

@@ -492,10 +492,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/insurance-providers", requireAuth, async (req, res) => {
     try {
       const providers = await storage.getInsuranceProviders();
-      // Prevent any stale caching by browser/CDN
-      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.set("Pragma", "no-cache");
-      res.set("Expires", "0");
       res.json(providers);
     } catch (error) {
       console.error("Error fetching insurance providers:", error);
@@ -554,7 +550,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       // Convert date string to Date object if it's a string
-      // Handle insurance provider - convert empty string to null
+      // Handle insurance provider - convert "no-insurance" to null
       // Set all transactions as synced by default
       const syncStatus = "synced";
       
@@ -562,7 +558,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : new Date(),
         createdBy: (req as any).user.id,
-        insuranceProviderId: req.body.insuranceProviderId || null,
+        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
         syncStatus: syncStatus
       };
       
@@ -589,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const updates = {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : undefined,
-        insuranceProviderId: req.body.insuranceProviderId || null,
+        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
       };
       
       // Remove undefined values

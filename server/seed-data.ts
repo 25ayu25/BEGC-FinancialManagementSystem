@@ -1,6 +1,5 @@
 import { db } from "./db";
 import { departments, insuranceProviders, users } from "@shared/schema";
-import { sql } from "drizzle-orm";
 
 export async function seedData() {
   try {
@@ -20,17 +19,12 @@ export async function seedData() {
 
     // Seed insurance providers
     await db.insert(insuranceProviders).values([
-      { code: 'ALIMA', name: 'ALIMA' },
-      { code: 'AMANAH', name: 'Amanah Insurance' },
       { code: 'CIC', name: 'CIC Insurance' },
+      { code: 'UAP', name: 'UAP Insurance' },
       { code: 'CIGNA', name: 'CIGNA Insurance' },
       { code: 'NSI', name: 'New Sudan Insurance' },
-      { code: 'UAP', name: 'UAP Insurance' },
-      { code: 'OTHER', name: 'Other' }
-    ]).onConflictDoUpdate({
-      target: insuranceProviders.code,
-      set: { name: sql`EXCLUDED.name` }
-    });
+      { code: 'AMAANAH', name: 'Amaanah Insurance' }
+    ]).onConflictDoNothing();
 
     console.log("Database seeded successfully!");
   } catch (error) {
