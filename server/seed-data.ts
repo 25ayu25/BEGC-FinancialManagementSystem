@@ -23,7 +23,8 @@ export async function seedData() {
       { code: 'UAP', name: 'UAP Insurance' },
       { code: 'CIGNA', name: 'CIGNA Insurance' },
       { code: 'NSI', name: 'New Sudan Insurance' },
-      { code: 'AMAANAH', name: 'Amaanah Insurance' }
+      { code: 'AMAANAH', name: 'Amaanah Insurance' },
+      { code: 'ALIMA', name: 'ALIMA' }
     ]).onConflictDoNothing();
 
     console.log("Database seeded successfully!");
