@@ -550,7 +550,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       // Convert date string to Date object if it's a string
-      // Handle insurance provider - convert "no-insurance" to null
+      // Handle insurance provider - convert empty string to null
       // Set all transactions as synced by default
       const syncStatus = "synced";
       
@@ -558,7 +558,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : new Date(),
         createdBy: (req as any).user.id,
-        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
+        insuranceProviderId: req.body.insuranceProviderId || null,
         syncStatus: syncStatus
       };
       
@@ -585,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const updates = {
         ...req.body,
         date: req.body.date ? new Date(req.body.date) : undefined,
-        insuranceProviderId: req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
+        insuranceProviderId: req.body.insuranceProviderId || null,
       };
       
       // Remove undefined values

@@ -129,7 +129,7 @@ export default function AddTransactionModal({
 
   // Auto-switch currency when insurance provider is selected
   useEffect(() => {
-    if (insuranceProviderId && insuranceProviderId !== "no-insurance") {
+    if (insuranceProviderId && insuranceProviderId !== "") {
       setCurrency("USD");
     } else {
       setCurrency("SSP");
@@ -149,7 +149,7 @@ export default function AddTransactionModal({
     }
 
     // For income transactions, department is required only if no insurance provider is selected
-    const hasValidInsurance = insuranceProviderId && insuranceProviderId !== "" && insuranceProviderId !== "no-insurance";
+    const hasValidInsurance = insuranceProviderId && insuranceProviderId !== "";
     
     if (type === "income" && !departmentId && !hasValidInsurance) {
       toast({
@@ -349,9 +349,6 @@ export default function AddTransactionModal({
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="no-insurance">
-                    <span className="text-gray-500 italic">No Insurance</span>
-                  </SelectItem>
                   {(insuranceProviders as any)?.map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {provider.name} ({provider.code})
