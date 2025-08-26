@@ -27,10 +27,12 @@ async function seedDatabase() {
     const insuranceProviders = [
       { code: "CIC", name: "CIC Insurance" },
       { code: "UAP", name: "UAP Insurance" },
-      { code: "CIGNA", name: "CIGNA" },
-      { code: "NILE", name: "Nile International" },
+      { code: "CIGNA", name: "CIGNA Insurance" },
+      { code: "NILE", name: "Nile International Insurance" },
       { code: "NEW_SUDAN", name: "New Sudan Insurance" },
-      { code: "AMAANAH", name: "Amaanah Insurance" },
+      { code: "AMANAH", name: "Amanah Insurance" },
+      { code: "ALIMA", name: "ALIMA Insurance" },
+      { code: "OTHER", name: "Other" },
     ];
 
     for (const provider of insuranceProviders) {

@@ -10,10 +10,12 @@ export const DEPARTMENTS = {
 export const INSURANCE_PROVIDERS = {
   CIC: { name: "CIC Insurance", code: "CIC" },
   UAP: { name: "UAP Insurance", code: "UAP" },
-  CIGNA: { name: "CIGNA", code: "CIGNA" },
-  NILE_INTERNATIONAL: { name: "Nile International", code: "NILE" },
+  CIGNA: { name: "CIGNA Insurance", code: "CIGNA" },
+  NILE_INTERNATIONAL: { name: "Nile International Insurance", code: "NILE" },
   NEW_SUDAN: { name: "New Sudan Insurance", code: "NEW_SUDAN" },
-  AMAANAH: { name: "Amaanah Insurance", code: "AMAANAH" },
+  AMANAH: { name: "Amanah Insurance", code: "AMANAH" },
+  ALIMA: { name: "ALIMA Insurance", code: "ALIMA" },
+  OTHER: { name: "Other", code: "OTHER" },
 } as const;
 
 export const CURRENCIES = {
