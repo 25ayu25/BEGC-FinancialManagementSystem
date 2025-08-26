@@ -106,8 +106,8 @@ export default function UserManagementPage() {
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to create user. Please try again."
+        title: "Failed to Create User",
+        description: error.response?.data?.error || error.message || "Failed to create user. Please try again."
       });
     }
   });
