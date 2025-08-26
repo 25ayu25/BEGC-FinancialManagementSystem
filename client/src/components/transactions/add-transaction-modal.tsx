@@ -51,7 +51,8 @@ export default function AddTransactionModal({
 
   const { data: insuranceProviders } = useQuery({
     queryKey: ["/api/insurance-providers"],
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // No cache - always fresh
+    gcTime: 0 // No cache storage
   });
 
   const createTransactionMutation = useMutation({
