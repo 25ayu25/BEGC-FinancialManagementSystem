@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,36 +11,39 @@ import { format } from "date-fns";
 import { Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft, CalendarIcon } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
+type Range = 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom';
+
 export default function InsuranceProvidersPage() {
-  const [location] = useLocation();
-  const currentDate = new Date();
-  
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
+  const [location, navigate] = useLocation();
+
+  // Read query string from the current location
+  const search = useMemo(() => {
+    const q = location.split('?')[1] ?? '';
+    return new URLSearchParams(q);
+  }, [location]);
+
+  const initialRange = (search.get('range') as Range) ?? 'current-month';
+  const initialYear = Number(search.get('year')) || new Date().getFullYear();
+  const initialMonth = Number(search.get('month')) || (new Date().getMonth() + 1);
+
+  const [timeRange, setTimeRange] = useState<Range>(initialRange);
+  const [selectedYear, setSelectedYear] = useState<number>(initialYear);
+  const [selectedMonth, setSelectedMonth] = useState<number>(initialMonth);
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
 
-  // Parse URL parameters on mount and when location changes
+  // Keep the URL in sync when user changes filters (shareable/bookmarkable)
   useEffect(() => {
-    const urlParams = new URLSearchParams(location.split('?')[1] || '');
-    const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
-    const yearParam = urlParams.get('year');
-    const monthParam = urlParams.get('month');
-    
-    if (rangeParam) {
-      setTimeRange(rangeParam);
+    const qs = new URLSearchParams();
+    qs.set('range', timeRange);
+    qs.set('year', String(selectedYear));
+    if (timeRange === 'current-month') {
+      qs.set('month', String(selectedMonth));
     }
-    if (yearParam) {
-      setSelectedYear(parseInt(yearParam));
-    }
-    if (monthParam) {
-      setSelectedMonth(parseInt(monthParam));
-    }
-  }, [location]);
+    navigate(`/insurance-providers?${qs.toString()}`, { replace: true });
+  }, [timeRange, selectedYear, selectedMonth, navigate]);
 
-  // Determine if we're in multi-period view (last-3-months or year)
-  const isMultiPeriodView = timeRange === 'last-3-months' || timeRange === 'year';
+  const isYearView = timeRange === 'year';
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
@@ -123,8 +126,34 @@ export default function InsuranceProvidersPage() {
   // Calculate overall change
   const overallChange = totalComparisonUSD > 0 ? ((totalSelectedUSD - totalComparisonUSD) / totalComparisonUSD) * 100 : 0;
 
-  // For multi-period views, group data by month (similar to patient volume)
-  const groupedByMonth = isMultiPeriodView ? {} : null;
+  // For year view, group insurance by month (similar to patient volume)
+  const monthlyInsurance = useMemo(() => {
+    if (!isYearView || !dashboardData?.transactions) return null;
+
+    const buckets = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      label: format(new Date(selectedYear, i, 1), 'MMM'),
+      totalUSD: 0,
+      byProvider: {} as Record<string, number>,
+    }));
+
+    // Process transactions to group by month and provider
+    for (const transaction of dashboardData.transactions || []) {
+      if (!transaction.insuranceProvider) continue;
+      
+      const date = new Date(transaction.date);
+      if (date.getFullYear() !== selectedYear) continue;
+      
+      const monthIndex = date.getMonth();
+      const amountUSD = parseFloat(transaction.amount) || 0;
+      
+      buckets[monthIndex].totalUSD += amountUSD;
+      buckets[monthIndex].byProvider[transaction.insuranceProvider] =
+        (buckets[monthIndex].byProvider[transaction.insuranceProvider] ?? 0) + amountUSD;
+    }
+    
+    return buckets;
+  }, [isYearView, dashboardData?.transactions, selectedYear]);
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -369,6 +398,37 @@ export default function InsuranceProvidersPage() {
             <p className="text-slate-600">No insurance transactions found for the selected period.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Monthly breakdown for year view */}
+      {isYearView && monthlyInsurance && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">Monthly Breakdown - {selectedYear}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {monthlyInsurance.map((m) => (
+              <Card key={m.month} className="border-0 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">{m.label} {selectedYear}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-xl font-semibold">USD {m.totalUSD.toLocaleString()}</div>
+                  <div className="text-xs text-slate-600">By provider</div>
+                  <ul className="text-sm space-y-1">
+                    {Object.entries(m.byProvider).map(([name, val]) => (
+                      <li key={name} className="flex justify-between">
+                        <span className="truncate">{name}</span>
+                        <span className="font-mono">USD {val.toLocaleString()}</span>
+                      </li>
+                    ))}
+                    {Object.keys(m.byProvider).length === 0 && (
+                      <li className="text-slate-500 text-xs">No insurance in this month</li>
+                    )}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -21,8 +21,8 @@ interface ExecutiveStyleKPIsProps {
       incomeChangeUSD?: number;
     };
   };
-  timeRange?: string;
-  selectedYear?: number;
+  timeRange: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom';
+  selectedYear: number;
   selectedMonth?: number;
 }
 
@@ -31,6 +31,14 @@ export default function ExecutiveStyleKPIs({ data, timeRange, selectedYear, sele
   const totalExpenses = parseFloat(data?.totalExpenses || '0');
   const sspNetIncome = parseFloat(data?.netIncome || '0');
   const usdIncome = parseFloat(data?.totalIncomeUSD || '0');
+
+  // Build URL parameters for insurance providers link
+  const qs = new URLSearchParams();
+  qs.set('range', timeRange);
+  qs.set('year', String(selectedYear));
+  if (timeRange === 'current-month') {
+    qs.set('month', String(selectedMonth ?? (new Date().getMonth() + 1)));
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -131,7 +139,7 @@ export default function ExecutiveStyleKPIs({ data, timeRange, selectedYear, sele
       </Card>
 
       {/* Insurance Revenue */}
-      <Link href={`/insurance-providers?range=${timeRange || 'current-month'}&year=${selectedYear || new Date().getFullYear()}&month=${selectedMonth || new Date().getMonth() + 1}`}>
+      <Link href={`/insurance-providers?${qs.toString()}`}>
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
