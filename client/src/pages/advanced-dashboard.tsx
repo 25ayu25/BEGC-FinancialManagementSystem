@@ -819,7 +819,7 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Insurance Revenue */}
-        <Link href="/insurance-providers">
+        <Link href={`/insurance-providers?range=${timeRange}${timeRange === 'custom' && customStartDate && customEndDate ? `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}` : ''}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">

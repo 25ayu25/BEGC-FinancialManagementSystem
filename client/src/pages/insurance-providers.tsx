@@ -13,11 +13,37 @@ import { Link } from "wouter";
 
 export default function InsuranceProvidersPage() {
   const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  
+  // Check URL parameters for time range context from dashboard
+  const urlParams = new URLSearchParams(window.location.search);
+  const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
+  const startDateParam = urlParams.get('startDate');
+  const endDateParam = urlParams.get('endDate');
+  
+  // Initialize year/month based on the passed time range
+  const getInitialYearMonth = () => {
+    const now = new Date();
+    switch(rangeParam) {
+      case 'last-month':
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+        return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
+      case 'year':
+        return { year: now.getFullYear(), month: 1 }; // January for year view
+      default:
+        return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    }
+  };
+  
+  const initialYearMonth = getInitialYearMonth();
+  const [selectedYear, setSelectedYear] = useState(initialYearMonth.year);
+  const [selectedMonth, setSelectedMonth] = useState(initialYearMonth.month);
+  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>(rangeParam || 'current-month');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(
+    startDateParam ? new Date(startDateParam) : undefined
+  );
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(
+    endDateParam ? new Date(endDateParam) : undefined
+  );
 
   const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
     setTimeRange(range);
