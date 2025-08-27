@@ -24,7 +24,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   
   // Authentication middleware with Safari fallback support
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
-    console.log(`[AUTH] Authentication check for: ${req.method} ${req.url}`);
     try {
       let userSession = null;
       
@@ -206,7 +205,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         }
       }
       
-      console.log(`[AUTH] Authentication failed for: ${req.method} ${req.url}`);
       res.status(401).json({ error: "Authentication required" });
     } catch (error) {
       console.error("Auth check error:", error);
@@ -627,7 +625,6 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Dashboard data
   app.get("/api/dashboard/:year/:month", requireAuth, async (req, res) => {
-    console.log(`[BACKEND] Dashboard endpoint reached successfully! User: ${req.user?.id}`);
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
@@ -635,10 +632,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
       
-      console.log(`[BACKEND] Dashboard API called - Year: ${year}, Month: ${month}, Range: ${range}`);
       const data = await storage.getDashboardData(year, month, range, startDate, endDate);
-      console.log(`[BACKEND] Dashboard response - Insurance breakdown:`, data?.insuranceBreakdown);
-      console.log(`[BACKEND] Dashboard response - Total insurance entries:`, Object.keys(data?.insuranceBreakdown || {}).length);
       res.json(data);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
