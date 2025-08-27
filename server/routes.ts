@@ -632,7 +632,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
       
+      console.log(`[BACKEND] Dashboard API called - Year: ${year}, Month: ${month}, Range: ${range}`);
       const data = await storage.getDashboardData(year, month, range, startDate, endDate);
+      console.log(`[BACKEND] Dashboard response - Insurance breakdown:`, data?.insuranceBreakdown);
+      console.log(`[BACKEND] Dashboard response - Total insurance entries:`, Object.keys(data?.insuranceBreakdown || {}).length);
       res.json(data);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
