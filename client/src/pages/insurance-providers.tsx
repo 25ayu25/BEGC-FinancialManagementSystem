@@ -82,9 +82,16 @@ export default function InsuranceProvidersPage() {
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }
+      console.log(`[FRONTEND] Making API call to: ${url}`);
       const res = await fetch(url, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch dashboard data');
-      return res.json();
+      if (!res.ok) {
+        console.error(`[FRONTEND] API call failed: ${res.status} ${res.statusText}`);
+        throw new Error('Failed to fetch dashboard data');
+      }
+      const data = await res.json();
+      console.log(`[FRONTEND] API response data:`, data);
+      console.log(`[FRONTEND] Insurance breakdown:`, data?.insuranceBreakdown);
+      return data;
     }
   });
 
