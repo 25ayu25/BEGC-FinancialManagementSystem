@@ -24,6 +24,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   
   // Authentication middleware with Safari fallback support
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+    console.log(`[AUTH] Authentication check for: ${req.method} ${req.url}`);
     try {
       let userSession = null;
       
@@ -205,6 +206,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         }
       }
       
+      console.log(`[AUTH] Authentication failed for: ${req.method} ${req.url}`);
       res.status(401).json({ error: "Authentication required" });
     } catch (error) {
       console.error("Auth check error:", error);
@@ -625,6 +627,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Dashboard data
   app.get("/api/dashboard/:year/:month", requireAuth, async (req, res) => {
+    console.log(`[BACKEND] Dashboard endpoint reached successfully! User: ${req.user?.id}`);
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
