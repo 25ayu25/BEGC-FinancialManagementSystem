@@ -489,6 +489,8 @@ export class DatabaseStorage implements IStorage {
     });
 
     // Get insurance breakdown (USD only for insurance payments)
+    console.log(`[DEBUG] Insurance query - Range: ${range}, Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
+    
     const insuranceData = await db.select({
       providerName: insuranceProviders.name,
       total: sql<string>`SUM(CASE WHEN ${transactions.currency} = 'USD' THEN ${transactions.amount} ELSE 0 END)`
@@ -504,12 +506,16 @@ export class DatabaseStorage implements IStorage {
     )
     .groupBy(insuranceProviders.name);
 
+    console.log(`[DEBUG] Insurance data found:`, insuranceData);
+
     const insuranceBreakdown: Record<string, string> = {};
     insuranceData.forEach(item => {
       if (item.providerName) {
         insuranceBreakdown[item.providerName] = item.total;
       }
     });
+    
+    console.log(`[DEBUG] Insurance breakdown:`, insuranceBreakdown);
 
     // Get recent transactions
     const recentTransactions = await this.getTransactions({
