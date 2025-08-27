@@ -349,12 +349,21 @@ export default function AddTransactionModal({
                   <SelectValue placeholder="Select Insurance Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="no-insurance">
-                    <span className="text-gray-500 italic">No Insurance</span>
-                  </SelectItem>
-                  {(insuranceProviders as any)?.map((provider: any) => (
+                  {(insuranceProviders as any)?.
+                    sort((a: any, b: any) => {
+                      // Put CIC, UAP, CIGNA first
+                      const priority = ['CIC', 'UAP', 'CIGNA'];
+                      const aIndex = priority.indexOf(a.code);
+                      const bIndex = priority.indexOf(b.code);
+                      
+                      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                      if (aIndex !== -1) return -1;
+                      if (bIndex !== -1) return 1;
+                      return a.name.localeCompare(b.name);
+                    }).
+                    map((provider: any) => (
                     <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name} ({provider.code})
+                      {provider.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

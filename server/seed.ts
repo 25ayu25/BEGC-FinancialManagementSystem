@@ -25,13 +25,13 @@ async function seedDatabase() {
 
     // Create insurance providers
     const insuranceProviders = [
-      { code: "CIC", name: "CIC Insurance" },
-      { code: "UAP", name: "UAP Insurance" },
-      { code: "CIGNA", name: "CIGNA Insurance" },
-      { code: "NILE", name: "Nile International Insurance" },
-      { code: "NEW_SUDAN", name: "New Sudan Insurance" },
-      { code: "AMANAH", name: "Amanah Insurance" },
-      { code: "ALIMA", name: "ALIMA Insurance" },
+      { code: "CIC", name: "CIC" },
+      { code: "UAP", name: "UAP" },
+      { code: "CIGNA", name: "CIGNA" },
+      { code: "NEW_SUDAN", name: "New Sudan" },
+      { code: "AMANAH", name: "Amanah" },
+      { code: "ALIMA", name: "ALIMA" },
+      { code: "NILE", name: "Nile International" },
       { code: "OTHER", name: "Other" },
     ];
 
