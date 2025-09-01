@@ -380,9 +380,9 @@ export class DatabaseStorage implements IStorage {
     
     switch(range) {
       case 'current-month':
-        // Use current date for current month
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        // Use the requested year/month for current month view
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0, 23, 59, 59);
         break;
       case 'last-month':
         // Use current date for last month
