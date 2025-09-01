@@ -1,10 +1,10 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import axios from 'axios';
 
-// Hard fallback prevents accidental Netlify calls
+// Development vs Production API URL
 const baseURL =
   import.meta.env.VITE_API_URL ??
-  "https://bgc-financialmanagementsystem.onrender.com";
+  (import.meta.env.DEV ? "http://localhost:5000" : "https://bgc-financialmanagementsystem.onrender.com");
 
 console.info("[CFG] API base URL =", baseURL); // <-- leaves a breadcrumb in DevTools
 
