@@ -369,6 +369,18 @@ export class DatabaseStorage implements IStorage {
     expenseBreakdown: Record<string, string>;
     recentTransactions: Transaction[];
     totalPatients: number;
+    previousPeriod: {
+      totalIncomeSSP: number;
+      totalExpensesSSP: number;
+      netIncomeSSP: number;
+      totalIncomeUSD: number;
+    };
+    changes: {
+      incomeChangeSSP: number;
+      expenseChangeSSP: number;
+      netIncomeChangeSSP: number;
+      incomeChangeUSD: number;
+    };
   }> {
     let startDate: Date;
     let endDate: Date;
