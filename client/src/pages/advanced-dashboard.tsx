@@ -339,7 +339,7 @@ export default function AdvancedDashboard() {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['/api/dashboard', selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
-      let url = `/api/dashboard/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
       }

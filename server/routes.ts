@@ -633,19 +633,20 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // Dashboard data
-  app.get("/api/dashboard/:year/:month", requireAuth, async (req, res) => {
+  // GET /api/dashboard?year=2025&month=8&range=current-month
+  app.get("/api/dashboard", requireAuth, async (req, res) => {
     try {
-      const year = parseInt(req.params.year);
-      const month = parseInt(req.params.month);
-      const range = req.query.range as string;
-      const startDate = req.query.startDate as string;
-      const endDate = req.query.endDate as string;
-      
-      const data = await storage.getDashboardData(year, month, range, startDate, endDate);
+      const year  = Number(req.query.year)  || new Date().getUTCFullYear();
+      const month = Number(req.query.month) || (new Date().getUTCMonth() + 1);
+      const range = (req.query.range as string) || "current-month";
+
+      const data = await storage.getDashboardData({ year, month, range });
+      // absolutely no caching for dashboard responses
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
       res.json(data);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      res.status(500).json({ error: "Failed to fetch dashboard data" });
+    } catch (err) {
+      console.error("[dashboard-error]", err);
+      res.status(500).json({ error: "Failed to load dashboard" });
     }
   });
 

@@ -1,0 +1,190 @@
+You’re right to be frustrated. What you’re seeing (expenses = 0, departments empty, wrong month) comes from three concrete bugs that can coexist:
+
+the backend builds the date range from “now” instead of the requested year/month
+
+the date window uses <= endOfMonth with local time (TZ drift → August items fall outside)
+
+the dashboard query/aggregation runs, but the frontend caches an old result (React-Query/Netlify/Browser)
+
+Below is a drop-in fix that closes all three at once. It’s safe to ship and won’t change your data model.
+
+1) Backend: make date windows correct & robust
+a) In server/routes.ts – ensure the API reads year, month, range
+// GET /api/dashboard?year=2025&month=8&range=current-month
+app.get("/api/dashboard", requireAuth, async (req, res) => {
+  try {
+    const year  = Number(req.query.year)  || new Date().getUTCFullYear();
+    const month = Number(req.query.month) || (new Date().getUTCMonth() + 1);
+    const range = (req.query.range as string) || "current-month";
+
+    const data = await storage.getDashboardData({ year, month, range });
+    // absolutely no caching for dashboard responses
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.json(data);
+  } catch (err) {
+    console.error("[dashboard-error]", err);
+    res.status(500).json({ error: "Failed to load dashboard" });
+  }
+});
+
+b) In server/storage.ts – compute UTC boundaries and aggregate correctly
+type TimeRange = "current-month" | "last-month" | "last-3-months" | "year";
+
+export async function getDashboardData(
+  { year, month, range }: { year: number; month: number; range: TimeRange }
+) {
+  // Always compute in UTC and use [start, end) to avoid TZ fence-post bugs
+  const startOfMonthUTC = (y: number, m1_12: number) => new Date(Date.UTC(y, m1_12 - 1, 1, 0, 0, 0));
+  const nextMonthUTC    = (y: number, m1_12: number) =>
+    m1_12 === 12 ? new Date(Date.UTC(y + 1, 0, 1)) : new Date(Date.UTC(y, m1_12, 1));
+
+  let start: Date;
+  let end: Date;
+
+  switch (range) {
+    case "current-month":
+      start = startOfMonthUTC(year, month);
+      end   = nextMonthUTC(year, month);
+      break;
+    case "last-month": {
+      const d = new Date(Date.UTC(year, month - 2, 1));
+      const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
+      start = startOfMonthUTC(y, m);
+      end   = nextMonthUTC(y, m);
+      break;
+    }
+    case "last-3-months": {
+      const from = new Date(Date.UTC(year, month - 4, 1));
+      start = startOfMonthUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
+      end   = nextMonthUTC(year, month);
+      break;
+    }
+    case "year":
+    default:
+      start = new Date(Date.UTC(year, 0, 1));
+      end   = new Date(Date.UTC(year + 1, 0, 1));
+  }
+
+  // pull transactions only once within the window [start, end)
+  const tx = await db.query.transactions.findMany({
+    where: (t, { and, gte, lt }) => and(gte(t.date, start), lt(t.date, end)),
+  });
+
+  // sums
+  const sum = (arr: typeof tx, filter: (t: any) => boolean) =>
+    arr.filter(filter).reduce((a, t) => a + Number(t.amount || 0), 0);
+
+  const totalIncomeSSP  = sum(tx, t => t.type === "income"  && t.currency === "SSP");
+  const totalIncomeUSD  = sum(tx, t => t.type === "income"  && t.currency === "USD");
+  const totalExpenseSSP = sum(tx, t => t.type === "expense" && t.currency === "SSP");
+  const totalExpenseUSD = sum(tx, t => t.type === "expense" && t.currency === "USD");
+
+  // department income (SSP only, change if you want USD too)
+  const departmentMap = new Map<string, number>();
+  for (const t of tx) {
+    if (t.type !== "income") continue;
+    if (!t.departmentId) continue;
+    const key = String(t.departmentId);
+    departmentMap.set(key, (departmentMap.get(key) || 0) + Number(t.amount || 0));
+  }
+  const departments = [...departmentMap.entries()].map(([departmentId, amountSSP]) => ({
+    departmentId, amountSSP
+  }));
+
+  return {
+    totals: {
+      income:   { SSP: totalIncomeSSP,  USD: totalIncomeUSD },
+      expenses: { SSP: totalExpenseSSP, USD: totalExpenseUSD },
+      net:      { SSP: totalIncomeSSP - totalExpenseSSP, USD: totalIncomeUSD - totalExpenseUSD },
+    },
+    departments,
+    // raw numbers help validate on the client if needed
+    meta: { startISO: start.toISOString(), endISO: end.toISOString(), range, year, month },
+  };
+}
+
+
+Why this fixes your symptoms
+• It uses the requested year/month, not new Date()
+• It uses UTC and [start, end) bounds (no off-by-one at month end)
+• It aggregates from the filtered set only, so expenses and department totals show up correctly
+
+2) Backend: make dashboard & transactions uncacheable
+
+Add once in server/app.ts (before routes):
+
+// Never cache API responses that change frequently
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+
+3) Frontend: always request with params & disable stale caching
+a) Wherever you fetch dashboard data (e.g. client/src/pages/overview.tsx or similar)
+const { timeRange, selectedYear, selectedMonth } = useTimeFilter(); // your existing state
+
+const { data, isFetching, refetch } = useQuery({
+  queryKey: ["dashboard", timeRange, selectedYear, selectedMonth],
+  queryFn: () =>
+    api.get("/api/dashboard", {
+      params: {
+        range: timeRange,
+        year: selectedYear,
+        month: selectedMonth, // 1–12
+      },
+      // belt & suspenders:
+      headers: { "Cache-Control": "no-store" },
+    }).then(r => r.data),
+  staleTime: 0,
+  gcTime: 0,         // React Query v5
+  refetchOnWindowFocus: true,
+});
+
+b) Ensure the Insurance/detail pages carry the same time context
+
+When you link from the executive card:
+
+<Link href={`/insurance-providers?range=${timeRange}&year=${selectedYear}&month=${selectedMonth}`}>
+  {/* card */}
+</Link>
+
+
+…and in insurance-providers.tsx read those params as initial state:
+
+const params = new URLSearchParams(location.search);
+const initRange  = (params.get("range") as any) || "current-month";
+const initYear   = Number(params.get("year"))  || new Date().getUTCFullYear();
+const initMonth  = Number(params.get("month")) || (new Date().getUTCMonth() + 1);
+
+const [timeRange, setTimeRange] = useState(initRange);
+const [selectedYear, setSelectedYear]   = useState(initYear);
+const [selectedMonth, setSelectedMonth] = useState(initMonth);
+
+
+…and use the same api.get("/api/dashboard", { params: … }) or your own providers endpoint with those params.
+
+4) Quick production checks (no guessing)
+
+After you deploy the backend (Render) and frontend (Netlify), run exactly these from your laptop’s terminal:
+
+# 1) Backend health
+curl -s https://bgc-financialmanagementsystem.onrender.com/api/health
+
+# 2) Dashboard for August 2025 (should show non-zero expenses)
+curl -s "https://bgc-financialmanagementsystem.onrender.com/api/dashboard?year=2025&month=8&range=current-month" | jq '.totals'
+
+# 3) From the browser DevTools (Console), confirm the client is asking with params:
+# You should see Network -> /api/dashboard?range=current-month&year=2025&month=8 (200)
+
+
+If (2) shows correct totals but the page still shows zeros, it’s only a frontend cache. Hard refresh or open a private window; with the React-Query settings above this should stop recurring.
+
+What to deploy where
+
+Render (backend): server/app.ts, server/routes.ts, server/storage.ts → Manual Deploy
+
+Netlify (frontend): any files that read/pass range/year/month + React-Query settings → Clear cache & deploy

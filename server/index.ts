@@ -25,6 +25,16 @@ app.use(cookieParser());
 // Trust proxy for correct cookie handling in development
 app.set('trust proxy', 1);
 
+// Never cache API responses that change frequently
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
