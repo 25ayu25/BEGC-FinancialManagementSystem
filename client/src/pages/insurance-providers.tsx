@@ -19,10 +19,22 @@ export default function InsuranceProvidersPage() {
   const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
   const startDateParam = urlParams.get('startDate');
   const endDateParam = urlParams.get('endDate');
+  const yearParam = urlParams.get('year');
+  const monthParam = urlParams.get('month');
   
-  // Initialize year/month based on the passed time range
+  // Initialize year/month based on URL parameters from dashboard or current date
   const getInitialYearMonth = () => {
     const now = new Date();
+    
+    // Use URL parameters if available (passed from dashboard)
+    if (yearParam && monthParam) {
+      return { 
+        year: parseInt(yearParam), 
+        month: parseInt(monthParam) 
+      };
+    }
+    
+    // Fallback to calculated values based on range
     switch(rangeParam) {
       case 'last-month':
         const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
@@ -318,7 +330,10 @@ export default function InsuranceProvidersPage() {
                 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Revenue</span>
+                    <span className="text-sm text-slate-600">
+                      {timeRange === 'last-3-months' ? 'Total (3 months)' : 
+                       timeRange === 'year' ? 'Total (Year)' : 'Revenue'}
+                    </span>
                     <span className="font-mono font-semibold text-slate-900">
                       USD {Math.round(currentAmount).toLocaleString()}
                     </span>
@@ -329,8 +344,8 @@ export default function InsuranceProvidersPage() {
                       vs {
                         timeRange === 'current-month' ? 'Last Month' :
                         timeRange === 'last-month' ? 'Current Month' :
-                        timeRange === 'last-3-months' ? 'Previous Period' :
-                        timeRange === 'year' ? 'Previous Period' :
+                        timeRange === 'last-3-months' ? 'Previous 3 Months' :
+                        timeRange === 'year' ? 'Previous Year' :
                         'Previous Period'
                       }
                     </span>
@@ -343,7 +358,19 @@ export default function InsuranceProvidersPage() {
                     </span>
                   </div>
                   
-                  {prevAmount > 0 && (
+                  {/* Show monthly average for multi-month periods */}
+                  {(timeRange === 'last-3-months' || timeRange === 'year') && currentAmount > 0 && (
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                      <span className="text-xs text-slate-500">
+                        Monthly Average
+                      </span>
+                      <span className="text-xs font-mono text-slate-500">
+                        USD {Math.round(currentAmount / (timeRange === 'year' ? 12 : 3)).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {prevAmount > 0 && timeRange !== 'last-3-months' && timeRange !== 'year' && (
                     <div className="flex justify-between items-center pt-1 border-t border-slate-100">
                       <span className="text-xs text-slate-500">
                         {

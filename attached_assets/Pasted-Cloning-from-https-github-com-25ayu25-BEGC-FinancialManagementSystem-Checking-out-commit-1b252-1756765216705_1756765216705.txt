@@ -1,0 +1,77 @@
+Cloning from https://github.com/25ayu25/BEGC-FinancialManagementSystem
+==> Checking out commit 1b2525e4483d38c6f521571bb6205c0100cf988e in branch main
+==> Using Node.js version 22.16.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'npm ci && npx esbuild server/app.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js'...
+added 637 packages, and audited 638 packages in 19s
+79 packages are looking for funding
+  run `npm fund` for details
+17 vulnerabilities (3 low, 14 high)
+To address issues that do not require attention, run:
+  npm audit fix
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+Run `npm audit` for details.
+  dist/index.js  76.2kb
+⚡ Done in 8ms
+==> Uploading build...
+==> Uploaded in 10.8s. Compression took 5.0s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+Seeding initial data...
+10:12:22 PM [api] 🚀 Bahr El Ghazal Clinic API running on port 10000
+Seeding initial data...
+Database seeded successfully!
+Database seeded successfully!
+10:12:25 PM [api] Database seeded successfully
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://bgc-financialmanagementsystem.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+10:13:47 PM [api] GET /api/income-trends/2025/9 401 in 2ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+10:13:47 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
+Auth check - Cookie exists: false
+10:13:47 PM [api] GET /api/auth/user 401 in 2ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+10:13:47 PM [api] GET /api/dashboard 401 in 0ms :: {"error":"Authentication required"}
+10:14:00 PM [api] POST /api/auth/login 200 in 1560ms :: {"id":"351180db-e916-400e-8097-ee7cd47b6dea","username":"Ayu","role":"admin","location":"clinic","fullName":"Ayele"}
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+Auth check - Cookie exists: true
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+10:14:01 PM [api] GET /api/departments 200 in 16ms :: [{"id":"d6f194de-ff5a-4890-a90a-9dee6dc7007f","code":"CON","name":"Consultation","isActive":true},{"id":"ff507b1d-c5e5-…
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+10:14:01 PM [api] GET /api/dashboard 200 in 109ms :: {"totalIncome":"30000","totalIncomeSSP":"30000","totalIncomeUSD":"7000","totalExpenses":"4000","totalExpensesSSP":"4000…
+10:14:03 PM [api] GET /api/auth/user 200 in 1999ms :: {"id":"351180db-e916-400e-8097-ee7cd47b6dea","username":"Ayu","email":"ayuudlls@gmail.com","role":"admin","location":"c…
+10:14:03 PM [api] GET /api/income-trends/2025/9 200 in 2094ms :: [{"date":"Sep 1","income":0,"incomeUSD":7000,"incomeSSP":30000},{"date":"Sep 2","income":0,"incomeUSD":0,"incomeSSP":0}…
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+10:14:09 PM [api] GET /api/income-trends/2025/9 200 in 195ms :: [{"date":"Jan 1","income":0,"incomeUSD":0,"incomeSSP":0},{"date":"Jan 2","income":0,"incomeUSD":0,"incomeSSP":0},{"date…
+10:14:10 PM [api] GET /api/dashboard 200 in 283ms :: {"totalIncome":"115000","totalIncomeSSP":"115000","totalIncomeUSD":"11000","totalExpenses":"9000","totalExpensesSSP":"9…
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+10:14:49 PM [api] GET /api/dashboard 200 in 1879ms :: {"totalIncome":"115000","totalIncomeSSP":"115000","totalIncomeUSD":"11000","totalExpenses":"9000","totalExpensesSSP":"9…
+10:14:49 PM [api] GET /api/income-trends/2025/9 200 in 1984ms :: [{"date":"Jun 1","income":0,"incomeUSD":0,"incomeSSP":0},{"date":"Jun 2","income":0,"incomeUSD":0,"incomeSSP":0},{"date…
+Debug - Cookies received: [ 'user_session' ]
+Debug - Session cookie exists: true
+10:15:20 PM [api] GET /api/detailed-transactions/2025/9 200 in 1339ms :: [{"id":"d53c2a66-4398-448f-86e1-ec659a886a47","date":"Sep 1","fullDate":"Sep 1, 2025","amount":10000,"currency":"SSP","…
