@@ -22,6 +22,15 @@ declare global {
 
 export async function registerRoutes(app: Express): Promise<void> {
   
+  // Health check endpoint for Render deployment
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ 
+      status: "ok", 
+      service: "Bahr El Ghazal Clinic API", 
+      timestamp: new Date().toISOString() 
+    });
+  });
+  
   // Authentication middleware with Safari fallback support
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -236,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       // Update password in database
-      const updatedUser = await storage.updateUser(req.user.id, { 
+      const updatedUser = await storage.updateUser(req.user!.id, { 
         password: newPassword 
       });
 
@@ -265,7 +274,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const fullName = `${firstName} ${lastName}`;
       
       // Update user preferences
-      const updatedUser = await storage.updateUser(req.user.id, {
+      const updatedUser = await storage.updateUser(req.user!.id, {
         fullName,
         email,
         emailNotifications: emailNotifications ?? true,
@@ -301,7 +310,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
       // Only admins can view all users
-      if (req.user.role !== 'admin') {
+      if (req.user!.role !== 'admin') {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -380,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/users", requireAuth, async (req, res) => {
     try {
       // Only admins can create users
-      if (req.user.role !== 'admin') {
+      if (req.user!.role !== 'admin') {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -426,7 +435,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.patch("/api/users/:id", requireAuth, async (req, res) => {
     try {
       // Only admins can update users  
-      if (req.user.role !== 'admin') {
+      if (req.user!.role !== 'admin') {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -458,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
       // Only admins can delete users
-      if (req.user.role !== 'admin') {
+      if (req.user!.role !== 'admin') {
         return res.status(403).json({ error: "Access denied" });
       }
 
