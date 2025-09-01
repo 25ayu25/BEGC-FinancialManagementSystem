@@ -749,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const userId = (req as any).user.id;
       
       // Get dashboard data for the month
-      const dashboardData = await storage.getDashboardData(year, month);
+      const dashboardData = await storage.getDashboardData({ year, month, range: 'current-month' });
       
       // Create the monthly report
       const reportData = {
@@ -794,7 +794,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const month = parseInt(pathParts[1]);
       
       // Get fresh dashboard data for accurate reporting
-      const dashboardData = await storage.getDashboardData(year, month);
+      const dashboardData = await storage.getDashboardData({ year, month, range: 'current-month' });
       
       // Get the report data
       const report = await storage.getMonthlyReport(year, month);
