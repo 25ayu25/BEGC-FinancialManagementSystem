@@ -111,6 +111,7 @@ export default function Dashboard() {
         const response = await api.get(url);
         return response.data;
       } catch (error) {
+        console.error('Patient volume fetch error:', error);
         return [];
       }
     }
