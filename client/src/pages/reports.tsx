@@ -64,11 +64,14 @@ export default function Reports() {
         title: "Report Generated",
         description: `Monthly report for ${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} has been generated successfully.`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating report:', error);
+      const errorMessage = error?.response?.status === 401 
+        ? "Please log in again to generate reports."
+        : "Failed to generate report. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to generate report. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }

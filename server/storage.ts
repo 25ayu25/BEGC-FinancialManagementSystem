@@ -439,7 +439,7 @@ export class DatabaseStorage implements IStorage {
       const key = String(t.departmentId);
       departmentMap.set(key, (departmentMap.get(key) || 0) + Number(t.amount || 0));
     }
-    const departments = [...departmentMap.entries()].map(([departmentId, amountSSP]) => ({
+    const departments = Array.from(departmentMap.entries()).map(([departmentId, amountSSP]) => ({
       departmentId, amountSSP
     }));
 
@@ -469,6 +469,16 @@ export class DatabaseStorage implements IStorage {
     // Insurance breakdown (simplified - just return empty for now)
     const insuranceBreakdown: Record<string, string> = {};
     
+    // Calculate total patients for the same period
+    const patientVolumeData = await db.select().from(patientVolume).where(
+      and(
+        gte(patientVolume.date, startDate),
+        lt(patientVolume.date, endDate)
+      )
+    );
+    
+    const totalPatients = patientVolumeData.reduce((sum, pv) => sum + (pv.patientCount || 0), 0);
+    
     // Recent transactions (get last 10 from the filtered set)
     const recentTransactions = txData.slice(0, 10);
 
@@ -486,7 +496,7 @@ export class DatabaseStorage implements IStorage {
       insuranceBreakdown,
       expenseBreakdown,
       recentTransactions,
-      totalPatients: 0, // Simplified for now
+      totalPatients,
       // Previous period data for comparisons
       previousPeriod: {
         totalIncomeSSP: 0,

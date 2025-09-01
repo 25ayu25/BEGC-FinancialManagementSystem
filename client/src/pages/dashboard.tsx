@@ -109,9 +109,9 @@ export default function Dashboard() {
       }
       try {
         const response = await api.get(url);
-        return response.data;
+        return Array.isArray(response.data) ? response.data : [];
       } catch (error) {
-        console.error('Patient volume fetch error:', error);
+        console.warn('Patient volume unavailable for this period');
         return [];
       }
     }
