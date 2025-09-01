@@ -396,7 +396,7 @@ export class DatabaseStorage implements IStorage {
         endDate = nextMonthUTC(year, month);
         break;
       case "last-month": {
-        const d = new Date(Date.UTC(year, month - 2, 1));
+        const d = new Date(Date.UTC(year, month - 1, 1));
         const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
         startDate = startOfMonthUTC(y, m);
         endDate = nextMonthUTC(y, m);
