@@ -72,7 +72,7 @@ export interface IStorage {
   deletePatientVolume(id: string): Promise<void>;
 
   // Analytics
-  getDashboardData(year: number, month: number): Promise<{
+  getDashboardData({ year, month, range }: { year: number; month: number; range: string }): Promise<{
     totalIncome: string;
     totalIncomeSSP: string;
     totalIncomeUSD: string;
@@ -466,8 +466,26 @@ export class DatabaseStorage implements IStorage {
     const netIncomeUSDStr = (totalIncomeUSD - totalExpenseUSD).toString();
 
 
-    // Insurance breakdown (simplified - just return empty for now)
+    // Insurance breakdown - calculate actual insurance revenue by provider
+    // First, get all insurance providers to map IDs to names
+    const allProviders = await db.select().from(insuranceProviders);
+    const providerMap = new Map<string, string>();
+    allProviders.forEach(p => providerMap.set(p.id, p.name));
+    
+    const insuranceMap = new Map<string, number>();
+    for (const t of txData) {
+      if (t.type !== "income") continue;
+      if (!t.insuranceProviderId) continue;
+      const providerName = providerMap.get(t.insuranceProviderId);
+      if (!providerName) continue;
+      const amount = t.currency === "USD" ? Number(t.amount || 0) : 0; // Insurance typically in USD
+      insuranceMap.set(providerName, (insuranceMap.get(providerName) || 0) + amount);
+    }
     const insuranceBreakdown: Record<string, string> = {};
+    // Convert Map entries to object
+    Array.from(insuranceMap.entries()).forEach(([provider, amount]) => {
+      insuranceBreakdown[provider] = amount.toString();
+    });
     
     // Calculate total patients for the same period
     const patientVolumeData = await db.select().from(patientVolume).where(
