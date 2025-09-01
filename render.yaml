@@ -11,4 +11,6 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false  # Set manually in Render dashboard (add ?sslmode=require)
+      - key: ALLOWED_ORIGINS
+        value: https://finance.bahrelghazalclinic.com
     healthCheckPath: /api/health
