@@ -1,0 +1,134 @@
+Cloning from https://github.com/25ayu25/BEGC-FinancialManagementSystem
+==> Checking out commit 93a5ed047c70333f5517e63e917fc2f4b71a6907 in branch main
+==> Using Node.js version 22.16.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'npm ci && npx esbuild server/app.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js'...
+added 637 packages, and audited 638 packages in 14s
+79 packages are looking for funding
+  run `npm fund` for details
+17 vulnerabilities (3 low, 14 high)
+To address issues that do not require attention, run:
+  npm audit fix
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+Run `npm audit` for details.
+  dist/index.js  76.2kb
+⚡ Done in 9ms
+==> Uploading build...
+==> Uploaded in 11.3s. Compression took 3.9s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+Seeding initial data...
+11:18:53 PM [api] 🚀 Bahr El Ghazal Clinic API running on port 10000
+Seeding initial data...
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+Database seeded successfully!
+Database seeded successfully!
+11:18:57 PM [api] Database seeded successfully
+==> Available at your primary URL https://bgc-financialmanagementsystem.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+Auth check - Cookie exists: false
+11:19:46 PM [api] GET /api/auth/user 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:19:46 PM [api] GET /api/departments 401 in 2ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:19:46 PM [api] GET /api/dashboard 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:19:46 PM [api] GET /api/income-trends/2025/9 401 in 1ms :: {"error":"Authentication required"}
+Auth check - Cookie exists: false
+11:20:13 PM [api] GET /api/auth/user 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:20:13 PM [api] GET /api/departments 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:20:13 PM [api] GET /api/income-trends/2025/9 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:20:13 PM [api] GET /api/dashboard 401 in 1ms :: {"error":"Authentication required"}
+11:20:33 PM [api] POST /api/auth/login 200 in 1565ms :: {"id":"351180db-e916-400e-8097-ee7cd47b6dea","username":"Ayu","role":"admin","location":"clinic","fullName":"Ayele"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+Auth check - Cookie exists: false
+11:20:34 PM [api] GET /api/departments 200 in 35ms :: [{"id":"d6f194de-ff5a-4890-a90a-9dee6dc7007f","code":"CON","name":"Consultation","isActive":true},{"id":"ff507b1d-c5e5-…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+11:20:35 PM [api] GET /api/income-trends/2025/9 200 in 100ms :: [{"date":"Sep 1","income":0,"incomeUSD":0,"incomeSSP":1769000},{"date":"Sep 2","income":0,"incomeUSD":0,"incomeSSP":0},…
+11:20:36 PM [api] GET /api/dashboard 200 in 2048ms :: {"totalIncome":"1769000","totalIncomeSSP":"1769000","totalIncomeUSD":"0","totalExpenses":"0","totalExpensesSSP":"0","to…
+11:20:36 PM [api] GET /api/auth/user 200 in 2044ms :: {"id":"351180db-e916-400e-8097-ee7cd47b6dea","username":"Ayu","email":"ayuudlls@gmail.com","role":"admin","location":"c…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+11:20:48 PM [api] GET /api/income-trends/2025/8 200 in 17ms :: [{"date":"Aug 1","income":0,"incomeUSD":0,"incomeSSP":0},{"date":"Aug 2","income":0,"incomeUSD":0,"incomeSSP":0},{"date…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+11:20:48 PM [api] GET /api/dashboard 200 in 24ms :: {"totalIncome":"2060500","totalIncomeSSP":"2060500","totalIncomeUSD":"0","totalExpenses":"0","totalExpensesSSP":"0","to…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+11:20:51 PM [api] GET /api/income-trends/2025/9 200 in 26ms :: [{"date":"Jun 3","income":0,"incomeUSD":0,"incomeSSP":0},{"date":"Jun 4","income":0,"incomeUSD":0,"incomeSSP":0},{"date…
+11:20:51 PM [api] GET /api/dashboard 200 in 38ms :: {"totalIncome":"3829500","totalIncomeSSP":"3829500","totalIncomeUSD":"0","totalExpenses":"0","totalExpensesSSP":"0","to…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+11:20:55 PM [api] GET /api/dashboard 200 in 24ms :: {"totalIncome":"3829500","totalIncomeSSP":"3829500","totalIncomeUSD":"0","totalExpenses":"0","totalExpensesSSP":"0","to…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+11:20:55 PM [api] GET /api/income-trends/2025/9 200 in 206ms :: [{"date":"Jan 1","income":0,"incomeUSD":0,"incomeSSP":0},{"date":"Jan 2","income":0,"incomeUSD":0,"incomeSSP":0},{"date…
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+Searching patient volume for 2025/7 between 2025-07-01T00:00:00.000Z and 2025-07-31T23:59:59.999Z
+Found 0 patient volume records for month 7/2025
+11:21:36 PM [api] GET /api/patient-volume/period/2025/7 200 in 1383ms :: []
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+Searching patient volume for 2025/8 between 2025-08-01T00:00:00.000Z and 2025-08-31T23:59:59.999Z
+Found 0 patient volume records for month 8/2025
+11:21:37 PM [api] GET /api/patient-volume/period/2025/8 200 in 14ms :: []
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+Using header-based auth for Safari compatibility
+Searching patient volume for 2025/9 between 2025-09-01T00:00:00.000Z and 2025-09-30T23:59:59.999Z
+Found 2 patient volume records for month 9/2025
+11:21:37 PM [api] GET /api/patient-volume/period/2025/9 200 in 14ms :: [{"id":"4ceaf4e5-e149-477a-8918-e0aa6de9ddfa","date":"2025-09-01T05:00:00.000Z","departmentId":null,"patientCount":62,"…
+==> Detected service running on port 10000
+==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+Auth check - Cookie exists: false
+11:25:13 PM [api] GET /api/auth/user 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:25:13 PM [api] GET /api/dashboard 401 in 1ms :: {"error":"Authentication required"}
+Debug - Cookies received: []
+Debug - Session cookie exists: false
+No session found, authentication required
+11:25:13 PM [api] GET /api/income-trends/2025/9 401 in 1ms :: {"error":"Authentication required"}
+Need better ways to work with logs? Try theRender CLI, Render 
