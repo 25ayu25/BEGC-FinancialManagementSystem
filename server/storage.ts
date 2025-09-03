@@ -431,11 +431,13 @@ export class DatabaseStorage implements IStorage {
     const totalExpenseSSP = sum(txData, t => t.type === "expense" && t.currency === "SSP");
     const totalExpenseUSD = sum(txData, t => t.type === "expense" && t.currency === "USD");
 
-    // Department income (SSP only, change if you want USD too)
+    // Department income (SSP only to match main total calculation)
     const departmentMap = new Map<string, number>();
     for (const t of txData) {
       if (t.type !== "income") continue;
       if (!t.departmentId) continue;
+      // CRITICAL FIX: Only count SSP transactions to match totalIncomeSSP
+      if (t.currency !== "SSP") continue;
       const key = String(t.departmentId);
       departmentMap.set(key, (departmentMap.get(key) || 0) + Number(t.amount || 0));
     }
