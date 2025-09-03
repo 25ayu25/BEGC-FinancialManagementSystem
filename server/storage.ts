@@ -403,7 +403,7 @@ export class DatabaseStorage implements IStorage {
         break;
       }
       case "last-3-months": {
-        const from = new Date(Date.UTC(year, month - 4, 1));
+        const from = new Date(Date.UTC(year, month - 3, 1));
         startDate = startOfMonthUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
         endDate = nextMonthUTC(year, month);
         break;
