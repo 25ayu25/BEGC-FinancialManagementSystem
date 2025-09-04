@@ -328,11 +328,6 @@ export default function AdvancedDashboard() {
         setSelectedMonth(lastMonth.getMonth() + 1);
         break;
       case 'last-3-months':
-        // For last 3 months, use 3 months back as reference to get the main financial period
-        const threeMonthsBack = new Date(now.getFullYear(), now.getMonth() - 3);
-        setSelectedYear(threeMonthsBack.getFullYear());
-        setSelectedMonth(threeMonthsBack.getMonth() + 1);
-        break;
       case 'year':
         // Keep current date for reference, but let backend calculate the range
         setSelectedYear(now.getFullYear());
