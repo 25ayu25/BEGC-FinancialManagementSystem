@@ -2,21 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { CalendarIcon, Users, Calendar } from "lucide-react";
+import { CalendarIcon, Users } from "lucide-react";
 import { api } from "@/lib/queryClient";
 import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
-
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
-
-import SimpleRecentTransactions from "@/components/dashboard/simple-recent-transactions";
-import SimpleMonthlyFooter from "@/components/dashboard/simple-monthly-footer";
+// NEW: Expenses chart
+import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
 import { Link } from "wouter";
 
 export default function Dashboard() {
@@ -116,8 +113,6 @@ export default function Dashboard() {
       }
     }
   });
-
-
 
   if (error) {
     return (
@@ -308,7 +303,6 @@ export default function Dashboard() {
         {/* KPI Band - Executive Style */}
         <ExecutiveStyleKPIs data={dashboardData || {}} />
 
-
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Departments Chart */}
@@ -317,11 +311,22 @@ export default function Dashboard() {
             departments={(departments as any) || []}
           />
 
-          {/* Recent Transactions */}
-          <SimpleRecentTransactions transactions={dashboardData?.recentTransactions || []} />
+          {/* NEW: Expenses by Category (replaces Recent Transactions) */}
+          <SimpleExpenseBreakdown
+            breakdown={(dashboardData as any)?.expenseBreakdown}
+            total={parseFloat((dashboardData as any)?.totalExpenses || "0")}
+            title="Expenses — Category Breakdown"
+            periodLabel={
+              timeRange === "current-month" ? "Current month" :
+              timeRange === "last-month" ? "Last month" :
+              timeRange === "last-3-months" ? "Last 3 months" :
+              timeRange === "year" ? "This year" :
+              timeRange === "custom" && customStartDate && customEndDate
+                ? `${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`
+                : undefined
+            }
+          />
         </div>
-
-
       </main>
     </div>
   );
