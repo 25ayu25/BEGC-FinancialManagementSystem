@@ -736,39 +736,99 @@ export default function AdvancedDashboard() {
                   </div>
                   <div className="ml-8 h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={incomeSeries} margin={{ top: 20, right: 60, left: 10, bottom: 30 }} barCategoryGap="1%">
-                        <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
-                        <XAxis 
-                          dataKey="day"
-                          axisLine={{ stroke: '#eef2f7', strokeWidth: 1 }}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: '#64748b' }}
-                          tickFormatter={formatXAxis}
-                          interval={0}
-                          height={40}
-                        />
-                        <YAxis 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 11, fill: '#64748b' }}
-                          tickFormatter={formatYAxis}
-                          domain={[0, Math.max(...generateYTicks())]}
-                          ticks={generateYTicks()}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }} />
-                        {showAvgLine && monthlyAvgSSP > 0 && (
-                          <ReferenceLine 
-                            y={monthlyAvgSSP} 
-                            stroke="#0d9488" 
-                            strokeWidth={1}
-                            strokeDasharray="4 2"
-                            label={{ value: `Avg ${(monthlyAvgSSP / 1000).toFixed(0)}k`, position: "insideTopRight", style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 }, offset: 8 }}
-                          />
-                        )}
-                        <Bar dataKey="amountSSP" fill="#14b8a6" radius={[0, 0, 0, 0]} stroke="none" style={{ cursor: 'pointer' }} onClick={handleBarClick} maxBarSize={18} name="SSP" stackId="revenue" />
-                        <Bar dataKey="amountUSD" fill="#0891b2" radius={[4, 4, 0, 0]} stroke="none" style={{ cursor: 'pointer' }} onClick={handleBarClick} maxBarSize={18} name="USD" stackId="revenue" />
-                      </BarChart>
+                      <BarChart 
+    data={incomeSeries}
+    margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
+    barCategoryGap="20%"
+  >
+    <CartesianGrid 
+      strokeDasharray="1 1" 
+      stroke="#f1f5f9" 
+      strokeWidth={0.3}
+      opacity={0.3}
+      vertical={false}
+    />
+
+    {/* X axis */}
+    <XAxis 
+      dataKey="day"
+      axisLine={{ stroke: '#eef2f7', strokeWidth: 1 }}
+      tickLine={false}
+      tick={{ fontSize: 12, fill: '#64748b' }}
+      tickFormatter={formatXAxis}
+      interval={0}
+      height={40}
+    />
+
+    {/* Left Y axis (SSP) */}
+    <YAxis 
+      yAxisId="ssp"
+      axisLine={false}
+      tickLine={false}
+      tick={{ fontSize: 11, fill: '#64748b' }}
+      tickFormatter={formatYAxis}
+      domain={[0, Math.max(...generateYTicks())]}
+      ticks={generateYTicks()}
+    />
+
+    {/* Right Y axis (USD) */}
+    <YAxis
+      yAxisId="usd"
+      orientation="right"
+      axisLine={false}
+      tickLine={false}
+      tick={{ fontSize: 11, fill: '#64748b' }}
+      tickFormatter={(v: number) => `${Math.round(v)}`}
+      allowDecimals={false}
+    />
+
+    <Tooltip content={<CustomTooltip />} />
+    <Legend 
+      verticalAlign="top" 
+      height={36}
+      iconType="rect"
+      wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }}
+    />
+
+    {/* Monthly average (SSP only) */}
+    {showAvgLine && monthlyAvgSSP > 0 && (
+      <ReferenceLine 
+        yAxisId="ssp"
+        y={monthlyAvgSSP} 
+        stroke="#0d9488" 
+        strokeWidth={1}
+        strokeDasharray="4 2"
+        label={{ 
+          value: `Avg ${(monthlyAvgSSP / 1000).toFixed(0)}k`, 
+          position: "insideTopRight", 
+          style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
+          offset: 8
+        }}
+      />
+    )}
+
+    {/* Two separate bars (not stacked) */}
+    <Bar 
+      yAxisId="ssp"
+      dataKey="amountSSP" 
+      fill="#14b8a6"       // teal
+      stroke="none"
+      name="SSP"
+      maxBarSize={16}
+      radius={[3,3,0,0]}
+      onClick={handleBarClick}
+    />
+    <Bar 
+      yAxisId="usd"
+      dataKey="amountUSD" 
+      fill="#0ea5e9"       // blue
+      stroke="none"
+      name="USD"
+      maxBarSize={16}
+      radius={[3,3,0,0]}
+      onClick={handleBarClick}
+    />
+  </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
