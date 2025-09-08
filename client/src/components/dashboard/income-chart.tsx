@@ -1,96 +1,149 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+// client/src/components/dashboard/income-chart.tsx
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+} from "recharts";
+import { memo } from "react";
 
-export default function IncomeChart() {
-  const [days, setDays] = useState(7);
-  
-  const { data: chartData, isLoading } = useQuery({
-    queryKey: ["/api/income-trends", days],
-    queryFn: async () => {
-      const res = await fetch(`/api/income-trends?days=${days}`, {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Failed to fetch income trends');
-      return res.json();
-    }
-  });
+/**
+ * Expected data shape (array of days or dates):
+ * [
+ *   {
+ *     day: number;            // 1..31 OR any index
+ *     label?: string;         // optional label like "Sep 7"
+ *     fullDate?: string;      // optional "Sep 7, 2025"
+ *     amountSSP: number;
+ *     amountUSD: number;
+ *     amount?: number;        // total (optional)
+ *   }
+ * ]
+ */
+type Row = {
+  day: number;
+  label?: string;
+  fullDate?: string;
+  amountSSP: number;
+  amountUSD: number;
+  amount?: number;
+};
+
+type Props = {
+  data: Row[];
+  avgLineSSP?: number;       // optional reference line for SSP daily average
+  yTickStep?: number;        // e.g. 10_000; if omitted we auto-pick
+  onBarClick?: (row: Row) => void;
+};
+
+const formatYAxis = (value: number) => {
+  if (value === 0) return "0";
+  if (Math.abs(value) >= 1_000_000) return `${Math.round(value / 1_000_000)}m`;
+  if (Math.abs(value) >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return `${Math.round(value)}`;
+};
+
+const defaultTooltip = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  const row = payload[0].payload as Row;
+  const dateLabel = row.fullDate || row.label || `Day ${row.day}`;
+  const total = (row.amountSSP ?? 0) + (row.amountUSD ?? 0);
 
   return (
-    <Card className="border border-slate-200 shadow-sm">
-      <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-            Daily Income Trend
-          </CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant={days === 7 ? "default" : "outline"} 
-              size="sm" 
-              className="px-3 py-1 text-xs font-medium"
-              onClick={() => setDays(7)}
-            >
-              7D
-            </Button>
-            <Button 
-              variant={days === 30 ? "default" : "outline"} 
-              size="sm" 
-              className="px-3 py-1 text-xs font-medium"
-              onClick={() => setDays(30)}
-            >
-              30D
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-6">
-        {isLoading ? (
-          <div className="h-64">
-            <Skeleton className="h-full w-full rounded-lg" />
-          </div>
-        ) : chartData && chartData.length > 0 ? (
-          <>
-            <div className="h-64 flex items-end justify-between space-x-1 bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4" data-testid="chart-daily-income">
-              {chartData.map((item: any, index: number) => (
-                <div 
-                  key={item.date}
-                  className="flex flex-col items-center flex-1 group"
-                >
-                  <div 
-                    className="w-full bg-gradient-to-t from-teal-600 to-teal-500 rounded-t-sm hover:from-teal-700 hover:to-teal-600 transition-all duration-200 cursor-pointer shadow-sm group-hover:shadow-md"
-                    style={{ 
-                      height: `${Math.max((item.income / Math.max(...chartData.map((d: any) => d.income))) * 200, 4)}px`,
-                      minHeight: '4px'
-                    }}
-                    title={`${item.date}: SSP ${Math.round(item.income).toLocaleString()}`}
-                  />
-                  <span className="text-xs text-slate-500 mt-2 rotate-45 origin-left font-medium">
-                    {item.date.replace('Aug ', '')}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg border border-teal-100">
-              <p className="text-sm text-slate-700 text-center">
-                Average daily income: <span className="font-semibold text-teal-700">
-                  SSP {Math.round(chartData.reduce((sum: number, d: any) => sum + d.income, 0) / chartData.length).toLocaleString()}
-                </span>
-              </p>
-            </div>
-          </>
-        ) : (
-          <div className="h-64 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <div className="w-8 h-8 bg-slate-300 rounded animate-pulse"></div>
-            </div>
-            <p className="text-slate-500 font-medium">No income data available</p>
-            <p className="text-slate-400 text-sm mt-1">Try a different time period</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
+      <p className="font-semibold text-slate-900 mb-2">{dateLabel}</p>
+      <p className="text-sm text-slate-700 font-mono">SSP {Math.round(row.amountSSP || 0).toLocaleString()}</p>
+      <p className="text-sm text-slate-700 font-mono">USD {(row.amountUSD || 0).toLocaleString()}</p>
+      <div className="mt-2 pt-2 border-t border-slate-100">
+        <p className="text-xs text-slate-500">
+          Total: SSP {Math.round(total).toLocaleString()}
+        </p>
+      </div>
+    </div>
   );
+};
+
+function computeTicks(data: Row[], step?: number) {
+  const peak = Math.max(0, ...data.map(d => (d.amountSSP || 0) + (d.amountUSD || 0)));
+  if (peak === 0) return [0, 10_000, 20_000, 30_000, 40_000];
+  const tick = step || Math.max(10_000, Math.round(peak / 6 / 1000) * 1000); // ~6 ticks
+  const ticks = [0];
+  for (let v = tick; v <= peak * 1.2 + tick; v += tick) ticks.push(v);
+  return ticks;
 }
+
+const IncomeChart = memo(({ data, avgLineSSP, yTickStep, onBarClick }: Props) => {
+  const ticks = computeTicks(data, yTickStep);
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart
+        data={data}
+        margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
+        barCategoryGap="6%"
+      >
+        <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
+        <XAxis
+          dataKey="day"
+          axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
+          tickLine={false}
+          tick={{ fontSize: 12, fill: "#64748b" }}
+        />
+        <YAxis
+          axisLine={false}
+          tickLine={false}
+          tick={{ fontSize: 11, fill: "#64748b" }}
+          tickFormatter={formatYAxis}
+          ticks={ticks}
+          domain={[0, Math.max(...ticks)]}
+        />
+        <Tooltip content={defaultTooltip} />
+        <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "10px" }} />
+
+        {typeof avgLineSSP === "number" && avgLineSSP > 0 && (
+          <ReferenceLine
+            y={avgLineSSP}
+            stroke="#0d9488"
+            strokeWidth={1}
+            strokeDasharray="4 2"
+            label={{
+              value: `Avg ${(avgLineSSP / 1000).toFixed(0)}k`,
+              position: "insideTopRight",
+              style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 },
+              offset: 8,
+            }}
+          />
+        )}
+
+        {/* Stacked bars with distinct modern colors */}
+        <Bar
+          dataKey="amountSSP"
+          name="SSP"
+          fill="#14b8a6"          // teal
+          stackId="revenue"
+          maxBarSize={18}
+          radius={[0, 0, 0, 0]}
+          style={{ cursor: onBarClick ? "pointer" : "default" }}
+          onClick={(e: any) => onBarClick?.(e?.activePayload?.[0]?.payload || e?.payload)}
+        />
+        <Bar
+          dataKey="amountUSD"
+          name="USD"
+          fill="#0891b2"          // teal-blue
+          stackId="revenue"
+          maxBarSize={18}
+          radius={[4, 4, 0, 0]}
+          style={{ cursor: onBarClick ? "pointer" : "default" }}
+          onClick={(e: any) => onBarClick?.(e?.activePayload?.[0]?.payload || e?.payload)}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+});
+
+export default IncomeChart;
