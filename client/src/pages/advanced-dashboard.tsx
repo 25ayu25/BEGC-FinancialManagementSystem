@@ -55,6 +55,9 @@ import {
 // 🔗 NEW: Global date filter (shared with Overview)
 import { useDateFilter } from "@/context/date-filter-context";
 
+// ✅ NEW: Drawer component
+import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
+
 // ---------------- Revenue Data Table ----------------
 
 interface DetailedTransaction {
@@ -278,6 +281,9 @@ export default function AdvancedDashboard() {
 
   const [showDataTable, setShowDataTable] = useState(false);
   const [showAllDepartments, setShowAllDepartments] = useState(false);
+
+  // ✅ NEW: drawer state
+  const [openExpenses, setOpenExpenses] = useState(false);
 
   const handleTimeRangeChange = (
     range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'
@@ -610,8 +616,12 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Total Expenses */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+        {/* Total Expenses — now clickable */}
+        <Card
+          className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)}
+          title="Click to view expense breakdown"
+        >
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
@@ -737,98 +747,98 @@ export default function AdvancedDashboard() {
                   <div className="ml-8 h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
-    data={incomeSeries}
-    margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
-    barCategoryGap="20%"
-  >
-    <CartesianGrid 
-      strokeDasharray="1 1" 
-      stroke="#f1f5f9" 
-      strokeWidth={0.3}
-      opacity={0.3}
-      vertical={false}
-    />
+                        data={incomeSeries}
+                        margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
+                        barCategoryGap="20%"
+                      >
+                        <CartesianGrid 
+                          strokeDasharray="1 1" 
+                          stroke="#f1f5f9" 
+                          strokeWidth={0.3}
+                          opacity={0.3}
+                          vertical={false}
+                        />
 
-    {/* X axis */}
-    <XAxis 
-      dataKey="day"
-      axisLine={{ stroke: '#eef2f7', strokeWidth: 1 }}
-      tickLine={false}
-      tick={{ fontSize: 12, fill: '#64748b' }}
-      tickFormatter={formatXAxis}
-      interval={0}
-      height={40}
-    />
+                        {/* X axis */}
+                        <XAxis 
+                          dataKey="day"
+                          axisLine={{ stroke: '#eef2f7', strokeWidth: 1 }}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: '#64748b' }}
+                          tickFormatter={formatXAxis}
+                          interval={0}
+                          height={40}
+                        />
 
-    {/* Left Y axis (SSP) */}
-    <YAxis 
-      yAxisId="ssp"
-      axisLine={false}
-      tickLine={false}
-      tick={{ fontSize: 11, fill: '#64748b' }}
-      tickFormatter={formatYAxis}
-      domain={[0, Math.max(...generateYTicks())]}
-      ticks={generateYTicks()}
-    />
+                        {/* Left Y axis (SSP) */}
+                        <YAxis 
+                          yAxisId="ssp"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#64748b' }}
+                          tickFormatter={formatYAxis}
+                          domain={[0, Math.max(...generateYTicks())]}
+                          ticks={generateYTicks()}
+                        />
 
-    {/* Right Y axis (USD) */}
-    <YAxis
-      yAxisId="usd"
-      orientation="right"
-      axisLine={false}
-      tickLine={false}
-      tick={{ fontSize: 11, fill: '#64748b' }}
-      tickFormatter={(v: number) => `${Math.round(v)}`}
-      allowDecimals={false}
-    />
+                        {/* Right Y axis (USD) */}
+                        <YAxis
+                          yAxisId="usd"
+                          orientation="right"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#64748b' }}
+                          tickFormatter={(v: number) => `${Math.round(v)}`}
+                          allowDecimals={false}
+                        />
 
-    <Tooltip content={<CustomTooltip />} />
-    <Legend 
-      verticalAlign="top" 
-      height={36}
-      iconType="rect"
-      wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }}
-    />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36}
+                          iconType="rect"
+                          wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }}
+                        />
 
-    {/* Monthly average (SSP only) */}
-    {showAvgLine && monthlyAvgSSP > 0 && (
-      <ReferenceLine 
-        yAxisId="ssp"
-        y={monthlyAvgSSP} 
-        stroke="#0d9488" 
-        strokeWidth={1}
-        strokeDasharray="4 2"
-        label={{ 
-          value: `Avg ${(monthlyAvgSSP / 1000).toFixed(0)}k`, 
-          position: "insideTopRight", 
-          style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
-          offset: 8
-        }}
-      />
-    )}
+                        {/* Monthly average (SSP only) */}
+                        {showAvgLine && monthlyAvgSSP > 0 && (
+                          <ReferenceLine 
+                            yAxisId="ssp"
+                            y={monthlyAvgSSP} 
+                            stroke="#0d9488" 
+                            strokeWidth={1}
+                            strokeDasharray="4 2"
+                            label={{ 
+                              value: `Avg ${(monthlyAvgSSP / 1000).toFixed(0)}k`, 
+                              position: "insideTopRight", 
+                              style: { fontSize: 10, fill: '#0d9488', fontWeight: 500 },
+                              offset: 8
+                            }}
+                          />
+                        )}
 
-    {/* Two separate bars (not stacked) */}
-    <Bar 
-      yAxisId="ssp"
-      dataKey="amountSSP" 
-      fill="#14b8a6"       // teal
-      stroke="none"
-      name="SSP"
-      maxBarSize={16}
-      radius={[3,3,0,0]}
-      onClick={handleBarClick}
-    />
-    <Bar 
-      yAxisId="usd"
-      dataKey="amountUSD" 
-      fill="#0ea5e9"       // blue
-      stroke="none"
-      name="USD"
-      maxBarSize={16}
-      radius={[3,3,0,0]}
-      onClick={handleBarClick}
-    />
-  </BarChart>
+                        {/* Two separate bars (not stacked) */}
+                        <Bar 
+                          yAxisId="ssp"
+                          dataKey="amountSSP" 
+                          fill="#14b8a6"       // teal
+                          stroke="none"
+                          name="SSP"
+                          maxBarSize={16}
+                          radius={[3,3,0,0]}
+                          onClick={handleBarClick}
+                        />
+                        <Bar 
+                          yAxisId="usd"
+                          dataKey="amountUSD" 
+                          fill="#0ea5e9"       // blue
+                          stroke="none"
+                          name="USD"
+                          maxBarSize={16}
+                          radius={[3,3,0,0]}
+                          onClick={handleBarClick}
+                        />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -1053,6 +1063,16 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ✅ Mount the Expenses drawer */}
+      <ExpensesDrawer
+        open={openExpenses}
+        onOpenChange={setOpenExpenses}
+        periodLabel={periodLabel}
+        expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
+        totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
+        onViewFullReport={() => { window.location.href = "/reports"; }}
+      />
     </div>
   );
 }
