@@ -5,7 +5,6 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
-  SheetOverlay,                 // ⬅️ import overlay
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
@@ -34,7 +33,9 @@ export default function ExpensesDrawer({
 }: ExpensesDrawerProps) {
   const rows = React.useMemo(() => {
     if (!expenseBreakdown) return [];
-    const arr = Object.entries(expenseBreakdown).map(([k, v]) => [k, Number(v) || 0] as [string, number]);
+    const arr = Object.entries(expenseBreakdown).map(
+      ([k, v]) => [k, Number(v) || 0] as [string, number]
+    );
     arr.sort((a, b) => b[1] - a[1]);
     return arr;
   }, [expenseBreakdown]);
@@ -44,49 +45,65 @@ export default function ExpensesDrawer({
   const safeTotal = total || 0;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      {/* ⬇️ Transparent, click-through overlay (no dimming) */}
-      <SheetOverlay className="bg-transparent pointer-events-none" />
-      <SheetContent side="right" className="w-full sm:max-w-md">
-        <SheetHeader className="mb-4">
-          <SheetTitle>Expense Breakdown</SheetTitle>
-          <SheetDescription>For {periodLabel}</SheetDescription>
-        </SheetHeader>
+    <>
+      {/* Make the built-in Radix overlay transparent (no dim / no blur) */}
+      <style>{`
+        [data-radix-dialog-overlay] {
+          background: transparent !important;
+          backdrop-filter: none !important;
+        }
+      `}</style>
 
-        <div className="mb-4 rounded-xl bg-muted px-4 py-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Total Expenses</span>
-            <span className="font-semibold">{formatSSP(safeTotal)}</span>
-          </div>
-        </div>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Expense Breakdown</SheetTitle>
+            <SheetDescription>For {periodLabel}</SheetDescription>
+          </SheetHeader>
 
-        <div className="space-y-3">
-          {rows.map(([name, amt]) => {
-            const pct = safeTotal > 0 ? (amt / safeTotal) * 100 : 0;
-            return (
-              <div key={name} className="rounded-lg border p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="truncate pr-3 font-medium">{name}</div>
-                  <div className="text-sm tabular-nums">{formatSSP(amt)}</div>
-                </div>
-                <div className="h-2.5 w-full overflow-hidden rounded bg-muted">
-                  <div className="h-full rounded bg-primary" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">{pct.toFixed(1)}%</div>
-              </div>
-            );
-          })}
-          {rows.length === 0 && (
-            <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-              No expense data for this period.
+          {/* Total line */}
+          <div className="mb-4 rounded-xl bg-muted px-4 py-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Total Expenses</span>
+              <span className="font-semibold">{formatSSP(safeTotal)}</span>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="mt-6 flex justify-end">
-          <Button onClick={() => onViewFullReport?.()}>View full report</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+          {/* Category rows */}
+          <div className="space-y-3">
+            {rows.map(([name, amt]) => {
+              const pct = safeTotal > 0 ? (amt / safeTotal) * 100 : 0;
+              return (
+                <div key={name} className="rounded-lg border p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="truncate pr-3 font-medium">{name}</div>
+                    <div className="text-sm tabular-nums">{formatSSP(amt)}</div>
+                  </div>
+                  <div className="h-2.5 w-full overflow-hidden rounded bg-muted">
+                    <div
+                      className="h-full rounded bg-primary"
+                      style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {pct.toFixed(1)}%
+                  </div>
+                </div>
+              );
+            })}
+
+            {rows.length === 0 && (
+              <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                No expense data for this period.
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <Button onClick={() => onViewFullReport?.()}>View full report</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
