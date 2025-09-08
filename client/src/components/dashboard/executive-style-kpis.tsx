@@ -1,9 +1,17 @@
 import * as React from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
 import { TrendingUp, TrendingDown, DollarSign, Shield } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetOverlay,
+} from "@/components/ui/sheet";
 
 interface ExecutiveStyleKPIsProps {
   data?: {
@@ -11,7 +19,6 @@ interface ExecutiveStyleKPIsProps {
     totalIncomeUSD: string;
     totalExpenses: string;
     netIncome: string;
-    // ⬇️ add this so the drawer can show grouped expenses
     expenseBreakdown?: Record<string, string | number>;
     insuranceBreakdown: Record<string, string>;
     changes?: {
@@ -33,13 +40,14 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
   const sspNetIncome = parseFloat(data?.netIncome || "0");
   const usdIncome = parseFloat(data?.totalIncomeUSD || "0");
 
-  // Drawer state
   const [openExpenses, setOpenExpenses] = React.useState(false);
 
   // Build sorted rows for the drawer from expenseBreakdown
   const expenseRows = React.useMemo(() => {
     const map = data?.expenseBreakdown || {};
-    const arr = Object.entries(map).map(([k, v]) => [k, Number(v) || 0] as [string, number]);
+    const arr = Object.entries(map).map(
+      ([k, v]) => [k, Number(v) || 0] as [string, number]
+    );
     arr.sort((a, b) => b[1] - a[1]);
     return arr;
   }, [data?.expenseBreakdown]);
@@ -49,7 +57,15 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
     [expenseRows]
   );
 
-  const periodLabel = "Selected period"; // optional: replace with your actual period label
+  const periodLabel = "Selected period";
+
+  const openDrawer = () => setOpenExpenses(true);
+  const kpiKeyHandler: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openDrawer();
+    }
+  };
 
   return (
     <>
@@ -83,7 +99,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                 </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
-                {data?.changes?.incomeChangeSSP !== undefined && data.changes.incomeChangeSSP < 0 ? (
+                {data?.changes?.incomeChangeSSP !== undefined &&
+                data.changes.incomeChangeSSP < 0 ? (
                   <TrendingDown className="h-4 w-4 text-red-600" />
                 ) : (
                   <TrendingUp className="h-4 w-4 text-emerald-600" />
@@ -93,10 +110,14 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
           </CardContent>
         </Card>
 
-        {/* Total Expenses — now clickable */}
+        {/* Total Expenses — CLICKABLE */}
         <Card
-          className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => setOpenExpenses(true)}
+          className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+          role="button"
+          tabIndex={0}
+          aria-label="Open expense breakdown"
+          onClick={openDrawer}
+          onKeyDown={kpiKeyHandler}
           title="Click to view expense breakdown"
         >
           <CardContent className="p-3">
@@ -126,7 +147,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                 </div>
               </div>
               <div className="bg-red-50 p-1.5 rounded-lg">
-                {data?.changes?.expenseChangeSSP !== undefined && data.changes.expenseChangeSSP < 0 ? (
+                {data?.changes?.expenseChangeSSP !== undefined &&
+                data.changes.expenseChangeSSP < 0 ? (
                   <TrendingDown className="h-4 w-4 text-emerald-600" />
                 ) : (
                   <TrendingUp className="h-4 w-4 text-red-600" />
@@ -165,7 +187,8 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                 </div>
               </div>
               <div className="bg-blue-50 p-1.5 rounded-lg">
-                {data?.changes?.netIncomeChangeSSP !== undefined && data.changes.netIncomeChangeSSP < 0 ? (
+                {data?.changes?.netIncomeChangeSSP !== undefined &&
+                data.changes.netIncomeChangeSSP < 0 ? (
                   <TrendingDown className="h-4 w-4 text-red-600" />
                 ) : (
                   <DollarSign className="h-4 w-4 text-blue-600" />
@@ -219,7 +242,14 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
 
       {/* ----- Right-side drawer for Expenses ----- */}
       <Sheet open={openExpenses} onOpenChange={setOpenExpenses}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
+        {/* Dim overlay so the background doesn’t bleed through */}
+        <SheetOverlay className="bg-black/40" />
+
+        {/* Solid white panel on top */}
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-[560px] bg-white shadow-2xl border-l border-slate-200 z-[100]"
+        >
           <SheetHeader className="mb-4">
             <SheetTitle>Expense Breakdown</SheetTitle>
             <SheetDescription>For {periodLabel}</SheetDescription>
@@ -230,7 +260,11 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Total Expenses</span>
               <span className="font-semibold">
-                {formatSSP(Number.isFinite(totalExpenses) && totalExpenses > 0 ? totalExpenses : totalFromRows)}
+                {formatSSP(
+                  Number.isFinite(totalExpenses) && totalExpenses > 0
+                    ? totalExpenses
+                    : totalFromRows
+                )}
               </span>
             </div>
           </div>
@@ -238,7 +272,10 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
           {/* Category rows */}
           <div className="space-y-3">
             {expenseRows.map(([name, amt]) => {
-              const base = Number.isFinite(totalExpenses) && totalExpenses > 0 ? totalExpenses : totalFromRows;
+              const base =
+                Number.isFinite(totalExpenses) && totalExpenses > 0
+                  ? totalExpenses
+                  : totalFromRows;
               const pct = base > 0 ? (amt / base) * 100 : 0;
               return (
                 <div key={name} className="rounded-lg border p-3">
@@ -247,25 +284,27 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                     <div className="text-sm tabular-nums">{formatSSP(amt)}</div>
                   </div>
                   <div className="h-2.5 w-full overflow-hidden rounded bg-muted">
-                    <div className="h-full rounded bg-primary" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+                    <div
+                      className="h-full rounded bg-primary"
+                      style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                    />
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{pct.toFixed(1)}%</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {pct.toFixed(1)}%
+                  </div>
                 </div>
               );
             })}
 
             {expenseRows.length === 0 && (
-              <div className="rounded-lg border p-4 text-sm text-muted-foreground">No expense data for this period.</div>
+              <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                No expense data for this period.
+              </div>
             )}
           </div>
 
           <div className="mt-6 flex justify-end">
-            <Button
-              onClick={() => {
-                // Simple: navigate to reports page with current filters (adjust if you pass period in URL)
-                window.location.href = "/reports";
-              }}
-            >
+            <Button onClick={() => (window.location.href = "/reports")}>
               View full report
             </Button>
           </div>
