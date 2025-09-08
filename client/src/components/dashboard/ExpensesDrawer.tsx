@@ -1,5 +1,12 @@
 import * as React from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetOverlay,                 // ⬅️ import overlay
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
 type ExpenseBreakdownMap = Record<string, number | string>;
@@ -38,6 +45,8 @@ export default function ExpensesDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
+      {/* ⬇️ Transparent, click-through overlay (no dimming) */}
+      <SheetOverlay className="bg-transparent pointer-events-none" />
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader className="mb-4">
           <SheetTitle>Expense Breakdown</SheetTitle>
@@ -68,7 +77,9 @@ export default function ExpensesDrawer({
             );
           })}
           {rows.length === 0 && (
-            <div className="rounded-lg border p-4 text-sm text-muted-foreground">No expense data for this period.</div>
+            <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+              No expense data for this period.
+            </div>
           )}
         </div>
 
