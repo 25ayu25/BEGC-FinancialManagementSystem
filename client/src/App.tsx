@@ -20,81 +20,80 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
 import { useLocation } from "wouter";
 
+// ⬇️ NEW: bring in the global date filter provider
+import { DateFilterProvider } from "@/context/date-filter-context";
+
 function Router() {
   return (
     <Switch>
       {/* Public routes without sidebar */}
       <Route path="/login" component={Login} />
-      
+
       {/* Authenticated routes with sidebar */}
       <Route>
         {(params) => {
           const [sidebarOpen, setSidebarOpen] = useState(false);
           const [location, setLocation] = useLocation();
-          
+
           // Auto-logout functionality (only enabled when not on login page)
-          const isOnLoginPage = location === '/login';
-          const {
-            isWarning,
-            remainingSeconds,
-            extendSession,
-            logoutNow,
-            formatTime
-          } = useIdleTimeout({
-            timeoutMinutes: 15, // 15 minutes of inactivity  
-            warningMinutes: 3,  // 3 minute warning
-            enabled: !isOnLoginPage,
-            onTimeout: () => {
-              // Force full page redirect for reliable navigation
-              window.location.href = '/login?timeout=true';
-            },
-            onWarning: (seconds) => {
-              console.log(`Session timeout warning: ${seconds} seconds remaining`);
-            }
-          });
+          const isOnLoginPage = location === "/login";
+          const { isWarning, remainingSeconds, extendSession, logoutNow, formatTime } =
+            useIdleTimeout({
+              timeoutMinutes: 15,
+              warningMinutes: 3,
+              enabled: !isOnLoginPage,
+              onTimeout: () => {
+                window.location.href = "/login?timeout=true";
+              },
+              onWarning: (seconds) => {
+                console.log(`Session timeout warning: ${seconds} seconds remaining`);
+              },
+            });
+
           return (
-          <div className="flex h-screen bg-gray-50">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="flex-1 flex flex-col overflow-auto">
-              {/* Mobile header */}
-              <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                <button 
-                  onClick={() => setSidebarOpen(true)}
-                  className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  data-testid="button-mobile-menu"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-                <h1 className="text-lg font-semibold text-gray-900">Bahr El Ghazal Clinic</h1>
-                <div className="w-10"></div>
+            <div className="flex h-screen bg-gray-50">
+              <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+              <div className="flex-1 flex flex-col overflow-auto">
+                {/* Mobile header */}
+                <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    data-testid="button-mobile-menu"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
+                  <h1 className="text-lg font-semibold text-gray-900">Bahr El Ghazal Clinic</h1>
+                  <div className="w-10"></div>
+                </div>
+
+                <Switch>
+                  <Route path="/" component={AdvancedDashboard} />
+                  <Route path="/advanced" component={AdvancedDashboard} />
+                  <Route path="/simple" component={Dashboard} />
+                  <Route path="/dashboard" component={Dashboard} />
+                  <Route path="/transactions" component={Transactions} />
+                  <Route path="/reports" component={Reports} />
+                  <Route path="/patient-volume" component={PatientVolume} />
+                  <Route path="/insurance-providers" component={InsuranceProviders} />
+                  <Route path="/settings" component={Settings} />
+                  <Route path="/security" component={Security} />
+                  <Route path="/users" component={UserManagement} />
+                  <Route component={NotFound} />
+                </Switch>
               </div>
-              <Switch>
-                <Route path="/" component={AdvancedDashboard} />
-                <Route path="/advanced" component={AdvancedDashboard} />
-                <Route path="/simple" component={Dashboard} />
-                <Route path="/dashboard" component={Dashboard} />
-                <Route path="/transactions" component={Transactions} />
-                <Route path="/reports" component={Reports} />
-                <Route path="/patient-volume" component={PatientVolume} />
-                <Route path="/insurance-providers" component={InsuranceProviders} />
-                <Route path="/settings" component={Settings} />
-                <Route path="/security" component={Security} />
-                <Route path="/users" component={UserManagement} />
-                <Route component={NotFound} />
-              </Switch>
+
+              {/* Auto-logout warning dialog */}
+              <IdleTimeoutDialog
+                isOpen={isWarning}
+                remainingSeconds={remainingSeconds}
+                onExtend={extendSession}
+                onLogout={logoutNow}
+                formatTime={formatTime}
+              />
             </div>
-            
-            {/* Auto-logout warning dialog */}
-            <IdleTimeoutDialog
-              isOpen={isWarning}
-              remainingSeconds={remainingSeconds}
-              onExtend={extendSession}
-              onLogout={logoutNow}
-              formatTime={formatTime}
-            />
-          </div>
           );
         }}
       </Route>
@@ -105,10 +104,13 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      {/* ⬇️ Wrap everything that needs the global period with the provider */}
+      <DateFilterProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </DateFilterProvider>
     </QueryClientProvider>
   );
 }
