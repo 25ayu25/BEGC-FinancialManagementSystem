@@ -4,14 +4,7 @@ import { TrendingUp, TrendingDown, DollarSign, Shield } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetOverlay,
-} from "@/components/ui/sheet";
+import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 
 interface ExecutiveStyleKPIsProps {
   data?: {
@@ -28,36 +21,25 @@ interface ExecutiveStyleKPIsProps {
       incomeChangeUSD?: number;
     };
   };
+  /** Optional label for the current period (e.g., “Current month”) */
+  periodLabel?: string;
 }
 
 function formatSSP(n: number) {
   return `SSP ${Math.round(n).toLocaleString()}`;
 }
 
-export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
+export default function ExecutiveStyleKPIs({
+  data,
+  periodLabel = "Selected period",
+}: ExecutiveStyleKPIsProps) {
   const sspRevenue = parseFloat(data?.totalIncomeSSP || "0");
   const totalExpenses = parseFloat(data?.totalExpenses || "0");
   const sspNetIncome = parseFloat(data?.netIncome || "0");
   const usdIncome = parseFloat(data?.totalIncomeUSD || "0");
 
+  // Drawer state (shared component has transparent overlay)
   const [openExpenses, setOpenExpenses] = React.useState(false);
-
-  // Build sorted rows for the drawer from expenseBreakdown
-  const expenseRows = React.useMemo(() => {
-    const map = data?.expenseBreakdown || {};
-    const arr = Object.entries(map).map(
-      ([k, v]) => [k, Number(v) || 0] as [string, number]
-    );
-    arr.sort((a, b) => b[1] - a[1]);
-    return arr;
-  }, [data?.expenseBreakdown]);
-
-  const totalFromRows = React.useMemo(
-    () => expenseRows.reduce((s, [, v]) => s + v, 0),
-    [expenseRows]
-  );
-
-  const periodLabel = "Selected period";
 
   const openDrawer = () => setOpenExpenses(true);
   const kpiKeyHandler: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
@@ -77,7 +59,7 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {Math.round(sspRevenue).toLocaleString()}
+                  {formatSSP(sspRevenue)}
                 </p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.incomeChangeSSP !== undefined ? (
@@ -94,7 +76,9 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                       {data.changes.incomeChangeSSP.toFixed(1)}% vs last month
                     </span>
                   ) : (
-                    <span className="text-xs font-medium text-slate-500">vs last month</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      vs last month
+                    </span>
                   )}
                 </div>
               </div>
@@ -110,7 +94,7 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
           </CardContent>
         </Card>
 
-        {/* Total Expenses — CLICKABLE */}
+        {/* Total Expenses — opens shared drawer */}
         <Card
           className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           role="button"
@@ -125,7 +109,7 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {Math.round(totalExpenses).toLocaleString()}
+                  {formatSSP(totalExpenses)}
                 </p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.expenseChangeSSP !== undefined ? (
@@ -142,7 +126,9 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                       {data.changes.expenseChangeSSP.toFixed(1)}% vs last month
                     </span>
                   ) : (
-                    <span className="text-xs font-medium text-slate-500">vs last month</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      vs last month
+                    </span>
                   )}
                 </div>
               </div>
@@ -165,7 +151,7 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {Math.round(sspNetIncome).toLocaleString()}
+                  {formatSSP(sspNetIncome)}
                 </p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.netIncomeChangeSSP !== undefined ? (
@@ -182,17 +168,14 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
                       {data.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
                     </span>
                   ) : (
-                    <span className="text-xs font-medium text-slate-500">vs last month</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      vs last month
+                    </span>
                   )}
                 </div>
               </div>
               <div className="bg-blue-50 p-1.5 rounded-lg">
-                {data?.changes?.netIncomeChangeSSP !== undefined &&
-                data.changes.netIncomeChangeSSP < 0 ? (
-                  <TrendingDown className="h-4 w-4 text-red-600" />
-                ) : (
-                  <DollarSign className="h-4 w-4 text-blue-600" />
-                )}
+                <DollarSign className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -240,76 +223,17 @@ export default function ExecutiveStyleKPIs({ data }: ExecutiveStyleKPIsProps) {
         </Link>
       </div>
 
-      {/* ----- Right-side drawer for Expenses ----- */}
-      <Sheet open={openExpenses} onOpenChange={setOpenExpenses}>
-        {/* Dim overlay so the background doesn’t bleed through */}
-        <SheetOverlay className="bg-black/40" />
-
-        {/* Solid white panel on top */}
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-[560px] bg-white shadow-2xl border-l border-slate-200 z-[100]"
-        >
-          <SheetHeader className="mb-4">
-            <SheetTitle>Expense Breakdown</SheetTitle>
-            <SheetDescription>For {periodLabel}</SheetDescription>
-          </SheetHeader>
-
-          {/* Total line */}
-          <div className="mb-4 rounded-xl bg-muted px-4 py-3 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Total Expenses</span>
-              <span className="font-semibold">
-                {formatSSP(
-                  Number.isFinite(totalExpenses) && totalExpenses > 0
-                    ? totalExpenses
-                    : totalFromRows
-                )}
-              </span>
-            </div>
-          </div>
-
-          {/* Category rows */}
-          <div className="space-y-3">
-            {expenseRows.map(([name, amt]) => {
-              const base =
-                Number.isFinite(totalExpenses) && totalExpenses > 0
-                  ? totalExpenses
-                  : totalFromRows;
-              const pct = base > 0 ? (amt / base) * 100 : 0;
-              return (
-                <div key={name} className="rounded-lg border p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="truncate pr-3 font-medium">{name}</div>
-                    <div className="text-sm tabular-nums">{formatSSP(amt)}</div>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded bg-muted">
-                    <div
-                      className="h-full rounded bg-primary"
-                      style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-                    />
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {pct.toFixed(1)}%
-                  </div>
-                </div>
-              );
-            })}
-
-            {expenseRows.length === 0 && (
-              <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-                No expense data for this period.
-              </div>
-            )}
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <Button onClick={() => (window.location.href = "/reports")}>
-              View full report
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Shared non-dimming drawer */}
+      <ExpensesDrawer
+        open={openExpenses}
+        onOpenChange={setOpenExpenses}
+        periodLabel={periodLabel}
+        expenseBreakdown={data?.expenseBreakdown}
+        totalExpenseSSP={
+          Number.isFinite(totalExpenses) ? totalExpenses : undefined
+        }
+        onViewFullReport={() => (window.location.href = "/reports")}
+      />
     </>
   );
 }
