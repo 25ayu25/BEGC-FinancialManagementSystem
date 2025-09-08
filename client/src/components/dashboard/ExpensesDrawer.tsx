@@ -31,6 +31,16 @@ export default function ExpensesDrawer({
   totalExpenseSSP,
   onViewFullReport,
 }: ExpensesDrawerProps) {
+  // 🔒 Ensure no-dim overlay wins even when the overlay is portaled to <body>
+  React.useEffect(() => {
+    const cls = "no-dim-overlay";
+    const el = typeof document !== "undefined" ? document.body : null;
+    if (!el) return;
+    if (open) el.classList.add(cls);
+    else el.classList.remove(cls);
+    return () => el.classList.remove(cls);
+  }, [open]);
+
   const rows = React.useMemo(() => {
     if (!expenseBreakdown) return [];
     const arr = Object.entries(expenseBreakdown).map(
@@ -46,9 +56,15 @@ export default function ExpensesDrawer({
 
   return (
     <>
-      {/* Make the built-in Radix overlay transparent (no dim / no blur) */}
+      {/* Scoped, high-specificity override for the Radix overlay when the drawer is open */}
       <style>{`
-        [data-radix-dialog-overlay] {
+        body.no-dim-overlay [data-radix-dialog-overlay] {
+          background: transparent !important;
+          backdrop-filter: none !important;
+        }
+        /* Fallback for builds where the overlay lacks the radix data-attr
+           but uses the standard fixed inset-0 class cluster */
+        body.no-dim-overlay .fixed.inset-0.z-50[data-state="open"] {
           background: transparent !important;
           backdrop-filter: none !important;
         }
@@ -69,7 +85,7 @@ export default function ExpensesDrawer({
             </div>
           </div>
 
-          {/* Category rows */}
+          {/* Rows */}
           <div className="space-y-3">
             {rows.map(([name, amt]) => {
               const pct = safeTotal > 0 ? (amt / safeTotal) * 100 : 0;
@@ -91,7 +107,6 @@ export default function ExpensesDrawer({
                 </div>
               );
             })}
-
             {rows.length === 0 && (
               <div className="rounded-lg border p-4 text-sm text-muted-foreground">
                 No expense data for this period.
