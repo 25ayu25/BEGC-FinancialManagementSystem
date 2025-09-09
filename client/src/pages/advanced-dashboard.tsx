@@ -205,6 +205,27 @@ export default function AdvancedDashboard() {
   const showAvgLine = daysWithSSP >= 2;
   const hasAnyUSD = incomeSeries.some((d) => d.amountUSD > 0);
 
+  // 👉 Chart data that hides per-day zero bars
+  const chartData = useMemo(
+    () =>
+      incomeSeries.map((d) => ({
+        ...d,
+        amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
+        amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
+      })),
+    [incomeSeries]
+  );
+
+  // Ticks for SSP axis (clean grid, adapt to peak)
+  const sspTicks = useMemo(() => {
+    if (!peakSSP) return [0, 250_000, 500_000, 750_000, 1_000_000];
+    const step = 200_000;
+    const maxNeeded = Math.max(peakSSP * 1.15, step * 5);
+    const arr: number[] = [0];
+    for (let v = step; v <= maxNeeded; v += step) arr.push(v);
+    return arr;
+  }, [peakSSP]);
+
   // Y axes formatting
   const formatYAxisSSP = (v: number) => kfmt(v);
   const formatYAxisUSD = (v: number) => kfmt(v);
@@ -623,7 +644,7 @@ export default function AdvancedDashboard() {
                 <div className="h-64 w-full">
                   <ResponsiveContainer>
                     <BarChart
-                      data={incomeSeries}
+                      data={chartData}
                       margin={{ top: 12, right: hasAnyUSD ? 60 : 20, left: 8, bottom: 22 }}
                       barGap={6}
                       barCategoryGap="28%"
@@ -651,7 +672,7 @@ export default function AdvancedDashboard() {
                         tickLine={false}
                         tick={{ fontSize: 11, fill: "#0f766e" }}
                         tickFormatter={formatYAxisSSP}
-                        domain={[0, Math.max(peakSSP * 1.2, 100000)]}
+                        ticks={sspTicks}
                         label={{
                           value: "Revenue (SSP)",
                           angle: -90,
@@ -706,7 +727,7 @@ export default function AdvancedDashboard() {
                       {/* SSP (left axis) */}
                       <Bar
                         yAxisId="ssp"
-                        dataKey="amountSSP"
+                        dataKey="amountSSPPlot"
                         name="SSP"
                         fill="#14b8a6"
                         maxBarSize={26}
@@ -717,7 +738,7 @@ export default function AdvancedDashboard() {
                       {hasAnyUSD && (
                         <Bar
                           yAxisId="usd"
-                          dataKey="amountUSD"
+                          dataKey="amountUSDPlot"
                           name="USD"
                           fill="#0ea5e9"
                           maxBarSize={26}
