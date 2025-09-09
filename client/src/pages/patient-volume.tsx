@@ -1,445 +1,334 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { format, parseISO, startOfWeek, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import { CalendarIcon, Users, Plus, Trash2 } from "lucide-react";
+import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
-import { apiRequest, api } from "@/lib/queryClient";
+import { api } from "@/lib/queryClient";
+import { useDateFilter } from "@/context/date-filter-context";
 
-interface PatientVolume {
-  id: string;
-  date: string;
-  departmentId?: string;
-  patientCount: number;
-  notes?: string;
-  recordedBy: string;
+import { CalendarIcon, Plus, Trash2 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+
+// ------------------ Helpers ------------------
+
+type VolumeRow = {
+  date: string;   // ISO "yyyy-MM-dd"
+  count: number;
+};
+
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
+
+function labelForBucket(dateISO: string, bucket: "day" | "week" | "month") {
+  const d = parseISO(dateISO);
+  if (bucket === "day") return format(d, "MMM d");
+  if (bucket === "week") return `Wk ${format(d, "I")}`; // ISO week number
+  return format(d, "MMM yyyy");
 }
 
-interface Department {
-  id: string;
-  code: string;
-  name: string;
+function bucketKey(d: Date, bucket: "day" | "week" | "month") {
+  if (bucket === "day") return format(d, "yyyy-MM-dd");
+  if (bucket === "week") return format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
+  return format(startOfMonth(d), "yyyy-MM-dd");
 }
 
-export default function PatientVolumePage() {
-  // Check URL parameters for view mode and date parameters
-  const urlParams = new URLSearchParams(window.location.search);
-  const viewMode = urlParams.get('view');
-  const yearParam = urlParams.get('year');
-  const monthParam = urlParams.get('month');
-  const dateParam = urlParams.get('date');
-  const rangeParam = urlParams.get('range'); // New: time range from dashboard
-  
-  // Determine if we're in monthly view mode
-  const isMonthlyView = viewMode === 'monthly' && yearParam && monthParam;
-  
-  // Determine if we're in multi-period view (last-3-months or year)
-  const isMultiPeriodView = rangeParam === 'last-3-months' || rangeParam === 'year';
-  
-  // Set initial date and view type based on parameters
-  // Default to monthly view showing current month when no specific parameters are provided
-  const shouldDefaultToMonthly = !dateParam && !isMonthlyView;
-  const initialViewType = isMonthlyView ? 'monthly' : (shouldDefaultToMonthly ? 'monthly' : 'daily');
-  
-  const initialDate = dateParam 
-    ? new Date(dateParam + 'T12:00:00')
-    : isMonthlyView 
-      ? new Date(parseInt(yearParam), parseInt(monthParam) - 1, 1)
-      : shouldDefaultToMonthly 
-        ? new Date() // For monthly view, current date is fine as it will show the whole month
-        : new Date();
-  
-  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("all-departments");
-  const [viewType, setViewType] = useState<'daily' | 'monthly'>(initialViewType);
-  const [newEntry, setNewEntry] = useState({
-    date: new Date(),
-    departmentId: "",
-    patientCount: "",
-    notes: ""
-  });
-  const [showAddForm, setShowAddForm] = useState(false);
+// ------------------ Page ------------------
 
-  const queryClient = useQueryClient();
+export default function PatientVolume() {
+  const {
+    timeRange,
+    selectedYear,
+    selectedMonth,
+    customStartDate,
+    customEndDate,
+    setTimeRange,
+    setCustomRange,
+    periodLabel,
+  } = useDateFilter();
 
-  // Get departments
-  const { data: departments = [] } = useQuery<Department[]>({
-    queryKey: ["/api/departments"],
-  });
+  const [view, setView] = useState<"chart" | "table">("chart");
 
-  // Get patient volume data - either daily, monthly, or multi-period
-  const { data: volumeData = [], isLoading, error } = useQuery<PatientVolume[]>({
-    queryKey: isMultiPeriodView
-      ? ["/api/patient-volume/multi-period", rangeParam, parseInt(yearParam || '0'), parseInt(monthParam || '0'), selectedDepartment]
-      : viewType === 'monthly' 
-        ? ["/api/patient-volume/period", selectedDate.getFullYear(), selectedDate.getMonth() + 1, selectedDepartment]
-        : ["/api/patient-volume/date", selectedDate.toISOString().split('T')[0], selectedDepartment],
+  // Build API URL
+  const { startDate, endDate } = useMemo(() => {
+    if (timeRange === "custom" && customStartDate && customEndDate) {
+      return { startDate: customStartDate, endDate: customEndDate };
+    }
+    // use the same month logic you use elsewhere
+    const s = new Date(selectedYear, selectedMonth - 1, 1);
+    const e = endOfMonth(s);
+    return { startDate: s, endDate: e };
+  }, [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["/api/patient-volume", startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async () => {
-      if (isMultiPeriodView) {
-        // Fetch data for multiple periods
-        const currentDate = new Date();
-        let monthsToFetch: {year: number, month: number}[] = [];
-        
-        if (rangeParam === 'last-3-months') {
-          // Get June, July, August (last 3 months)
-          for (let i = 2; i >= 0; i--) {
-            const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i);
-            monthsToFetch.push({ year: date.getFullYear(), month: date.getMonth() + 1 });
-          }
-        } else if (rangeParam === 'year') {
-          // Get all 12 months of current year
-          const year = parseInt(yearParam || currentDate.getFullYear().toString());
-          for (let month = 1; month <= 12; month++) {
-            monthsToFetch.push({ year, month });
-          }
-        }
-        
-        // Fetch all months data
-        const allData: PatientVolume[] = [];
-        for (const { year, month } of monthsToFetch) {
-          try {
-            const response = await api.get(`/api/patient-volume/period/${year}/${month}`);
-            if (Array.isArray(response.data)) {
-              allData.push(...response.data);
-            }
-          } catch (error) {
-            console.warn(`Failed to fetch data for ${year}/${month}:`, error);
-          }
-        }
-        
-        return allData;
-      } else if (viewType === 'monthly') {
-        const response = await api.get(`/api/patient-volume/period/${selectedDate.getFullYear()}/${selectedDate.getMonth() + 1}`);
-        return Array.isArray(response.data) ? response.data : [];
-      } else {
-        const params = selectedDepartment !== "all-departments" ? `?departmentId=${selectedDepartment}` : "?departmentId=all-departments";
-        const response = await api.get(`/api/patient-volume/date/${selectedDate.toISOString().split('T')[0]}${params}`);
-        return Array.isArray(response.data) ? response.data : [];
-      }
+      const url = `/api/patient-volume?start=${format(startDate!, "yyyy-MM-dd")}&end=${format(
+        endDate!,
+        "yyyy-MM-dd"
+      )}`;
+      const resp = await api.get(url);
+      return (resp.data || []) as VolumeRow[];
     },
-    staleTime: 0,
-    refetchOnWindowFocus: false
+    enabled: !!startDate && !!endDate,
   });
 
-  // Create patient volume mutation
-  const createVolumeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
-    onSuccess: () => {
-      // Force refresh all patient volume data and dashboard
-      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
-      queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
-      queryClient.removeQueries({ queryKey: ["/api/patient-volume/period"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      toast({ title: "Patient volume recorded successfully" });
-      setShowAddForm(false);
-      setNewEntry({ date: new Date(), departmentId: "", patientCount: "", notes: "" });
-    },
-    onError: () => {
-      toast({ title: "Failed to record patient volume", variant: "destructive" });
-    }
-  });
+  // Totals & KPIs
+  const totalPatients = rows.reduce((s, r) => s + (r.count || 0), 0);
+  const daysWithData = rows.filter((r) => r.count > 0).length;
+  const avgPerDay = daysWithData ? Math.round(totalPatients / daysWithData) : 0;
+  const peak = rows.reduce((max, r) => (r.count > max.count ? r : max), { date: "", count: 0 });
 
-  // Delete patient volume mutation
-  const deleteVolumeMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
-    onSuccess: () => {
-      // Invalidate ALL patient volume related queries including dashboard
-      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
-      queryClient.removeQueries({ queryKey: ["/api/patient-volume/date"] });
-      queryClient.removeQueries({ queryKey: ["/api/patient-volume/period"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      toast({ title: "Patient volume record deleted" });
-    },
-    onError: () => {
-      toast({ title: "Failed to delete record", variant: "destructive" });
-    }
-  });
+  // Decide granularity based on duration
+  const durationDays = startDate && endDate ? differenceInCalendarDays(endDate, startDate) + 1 : 0;
+  const bucket: "day" | "week" | "month" = durationDays <= 45 ? "day" : durationDays <= 180 ? "week" : "month";
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!newEntry.patientCount || parseInt(newEntry.patientCount) < 0) {
-      toast({ title: "Please enter a valid patient count", variant: "destructive" });
-      return;
-    }
-
-    createVolumeMutation.mutate({
-      date: newEntry.date.toISOString(),
-      departmentId: null,
-      patientCount: parseInt(newEntry.patientCount),
-      notes: newEntry.notes || null
+  // Aggregate
+  const series = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach((r) => {
+      const d = parseISO(r.date);
+      const key = bucketKey(d, bucket);
+      map.set(key, (map.get(key) || 0) + (r.count || 0));
     });
+    const sorted = Array.from(map.entries())
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([dateISO, count]) => ({
+        dateISO,
+        label: labelForBucket(dateISO, bucket),
+        count,
+      }));
+    return sorted;
+  }, [rows, bucket]);
+
+  // Group rows by month for the table
+  const tableGroups = useMemo(() => {
+    const groups: Record<string, VolumeRow[]> = {};
+    for (const r of rows) {
+      const m = format(parseISO(r.date), "MMMM yyyy");
+      (groups[m] ||= []).push(r);
+    }
+    // sort days inside month
+    Object.values(groups).forEach((arr) => arr.sort((a, b) => (a.date < b.date ? -1 : 1)));
+    return Object.entries(groups).sort((a, b) => {
+      const da = parseISO(a[1][0].date);
+      const db = parseISO(b[1][0].date);
+      return da.getTime() - db.getTime();
+    });
+  }, [rows]);
+
+  // UI helpers
+  const formatYAxis = (v: number) => kfmt(v);
+
+  const ChartTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const p = payload[0].payload;
+    return (
+      <div className="bg-white p-2 border border-slate-200 rounded-md shadow-sm text-sm">
+        <div className="font-semibold text-slate-900">{p.label}</div>
+        <div className="text-slate-700 mt-1 font-mono">Patients {nf0.format(p.count)}</div>
+      </div>
+    );
   };
 
-  const totalPatients = Array.isArray(volumeData) ? volumeData.reduce((sum, entry) => sum + entry.patientCount, 0) : 0;
-
-  // Group data by month for multi-period views
-  const groupedByMonth = isMultiPeriodView ? volumeData.reduce((acc, entry) => {
-    const entryDate = new Date(entry.date);
-    const monthKey = `${entryDate.getFullYear()}-${(entryDate.getMonth() + 1).toString().padStart(2, '0')}`;
-    const monthName = format(entryDate, 'MMMM yyyy');
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = {
-        monthName,
-        entries: [],
-        total: 0
-      };
-    }
-    
-    acc[monthKey].entries.push(entry);
-    acc[monthKey].total += entry.patientCount;
-    return acc;
-  }, {} as Record<string, { monthName: string; entries: PatientVolume[]; total: number }>) : {};
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6">
+      {/* Header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-          <p className="text-slate-600">
-            {isMultiPeriodView 
-              ? rangeParam === 'last-3-months' 
-                ? 'Multi-month summary for last 3 months'
-                : rangeParam === 'year'
-                  ? `Year summary for ${parseInt(yearParam || new Date().getFullYear().toString())}`
-                  : 'Multi-period summary'
-              : viewType === 'monthly' 
-                ? `Monthly summary for ${format(selectedDate, 'MMMM yyyy')}` 
-                : 'Record and monitor daily patient visits'}
-          </p>
+          <h1 className="text-2xl font-semibold text-slate-900">Patient Volume Tracking</h1>
+          <p className="text-sm text-slate-500">Monthly summary · {periodLabel}</p>
         </div>
-        <Button 
-          onClick={() => setShowAddForm(true)}
-          className="bg-teal-600 hover:bg-teal-700"
-          data-testid="button-add-volume"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Volume
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Select value={timeRange} onValueChange={(v: any) => setTimeRange(v)}>
+            <SelectTrigger className="h-9 w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current-month">Current Month</SelectItem>
+              <SelectItem value="last-month">Last Month</SelectItem>
+              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+              <SelectItem value="last-6-months">Last 6 Months</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {timeRange === "custom" && (
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-2 w-[280px]">
+                  <DatePicker
+                    mode="single"
+                    numberOfMonths={1}
+                    selected={customStartDate}
+                    onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <span className="text-slate-400">to</span>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-2 w-[280px]">
+                  <DatePicker
+                    mode="single"
+                    numberOfMonths={1}
+                    selected={customEndDate}
+                    onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
+          <div className="ml-2 inline-flex rounded-lg border border-slate-200 p-0.5">
+            <Button variant={view === "chart" ? "default" : "ghost"} size="sm" onClick={() => setView("chart")}>
+              Chart
+            </Button>
+            <Button variant={view === "table" ? "default" : "ghost"} size="sm" onClick={() => setView("table")}>
+              Table
+            </Button>
+          </div>
+
+          <Button className="ml-2">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Volume
+          </Button>
+        </div>
       </div>
 
-      {/* Date Selector - Hidden for multi-period views */}
-      {!isMultiPeriodView && (
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2"
-                  data-testid="button-select-date"
-                >
-                  <CalendarIcon className="w-4 h-4" />
-                  {format(selectedDate, "MMMM d, yyyy")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent 
-                className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl" 
-                sideOffset={8}
-                align="start"
-                style={{ zIndex: 50 }}
-              >
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            
-            <div className="text-sm text-slate-600">
-              Total: <span className="font-semibold text-teal-600" data-testid="text-total-patients">{totalPatients}</span> patients
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card className="border-slate-200">
+          <CardContent className="p-4">
+            <div className="text-slate-500 text-xs">Total Patients</div>
+            <div className="text-xl font-semibold mt-1 font-mono tabular-nums">{nf0.format(totalPatients)}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200">
+          <CardContent className="p-4">
+            <div className="text-slate-500 text-xs">Average / Active Day</div>
+            <div className="text-xl font-semibold mt-1 font-mono tabular-nums">{nf0.format(avgPerDay)}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200">
+          <CardContent className="p-4">
+            <div className="text-slate-500 text-xs">Peak Day</div>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="text-xl font-semibold font-mono tabular-nums">{nf0.format(peak.count)}</div>
+              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">Peak</Badge>
             </div>
-          </div>
-        </div>
-      )}
+            {peak.date && <div className="text-xs text-slate-500 mt-1">{format(parseISO(peak.date), "PP")}</div>}
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Multi-period summary */}
-      {isMultiPeriodView && (
-        <div className="flex items-center justify-between mb-6">
-          <div className="text-sm text-slate-600">
-            Total: <span className="font-semibold text-teal-600" data-testid="text-total-patients">{totalPatients}</span> patients
-            <span className="ml-4 text-slate-500">
-              {rangeParam === 'last-3-months' ? '(June - August 2025)' : rangeParam === 'year' ? `(${parseInt(yearParam || new Date().getFullYear().toString())})` : ''}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Patient Volume Data */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            {isMultiPeriodView 
-              ? rangeParam === 'last-3-months' 
-                ? 'Patient Volume - Last 3 Months'
-                : rangeParam === 'year'
-                  ? `Patient Volume - ${parseInt(yearParam || new Date().getFullYear().toString())}`
-                  : 'Patient Volume - Multi-Period'
-              : viewType === 'monthly' 
-                ? `Patient Volume - ${format(selectedDate, "MMMM yyyy")}` 
-                : `Patient Volume - ${format(selectedDate, "MMMM d, yyyy")}`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : volumeData.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              No patient volume data recorded for this period
+      {/* Chart or Table */}
+      {view === "chart" ? (
+        <Card className="border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Patient Volume — {bucket === "day" ? "Daily" : bucket === "week" ? "Weekly" : "Monthly"}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={series} margin={{ top: 16, right: 16, left: 8, bottom: 24 }} barCategoryGap="25%" barGap={6}>
+                  <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" />
+                  <XAxis
+                    dataKey="label"
+                    interval={0}
+                    tick={{ fontSize: 12, fill: "#64748b" }}
+                    height={40}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickFormatter={formatYAxis}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="count" name="Patients" fill="#0ea5e9" radius={[4,4,0,0]} maxBarSize={28} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          ) : isMultiPeriodView ? (
-            // Multi-period view: Show month-by-month breakdown
-            <div className="space-y-4">
-              {Object.entries(groupedByMonth)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([monthKey, monthData]) => (
-                  <div key={monthKey} className="border border-slate-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-medium text-slate-900">{monthData.monthName}</h3>
-                      <span className="text-lg font-semibold text-teal-600">{monthData.total} patients</span>
-                    </div>
-                    <div className="space-y-2">
-                      {monthData.entries.map((entry) => (
-                        <div key={entry.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
-                          <span className="text-slate-600">{format(new Date(entry.date), 'MMM d, yyyy')}</span>
-                          <span className="font-medium">{entry.patientCount} patients</span>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Patient Volume — Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y divide-slate-100">
+              {tableGroups.map(([monthLabel, items]) => {
+                const monthTotal = items.reduce((s, r) => s + r.count, 0);
+                return (
+                  <details key={monthLabel} className="group">
+                    <summary className="flex items-center justify-between py-3 cursor-pointer select-none">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-900 font-medium">{monthLabel}</span>
+                        <Badge variant="outline" className="ml-2">Total {nf0.format(monthTotal)}</Badge>
+                      </div>
+                      <span className="text-slate-400 group-open:rotate-180 transition-transform">▾</span>
+                    </summary>
+                    <div className="pb-3">
+                      {items.map((r) => (
+                        <div key={r.date} className="flex items-center justify-between py-2 px-2 rounded hover:bg-slate-50">
+                          <div>
+                            <div className="font-medium text-slate-800">{nf0.format(r.count)} patients</div>
+                            <div className="text-xs text-slate-500">{format(parseISO(r.date), "PP")}</div>
+                          </div>
+                          <button className="text-red-500 hover:text-red-600 p-1" title="Delete">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       ))}
                     </div>
-                  </div>
-                ))}
-            </div>
-          ) : (
-            // Single period view: Show individual entries
-            <div className="space-y-3">
-              {Array.isArray(volumeData) && volumeData.map((entry) => {
-                return (
-                  <div key={entry.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {entry.patientCount} patients
-                          </div>
-                          <div className="text-sm text-slate-600">
-                            {format(new Date(entry.date), "PPP")}
-                          </div>
-                          {entry.notes && (
-                            <div className="text-xs text-slate-500 mt-1">{entry.notes}</div>
-                          )}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteVolumeMutation.mutate(entry.id)}
-                          className="text-red-600 hover:text-red-700"
-                          data-testid={`button-delete-${entry.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                  </details>
+                );
+              })}
+              {tableGroups.length === 0 && !isLoading && (
+                <div className="py-10 text-center text-slate-500">No records in this range</div>
               )}
-        </CardContent>
-      </Card>
-
-      {/* Add New Entry Modal/Form */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md shadow-2xl border-0 bg-white dark:bg-slate-900">
-            <CardHeader>
-              <CardTitle>Add Patient Volume</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                        data-testid="button-entry-date"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(newEntry.date, "PPP")}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent 
-                      className="w-auto p-0 z-[60] bg-white border border-slate-200 shadow-2xl" 
-                      sideOffset={8}
-                      style={{ zIndex: 60 }}
-                    >
-                      <Calendar
-                        mode="single"
-                        selected={newEntry.date}
-                        onSelect={(date) => date && setNewEntry(prev => ({ ...prev, date }))}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-
-
-                <div className="space-y-2">
-                  <Label>Patient Count</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={newEntry.patientCount}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, patientCount: e.target.value }))}
-                    placeholder="Number of patients"
-                    data-testid="input-patient-count"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notes (Optional)</Label>
-                  <Textarea
-                    value={newEntry.notes}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Additional notes about the day..."
-                    data-testid="textarea-notes"
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowAddForm(false)}
-                    className="flex-1"
-                    data-testid="button-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 bg-teal-600 hover:bg-teal-700"
-                    disabled={createVolumeMutation.isPending}
-                    data-testid="button-save-volume"
-                  >
-                    {createVolumeMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
