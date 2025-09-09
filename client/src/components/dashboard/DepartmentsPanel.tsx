@@ -1,114 +1,88 @@
+// client/src/components/dashboard/DepartmentsPanel.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import {
-  FlaskConical,
-  Waves,
-  Pill,
-  Scan,
-  MessageSquare,
-  MoreHorizontal,
+  FlaskConical, Waves, Pill, Scan, Stethoscope, MoreHorizontal
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-type Department = {
-  id: string;
-  code?: string;
-  name: string;
+type DepartmentsPanelProps = {
+  className?: string;
+  departments: Array<{ id: string; code: string; name: string }>;
+  departmentBreakdown?: Record<string, number>; // id -> SSP total
+  totalSSP: number;
 };
 
-type Props = {
-  departments: Department[];
-  departmentBreakdown?: Record<string, number | string>; // keyed by dept.id
-  totalSSP: number; // used for %
+// icon by department code (fallback = dot)
+const ICONS: Record<string, any> = {
+  LAB: FlaskConical,
+  ULT: Waves,
+  PHM: Pill,
+  XRY: Scan,
+  CON: Stethoscope,
 };
 
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-
-const iconFor = (codeOrName?: string) => {
-  const key = (codeOrName || "").toLowerCase();
-  if (key.includes("lab")) return { Icon: FlaskConical, tint: "text-emerald-600 bg-emerald-50" };
-  if (key.includes("ultra")) return { Icon: Waves, tint: "text-sky-600 bg-sky-50" };
-  if (key.includes("x-ray") || key.includes("xray")) return { Icon: Scan, tint: "text-slate-600 bg-slate-100" };
-  if (key.includes("pharm")) return { Icon: Pill, tint: "text-violet-600 bg-violet-50" };
-  if (key.includes("consult")) return { Icon: MessageSquare, tint: "text-orange-600 bg-orange-50" };
-  return { Icon: MoreHorizontal, tint: "text-slate-500 bg-slate-100" };
-};
-
-export default function DepartmentsPanel({ departments, departmentBreakdown = {}, totalSSP }: Props) {
-  // Normalize items: ensure we show name, not id
+export default function DepartmentsPanel({
+  className,
+  departments = [],
+  departmentBreakdown = {},
+  totalSSP = 0,
+}: DepartmentsPanelProps) {
+  // Map + sort by amount desc
   const rows = departments
     .map((d) => {
-      const amountRaw = departmentBreakdown[d.id];
-      const amount = typeof amountRaw === "string" ? parseFloat(amountRaw) : Number(amountRaw || 0);
-      return {
-        id: d.id,
-        name: d.name || d.code || d.id,
-        code: d.code,
-        amount,
-        pct: totalSSP > 0 ? (amount / totalSSP) * 100 : 0,
-      };
+      const ssp = Number(departmentBreakdown[d.id] || 0);
+      const pct = totalSSP > 0 ? (ssp / totalSSP) * 100 : 0;
+      return { ...d, ssp, pct };
     })
-    .filter((r) => r.amount > 0) // hide empty
-    .sort((a, b) => b.amount - a.amount);
+    .sort((a, b) => b.ssp - a.ssp);
 
   return (
-    <Card className="border border-slate-200 shadow-sm">
+    <Card className={cn("border border-slate-200 shadow-sm", className)}>
       <CardHeader className="pb-3">
-        <CardTitle className="text-xl font-semibold text-slate-900">
-          Departments
-        </CardTitle>
+        <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {rows.length === 0 ? (
-          <div className="text-sm text-slate-500">No department revenue for this period.</div>
-        ) : (
-          rows.map((r, idx) => {
-            const { Icon, tint } = iconFor(r.code || r.name);
-            const bar =
-              idx === 0
-                ? "bg-emerald-500"
-                : idx === 1
-                ? "bg-sky-500"
-                : idx === 2
-                ? "bg-violet-500"
-                : idx === 3
-                ? "bg-orange-500"
-                : "bg-slate-400";
+      <CardContent className="pt-0 space-y-3">
+        {rows.length === 0 && (
+          <div className="text-sm text-slate-500">No department data for this period.</div>
+        )}
 
-            return (
-              <div
-                key={r.id}
-                className="w-full rounded-lg border bg-white border-slate-100 p-3"
-                data-testid={`row-department-${r.id}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ${tint}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="truncate">
-                      <div className="font-medium text-slate-800 truncate">{r.name}</div>
-                      <div className="text-[11px] text-slate-500">
-                        {r.pct.toFixed(1)}% of revenue
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(r.amount))}
-                    </div>
-                  </div>
+        {rows.map((row) => {
+          const Icon = ICONS[row.code] ?? MoreHorizontal;
+          const colorBar =
+            row.code === "LAB" ? "bg-emerald-500" :
+            row.code === "ULT" ? "bg-sky-500" :
+            row.code === "PHM" ? "bg-violet-500" :
+            row.code === "XRY" ? "bg-cyan-600" :
+            row.code === "CON" ? "bg-orange-500" : "bg-slate-400";
+
+          return (
+            <div key={row.id} className="rounded-lg border border-slate-100 p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-50 border border-slate-200">
+                    <Icon className="h-3.5 w-3.5 text-slate-700" />
+                  </span>
+                  <div className="text-sm font-medium text-slate-900">{row.name}</div>
                 </div>
-                <div className="mt-2">
-                  <Progress
-                    value={r.pct}
-                    className="h-1.5 bg-slate-100"
-                    indicatorClassName={`${bar}`}
-                  />
+                <div className="text-sm font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {row.ssp.toLocaleString()}
                 </div>
               </div>
-            );
-          })
-        )}
+
+              <div className="mt-2">
+                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className={cn("h-2 rounded-full", colorBar)}
+                    style={{ width: `${Math.min(100, row.pct)}%` }}
+                  />
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {row.pct.toFixed(1)}% of revenue
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
