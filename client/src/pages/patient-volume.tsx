@@ -132,7 +132,7 @@ export default function PatientVolumePage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`)),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period", year, monthNumber] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -232,46 +232,21 @@ export default function PatientVolumePage() {
             Total: <span className="font-medium text-slate-800">{totalPatients}</span> patients
           </div>
         </div>
-
-        {/* FIX: active pill text/icon color */}
         <div className="flex gap-2">
           <Button
             variant={mode === "chart" ? "default" : "outline"}
-            className={cn(
-              "h-8 px-3",
-              mode === "chart"
-                ? "bg-slate-900 hover:bg-slate-800 text-white"
-                : "text-slate-700"
-            )}
+            className={cn("h-8 px-3", mode === "chart" ? "bg-slate-900 hover:bg-slate-800" : "")}
             onClick={() => setMode("chart")}
-            aria-pressed={mode === "chart"}
           >
-            <BarChart3
-              className={cn(
-                "w-4 h-4 mr-1",
-                mode === "chart" ? "text-white" : "text-slate-700"
-              )}
-            />
+            <BarChart3 className="w-4 h-4 mr-1" />
             Chart
           </Button>
-
           <Button
             variant={mode === "table" ? "default" : "outline"}
-            className={cn(
-              "h-8 px-3",
-              mode === "table"
-                ? "bg-slate-900 hover:bg-slate-800 text-white"
-                : "text-slate-700"
-            )}
+            className={cn("h-8 px-3", mode === "table" ? "bg-slate-900 hover:bg-slate-800" : "")}
             onClick={() => setMode("table")}
-            aria-pressed={mode === "table"}
           >
-            <TableIcon
-              className={cn(
-                "w-4 h-4 mr-1",
-                mode === "table" ? "text-white" : "text-slate-700"
-              )}
-            />
+            <TableIcon className="w-4 h-4 mr-1" />
             Table
           </Button>
         </div>
@@ -297,6 +272,7 @@ export default function PatientVolumePage() {
                     tick={{ fontSize: 11, fill: "#64748b" }}
                     axisLine={{ stroke: "#e5e7eb" }}
                     tickLine={false}
+                    // label is optional—uncomment if you want it
                     label={{
                       value: "Day",
                       position: "insideBottomRight",
@@ -336,6 +312,7 @@ export default function PatientVolumePage() {
                   const idToDelete =
                     rawVolumes.find((v) => {
                       const vd = parseISO(v.date);
+                      // match same local day (handles tz correctly)
                       return (
                         vd.getFullYear() === dayDate.getFullYear() &&
                         vd.getMonth() === dayDate.getMonth() &&
