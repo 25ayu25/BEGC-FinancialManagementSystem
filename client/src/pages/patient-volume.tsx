@@ -233,20 +233,32 @@ export default function PatientVolumePage() {
           </div>
         </div>
         <div className="flex gap-2">
+          {/* CHANGED: set text to white when active AND force svg to inherit using [&>svg] */}
           <Button
             variant={mode === "chart" ? "default" : "outline"}
-            className={cn("h-8 px-3", mode === "chart" ? "bg-slate-900 hover:bg-slate-800" : "")}
+            className={cn(
+              "h-8 px-3",
+              mode === "chart"
+                ? "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white"
+                : "text-slate-700"
+            )}
             onClick={() => setMode("chart")}
           >
-            <BarChart3 className="w-4 h-4 mr-1" />
+            <BarChart3 className="w-4 h-4 mr-1 shrink-0" />
             Chart
           </Button>
+          {/* CHANGED: same treatment for the Table button */}
           <Button
             variant={mode === "table" ? "default" : "outline"}
-            className={cn("h-8 px-3", mode === "table" ? "bg-slate-900 hover:bg-slate-800" : "")}
+            className={cn(
+              "h-8 px-3",
+              mode === "table"
+                ? "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white"
+                : "text-slate-700"
+            )}
             onClick={() => setMode("table")}
           >
-            <TableIcon className="w-4 h-4 mr-1" />
+            <TableIcon className="w-4 h-4 mr-1 shrink-0" />
             Table
           </Button>
         </div>
@@ -272,7 +284,6 @@ export default function PatientVolumePage() {
                     tick={{ fontSize: 11, fill: "#64748b" }}
                     axisLine={{ stroke: "#e5e7eb" }}
                     tickLine={false}
-                    // label is optional—uncomment if you want it
                     label={{
                       value: "Day",
                       position: "insideBottomRight",
