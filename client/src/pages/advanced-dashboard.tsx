@@ -443,7 +443,7 @@ export default function AdvancedDashboard() {
   };
 
   const generateYTicks = () => {
-    const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
+    const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0); // using SSP scale
     if (peak === 0) return [0, 10000, 20000, 30000, 40000];
     const maxNeeded = Math.max(peak * 1.2, 10000);
     const ticks = [0];
@@ -746,10 +746,12 @@ export default function AdvancedDashboard() {
                   </div>
                   <div className="ml-8 h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
+                      {/* === Stacked Bar (SSP + USD) === */}
                       <BarChart 
                         data={incomeSeries}
                         margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
-                        barCategoryGap="20%"
+                        barCategoryGap="12%"   // thicker bars
+                        barGap={2}
                       >
                         <CartesianGrid 
                           strokeDasharray="1 1" 
@@ -759,7 +761,6 @@ export default function AdvancedDashboard() {
                           vertical={false}
                         />
 
-                        {/* X axis */}
                         <XAxis 
                           dataKey="day"
                           axisLine={{ stroke: '#eef2f7', strokeWidth: 1 }}
@@ -770,26 +771,14 @@ export default function AdvancedDashboard() {
                           height={40}
                         />
 
-                        {/* Left Y axis (SSP) */}
+                        {/* Single Y axis (SSP scale) */}
                         <YAxis 
-                          yAxisId="ssp"
                           axisLine={false}
                           tickLine={false}
                           tick={{ fontSize: 11, fill: '#64748b' }}
                           tickFormatter={formatYAxis}
                           domain={[0, Math.max(...generateYTicks())]}
                           ticks={generateYTicks()}
-                        />
-
-                        {/* Right Y axis (USD) */}
-                        <YAxis
-                          yAxisId="usd"
-                          orientation="right"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 11, fill: '#64748b' }}
-                          tickFormatter={(v: number) => `${Math.round(v)}`}
-                          allowDecimals={false}
                         />
 
                         <Tooltip content={<CustomTooltip />} />
@@ -803,7 +792,6 @@ export default function AdvancedDashboard() {
                         {/* Monthly average (SSP only) */}
                         {showAvgLine && monthlyAvgSSP > 0 && (
                           <ReferenceLine 
-                            yAxisId="ssp"
                             y={monthlyAvgSSP} 
                             stroke="#0d9488" 
                             strokeWidth={1}
@@ -817,25 +805,33 @@ export default function AdvancedDashboard() {
                           />
                         )}
 
-                        {/* Two separate bars (not stacked) */}
+                        {/* Pattern to keep tiny USD visible */}
+                        <defs>
+                          <pattern id="usdHatch" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="#0ea5e9" opacity="0.85" />
+                            <path d="M-1,1 l2,-2 M0,6 l6,-6 M5,7 l2,-2" stroke="white" strokeWidth="0.6" opacity="0.35" />
+                          </pattern>
+                        </defs>
+
+                        {/* Stacked bars */}
                         <Bar 
-                          yAxisId="ssp"
                           dataKey="amountSSP" 
-                          fill="#14b8a6"       // teal
-                          stroke="none"
                           name="SSP"
-                          maxBarSize={16}
-                          radius={[3,3,0,0]}
+                          fill="#14b8a6"        // teal
+                          stackId="rev"
+                          maxBarSize={24}
+                          radius={[0,0,0,0]}
+                          minPointSize={1}
                           onClick={handleBarClick}
                         />
                         <Bar 
-                          yAxisId="usd"
                           dataKey="amountUSD" 
-                          fill="#0ea5e9"       // blue
-                          stroke="none"
                           name="USD"
-                          maxBarSize={16}
-                          radius={[3,3,0,0]}
+                          fill="url(#usdHatch)" // patterned blue
+                          stackId="rev"
+                          maxBarSize={24}
+                          radius={[4,4,0,0]}   // round the top of full stack
+                          minPointSize={3}
                           onClick={handleBarClick}
                         />
                       </BarChart>
