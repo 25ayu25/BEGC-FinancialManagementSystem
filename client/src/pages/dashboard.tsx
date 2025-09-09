@@ -315,7 +315,7 @@ export default function Dashboard() {
           <SimpleExpenseBreakdown
             breakdown={(dashboardData as any)?.expenseBreakdown}
             total={parseFloat((dashboardData as any)?.totalExpenses || "0")}
-            title="Expenses — Category Breakdown"
+            title="Expenses Breakdown"
             periodLabel={
               timeRange === "current-month" ? "Current month" :
               timeRange === "last-month" ? "Last month" :
