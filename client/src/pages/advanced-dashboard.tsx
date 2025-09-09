@@ -1,3 +1,4 @@
+// client/src/pages/advanced-dashboard.tsx
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -14,7 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
-  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
+  TrendingUp, TrendingDown, DollarSign, Users, Calendar as CalendarIcon, Shield, RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 
@@ -23,10 +24,14 @@ import {
   CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from "recharts";
 
+// Global date filter
 import { useDateFilter } from "@/context/date-filter-context";
+
+// Drawer + improved Departments panel
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
+// ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
@@ -48,6 +53,7 @@ export default function AdvancedDashboard() {
     range: "current-month" | "last-month" | "last-3-months" | "year" | "custom"
   ) => setTimeRange(range);
 
+  // ---------- queries ----------
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
@@ -110,6 +116,7 @@ export default function AdvancedDashboard() {
     }
   }
 
+  // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
@@ -119,6 +126,7 @@ export default function AdvancedDashboard() {
   const showAvgLine = daysWithSSP >= 2;
   const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
 
+  // hide zero bars: null skips drawing
   const chartData = useMemo(
     () => incomeSeries.map(d => ({
       ...d,
@@ -128,6 +136,7 @@ export default function AdvancedDashboard() {
     [incomeSeries]
   );
 
+  // X ticks: 1,5,10,15,20,25,last
   const xTicks = useMemo(() => {
     const n = incomeSeries.length;
     if (!n) return [];
@@ -154,6 +163,7 @@ export default function AdvancedDashboard() {
     );
   };
 
+  // loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -165,6 +175,7 @@ export default function AdvancedDashboard() {
     );
   }
 
+  // summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
@@ -194,7 +205,8 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
-      <header className="mb-4">
+      {/* Header + date filters */}
+      <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
@@ -204,6 +216,7 @@ export default function AdvancedDashboard() {
               <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
             </div>
           </div>
+
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
@@ -265,8 +278,8 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+      {/* KPI band */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
@@ -414,43 +427,47 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      {/* Main section — fixed right rail, taller chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 mb-6">
         {/* Revenue Analytics */}
-        <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+            </div>
           </CardHeader>
-          <CardContent className="pb-3">
+          <CardContent className="pb-4">
             {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
               <div className="space-y-0">
-                <div className="h-60 w-full">
+                <div className="h-80 w-full">{/* taller than before for legibility */}
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 16, right: hasAnyUSD ? 56 : 16, left: 8, bottom: 24 }}
+                      margin={{ top: 16, right: hasAnyUSD ? 52 : 16, left: 8, bottom: 28 }}
                       barGap={6}
                       barCategoryGap="28%"
                     >
-                      <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
-                      <Legend verticalAlign="top" height={30} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "6px" }} />
+                      <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.35} vertical={false} />
+                      <Legend verticalAlign="top" height={32} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "8px" }} />
                       <XAxis
                         dataKey="day"
                         ticks={xTicks}
                         tickFormatter={(v: number) => String(v)}
                         axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
                         tickLine={false}
-                        tick={{ fontSize: 11, fill: "#64748b" }}
-                        height={34}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        height={36}
                       />
+                      {/* Left Y axis (SSP) */}
                       <YAxis
                         yAxisId="ssp"
                         axisLine={false}
                         tickLine={false}
                         tick={{ fontSize: 11, fill: "#0f766e" }}
                         tickFormatter={formatYAxisSSP}
-                        label={{ value: "Revenue (SSP)", angle: -90, position: "insideLeft", offset: 6, style: { fill: "#0f766e", fontSize: 10 } }}
+                        label={{ value: "Revenue (SSP)", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#0f766e", fontSize: 11 } }}
                       />
+                      {/* Right Y axis (USD) */}
                       <YAxis
                         yAxisId="usd"
                         hide={!hasAnyUSD}
@@ -459,9 +476,10 @@ export default function AdvancedDashboard() {
                         tickLine={false}
                         tick={{ fontSize: 11, fill: "#1d4ed8" }}
                         tickFormatter={formatYAxisUSD}
-                        label={{ value: "Revenue (USD)", angle: 90, position: "insideRight", offset: 6, style: { fill: "#1d4ed8", fontSize: 10 } }}
+                        label={{ value: "Revenue (USD)", angle: 90, position: "insideRight", offset: 8, style: { fill: "#1d4ed8", fontSize: 11 } }}
                       />
                       <Tooltip content={<CustomTooltip />} />
+                      {/* Avg line (SSP only) */}
                       {showAvgLine && monthlyAvgSSP > 0 && (
                         <ReferenceLine
                           yAxisId="ssp"
@@ -469,7 +487,7 @@ export default function AdvancedDashboard() {
                           stroke="#0d9488"
                           strokeWidth={1}
                           strokeDasharray="4 2"
-                          label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 6 }}
+                          label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 8 }}
                         />
                       )}
                       <Bar yAxisId="ssp" dataKey="amountSSPPlot" name="SSP" fill="#14b8a6" barSize={24} radius={[4, 4, 0, 0]} />
@@ -480,7 +498,8 @@ export default function AdvancedDashboard() {
                   </ResponsiveContainer>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3">
+                {/* Totals under chart */}
+                <div className="border-t border-slate-100 pt-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
@@ -509,7 +528,7 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="h-60 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
+              <div className="h-80 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3" />
                   <p className="text-slate-600 text-sm font-medium">No revenue in this range</p>
@@ -520,23 +539,26 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Departments Panel */}
-        <DepartmentsPanel
-          departments={Array.isArray(departments) ? (departments as any[]) : []}
-          departmentBreakdown={dashboardData?.departmentBreakdown}
-          totalSSP={sspRevenue}
-        />
+        {/* Right fixed rail — Departments */}
+        <div className="lg:sticky lg:top-20">
+          <DepartmentsPanel
+            className="lg:w-[380px]"
+            departments={Array.isArray(departments) ? (departments as any[]) : []}
+            departmentBreakdown={dashboardData?.departmentBreakdown}
+            totalSSP={sspRevenue}
+          />
+        </div>
       </div>
 
-      {/* Quick Actions / System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Actions & system status — compact */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border border-slate-200 shadow-sm">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <a href="/transactions" className="block">
                 <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
@@ -575,12 +597,12 @@ export default function AdvancedDashboard() {
         </Card>
 
         <Card className="border border-slate-200 shadow-sm">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Database</span>
@@ -601,6 +623,7 @@ export default function AdvancedDashboard() {
         </Card>
       </div>
 
+      {/* Expenses drawer */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
