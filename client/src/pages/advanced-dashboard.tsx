@@ -24,10 +24,7 @@ import {
   CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from "recharts";
 
-// Global date filter
 import { useDateFilter } from "@/context/date-filter-context";
-
-// Drawer + improved Departments panel
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
@@ -427,8 +424,8 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
         {/* Revenue Analytics */}
         <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
@@ -439,7 +436,7 @@ export default function AdvancedDashboard() {
           <CardContent className="pb-4">
             {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
               <div className="space-y-0">
-                <div className="h-64 w-full">
+                <div className="h-80 lg:h-[420px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData}
@@ -529,7 +526,7 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="h-64 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
+              <div className="h-80 lg:h-[420px] bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3" />
                   <p className="text-slate-600 text-sm font-medium">No revenue in this range</p>
@@ -540,17 +537,17 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Departments Panel (icons, progress, pill) */}
-        <DepartmentsPanel
-          departments={Array.isArray(departments) ? (departments as any[]) : []}
-          departmentBreakdown={dashboardData?.departmentBreakdown}
-          totalSSP={sspRevenue}
-        />
-      </div>
+        {/* Departments Panel */}
+        <div className="lg:col-span-1">
+          <DepartmentsPanel
+            departments={Array.isArray(departments) ? (departments as any[]) : []}
+            departmentBreakdown={dashboardData?.departmentBreakdown}
+            totalSSP={sspRevenue}
+          />
+        </div>
 
-      {/* Quick Actions / System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <Card className="border border-slate-200 shadow-sm">
+        {/* Quick Actions — sits below chart (spans 2) */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
@@ -594,7 +591,8 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border border-slate-200 shadow-sm">
+        {/* System Status — sits under Departments */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
