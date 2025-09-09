@@ -1,24 +1,24 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
-import {
-  BarChart3,
-  Table as TableIcon,
-  Plus,
-  Trash2,
-} from "lucide-react";
-
-import { api, apiRequest } from "@/lib/queryClient";
-import { cn } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
-
+import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { apiRequest, api } from "@/lib/queryClient";
+import {
+  Calendar as CalendarIcon,
+  Users,
+  Plus,
+  Trash2,
+  BarChart3,
+  Table as TableIcon,
+} from "lucide-react";
 
 import {
   ResponsiveContainer,
@@ -32,205 +32,219 @@ import {
 
 type PatientVolume = {
   id: string;
-  date: string; // ISO
+  date: string;           // ISO string from API
   patientCount: number;
   notes?: string | null;
 };
 
-type Mode = "chart" | "table";
-
-// —————————————————————————————————————————————————————
-// Helpers
-// —————————————————————————————————————————————————————
-const monthLabel = (y: number, m1: number) =>
-  format(new Date(y, m1 - 1, 1), "MMMM yyyy");
-
-const dayTicks = (year: number, month1: number) =>
-  Array.from({ length: new Date(year, month1, 0).getDate() }, (_, i) => i + 1);
-
-const toISODate = (d: Date) => d.toISOString().split("T")[0];
-
-// —————————————————————————————————————————————————————
-// Component
-// —————————————————————————————————————————————————————
 export default function PatientVolumePage() {
-  // Current month (you can pass ?year=YYYY&month=MM if you like)
+  // Read URL params coming from dashboard links (optional)
   const params = new URLSearchParams(window.location.search);
-  const yearParam = parseInt(params.get("year") || "", 10);
-  const monthParam = parseInt(params.get("month") || "", 10);
+  const viewParam = params.get("view"); // "monthly" or null
+  const yearParam = params.get("year");
+  const monthParam = params.get("month");
 
-  const today = new Date();
-  const year = Number.isFinite(yearParam) ? yearParam : today.getFullYear();
-  const month1 = Number.isFinite(monthParam) ? monthParam : today.getMonth() + 1;
+  // Default to current month unless explicitly set via URL (from dashboard)
+  const initialMonthDate = useMemo(() => {
+    if (viewParam === "monthly" && yearParam && monthParam) {
+      return new Date(Number(yearParam), Number(monthParam) - 1, 1, 12); // noon to avoid tz drift
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1, 12);
+  }, [viewParam, yearParam, monthParam]);
 
-  const [mode, setMode] = useState<Mode>("chart");
-  const [showAdd, setShowAdd] = useState(false);
-  const [newEntry, setNewEntry] = useState({
+  const [selectedMonth, setSelectedMonth] = useState<Date>(initialMonthDate);
+  const [mode, setMode] = useState<"chart" | "table">("chart");
+  const [addOpen, setAddOpen] = useState(false);
+  const [newEntry, setNewEntry] = useState<{ date: Date; patientCount: string; notes: string }>({
     date: new Date(),
     patientCount: "",
     notes: "",
   });
 
-  const q = useQuery({
-    queryKey: ["/api/patient-volume/period", year, month1],
-    queryFn: async () => {
-      const res = await api.get(`/api/patient-volume/period/${year}/${month1}`);
-      return Array.isArray(res.data) ? (res.data as PatientVolume[]) : [];
-    },
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-  });
-
   const queryClient = useQueryClient();
 
+  // --- Fetch this month's volumes ---
+  const year = selectedMonth.getFullYear();
+  const monthIndex = selectedMonth.getMonth(); // 0-based
+  const monthNumber = monthIndex + 1;         // 1-based
+
+  const { data: rawVolumes = [], isLoading } = useQuery<PatientVolume[]>({
+    queryKey: ["/api/patient-volume/period", year, monthNumber],
+    queryFn: async () => {
+      const resp = await api.get(`/api/patient-volume/period/${year}/${monthNumber}`);
+      return Array.isArray(resp.data) ? resp.data : [];
+    },
+  });
+
+  // --- Normalize & aggregate to days (avoid timezone “Aug 31” drift) ---
+  const daysInMonth = useMemo(
+    () => new Date(year, monthIndex + 1, 0).getDate(),
+    [year, monthIndex]
+  );
+
+  const dayBuckets = useMemo(() => {
+    const buckets = Array.from({ length: daysInMonth }, () => 0);
+    for (const v of rawVolumes) {
+      // Parse server ISO date in local time, then bucket by local day if it truly belongs to this month
+      const d = parseISO(v.date);
+      if (d.getFullYear() === year && d.getMonth() === monthIndex) {
+        const day = d.getDate(); // 1..N local
+        buckets[day - 1] += Number(v.patientCount || 0);
+      }
+    }
+    return buckets;
+  }, [rawVolumes, daysInMonth, year, monthIndex]);
+
+  const activeDays = dayBuckets.filter((c) => c > 0).length;
+  const totalPatients = dayBuckets.reduce((s, n) => s + n, 0);
+  const avgPerActiveDay = activeDays ? totalPatients / activeDays : 0;
+  const peakCount = Math.max(0, ...dayBuckets);
+  const peakDay = peakCount > 0 ? dayBuckets.findIndex((n) => n === peakCount) + 1 : null;
+
+  // Recharts data
+  const chartData = useMemo(
+    () =>
+      dayBuckets.map((count, idx) => ({
+        day: idx + 1,
+        count: count > 0 ? count : 0, // keep bars even for zero (or set to null to hide)
+      })),
+    [dayBuckets]
+  );
+
+  // X-axis ticks: show all 1..N (your request)
+  const xTicks = useMemo(
+    () => Array.from({ length: daysInMonth }, (_, i) => i + 1),
+    [daysInMonth]
+  );
+
+  // --- Mutations ---
   const createMutation = useMutation({
-    mutationFn: (payload: any) => apiRequest("POST", "/api/patient-volume", payload),
+    mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period", year, monthNumber] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      toast({ title: "Patient volume recorded successfully" });
-      setShowAdd(false);
+      toast({ title: "Patient volume recorded" });
+      setAddOpen(false);
       setNewEntry({ date: new Date(), patientCount: "", notes: "" });
     },
     onError: () => toast({ title: "Failed to record patient volume", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period", year, monthNumber] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      toast({ title: "Patient volume record deleted" });
+      toast({ title: "Patient volume deleted" });
     },
-    onError: () => toast({ title: "Failed to delete record", variant: "destructive" }),
+    onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
 
-  // ——— Derived data
-  const days = new Date(year, month1, 0).getDate();
-  const ticks = dayTicks(year, month1);
-
-  const dailyMap = useMemo(() => {
-    const map = new Map<number, PatientVolume[]>();
-    (q.data || []).forEach((e) => {
-      const d = new Date(e.date);
-      const day = d.getDate();
-      if (!map.has(day)) map.set(day, []);
-      map.get(day)!.push(e);
-    });
-    return map;
-  }, [q.data]);
-
-  const chartData = useMemo(
-    () =>
-      ticks.map((d) => ({
-        day: d,
-        count: (dailyMap.get(d) || []).reduce((s, r) => s + r.patientCount, 0),
-      })),
-    [ticks, dailyMap]
-  );
-
-  const total = chartData.reduce((s, r) => s + r.count, 0);
-  const activeDays = chartData.filter((d) => d.count > 0).length;
-  const avgActive = activeDays ? total / activeDays : 0;
-  const peak = chartData.reduce(
-    (acc, cur) => (cur.count > acc.count ? cur : acc),
-    { day: 0, count: 0 }
-  );
-
-  // ——— Add form submit
-  const submit = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const n = parseInt(newEntry.patientCount, 10);
-    if (!Number.isFinite(n) || n < 0) {
-      toast({ title: "Please enter a valid patient count", variant: "destructive" });
+    const pc = parseInt(newEntry.patientCount, 10);
+    if (Number.isNaN(pc) || pc < 0) {
+      toast({ title: "Enter a valid patient count", variant: "destructive" });
       return;
     }
+    // Save as ISO; backend already expects ISO string
     createMutation.mutate({
       date: newEntry.date.toISOString(),
       departmentId: null,
-      patientCount: n,
+      patientCount: pc,
       notes: newEntry.notes || null,
     });
   };
 
-  // —————————————————————————————————————————————————————
-  // UI
-  // —————————————————————————————————————————————————————
+  // --- Rendering helpers ---
+  const monthTitle = format(selectedMonth, "MMMM yyyy"); // auto updates (Sep → Oct, etc.)
+
+  const TooltipBox = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const p = payload[0].payload;
+    const d = new Date(year, monthIndex, p.day, 12);
+    return (
+      <div className="bg-white border border-slate-200 rounded-md shadow-md px-3 py-2">
+        <div className="font-medium text-slate-900 mb-1">{format(d, "EEE, MMM d, yyyy")}</div>
+        <div className="text-sm text-slate-700">
+          Patients: <span className="font-semibold">{p.count}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header & Action */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
           <p className="text-slate-600">Monthly & multi-period summary</p>
         </div>
-
-        <Button
-          onClick={() => setShowAdd(true)}
-          className="bg-teal-600 hover:bg-teal-700"
-        >
+        <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setAddOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Volume
         </Button>
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Total Patients</p>
-            <p className="text-2xl font-semibold">{total.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">{monthLabel(year, month1)}</p>
+            <div className="text-xs text-slate-600">Total Patients</div>
+            <div className="text-2xl font-semibold">{totalPatients.toLocaleString()}</div>
+            <div className="text-xs text-slate-500">{monthTitle}</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Average / Active Day</p>
-            <p className="text-2xl font-semibold">
-              {avgActive.toFixed(1)}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">{activeDays} active days</p>
+            <div className="text-xs text-slate-600">Average / Active Day</div>
+            <div className="text-2xl font-semibold">
+              {activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}
+            </div>
+            <div className="text-xs text-slate-500">{activeDays} active days</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Peak Day</p>
-            <p className="text-2xl font-semibold">{peak.count}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              {peak.day > 0 ? format(new Date(year, month1 - 1, peak.day), "EEE, MMM d, yyyy") : "—"}
-            </p>
+            <div className="text-xs text-slate-600">Peak Day</div>
+            <div className="text-2xl font-semibold">{peakCount}</div>
+            <div className="text-xs text-slate-500">
+              {peakDay ? format(new Date(year, monthIndex, peakDay, 12), "EEE, MMM d, yyyy") : "—"}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Section heading + toggle */}
+      {/* Section header with chip + toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600">
-            👥
-          </span>
-          <h2 className="text-lg font-semibold text-slate-900">
-            Patient Volume <span className="mx-2 text-slate-300">•</span>
-            <span className="inline-flex items-center rounded-full border border-slate-200 px-2 py-[2px] text-xs text-slate-700 bg-white">
-              {monthLabel(year, month1)}
+          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Patient Volume
+            <span className="mx-1 text-slate-300">•</span>
+            <span className="rounded-full border px-2 py-0.5 text-sm bg-slate-50 border-slate-200">
+              {monthTitle}
             </span>
           </h2>
-          <span className="ml-2 text-sm text-slate-500">
-            Total: <span className="font-semibold text-teal-600">{total}</span> patients
-          </span>
+          <div className="ml-2 text-sm text-slate-500">
+            Total: <span className="font-medium text-slate-800">{totalPatients}</span> patients
+          </div>
         </div>
 
+        {/* FIX: active pill text/icon color */}
         <div className="flex gap-2">
-          {/* CHART pill — explicit white text when active */}
           <Button
             variant={mode === "chart" ? "default" : "outline"}
             className={cn(
-              "h-8 px-3 rounded-md",
+              "h-8 px-3",
               mode === "chart"
                 ? "bg-slate-900 hover:bg-slate-800 text-white"
                 : "text-slate-700"
             )}
             onClick={() => setMode("chart")}
+            aria-pressed={mode === "chart"}
           >
             <BarChart3
               className={cn(
@@ -241,16 +255,16 @@ export default function PatientVolumePage() {
             Chart
           </Button>
 
-          {/* TABLE pill — explicit white text when active */}
           <Button
             variant={mode === "table" ? "default" : "outline"}
             className={cn(
-              "h-8 px-3 rounded-md",
+              "h-8 px-3",
               mode === "table"
                 ? "bg-slate-900 hover:bg-slate-800 text-white"
                 : "text-slate-700"
             )}
             onClick={() => setMode("table")}
+            aria-pressed={mode === "table"}
           >
             <TableIcon
               className={cn(
@@ -264,96 +278,92 @@ export default function PatientVolumePage() {
       </div>
 
       {/* Chart / Table */}
-      <Card className="border border-slate-200 shadow-sm">
-        <CardContent className="pt-4">
-          {q.isLoading ? (
-            <div className="text-center py-8">Loading…</div>
+      <Card>
+        <CardContent className="p-4">
+          {isLoading ? (
+            <div className="py-14 text-center text-slate-500">Loading…</div>
           ) : mode === "chart" ? (
-            <div className="h-80">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
-                  margin={{ top: 10, right: 12, left: 12, bottom: 24 }}
-                  barCategoryGap="28%"
+                  margin={{ top: 8, right: 16, left: 4, bottom: 22 }}
+                  barCategoryGap="20%"
                 >
-                  <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#eef2f7" />
+                  <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                   <XAxis
                     dataKey="day"
-                    ticks={ticks}
-                    interval={0}
+                    ticks={xTicks}
                     tick={{ fontSize: 11, fill: "#64748b" }}
+                    axisLine={{ stroke: "#e5e7eb" }}
+                    tickLine={false}
                     label={{
                       value: "Day",
                       position: "insideBottomRight",
-                      offset: -12,
-                      style: { fill: "#94a3b8", fontSize: 11 },
+                      offset: -14,
+                      style: { fill: "#64748b", fontSize: 11 },
                     }}
                   />
                   <YAxis
                     tick={{ fontSize: 11, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
                     allowDecimals={false}
                     label={{
                       value: "Patients",
                       angle: -90,
                       position: "insideLeft",
                       offset: 8,
-                      style: { fill: "#94a3b8", fontSize: 11 },
+                      style: { fill: "#64748b", fontSize: 11 },
                     }}
                   />
-                  <Tooltip
-                    formatter={(v: any) => [`${v} patients`, "Count"]}
-                    labelFormatter={(d: any) =>
-                      format(new Date(year, month1 - 1, Number(d)), "EEE, MMM d, yyyy")
-                    }
-                  />
-                  <Bar
-                    dataKey="count"
-                    name="Patients"
-                    fill="#14b8a6"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={26}
-                  />
+                  <Tooltip content={<TooltipBox />} />
+                  <Bar dataKey="count" name="Patients" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border border-slate-200">
-              <div className="grid grid-cols-[1fr_120px_44px] bg-slate-50 text-slate-600 text-sm px-3 py-2">
+              <div className="grid grid-cols-[1fr_120px_44px] bg-slate-50 text-slate-600 text-sm px-3 py-2 font-medium">
                 <div>Date</div>
-                <div className="text-right pr-2">Patients</div>
+                <div className="text-right pr-6">Patients</div>
                 <div />
               </div>
-              <div>
-                {ticks.map((d) => {
-                  const entries = dailyMap.get(d) || [];
-                  const count = entries.reduce((s, r) => s + r.patientCount, 0);
-                  const has = entries.length > 0;
-                  // If you want to *only* list existing entries, replace ticks.map with (q.data || []).sort(...)
+              <div className="divide-y divide-slate-100">
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
+                  const count = dayBuckets[d - 1] || 0;
+                  const dayDate = new Date(year, monthIndex, d, 12);
+                  const idToDelete =
+                    rawVolumes.find((v) => {
+                      const vd = parseISO(v.date);
+                      return (
+                        vd.getFullYear() === dayDate.getFullYear() &&
+                        vd.getMonth() === dayDate.getMonth() &&
+                        vd.getDate() === dayDate.getDate()
+                      );
+                    })?.id ?? null;
+
                   return (
                     <div
                       key={d}
-                      className="grid grid-cols-[1fr_120px_44px] items-center border-t border-slate-100 px-3 py-2"
+                      className="grid grid-cols-[1fr_120px_44px] items-center px-3 py-2 hover:bg-slate-50"
                     >
-                      <div className="text-slate-800">
-                        {format(new Date(year, month1 - 1, d), "EEE, MMM d, yyyy")}
-                      </div>
-                      <div className={cn("text-right pr-2 font-medium", has ? "text-slate-900" : "text-slate-400")}>
-                        {count}
-                      </div>
-                      <div className="text-right">
-                        {/* Show delete for each raw entry of that day */}
-                        {entries.map((e) => (
+                      <div className="text-slate-900">{format(dayDate, "EEE, MMM d, yyyy")}</div>
+                      <div className="text-right font-medium text-slate-900 pr-6">{count}</div>
+                      <div className="flex justify-end">
+                        {idToDelete ? (
                           <Button
-                            key={e.id}
                             variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => deleteMutation.mutate(e.id)}
-                            title="Delete this entry"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700"
+                            onClick={() => deleteMutation.mutate(idToDelete)}
+                            title="Delete entry"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
-                        ))}
+                        ) : (
+                          <div className="h-8 w-8" />
+                        )}
                       </div>
                     </div>
                   );
@@ -364,38 +374,29 @@ export default function PatientVolumePage() {
         </CardContent>
       </Card>
 
-      {/* Add Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md shadow-2xl border-0 bg-white">
+      {/* Add modal */}
+      {addOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border-0 shadow-2xl">
             <CardHeader>
               <CardTitle>Add Patient Volume</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                      >
+                      <Button variant="outline" className="w-full justify-start">
+                        <CalendarIcon className="w-4 h-4 mr-2" />
                         {format(newEntry.date, "PPP")}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      side="bottom"
-                      align="start"
-                      sideOffset={8}
-                      className="p-2 w-[280px] bg-white border border-slate-200 shadow-2xl"
-                    >
-                      <DatePicker
+                    <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
+                      <Calendar
                         mode="single"
                         selected={newEntry.date}
-                        onSelect={(d) =>
-                          d && setNewEntry((p) => ({ ...p, date: new Date(toISODate(d) + "T12:00:00") }))
-                        }
+                        onSelect={(d) => d && setNewEntry((p) => ({ ...p, date: d }))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -406,42 +407,28 @@ export default function PatientVolumePage() {
                   <Label>Patient Count</Label>
                   <Input
                     type="number"
-                    inputMode="numeric"
                     min={0}
                     value={newEntry.patientCount}
-                    onChange={(e) =>
-                      setNewEntry((p) => ({ ...p, patientCount: e.target.value }))
-                    }
-                    placeholder="Number of patients"
+                    onChange={(e) => setNewEntry((p) => ({ ...p, patientCount: e.target.value }))}
+                    placeholder="e.g. 27"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Notes (Optional)</Label>
+                  <Label>Notes (optional)</Label>
                   <Textarea
                     value={newEntry.notes}
-                    onChange={(e) =>
-                      setNewEntry((p) => ({ ...p, notes: e.target.value }))
-                    }
+                    onChange={(e) => setNewEntry((p) => ({ ...p, notes: e.target.value }))}
                     placeholder="Additional notes…"
                   />
                 </div>
 
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setShowAdd(false)}
-                  >
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setAddOpen(false)}>
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 bg-teal-600 hover:bg-teal-700"
-                    disabled={createMutation.isPending}
-                  >
+                  <Button type="submit" className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={createMutation.isPending}>
                     {createMutation.isPending ? "Saving…" : "Save"}
                   </Button>
                 </div>
