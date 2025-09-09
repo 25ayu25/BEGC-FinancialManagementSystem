@@ -2,14 +2,22 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
 import {
   TrendingUp,
   TrendingDown,
@@ -19,7 +27,9 @@ import {
   Shield,
   RefreshCw,
 } from "lucide-react";
+
 import { api } from "@/lib/queryClient";
+
 import {
   ResponsiveContainer,
   BarChart,
@@ -35,21 +45,25 @@ import {
 // Global date filter (shared with Overview)
 import { useDateFilter } from "@/context/date-filter-context";
 
-// Drawer component
+// Drawer + Departments panel
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
+import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
-// -------- number formatting helpers --------
+// ---------------- Helpers ----------------
+
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
 const kfmt = (v: number) =>
   v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v));
-const fmtUSD = (v: number) => {
-  const one = Number(v.toFixed(1));
-  return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
-};
+
+const fmtUSD = (v: number) =>
+  Number.isInteger(v) ? nf0.format(v) : nf1.format(v);
+
+// ---------------- Page ----------------
 
 export default function AdvancedDashboard() {
-  // Global date state from provider
+  // 🔗 Global date state from provider
   const {
     timeRange,
     selectedYear,
@@ -61,15 +75,14 @@ export default function AdvancedDashboard() {
     periodLabel,
   } = useDateFilter();
 
-  const [showAllDepartments, setShowAllDepartments] = useState(false);
+  // Drawer state
   const [openExpenses, setOpenExpenses] = useState(false);
 
   const handleTimeRangeChange = (
     range: "current-month" | "last-month" | "last-3-months" | "year" | "custom"
-  ) => {
-    setTimeRange(range);
-  };
+  ) => setTimeRange(range);
 
+  // Dashboard summary
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
@@ -92,35 +105,12 @@ export default function AdvancedDashboard() {
     },
   });
 
+  // Departments list
   const { data: departments } = useQuery({
     queryKey: ["/api/departments"],
   });
 
-  // Decide which month to show for patient-volume link
-  const getPatientVolumeNavigation = () => {
-    const currentDate = new Date();
-    switch (timeRange) {
-      case "current-month":
-        return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
-      case "last-month": {
-        const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
-        return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
-      }
-      case "last-3-months": {
-        const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2);
-        return { year: threeMonthsAgo.getFullYear(), month: threeMonthsAgo.getMonth() + 1 };
-      }
-      case "year":
-        return { year: currentDate.getFullYear(), month: 1 };
-      case "custom":
-        return customStartDate
-          ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
-          : { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
-      default:
-        return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
-    }
-  };
-
+  // Daily income series
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
@@ -144,11 +134,21 @@ export default function AdvancedDashboard() {
   });
 
   // Build income series
-  let incomeSeries: Array<any> = [];
+  let incomeSeries: Array<{
+    day: number;
+    amount: number;
+    amountSSP: number;
+    amountUSD: number;
+    label: string;
+    fullDate: string;
+  }> = [];
   let monthName = "";
 
   if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
-    monthName = `${format(customStartDate, "MMM d, yyyy")} - ${format(customEndDate, "MMM d, yyyy")}`;
+    monthName = `${format(customStartDate, "MMM d, yyyy")} - ${format(
+      customEndDate,
+      "MMM d, yyyy"
+    )}`;
     incomeSeries = rawIncome.map((r: any, index: number) => {
       const totalIncome = Number(r.income ?? r.amount ?? 0);
       return {
@@ -175,11 +175,10 @@ export default function AdvancedDashboard() {
       amountUSD: 0,
       amountSSP: 0,
       label: `${i + 1}`,
-      fullDate: new Date(displayYear, displayMonth - 1, i + 1).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
+      fullDate: new Date(displayYear, displayMonth - 1, i + 1).toLocaleDateString(
+        "en-US",
+        { month: "short", day: "numeric", year: "numeric" }
+      ),
     }));
 
     if (Array.isArray(rawIncome)) {
@@ -196,7 +195,7 @@ export default function AdvancedDashboard() {
     }
   }
 
-  // Totals & display metrics
+  // Totals & chart metrics
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const daysWithSSP = incomeSeries.filter((d) => d.amountSSP > 0).length;
@@ -204,54 +203,32 @@ export default function AdvancedDashboard() {
   const peakSSP = Math.max(...incomeSeries.map((d) => d.amountSSP), 0);
   const peakDaySSP = incomeSeries.find((d) => d.amountSSP === peakSSP);
   const showAvgLine = daysWithSSP >= 2;
+  const hasAnyUSD = incomeSeries.some((d) => d.amountUSD > 0);
 
-  // Chart data: hide zero bars (null makes Recharts skip drawing)
-  const chartData = useMemo(
-    () =>
-      incomeSeries.map((d) => ({
-        ...d,
-        amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
-        amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
-      })),
-    [incomeSeries]
-  );
+  // Y axes formatting
+  const formatYAxisSSP = (v: number) => kfmt(v);
+  const formatYAxisUSD = (v: number) => kfmt(v);
 
-  // X ticks: 1, 5, 10, 15, 20, 25, last day
-  const xTicks = useMemo(() => {
-    const n = incomeSeries.length;
-    if (!n) return [];
-    const base = Array.from({ length: n }, (_, i) => i + 1).filter(
-      (d) => d === 1 || d === n || d % 5 === 0
-    );
-    if (!base.includes(n)) base.push(n);
-    return base;
-  }, [incomeSeries.length]);
-
-  // Axis formatters
-  const formatYAxisSSP = kfmt;
-  const formatYAxisUSD = kfmt;
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const p = payload[0].payload;
-    const hasSSP = p.amountSSP > 0;
-    const hasUSD = p.amountUSD > 0;
-    return (
-      <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
-        <p className="font-semibold text-slate-900 mb-2">{p.fullDate}</p>
-        {hasSSP && (
-          <p className="text-sm text-slate-700 font-mono">SSP {nf0.format(p.amountSSP)}</p>
-        )}
-        {hasUSD && (
-          <p className="text-sm text-slate-700 font-mono">USD {fmtUSD(p.amountUSD)}</p>
-        )}
-        {!hasSSP && !hasUSD && (
-          <p className="text-sm text-slate-500">No transactions</p>
-        )}
-      </div>
-    );
+  // X axis tick policy
+  const formatXAxis = (tickItem: any, index: number) => {
+    if (timeRange === "custom" && customStartDate && customEndDate) {
+      const dayData = incomeSeries[index];
+      if (!dayData) return "";
+      const hasTransaction = dayData.amount > 0;
+      if (hasTransaction) return dayData.label;
+      return index % 7 === 0 ? dayData.label : "";
+    } else {
+      const day = parseInt(tickItem);
+      const dayData = incomeSeries.find((d) => d.day === day);
+      const hasTransaction = dayData && dayData.amount > 0;
+      if (hasTransaction) return day.toString();
+      const daysInCurrentMonth = incomeSeries.length;
+      if (daysInCurrentMonth <= 28) return day.toString();
+      return day === 1 || day === daysInCurrentMonth || day % 5 === 0 ? day.toString() : "";
+    }
   };
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -263,14 +240,78 @@ export default function AdvancedDashboard() {
     );
   }
 
+  // Summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
 
+  // Navigate Patient Volume month based on range
+  const getPatientVolumeNavigation = () => {
+    const currentDate = new Date();
+    switch (timeRange) {
+      case "current-month":
+        return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      case "last-month": {
+        const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
+        return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
+      }
+      case "last-3-months": {
+        const threeMonthsAgo = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() - 2
+        );
+        return { year: threeMonthsAgo.getFullYear(), month: threeMonthsAgo.getMonth() + 1 };
+      }
+      case "year":
+        return { year: currentDate.getFullYear(), month: 1 };
+      case "custom":
+        return customStartDate
+          ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
+          : { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      default:
+        return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+    }
+  };
+
+  // Tooltip
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const d = payload[0]?.payload ?? {};
+      const hasSSP = d.amountSSP > 0;
+      const hasUSD = d.amountUSD > 0;
+      const totalAmount = d.amount;
+      const shareOfMonth =
+        monthTotalSSP + monthTotalUSD > 0
+          ? (totalAmount / (monthTotalSSP + monthTotalUSD)) * 100
+          : 0;
+      return (
+        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
+          <p className="font-semibold text-slate-900 mb-2">{d.fullDate}</p>
+          {hasSSP && (
+            <p className="text-sm text-slate-700 font-mono">SSP {nf0.format(d.amountSSP)}</p>
+          )}
+          {hasUSD && (
+            <p className="text-sm text-slate-700 font-mono">USD {fmtUSD(d.amountUSD)}</p>
+          )}
+          {totalAmount > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                Share of period: {nf1.format(shareOfMonth)}%
+              </p>
+            </div>
+          )}
+          {!hasSSP && !hasUSD && <p className="text-sm text-slate-500">No transactions</p>}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
+      {/* Header + date filters */}
       <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
@@ -317,7 +358,7 @@ export default function AdvancedDashboard() {
                     sideOffset={12}
                     className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions={true}
+                    avoidCollisions
                     collisionPadding={15}
                   >
                     <DatePicker
@@ -354,7 +395,7 @@ export default function AdvancedDashboard() {
                     sideOffset={12}
                     className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions={true}
+                    avoidCollisions
                     collisionPadding={15}
                   >
                     <DatePicker
@@ -413,7 +454,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Total Expenses — clickable */}
+        {/* Total Expenses (clickable) */}
         <Card
           className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
           onClick={() => setOpenExpenses(true)}
@@ -488,7 +529,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Insurance Revenue */}
+        {/* Insurance Revenue (USD) */}
         <Link
           href={`/insurance-providers?range=${timeRange}${
             timeRange === "custom" && customStartDate && customEndDate
@@ -505,7 +546,7 @@ export default function AdvancedDashboard() {
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD {fmtUSD(usdIncome)}
+                    USD {fmtUSD(Math.round(usdIncome))}
                   </p>
                   <div className="flex items-center mt-1">
                     {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
@@ -567,6 +608,7 @@ export default function AdvancedDashboard() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Revenue Analytics */}
         <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -578,120 +620,121 @@ export default function AdvancedDashboard() {
           <CardContent className="pb-4">
             {monthTotalSSP > 0 || monthTotalUSD > 0 ? (
               <div className="space-y-0">
-                <div className="h-64 relative">
-                  <div className="ml-2 h-full w-[calc(100%-8px)]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={chartData}
-                        margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
-                        barGap={6}
-                        barCategoryGap="28%"
-                      >
-                        <CartesianGrid
-                          strokeDasharray="1 1"
-                          stroke="#f1f5f9"
-                          strokeWidth={0.3}
-                          opacity={0.3}
-                          vertical={false}
-                        />
+                <div className="h-64 w-full">
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={incomeSeries}
+                      margin={{ top: 12, right: hasAnyUSD ? 60 : 20, left: 8, bottom: 22 }}
+                      barGap={6}
+                      barCategoryGap="28%"
+                    >
+                      <CartesianGrid
+                        strokeDasharray="1 1"
+                        stroke="#f1f5f9"
+                        strokeWidth={0.3}
+                        opacity={0.3}
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="day"
+                        axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        tickFormatter={formatXAxis}
+                        interval={0}
+                        height={32}
+                      />
+                      {/* Left Y axis (SSP) */}
+                      <YAxis
+                        yAxisId="ssp"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: "#0f766e" }}
+                        tickFormatter={formatYAxisSSP}
+                        domain={[0, Math.max(peakSSP * 1.2, 100000)]}
+                        label={{
+                          value: "Revenue (SSP)",
+                          angle: -90,
+                          position: "insideLeft",
+                          offset: 8,
+                          style: { fill: "#0f766e", fontSize: 11 },
+                        }}
+                      />
+                      {/* Right Y axis (USD) */}
+                      <YAxis
+                        yAxisId="usd"
+                        hide={!hasAnyUSD}
+                        orientation="right"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: "#1d4ed8" }}
+                        tickFormatter={formatYAxisUSD}
+                        label={{
+                          value: "Revenue (USD)",
+                          angle: 90,
+                          position: "insideRight",
+                          offset: 8,
+                          style: { fill: "#1d4ed8", fontSize: 11 },
+                        }}
+                      />
 
-                        <Legend
-                          verticalAlign="top"
-                          height={36}
-                          iconType="rect"
-                          wrapperStyle={{ fontSize: "12px", paddingBottom: "10px" }}
-                        />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend
+                        verticalAlign="top"
+                        height={28}
+                        iconType="rect"
+                        wrapperStyle={{ fontSize: "12px" }}
+                      />
 
-                        <XAxis
-                          dataKey="day"
-                          ticks={xTicks}
-                          tickFormatter={(v: number) => String(v)}
-                          axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: "#64748b" }}
-                          height={40}
-                        />
-
-                        {/* Left Y axis (SSP) */}
-                        <YAxis
+                      {/* Average line (SSP only) */}
+                      {showAvgLine && monthlyAvgSSP > 0 && (
+                        <ReferenceLine
                           yAxisId="ssp"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 11, fill: "#0f766e" }}
-                          tickFormatter={formatYAxisSSP}
+                          y={monthlyAvgSSP}
+                          stroke="#0d9488"
+                          strokeWidth={1}
+                          strokeDasharray="4 2"
                           label={{
-                            value: "Revenue (SSP)",
-                            angle: -90,
-                            position: "insideLeft",
-                            offset: 8,
-                            style: { fill: "#0f766e", fontSize: 11 },
+                            value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`,
+                            position: "insideTopRight",
+                            style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 },
+                            offset: 6,
                           }}
                         />
+                      )}
 
-                        {/* Right Y axis (USD) */}
-                        <YAxis
-                          yAxisId="usd"
-                          orientation="right"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 11, fill: "#1d4ed8" }}
-                          tickFormatter={formatYAxisUSD}
-                          label={{
-                            value: "Revenue (USD)",
-                            angle: 90,
-                            position: "insideRight",
-                            offset: 8,
-                            style: { fill: "#1d4ed8", fontSize: 11 },
-                          }}
-                        />
+                      {/* SSP (left axis) */}
+                      <Bar
+                        yAxisId="ssp"
+                        dataKey="amountSSP"
+                        name="SSP"
+                        fill="#14b8a6"
+                        maxBarSize={26}
+                        radius={[4, 4, 0, 0]}
+                      />
 
-                        <Tooltip content={<CustomTooltip />} />
-
-                        {/* Monthly average (SSP only) */}
-                        {showAvgLine && monthlyAvgSSP > 0 && (
-                          <ReferenceLine
-                            yAxisId="ssp"
-                            y={monthlyAvgSSP}
-                            stroke="#0d9488"
-                            strokeWidth={1}
-                            strokeDasharray="4 2"
-                            label={{
-                              value: `Avg (SSP) ${Math.round(monthlyAvgSSP / 1000)}k`,
-                              position: "insideTopRight",
-                              style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 },
-                              offset: 8,
-                            }}
-                          />
-                        )}
-
-                        {/* Grouped bars */}
-                        <Bar
-                          yAxisId="ssp"
-                          dataKey="amountSSPPlot"
-                          name="SSP"
-                          fill="#14b8a6"
-                          stroke="none"
-                          barSize={24}
-                          radius={[4, 4, 0, 0]}
-                        />
+                      {/* USD (right axis) — render only if any USD exists */}
+                      {hasAnyUSD && (
                         <Bar
                           yAxisId="usd"
-                          dataKey="amountUSDPlot"
+                          dataKey="amountUSD"
                           name="USD"
                           fill="#0ea5e9"
-                          stroke="none"
-                          barSize={24}
+                          maxBarSize={26}
                           radius={[4, 4, 0, 0]}
                         />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                      )}
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
 
+                {/* Totals below chart */}
                 <div className="border-t border-slate-100 pt-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex flex-col text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">
+                        Total
+                      </span>
                       <div className="space-y-1">
                         {monthTotalSSP > 0 && (
                           <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">
@@ -704,10 +747,13 @@ export default function AdvancedDashboard() {
                           </span>
                         )}
                         {monthTotalSSP === 0 && monthTotalUSD === 0 && (
-                          <span className="text-sm text-slate-500">No revenue in this range</span>
+                          <span className="text-sm text-slate-500">
+                            No revenue in this range
+                          </span>
                         )}
                       </div>
                     </div>
+
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">
                         Peak Day
@@ -727,6 +773,7 @@ export default function AdvancedDashboard() {
                         <span className="text-xs text-slate-500 mt-1">{peakDaySSP.fullDate}</span>
                       )}
                     </div>
+
                     <div className="flex flex-col text-center">
                       <span className="text-xs text-slate-500 uppercase tracking-wide">
                         Monthly Avg
@@ -751,86 +798,117 @@ export default function AdvancedDashboard() {
                 <div className="text-center">
                   <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3" />
                   <p className="text-slate-600 text-sm font-medium">No revenue in this range</p>
-                  <p className="text-slate-500 text-xs mt-1">Try selecting a different time period</p>
+                  <p className="text-slate-500 text-xs mt-1">Try selecting a different period</p>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Departments Widget */}
+        {/* Departments Panel (new) */}
+        <DepartmentsPanel
+          departments={Array.isArray(departments) ? (departments as any[]) : []}
+          departmentBreakdown={dashboardData?.departmentBreakdown}
+          totalSSP={sspRevenue}
+        />
+      </div>
+
+      {/* Quick Actions / System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <Card className="border border-slate-200 shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-semibold text-slate-900">Departments</CardTitle>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              Quick Actions
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {Array.isArray(departments)
-              ? departments
-                  .map((dept: any) => {
-                    const amount = parseFloat(dashboardData?.departmentBreakdown?.[dept.id] || "0");
-                    const percentage = sspRevenue > 0 ? (amount / sspRevenue) * 100 : 0;
-                    return { ...dept, amount, percentage };
-                  })
-                  .sort((a, b) => b.amount - a.amount)
-                  .slice(0, showAllDepartments ? departments.length : 5)
-                  .map((dept: any, index: number) => {
-                    const maxAmount = Math.max(
-                      ...departments.map((d: any) =>
-                        parseFloat(dashboardData?.departmentBreakdown?.[d.id] || "0")
-                      )
-                    );
-                    const proportionWidth = maxAmount > 0 ? (dept.amount / maxAmount) * 100 : 0;
-                    return (
-                      <div
-                        key={dept.id}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border bg-slate-50 border-slate-100"
-                        data-testid={`row-department-${dept.id}`}
-                      >
-                        <div className="flex items-center space-x-3 flex-1">
-                          <div
-                            className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                              index === 0
-                                ? "bg-emerald-500"
-                                : index === 1
-                                ? "bg-blue-500"
-                                : index === 2
-                                ? "bg-purple-500"
-                                : index === 3
-                                ? "bg-orange-500"
-                                : "bg-slate-400"
-                            }`}
-                          />
-                          <span className="font-medium text-slate-700 flex-1 text-left">
-                            {dept.name}
-                          </span>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-4 min-w-[80px]">
-                          <p className="font-semibold text-slate-900 text-sm font-mono tabular-nums">
-                            SSP {nf0.format(Math.round(dept.amount))}
-                          </p>
-                          <p className="text-xs text-slate-500">{dept.percentage.toFixed(1)}%</p>
-                          <div className="w-full bg-slate-200 rounded-full h-1 mt-1">
-                            <div
-                              className="bg-teal-500 h-1 rounded-full transition-all duration-300"
-                              style={{ width: `${proportionWidth}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-              : []}
-            {Array.isArray(departments) && departments.length > 5 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                onClick={() => setShowAllDepartments(!showAllDepartments)}
-                data-testid="button-view-all-departments"
-              >
-                {showAllDepartments ? "Show less" : `View all departments (${departments.length} total)`}
-              </Button>
-            )}
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <a href="/transactions" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Add Transaction</span>
+                    <span className="text-xs text-slate-500">Record new income or expense</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/patient-volume" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Patient Volume</span>
+                    <span className="text-xs text-slate-500">Update patient count</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/reports" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Monthly Reports</span>
+                    <span className="text-xs text-slate-500">View generated reports</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/users" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">User Management</span>
+                    <span className="text-xs text-slate-500">Manage user accounts</span>
+                  </div>
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Database</span>
+                <Badge
+                  variant="secondary"
+                  className="bg-green-100 text-green-700 border-green-200 rounded-full"
+                >
+                  Connected
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Last Sync</span>
+                <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+                  {new Date().toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Active Users</span>
+                <Badge
+                  variant="outline"
+                  className="bg-blue-50 text-blue-700 border-blue-200 rounded-full"
+                >
+                  1 online
+                </Badge>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
