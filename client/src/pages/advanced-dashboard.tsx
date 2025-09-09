@@ -52,10 +52,10 @@ import {
   Legend
 } from 'recharts';
 
-// 🔗 NEW: Global date filter (shared with Overview)
+// 🔗 Global date filter (shared with Overview)
 import { useDateFilter } from "@/context/date-filter-context";
 
-// ✅ NEW: Drawer component
+// Drawer for expenses
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 
 // ---------------- Revenue Data Table ----------------
@@ -267,7 +267,7 @@ function RevenueDataTable({ data, departments, monthName, selectedYear, selected
 // ---------------- Executive Dashboard ----------------
 
 export default function AdvancedDashboard() {
-  // 🔗 Global date state from provider (replaces local state)
+  // 🔗 Global date state from provider
   const {
     timeRange,
     selectedYear,
@@ -281,8 +281,6 @@ export default function AdvancedDashboard() {
 
   const [showDataTable, setShowDataTable] = useState(false);
   const [showAllDepartments, setShowAllDepartments] = useState(false);
-
-  // ✅ NEW: drawer state
   const [openExpenses, setOpenExpenses] = useState(false);
 
   const handleTimeRangeChange = (
@@ -401,6 +399,13 @@ export default function AdvancedDashboard() {
   const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
   const showAvgLine = nonzeroDaysSSP >= 2;
 
+  // ✅ Only render a colored segment when it has data (no ghost USD stripes)
+  const chartData = incomeSeries.map(d => ({
+    ...d,
+    amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
+    amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
+  }));
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -431,7 +436,6 @@ export default function AdvancedDashboard() {
 
   const handleBarClick = (data: any) => {
     if (data && data.amount > 0) {
-      // Placeholder for future drill-in
       console.log(`Open transactions for ${data.fullDate}`);
     }
   };
@@ -443,7 +447,7 @@ export default function AdvancedDashboard() {
   };
 
   const generateYTicks = () => {
-    const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0); // using SSP scale
+    const peak = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
     if (peak === 0) return [0, 10000, 20000, 30000, 40000];
     const maxNeeded = Math.max(peak * 1.2, 10000);
     const ticks = [0];
@@ -746,11 +750,10 @@ export default function AdvancedDashboard() {
                   </div>
                   <div className="ml-8 h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      {/* === Stacked Bar (SSP + USD) === */}
                       <BarChart 
-                        data={incomeSeries}
+                        data={chartData}
                         margin={{ top: 20, right: 60, left: 10, bottom: 30 }}
-                        barCategoryGap="12%"   // thicker bars
+                        barCategoryGap="14%"
                         barGap={2}
                       >
                         <CartesianGrid 
@@ -771,7 +774,7 @@ export default function AdvancedDashboard() {
                           height={40}
                         />
 
-                        {/* Single Y axis (SSP scale) */}
+                        {/* Single SSP axis (stacked values are shown in SSP; USD portion will be small) */}
                         <YAxis 
                           axisLine={false}
                           tickLine={false}
@@ -805,39 +808,37 @@ export default function AdvancedDashboard() {
                           />
                         )}
 
-                        {/* Pattern to keep tiny USD visible */}
+                        {/* Stacked bars; segment only renders when > 0 (we pass null for zero) */}
                         <defs>
                           <pattern id="usdHatch" patternUnits="userSpaceOnUse" width="6" height="6">
-                            <rect width="6" height="6" fill="#0ea5e9" opacity="0.85" />
+                            <rect width="6" height="6" fill="#0ea5e9" opacity="0.9" />
                             <path d="M-1,1 l2,-2 M0,6 l6,-6 M5,7 l2,-2" stroke="white" strokeWidth="0.6" opacity="0.35" />
                           </pattern>
                         </defs>
 
-                        {/* Stacked bars */}
                         <Bar 
-                          dataKey="amountSSP" 
+                          dataKey="amountSSPPlot" 
                           name="SSP"
-                          fill="#14b8a6"        // teal
+                          fill="#14b8a6"
                           stackId="rev"
                           maxBarSize={24}
                           radius={[0,0,0,0]}
-                          minPointSize={1}
                           onClick={handleBarClick}
                         />
                         <Bar 
-                          dataKey="amountUSD" 
+                          dataKey="amountUSDPlot" 
                           name="USD"
-                          fill="url(#usdHatch)" // patterned blue
+                          fill="url(#usdHatch)"
                           stackId="rev"
                           maxBarSize={24}
-                          radius={[4,4,0,0]}   // round the top of full stack
-                          minPointSize={3}
+                          radius={[4,4,0,0]}
                           onClick={handleBarClick}
                         />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
+
                 <div className="border-t border-slate-100 pt-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex flex-col text-center">
@@ -1060,7 +1061,7 @@ export default function AdvancedDashboard() {
         </Card>
       </div>
 
-      {/* ✅ Mount the Expenses drawer */}
+      {/* Expenses drawer */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
