@@ -1,282 +1,205 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  startOfMonth, endOfMonth, subMonths, addMonths, format,
-  isWithinInterval, addDays, differenceInCalendarDays, startOfWeek
-} from "date-fns";
-
+// client/src/pages/patient-volume.tsx  (or your current file name)
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as DatePicker } from "@/components/ui/calendar";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select";
-
+import { format as dfFormat, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval } from "date-fns";
+import { CalendarIcon, Users, Plus, Trash2, BarChart3, Table } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import { apiRequest, api } from "@/lib/queryClient";
 
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
 } from "recharts";
 
-import {
-  CalendarIcon, Users, Plus, Trash2, BarChart2, Table as TableIcon
-} from "lucide-react";
-
-/* ----------------------------- Types & helpers ---------------------------- */
-
-type PatientVolume = {
+interface PatientVolume {
   id: string;
-  date: string;            // ISO date
+  date: string;
   departmentId?: string;
   patientCount: number;
   notes?: string;
   recordedBy: string;
-};
-
-type Department = { id: string; code: string; name: string; };
-
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
-
-const enumerateDays = (start: Date, end: Date) => {
-  const out: string[] = [];
-  let d = start;
-  while (d <= end) {
-    out.push(format(d, "yyyy-MM-dd"));
-    d = addDays(d, 1);
-  }
-  return out;
-};
-
-const monthsBetween = (start: Date, end: Date) => {
-  const res: { year: number; month: number }[] = [];
-  const s = startOfMonth(start);
-  const e = endOfMonth(end);
-  let cur = new Date(s);
-  while (cur <= e) {
-    res.push({ year: cur.getFullYear(), month: cur.getMonth() + 1 });
-    cur = addMonths(cur, 1);
-  }
-  return res;
-};
-
-function bucketForChart(rows: { date: string; total: number }[], start: Date, end: Date) {
-  const span = differenceInCalendarDays(end, start) + 1;
-  if (span <= 62) {
-    return {
-      mode: "daily" as const,
-      data: rows.map(r => ({
-        iso: r.date,
-        label: format(new Date(r.date), "MMM d"),
-        count: r.total,
-      }))
-    };
-  }
-
-  // Weekly buckets (week starts Mon)
-  const map = new Map<string, number>();
-  for (const r of rows) {
-    const wk = startOfWeek(new Date(r.date), { weekStartsOn: 1 });
-    const k = format(wk, "yyyy-MM-dd");
-    map.set(k, (map.get(k) || 0) + r.total);
-  }
-  const weekly = Array.from(map.entries())
-    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-    .map(([iso, total]) => ({
-      iso,
-      label: `Week of ${format(new Date(iso), "MMM d")}`,
-      count: total,
-    }));
-  return { mode: "weekly" as const, data: weekly };
 }
 
-/* --------------------------------- Page ---------------------------------- */
-
 export default function PatientVolumePage() {
-  /* ------------------ URL -> initial view hand-off (compatible) ------------------ */
-  const params = new URLSearchParams(window.location.search);
-  const viewParam = params.get("view");
-  const yearParam = params.get("year");
-  const monthParam = params.get("month");
-  const rangeParam = params.get("range"); // from dashboard
-  // Keep old links working:
-  const defaultMode: Mode =
-    rangeParam === "last-3-months" ? "last-3-months" :
-    rangeParam === "year" ? "last-6-months" : // your old "year" button can map to a longer bucketed view
-    "current-month";
+  // --- URL params for deep-links from the dashboard ---
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewParam = urlParams.get("view");               // 'monthly' | null
+  const yearParam = urlParams.get("year");               // '2025'
+  const monthParam = urlParams.get("month");             // '9'
+  const dateParam = urlParams.get("date");               // '2025-09-06'
+  const rangeParam = urlParams.get("range");             // 'last-3-months' | 'year' | null
 
-  const initialMode: Mode =
-    viewParam === "monthly" && yearParam && monthParam ? "monthly-param" : defaultMode;
+  const isMonthlyView = viewParam === "monthly" && !!yearParam && !!monthParam;
+  const isMultiPeriodView = rangeParam === "last-3-months" || rangeParam === "year";
+  const shouldDefaultToMonthly = !dateParam && !isMonthlyView;
 
-  const monthlyParamDate =
-    viewParam === "monthly" && yearParam && monthParam
-      ? new Date(Number(yearParam), Number(monthParam) - 1, 1)
+  // initial date
+  const initialDate = dateParam
+    ? new Date(`${dateParam}T12:00:00`)
+    : isMonthlyView
+      ? new Date(parseInt(yearParam as string, 10), parseInt(monthParam as string, 10) - 1, 1)
       : new Date();
 
-  /* ------------------------------ Local state ------------------------------ */
-  type Mode = "current-month" | "last-month" | "last-3-months" | "last-6-months" | "custom" | "monthly-param";
-  const [mode, setMode] = useState<Mode>(initialMode);
-  const [customStart, setCustomStart] = useState<Date | undefined>();
-  const [customEnd, setCustomEnd] = useState<Date | undefined>();
-  const [view, setView] = useState<"chart" | "table">("chart");
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [uiView, setUiView] = useState<"chart" | "table">("chart"); // toggle for monthly page section
 
-  // Add form
-  const [showAdd, setShowAdd] = useState(false);
-  const [newEntry, setNewEntry] = useState<{ date: Date; patientCount: string; notes: string }>({
+  const [newEntry, setNewEntry] = useState({
     date: new Date(),
     patientCount: "",
-    notes: ""
+    notes: "",
   });
 
-  /* ------------------------------ Date range ------------------------------ */
-  const { startDate, endDate, label } = useMemo(() => {
-    const today = new Date();
-    let s: Date, e: Date, lbl = "";
+  const queryClient = useQueryClient();
 
-    if (mode === "current-month") {
-      s = startOfMonth(today);
-      e = endOfMonth(today);
-      lbl = format(today, "MMMM yyyy");
-    } else if (mode === "last-month") {
-      const prev = subMonths(today, 1);
-      s = startOfMonth(prev);
-      e = endOfMonth(prev);
-      lbl = format(prev, "MMMM yyyy");
-    } else if (mode === "last-3-months") {
-      const three = subMonths(today, 2);
-      s = startOfMonth(three);
-      e = endOfMonth(today);
-      lbl = `${format(three, "MMM yyyy")} – ${format(today, "MMM yyyy")}`;
-    } else if (mode === "last-6-months") {
-      const six = subMonths(today, 5);
-      s = startOfMonth(six);
-      e = endOfMonth(today);
-      lbl = `${format(six, "MMM yyyy")} – ${format(today, "MMM yyyy")}`;
-    } else if (mode === "monthly-param") {
-      s = startOfMonth(monthlyParamDate);
-      e = endOfMonth(monthlyParamDate);
-      lbl = format(monthlyParamDate, "MMMM yyyy");
-    } else {
-      s = customStart ?? startOfMonth(today);
-      e = customEnd ?? endOfMonth(today);
-      lbl = (customStart && customEnd)
-        ? `${format(customStart, "MMM d, yyyy")} – ${format(customEnd, "MMM d, yyyy")}`
-        : "Custom range";
-    }
+  // --- Fetch data (single month, single day, or multi period) ---
+  const { data: volumeData = [], isLoading } = useQuery<PatientVolume[]>({
+    queryKey: isMultiPeriodView
+      ? ["/api/patient-volume/multi-period", rangeParam, yearParam, monthParam]
+      : isMonthlyView
+        ? ["/api/patient-volume/period", selectedDate.getFullYear(), selectedDate.getMonth() + 1]
+        : ["/api/patient-volume/period", selectedDate.getFullYear(), selectedDate.getMonth() + 1], // we show monthly by default
+    queryFn: async () => {
+      if (isMultiPeriodView) {
+        const now = new Date();
+        const months: Array<{ year: number; month: number }> = [];
 
-    return { startDate: s, endDate: e, label: lbl };
-  }, [mode, customStart, customEnd]);
-
-  /* --------------------------------- Fetch -------------------------------- */
-  const { data: departments = [] } = useQuery<Department[]>({
-    queryKey: ["/api/departments"],
-  });
-
-  const { data: rawRows = [], isLoading, isFetching } = useQuery({
-    queryKey: ["patient-volume-range", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
-    queryFn: async (): Promise<PatientVolume[]> => {
-      // Primary strategy: fetch each month using your existing endpoint
-      const months = monthsBetween(startDate, endDate);
-      const all: PatientVolume[] = [];
-
-      for (const m of months) {
-        try {
-          const resp = await api.get(`/api/patient-volume/period/${m.year}/${m.month}`);
-          if (Array.isArray(resp.data)) all.push(...resp.data);
-        } catch (err) {
-          // ignore; we'll try fallback below after loop
+        if (rangeParam === "last-3-months") {
+          for (let i = 2; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+          }
+        } else {
+          // full year
+          const y = parseInt(yearParam || String(now.getFullYear()), 10);
+          for (let m = 1; m <= 12; m++) months.push({ year: y, month: m });
         }
-      }
 
-      if (all.length > 0) {
-        // Filter to the exact range
-        return all.filter(r =>
-          isWithinInterval(new Date(r.date), { start: startDate, end: endDate })
-        );
-      }
-
-      // Fallback: try a start/end endpoint if your prod exposes it
-      try {
-        const resp = await api.get(
-          `/api/patient-volume?start=${format(startDate, "yyyy-MM-dd")}&end=${format(endDate, "yyyy-MM-dd")}`
-        );
-        const data = Array.isArray(resp.data) ? resp.data : resp.data?.data ?? [];
-        return data as PatientVolume[];
-      } catch {
-        return []; // nothing available
+        const all: PatientVolume[] = [];
+        for (const { year, month } of months) {
+          try {
+            const r = await api.get(`/api/patient-volume/period/${year}/${month}`);
+            if (Array.isArray(r.data)) all.push(...r.data);
+          } catch (e) {
+            console.warn("Fetch month failed:", year, month, e);
+          }
+        }
+        return all;
+      } else {
+        const y = isMonthlyView ? parseInt(yearParam as string, 10) : selectedDate.getFullYear();
+        const m = isMonthlyView ? parseInt(monthParam as string, 10) : selectedDate.getMonth() + 1;
+        const r = await api.get(`/api/patient-volume/period/${y}/${m}`);
+        return Array.isArray(r.data) ? r.data : [];
       }
     },
-    staleTime: 0,
     refetchOnWindowFocus: false,
+    staleTime: 0,
   });
 
-  /* ------------------------------- Transform ------------------------------- */
-  const dailyTotals = useMemo(() => {
-    // Sum by date, then fill missing days
-    const map = new Map<string, number>();
-    for (const r of rawRows) {
-      const iso = format(new Date(r.date), "yyyy-MM-dd");
-      map.set(iso, (map.get(iso) || 0) + (Number(r.patientCount) || 0));
-    }
-
-    const allDays = enumerateDays(startDate, endDate);
-    return allDays.map(iso => ({
-      date: iso,
-      total: map.get(iso) || 0,
-    }));
-  }, [rawRows, startDate, endDate]);
-
-  const kpis = useMemo(() => {
-    const total = dailyTotals.reduce((s, r) => s + r.total, 0);
-    const active = dailyTotals.filter(r => r.total > 0).length;
-    const avgActive = active ? total / active : 0;
-    const peak = Math.max(0, ...dailyTotals.map(r => r.total));
-    const peakDay = dailyTotals.find(r => r.total === peak)?.date;
-    return { total, active, avgActive, peak, peakDay };
-  }, [dailyTotals]);
-
-  const chart = useMemo(() => bucketForChart(dailyTotals, startDate, endDate), [dailyTotals, startDate, endDate]);
-
-  /* ----------------------------- Add / Delete ------------------------------ */
-  const qc = useQueryClient();
-
-  const createMutation = useMutation({
+  // --- Create / Delete ---
+  const createVolumeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/patient-volume", data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["patient-volume-range"] });
-      qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Patient volume recorded successfully" });
-      setShowAdd(false);
+      setShowAddForm(false);
       setNewEntry({ date: new Date(), patientCount: "", notes: "" });
     },
-    onError: () => toast({ title: "Failed to record patient volume", variant: "destructive" })
+    onError: () => toast({ title: "Failed to record patient volume", variant: "destructive" }),
   });
 
-  const deleteMutation = useMutation({
+  const deleteVolumeMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/patient-volume/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["patient-volume-range"] });
-      qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Patient volume record deleted" });
     },
-    onError: () => toast({ title: "Failed to delete record", variant: "destructive" })
+    onError: () => toast({ title: "Failed to delete record", variant: "destructive" }),
   });
 
+  // --- Month-aggregated helpers (strict 1..last-day; no "Aug 31") ---
+  const mStart = startOfMonth(selectedDate);
+  const mEnd = endOfMonth(selectedDate);
+
+  // Index totals by ISO date
+  const totalsByISO: Record<string, number> = useMemo(() => {
+    const idx: Record<string, number> = {};
+    (volumeData || []).forEach((r) => {
+      const iso = dfFormat(new Date(r.date), "yyyy-MM-dd");
+      idx[iso] = (idx[iso] ?? 0) + (r.patientCount ?? 0);
+    });
+    return idx;
+  }, [volumeData]);
+
+  // Build chart rows (month only)
+  const chartData = useMemo(() => {
+    return eachDayOfInterval({ start: mStart, end: mEnd }).map((d) => {
+      const iso = dfFormat(d, "yyyy-MM-dd");
+      return {
+        dayNum: d.getDate(),                               // numeric tick
+        dateISO: iso,
+        label: dfFormat(d, "EEE, MMM d, yyyy"),            // tooltip label
+        count: totalsByISO[iso] ?? 0,
+      };
+    });
+  }, [mStart, mEnd, totalsByISO]);
+
+  // Nice weekly ticks (numeric) + last day
+  const weeklyTicks = useMemo(() => {
+    const ticks = eachWeekOfInterval({ start: mStart, end: mEnd }, { weekStartsOn: 1 }).map((d) => d.getDate());
+    const lastDay = mEnd.getDate();
+    if (!ticks.includes(lastDay)) ticks.push(lastDay);
+    return ticks;
+  }, [mStart, mEnd]);
+
+  // KPIs
+  const totalPatients = (volumeData || []).reduce((s, r) => s + (r.patientCount ?? 0), 0);
+  const activeDays = chartData.filter((d) => d.count > 0).length;
+  const avgPerActive = activeDays ? (totalPatients / activeDays) : 0;
+  const peak = chartData.reduce((p, d) => (d.count > p.count ? d : p), { dayNum: 0, dateISO: "", label: "", count: 0 });
+
+  // Group for multi-period list
+  const groupedByMonth: Record<string, { monthName: string; entries: PatientVolume[]; total: number }> = useMemo(() => {
+    if (!isMultiPeriodView) return {};
+    return (volumeData || []).reduce((acc, entry) => {
+      const d = new Date(entry.date);
+      const key = dfFormat(d, "yyyy-MM");
+      if (!acc[key]) acc[key] = { monthName: dfFormat(d, "MMMM yyyy"), entries: [], total: 0 };
+      acc[key].entries.push(entry);
+      acc[key].total += entry.patientCount ?? 0;
+      return acc;
+    }, {} as Record<string, { monthName: string; entries: PatientVolume[]; total: number }>);
+  }, [isMultiPeriodView, volumeData]);
+
+  // Header labels (auto updates every month)
+  const monthLabel = dfFormat(selectedDate, "MMMM yyyy");
+
+  // Save form submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const n = parseInt(newEntry.patientCount);
+    const n = parseInt(newEntry.patientCount, 10);
     if (Number.isNaN(n) || n < 0) {
       toast({ title: "Please enter a valid patient count", variant: "destructive" });
       return;
     }
-    createMutation.mutate({
+    createVolumeMutation.mutate({
       date: newEntry.date.toISOString(),
       departmentId: null,
       patientCount: n,
@@ -284,230 +207,232 @@ export default function PatientVolumePage() {
     });
   };
 
-  /* ---------------------------------- UI ---------------------------------- */
-
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-          <p className="text-slate-600">Monthly & multi-period summary</p>
+          <p className="text-slate-600">
+            {isMultiPeriodView
+              ? rangeParam === "last-3-months"
+                ? "Monthly & multi-period summary · Last 3 months"
+                : `Monthly & multi-period summary · ${dfFormat(selectedDate, "yyyy")}`
+              : "Monthly & multi-period summary"}
+          </p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="bg-teal-600 hover:bg-teal-700">
+
+        <Button onClick={() => setShowAddForm(true)} className="bg-teal-600 hover:bg-teal-700" data-testid="button-add-volume">
           <Plus className="w-4 h-4 mr-2" />
           Add Volume
         </Button>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={mode} onValueChange={(v: any) => setMode(v)}>
-          <SelectTrigger className="h-9 w-[170px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="current-month">Current Month</SelectItem>
-            <SelectItem value="last-month">Last Month</SelectItem>
-            <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-            <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-            <SelectItem value="custom">Custom</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Small KPI strip (only meaningful for single-month view) */}
+      {!isMultiPeriodView && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-slate-500">Total Patients</p>
+              <p className="text-xl font-semibold">{totalPatients}</p>
+              <p className="text-xs text-slate-400">{monthLabel}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-slate-500">Average / Active Day</p>
+              <p className="text-xl font-semibold">{avgPerActive.toFixed(1)}</p>
+              <p className="text-xs text-slate-400">{activeDays} active days</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-slate-500">Peak Day</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xl font-semibold">{peak.count}</p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">Peak</span>
+              </div>
+              <p className="text-xs text-slate-400">{peak.label || "—"}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        {mode === "custom" && (
+      {/* Main section header — modernized (no long em-dash) */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-slate-500" />
+          <h2 className="text-base font-semibold text-slate-900">
+            Patient Volume <span className="ml-1 text-slate-500 font-normal">• {monthLabel}</span>
+          </h2>
+        </div>
+        <div className="flex-1 h-px bg-gradient-to-r from-slate-200 via-slate-100 to-transparent" />
+        {!isMultiPeriodView && (
           <div className="flex items-center gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("h-9", !customStart && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {customStart ? format(customStart, "MMM d, yyyy") : "Start date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent side="bottom" align="start" sideOffset={8} className="w-auto p-2">
-                <DatePicker
-                  mode="single"
-                  numberOfMonths={1}
-                  selected={customStart}
-                  onSelect={(d) => d && setCustomStart(d)}
-                />
-              </PopoverContent>
-            </Popover>
-
-            <span className="text-slate-500">to</span>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("h-9", !customEnd && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {customEnd ? format(customEnd, "MMM d, yyyy") : "End date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent side="bottom" align="start" sideOffset={8} className="w-auto p-2">
-                <DatePicker
-                  mode="single"
-                  numberOfMonths={1}
-                  selected={customEnd}
-                  onSelect={(d) => d && setCustomEnd(d)}
-                />
-              </PopoverContent>
-            </Popover>
+            <Button
+              variant={uiView === "chart" ? "default" : "outline"}
+              size="sm"
+              className={cn("h-8", uiView === "chart" ? "bg-slate-900 hover:bg-slate-800 text-white" : "")}
+              onClick={() => setUiView("chart")}
+              title="Chart"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" /> Chart
+            </Button>
+            <Button
+              variant={uiView === "table" ? "default" : "outline"}
+              size="sm"
+              className={cn("h-8", uiView === "table" ? "bg-slate-900 hover:bg-slate-800 text-white" : "")}
+              onClick={() => setUiView("table")}
+              title="Table"
+            >
+              <Table className="w-4 h-4 mr-1" /> Table
+            </Button>
           </div>
         )}
+      </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant={view === "chart" ? "default" : "outline"} onClick={() => setView("chart")} className="h-9">
-            <BarChart2 className="h-4 w-4 mr-2" />
-            Chart
-          </Button>
-          <Button variant={view === "table" ? "default" : "outline"} onClick={() => setView("table")} className="h-9">
-            <TableIcon className="h-4 w-4 mr-2" />
-            Table
-          </Button>
+      {/* Date picker + total (single month) */}
+      {!isMultiPeriodView && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  {dfFormat(selectedDate, "MMMM yyyy")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl" sideOffset={8} align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(d) => d && setSelectedDate(d)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <span className="text-sm text-slate-600">
+              Total:&nbsp;<span className="font-semibold text-teal-600">{totalPatients}</span>&nbsp;patients
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Total Patients</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums">{nf0.format(kpis.total)}</p>
-            <p className="text-xs text-slate-500 mt-1">{label}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Average / Active Day</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums">{nf1.format(kpis.avgActive)}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              {kpis.active} active {kpis.active === 1 ? "day" : "days"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Peak Day</p>
-            <div className="mt-1 flex items-baseline gap-2">
-              <p className="text-xl font-semibold tabular-nums">{nf0.format(kpis.peak)}</p>
-              <span className="text-xs rounded-full bg-orange-100 text-orange-700 px-2 py-0.5">Peak</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">{kpis.peakDay ? format(new Date(kpis.peakDay), "MMM d, yyyy") : "—"}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main view */}
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Patient Volume — {label}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Content */}
+      <Card>
+        <CardContent className="pt-4">
           {isLoading ? (
-            <div className="text-center py-12 text-slate-500">Loading…</div>
-          ) : rawRows.length === 0 && dailyTotals.every(d => d.total === 0) ? (
-            <div className="text-center py-12 text-slate-500">No patient volume recorded for this range.</div>
-          ) : view === "chart" ? (
-            <div className="h-[360px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chart.data}
-                  margin={{ top: 8, right: 12, left: 8, bottom: 28 }}
-                  barCategoryGap="24%"
-                >
-                  <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.5} vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 12, fill: "#64748b" }}
-                    interval="preserveStartEnd"
-                    height={40}
-                    axisLine={{ stroke: "#e5e7eb" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#0f172a" }}
-                    tickFormatter={kfmt}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    formatter={(v: any) => nf0.format(Number(v || 0))}
-                    labelFormatter={(l: any) => l}
-                    wrapperStyle={{ outline: "none" }}
-                  />
-                  <Bar dataKey="count" name={chart.mode === "weekly" ? "Patients / week" : "Patients / day"} fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            // Table view: daily totals first, then raw entries with delete
-            <div className="space-y-6">
-              {/* Daily totals */}
-              <div className="overflow-auto max-h-[360px] border border-slate-100 rounded">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 sticky top-0 z-10">
-                    <tr>
-                      <th className="text-left px-4 py-2 font-medium text-slate-600">Date</th>
-                      <th className="text-right px-4 py-2 font-medium text-slate-600">Patients</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dailyTotals.map(r => (
-                      <tr key={r.date} className="border-t border-slate-100">
-                        <td className="px-4 py-2">{format(new Date(r.date), "EEE, MMM d, yyyy")}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{nf0.format(r.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-50">
-                    <tr className="border-t border-slate-200">
-                      <td className="px-4 py-2 font-semibold">Total</td>
-                      <td className="px-4 py-2 text-right font-semibold tabular-nums">{nf0.format(kpis.total)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-
-              {/* Raw entries (with delete) */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-slate-700">Raw entries</h4>
-                <div className="space-y-2 max-h-[360px] overflow-auto">
-                  {rawRows
-                    .slice()
-                    .sort((a, b) => (a.date < b.date ? -1 : 1))
-                    .map((entry) => (
-                      <div key={entry.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div>
-                          <div className="font-medium">{entry.patientCount} patients</div>
-                          <div className="text-sm text-slate-600">
-                            {format(new Date(entry.date), "PPP")}
+            <div className="text-center py-8 text-slate-500">Loading…</div>
+          ) : isMultiPeriodView ? (
+            // Multi-period stacked lists by month
+            <div className="space-y-4">
+              {Object.entries(groupedByMonth)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, grp]) => (
+                  <div key={key} className="border border-slate-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium text-slate-900">{grp.monthName}</h3>
+                      <span className="text-lg font-semibold text-teal-600">{grp.total} patients</span>
+                    </div>
+                    <div className="space-y-2">
+                      {grp.entries
+                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                        .map((entry) => (
+                          <div key={entry.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
+                            <span className="text-slate-600">{dfFormat(new Date(entry.date), "MMM d, yyyy")}</span>
+                            <span className="font-medium">{entry.patientCount} patients</span>
                           </div>
-                          {entry.notes && <div className="text-xs text-slate-500 mt-1">{entry.notes}</div>}
-                        </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ) : uiView === "chart" ? (
+            // Chart view (month-only, numeric day ticks)
+            chartData.length === 0 ? (
+              <div className="text-center py-10 text-slate-500">No data this month</div>
+            ) : (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 12, right: 8, left: 8, bottom: 24 }}
+                    barGap={6}
+                    barCategoryGap="28%"
+                  >
+                    <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
+                    <XAxis
+                      dataKey="dayNum"
+                      ticks={weeklyTicks}
+                      tickFormatter={(v: number) => String(v)}
+                      axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: "#64748b" }}
+                      height={32}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: "#0f766e" }}
+                      tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)}
+                    />
+                    <Tooltip
+                      formatter={(v: any) => [`${v} patients`, "Patients"]}
+                      labelFormatter={(_, payload: any[]) => payload?.[0]?.payload?.label || ""}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Patients"
+                      fill="#14b8a6"
+                      stroke="none"
+                      barSize={24}
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )
+          ) : (
+            // Table view (month-only)
+            <div className="overflow-hidden rounded-md border border-slate-200">
+              <div className="grid grid-cols-[1fr_100px_40px] bg-slate-50 text-xs font-medium text-slate-600 px-3 py-2">
+                <div>Date</div>
+                <div className="text-right">Patients</div>
+                <div></div>
+              </div>
+              {chartData.map((d) => {
+                const entry = (volumeData as PatientVolume[]).find(
+                  (e) => dfFormat(new Date(e.date), "yyyy-MM-dd") === d.dateISO
+                );
+                return (
+                  <div key={d.dateISO} className="grid grid-cols-[1fr_100px_40px] items-center px-3 py-2 border-t">
+                    <div className="text-sm text-slate-700">{d.label}</div>
+                    <div className="text-right font-medium">{d.count}</div>
+                    <div className="flex justify-end">
+                      {entry ? (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteMutation.mutate(entry.id)}
+                          onClick={() => deleteVolumeMutation.mutate(entry.id)}
                           className="text-red-600 hover:text-red-700"
-                          data-testid={`button-delete-${entry.id}`}
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                      </div>
-                    ))}
-                </div>
-              </div>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
-          {(isFetching || isLoading) && <div className="mt-2 text-xs text-slate-500">Refreshing…</div>}
         </CardContent>
       </Card>
 
-      {/* Add New Entry modal */}
-      {showAdd && (
+      {/* Add New Entry Modal */}
+      {showAddForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md shadow-2xl border-0 bg-white dark:bg-slate-900">
             <CardHeader>
@@ -521,14 +446,14 @@ export default function PatientVolumePage() {
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal">
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(newEntry.date, "PPP")}
+                        {dfFormat(newEntry.date, "PPP")}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent side="bottom" sideOffset={8} className="w-auto p-2 z-[60] bg-white border border-slate-200 shadow-2xl">
-                      <DatePicker
+                    <PopoverContent className="w-auto p-0 z-[60] bg-white border border-slate-200 shadow-2xl" sideOffset={8}>
+                      <Calendar
                         mode="single"
                         selected={newEntry.date}
-                        onSelect={(d) => d && setNewEntry(prev => ({ ...prev, date: d }))}
+                        onSelect={(d) => d && setNewEntry((p) => ({ ...p, date: d }))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -541,7 +466,7 @@ export default function PatientVolumePage() {
                     type="number"
                     min="0"
                     value={newEntry.patientCount}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, patientCount: e.target.value }))}
+                    onChange={(e) => setNewEntry((p) => ({ ...p, patientCount: e.target.value }))}
                     placeholder="Number of patients"
                     required
                   />
@@ -551,17 +476,17 @@ export default function PatientVolumePage() {
                   <Label>Notes (Optional)</Label>
                   <Textarea
                     value={newEntry.notes}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Additional notes about the day…"
+                    onChange={(e) => setNewEntry((p) => ({ ...p, notes: e.target.value }))}
+                    placeholder="Additional notes about the day..."
                   />
                 </div>
 
                 <div className="flex gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setShowAdd(false)} className="flex-1">
+                  <Button type="button" variant="outline" onClick={() => setShowAddForm(false)} className="flex-1">
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "Saving…" : "Save"}
+                  <Button type="submit" className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={createVolumeMutation.isPending}>
+                    {createVolumeMutation.isPending ? "Saving..." : "Save"}
                   </Button>
                 </div>
               </form>
