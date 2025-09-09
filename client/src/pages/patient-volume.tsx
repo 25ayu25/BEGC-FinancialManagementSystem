@@ -18,6 +18,8 @@ import {
   Trash2,
   BarChart3,
   Table as TableIcon,
+  X,
+  Save,
 } from "lucide-react";
 
 import {
@@ -58,7 +60,7 @@ export default function PatientVolumePage() {
   const [addOpen, setAddOpen] = useState(false);
   const [newEntry, setNewEntry] = useState<{ date: Date; patientCount: string; notes: string }>({
     date: new Date(),
-    patientCount: "",
+    patientCount: "0", // default like your example
     notes: "",
   });
 
@@ -77,7 +79,7 @@ export default function PatientVolumePage() {
     },
   });
 
-  // --- Normalize & aggregate to days (avoid timezone “Aug 31” drift) ---
+  // --- Normalize & aggregate to days ---
   const daysInMonth = useMemo(
     () => new Date(year, monthIndex + 1, 0).getDate(),
     [year, monthIndex]
@@ -86,10 +88,9 @@ export default function PatientVolumePage() {
   const dayBuckets = useMemo(() => {
     const buckets = Array.from({ length: daysInMonth }, () => 0);
     for (const v of rawVolumes) {
-      // Parse server ISO date in local time, then bucket by local day if it truly belongs to this month
       const d = parseISO(v.date);
       if (d.getFullYear() === year && d.getMonth() === monthIndex) {
-        const day = d.getDate(); // 1..N local
+        const day = d.getDate();
         buckets[day - 1] += Number(v.patientCount || 0);
       }
     }
@@ -102,21 +103,11 @@ export default function PatientVolumePage() {
   const peakCount = Math.max(0, ...dayBuckets);
   const peakDay = peakCount > 0 ? dayBuckets.findIndex((n) => n === peakCount) + 1 : null;
 
-  // Recharts data
   const chartData = useMemo(
-    () =>
-      dayBuckets.map((count, idx) => ({
-        day: idx + 1,
-        count: count > 0 ? count : 0, // keep bars even for zero (or set to null to hide)
-      })),
+    () => dayBuckets.map((count, idx) => ({ day: idx + 1, count: count > 0 ? count : 0 })),
     [dayBuckets]
   );
-
-  // X-axis ticks: show all 1..N (your request)
-  const xTicks = useMemo(
-    () => Array.from({ length: daysInMonth }, (_, i) => i + 1),
-    [daysInMonth]
-  );
+  const xTicks = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
   // --- Mutations ---
   const createMutation = useMutation({
@@ -126,7 +117,7 @@ export default function PatientVolumePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Patient volume recorded" });
       setAddOpen(false);
-      setNewEntry({ date: new Date(), patientCount: "", notes: "" });
+      setNewEntry({ date: new Date(), patientCount: "0", notes: "" });
     },
     onError: () => toast({ title: "Failed to record patient volume", variant: "destructive" }),
   });
@@ -148,7 +139,6 @@ export default function PatientVolumePage() {
       toast({ title: "Enter a valid patient count", variant: "destructive" });
       return;
     }
-    // Save as ISO; backend already expects ISO string
     createMutation.mutate({
       date: newEntry.date.toISOString(),
       departmentId: null,
@@ -158,7 +148,7 @@ export default function PatientVolumePage() {
   };
 
   // --- Rendering helpers ---
-  const monthTitle = format(selectedMonth, "MMMM yyyy"); // auto updates (Sep → Oct, etc.)
+  const monthTitle = format(selectedMonth, "MMMM yyyy");
 
   const TooltipBox = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -233,7 +223,6 @@ export default function PatientVolumePage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {/* CHANGED: set text to white when active AND force svg to inherit using [&>svg] */}
           <Button
             variant={mode === "chart" ? "default" : "outline"}
             className={cn(
@@ -247,7 +236,6 @@ export default function PatientVolumePage() {
             <BarChart3 className="w-4 h-4 mr-1 shrink-0" />
             Chart
           </Button>
-          {/* CHANGED: same treatment for the Table button */}
           <Button
             variant={mode === "table" ? "default" : "outline"}
             className={cn(
@@ -272,11 +260,7 @@ export default function PatientVolumePage() {
           ) : mode === "chart" ? (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 8, right: 16, left: 4, bottom: 22 }}
-                  barCategoryGap="20%"
-                >
+                <BarChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
                   <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                   <XAxis
                     dataKey="day"
@@ -284,25 +268,14 @@ export default function PatientVolumePage() {
                     tick={{ fontSize: 11, fill: "#64748b" }}
                     axisLine={{ stroke: "#e5e7eb" }}
                     tickLine={false}
-                    label={{
-                      value: "Day",
-                      position: "insideBottomRight",
-                      offset: -14,
-                      style: { fill: "#64748b", fontSize: 11 },
-                    }}
+                    label={{ value: "Day", position: "insideBottomRight", offset: -14, style: { fill: "#64748b", fontSize: 11 } }}
                   />
                   <YAxis
                     tick={{ fontSize: 11, fill: "#64748b" }}
                     axisLine={false}
                     tickLine={false}
                     allowDecimals={false}
-                    label={{
-                      value: "Patients",
-                      angle: -90,
-                      position: "insideLeft",
-                      offset: 8,
-                      style: { fill: "#64748b", fontSize: 11 },
-                    }}
+                    label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
                   />
                   <Tooltip content={<TooltipBox />} />
                   <Bar dataKey="count" name="Patients" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
@@ -323,7 +296,6 @@ export default function PatientVolumePage() {
                   const idToDelete =
                     rawVolumes.find((v) => {
                       const vd = parseISO(v.date);
-                      // match same local day (handles tz correctly)
                       return (
                         vd.getFullYear() === dayDate.getFullYear() &&
                         vd.getMonth() === dayDate.getMonth() &&
@@ -332,10 +304,7 @@ export default function PatientVolumePage() {
                     })?.id ?? null;
 
                   return (
-                    <div
-                      key={d}
-                      className="grid grid-cols-[1fr_120px_44px] items-center px-3 py-2 hover:bg-slate-50"
-                    >
+                    <div key={d} className="grid grid-cols-[1fr_120px_44px] items-center px-3 py-2 hover:bg-slate-50">
                       <div className="text-slate-900">{format(dayDate, "EEE, MMM d, yyyy")}</div>
                       <div className="text-right font-medium text-slate-900 pr-6">{count}</div>
                       <div className="flex justify-end">
@@ -362,14 +331,20 @@ export default function PatientVolumePage() {
         </CardContent>
       </Card>
 
-      {/* Add modal */}
+      {/* Add modal — light overlay, header, close button, tidy footer */}
       {addOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md border-0 shadow-2xl">
-            <CardHeader>
-              <CardTitle>Add Patient Volume</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <div className="fixed inset-0 z-50 bg-black/20 flex items-start justify-center p-4">
+          <div className="mt-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <h3 className="text-base font-semibold text-slate-900">Add Patient Volume</h3>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAddOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4">
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Date</Label>
@@ -398,31 +373,35 @@ export default function PatientVolumePage() {
                     min={0}
                     value={newEntry.patientCount}
                     onChange={(e) => setNewEntry((p) => ({ ...p, patientCount: e.target.value }))}
-                    placeholder="e.g. 27"
-                    required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
+                  <Label>Notes (Optional)</Label>
                   <Textarea
                     value={newEntry.notes}
                     onChange={(e) => setNewEntry((p) => ({ ...p, notes: e.target.value }))}
-                    placeholder="Additional notes…"
+                    placeholder="Enter any additional notes (optional)…"
                   />
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => setAddOpen(false)}>
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                  <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={createMutation.isPending}>
+                  <Button
+                    type="submit"
+                    className="bg-teal-600 hover:bg-teal-700"
+                    disabled={createMutation.isPending}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
                     {createMutation.isPending ? "Saving…" : "Save"}
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </div>
