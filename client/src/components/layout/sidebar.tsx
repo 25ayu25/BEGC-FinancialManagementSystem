@@ -97,15 +97,17 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer",
+                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
                       ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
                       : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
-                  <item.icon className="w-5 h-5 shrink-0" />
-                  <span className="font-medium truncate">{item.name}</span>
+                  <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
+                    {item.name}
+                  </span>
                 </div>
               </Link>
             );
