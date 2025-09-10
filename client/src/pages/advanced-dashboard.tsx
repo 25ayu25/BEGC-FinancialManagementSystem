@@ -15,7 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
-  TrendingUp, TrendingDown, DollarSign, Users, Calendar as CalendarIcon, Shield, RefreshCw,
+  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 
@@ -24,10 +24,7 @@ import {
   CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from "recharts";
 
-// Global date filter
 import { useDateFilter } from "@/context/date-filter-context";
-
-// Drawer + improved Departments panel
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
@@ -278,7 +275,7 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* KPI band */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
@@ -427,10 +424,10 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main section — fixed right rail, taller chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 mb-6">
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
         {/* Revenue Analytics */}
-        <Card className="border border-slate-200 shadow-sm">
+        <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
@@ -439,16 +436,16 @@ export default function AdvancedDashboard() {
           <CardContent className="pb-4">
             {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
               <div className="space-y-0">
-                <div className="h-80 w-full">{/* taller than before for legibility */}
+                <div className="h-80 lg:h-[420px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 16, right: hasAnyUSD ? 52 : 16, left: 8, bottom: 28 }}
+                      margin={{ top: 20, right: hasAnyUSD ? 60 : 20, left: 10, bottom: 30 }}
                       barGap={6}
                       barCategoryGap="28%"
                     >
-                      <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.35} vertical={false} />
-                      <Legend verticalAlign="top" height={32} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "8px" }} />
+                      <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
+                      <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "10px" }} />
                       <XAxis
                         dataKey="day"
                         ticks={xTicks}
@@ -456,7 +453,7 @@ export default function AdvancedDashboard() {
                         axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
                         tickLine={false}
                         tick={{ fontSize: 12, fill: "#64748b" }}
-                        height={36}
+                        height={40}
                       />
                       {/* Left Y axis (SSP) */}
                       <YAxis
@@ -490,6 +487,7 @@ export default function AdvancedDashboard() {
                           label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 8 }}
                         />
                       )}
+                      {/* Thick grouped bars */}
                       <Bar yAxisId="ssp" dataKey="amountSSPPlot" name="SSP" fill="#14b8a6" barSize={24} radius={[4, 4, 0, 0]} />
                       {hasAnyUSD && (
                         <Bar yAxisId="usd" dataKey="amountUSDPlot" name="USD" fill="#0ea5e9" barSize={24} radius={[4, 4, 0, 0]} />
@@ -498,7 +496,7 @@ export default function AdvancedDashboard() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Totals under chart */}
+                {/* Totals */}
                 <div className="border-t border-slate-100 pt-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex flex-col text-center">
@@ -528,7 +526,7 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="h-80 bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
+              <div className="h-80 lg:h-[420px] bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3" />
                   <p className="text-slate-600 text-sm font-medium">No revenue in this range</p>
@@ -539,26 +537,23 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Right fixed rail — Departments */}
-        <div className="lg:sticky lg:top-20">
+        {/* Departments Panel */}
+        <div className="lg:col-span-1">
           <DepartmentsPanel
-            className="lg:w-[380px]"
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
           />
         </div>
-      </div>
 
-      {/* Actions & system status — compact */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border border-slate-200 shadow-sm">
-          <CardHeader className="pb-3">
+        {/* Quick Actions — sits below chart (spans 2) */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-2">
+          <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <a href="/transactions" className="block">
                 <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
@@ -596,13 +591,14 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border border-slate-200 shadow-sm">
-          <CardHeader className="pb-3">
+        {/* System Status — sits under Departments */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1">
+          <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Database</span>
