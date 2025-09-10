@@ -1,19 +1,22 @@
+// client/src/components/layout/AppContainer.tsx
+import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type Props = {
+  children: ReactNode;
   className?: string;
-  children: React.ReactNode;
+  /** Optional max width override */
+  max?: "default" | "wide";
 };
 
 /**
- * Mobile-first page container:
- * - Comfortable side padding on phones
- * - Wider padding on tablet/desktop
- * - Max width to avoid super-wide lines on desktop
+ * Centers content and applies responsive horizontal padding.
+ * Use this to wrap page sections so spacing is consistent on mobile/desktop.
  */
-export default function AppContainer({ className, children }: Props) {
+export default function AppContainer({ children, className, max = "default" }: Props) {
+  const maxWidth = max === "wide" ? "max-w-[1400px]" : "max-w-[1200px]";
   return (
-    <div className={cn("mx-auto w-full max-w-7xl px-4 sm:px-6 md:px-8", className)}>
+    <div className={cn("mx-auto w-full px-4 sm:px-6", maxWidth, className)}>
       {children}
     </div>
   );
