@@ -1,4 +1,5 @@
-import { useState } from "react";
+// client/src/pages/insurance-providers.tsx
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,48 +9,57 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft, CalendarIcon } from "lucide-react";
+import {
+  Shield, DollarSign, TrendingUp, TrendingDown, ArrowLeft, Calendar as CalendarIcon, Download
+} from "lucide-react";
 import { Link } from "wouter";
+
+// Recharts for the donut
+import {
+  ResponsiveContainer, PieChart, Pie, Cell, Tooltip
+} from "recharts";
+
+const COLORS = ["#4f46e5","#0ea5e9","#22c55e","#f59e0b","#ef4444","#a855f7","#06b6d4","#84cc16","#f97316","#10b981"];
+
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const fmtUSD = (v: number) => nf0.format(Math.round(v));
 
 export default function InsuranceProvidersPage() {
   const currentDate = new Date();
-  
-  // Check URL parameters for time range context from dashboard
+
+  // —— pick up URL context passed from dashboard ——
   const urlParams = new URLSearchParams(window.location.search);
-  const rangeParam = urlParams.get('range') as 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom' | null;
-  const startDateParam = urlParams.get('startDate');
-  const endDateParam = urlParams.get('endDate');
-  const yearParam = urlParams.get('year');
-  const monthParam = urlParams.get('month');
-  
-  // Initialize year/month based on URL parameters from dashboard or current date
+  const rangeParam = urlParams.get("range") as
+    | "current-month" | "last-month" | "last-3-months" | "year" | "custom" | null;
+  const startDateParam = urlParams.get("startDate");
+  const endDateParam = urlParams.get("endDate");
+  const yearParam = urlParams.get("year");
+  const monthParam = urlParams.get("month");
+
+  // initial YM from params or sensible default
   const getInitialYearMonth = () => {
     const now = new Date();
-    
-    // Use URL parameters if available (passed from dashboard)
     if (yearParam && monthParam) {
-      return { 
-        year: parseInt(yearParam), 
-        month: parseInt(monthParam) 
-      };
+      return { year: parseInt(yearParam), month: parseInt(monthParam) };
     }
-    
-    // Fallback to calculated values based on range
-    switch(rangeParam) {
-      case 'last-month':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-        return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
-      case 'year':
-        return { year: now.getFullYear(), month: 1 }; // January for year view
+    switch (rangeParam) {
+      case "last-month": {
+        const last = new Date(now.getFullYear(), now.getMonth() - 1);
+        return { year: last.getFullYear(), month: last.getMonth() + 1 };
+      }
+      case "year":
+        return { year: now.getFullYear(), month: 1 };
       default:
         return { year: now.getFullYear(), month: now.getMonth() + 1 };
     }
   };
-  
+
   const initialYearMonth = getInitialYearMonth();
   const [selectedYear, setSelectedYear] = useState(initialYearMonth.year);
   const [selectedMonth, setSelectedMonth] = useState(initialYearMonth.month);
-  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>(rangeParam || 'current-month');
+  const [timeRange, setTimeRange] = useState<
+    "current-month" | "last-month" | "last-3-months" | "year" | "custom"
+  >(rangeParam || "current-month");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(
     startDateParam ? new Date(startDateParam) : undefined
   );
@@ -57,89 +67,115 @@ export default function InsuranceProvidersPage() {
     endDateParam ? new Date(endDateParam) : undefined
   );
 
-  const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
+  const handleTimeRangeChange = (range:
+    "current-month" | "last-month" | "last-3-months" | "year" | "custom"
+  ) => {
     setTimeRange(range);
-    
     const now = new Date();
-    switch(range) {
-      case 'current-month':
+    switch (range) {
+      case "current-month":
         setSelectedYear(now.getFullYear());
         setSelectedMonth(now.getMonth() + 1);
         break;
-      case 'last-month':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-        setSelectedYear(lastMonth.getFullYear());
-        setSelectedMonth(lastMonth.getMonth() + 1);
+      case "last-month": {
+        const last = new Date(now.getFullYear(), now.getMonth() - 1);
+        setSelectedYear(last.getFullYear());
+        setSelectedMonth(last.getMonth() + 1);
         break;
-      case 'last-3-months':
+      }
+      case "last-3-months":
         setSelectedYear(now.getFullYear());
         setSelectedMonth(now.getMonth() + 1);
         break;
-      case 'year':
+      case "year":
         setSelectedYear(now.getFullYear());
-        setSelectedMonth(1); // Use January for year queries
+        setSelectedMonth(1);
         break;
     }
   };
 
-  const currentYear = selectedYear;
-  const currentMonth = selectedMonth;
-
-  // Calculate date ranges
-  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-  // Get dashboard data for selected time range
+  // fetch dashboard (selected range)
   const { data: dashboardData } = useQuery({
     queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
-      if (timeRange === 'custom' && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
-      const res = await fetch(url, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch dashboard data");
       return res.json();
-    }
+    },
   });
 
-  // Get comparison data (previous period)
+  // fetch comparison (prev period) only when needed
   const { data: comparisonData } = useQuery({
     queryKey: ["/api/dashboard/comparison", selectedYear, selectedMonth, timeRange],
     queryFn: async () => {
-      // For comparison, get the previous period
       let compYear = selectedYear;
       let compMonth = selectedMonth;
-      
-      if (timeRange === 'current-month') {
-        // Compare with last month
-        const lastMonth = new Date(selectedYear, selectedMonth - 2);
-        compYear = lastMonth.getFullYear();
-        compMonth = lastMonth.getMonth() + 1;
-      } else if (timeRange === 'last-month') {
-        // Compare with current month
-        compYear = new Date().getFullYear();
-        compMonth = new Date().getMonth() + 1;
+      if (timeRange === "current-month") {
+        const last = new Date(selectedYear, selectedMonth - 2);
+        compYear = last.getFullYear();
+        compMonth = last.getMonth() + 1;
+      } else if (timeRange === "last-month") {
+        const now = new Date();
+        compYear = now.getFullYear();
+        compMonth = now.getMonth() + 1;
       }
-      // For other ranges, we'll compare against the same period
-      
       const url = `/api/dashboard?year=${compYear}&month=${compMonth}`;
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: timeRange === 'current-month' || timeRange === 'last-month'
+    enabled: timeRange === "current-month" || timeRange === "last-month",
   });
 
+  // ---- shape data the way the UI needs ----
   const insuranceBreakdown = (dashboardData as any)?.insuranceBreakdown || {};
   const prevInsuranceBreakdown = (comparisonData as any)?.insuranceBreakdown || {};
-  
-  // Calculate totals
-  const totalSelectedUSD = Object.values(insuranceBreakdown).reduce((sum: number, value) => sum + parseFloat(value as string), 0);
-  const totalComparisonUSD = Object.values(prevInsuranceBreakdown).reduce((sum: number, value) => sum + parseFloat(value as string), 0);
-  
-  // Calculate overall change
-  const overallChange = totalComparisonUSD > 0 ? ((totalSelectedUSD - totalComparisonUSD) / totalComparisonUSD) * 100 : 0;
+
+  const providers = useMemo(() => {
+    return Object.entries(insuranceBreakdown).map(([name, amt]) => ({
+      name,
+      usd: parseFloat(amt as string) || 0,
+      prev: parseFloat((prevInsuranceBreakdown as any)[name] as string) || 0,
+    })).sort((a, b) => b.usd - a.usd);
+  }, [insuranceBreakdown, prevInsuranceBreakdown]);
+
+  const totalUSD = providers.reduce((s, p) => s + p.usd, 0);
+  const prevTotalUSD = Object.values(prevInsuranceBreakdown)
+    .reduce((s: number, v: any) => s + (parseFloat(v as string) || 0), 0);
+  const overallChange = prevTotalUSD > 0 ? ((totalUSD - prevTotalUSD) / prevTotalUSD) * 100 : 0;
+
+  // donut chart data
+  const donutData = providers.map(p => ({ name: p.name, value: p.usd }));
+
+  const periodLabel =
+    timeRange === "current-month" ? "Current month" :
+    timeRange === "last-month" ? "Last month" :
+    timeRange === "last-3-months" ? "Last 3 months" :
+    timeRange === "year" ? `Year ${selectedYear}` :
+    (customStartDate && customEndDate)
+      ? `${format(customStartDate, "MMM d, yyyy")} — ${format(customEndDate, "MMM d, yyyy")}`
+      : "Custom period";
+
+  // export CSV
+  const exportCSV = () => {
+    const rows = [["Provider", "Revenue (USD)", "Share (%)", "Prev Period (USD)"]];
+    providers.forEach((p) => {
+      const share = totalUSD ? ((p.usd / totalUSD) * 100).toFixed(1) : "0.0";
+      rows.push([p.name, String(Math.round(p.usd)), share, String(Math.round(p.prev || 0))]);
+    });
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `insurance-providers-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -158,7 +194,7 @@ export default function InsuranceProvidersPage() {
               <p className="text-slate-600 mt-1">Detailed breakdown by insurance provider</p>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="w-[140px]">
@@ -173,83 +209,61 @@ export default function InsuranceProvidersPage() {
               </SelectContent>
             </Select>
 
-            {/* Custom Date Range Controls */}
-            {timeRange === 'custom' && (
+            {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
+                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent 
-                    side="bottom" 
-                    align="start" 
-                    sideOffset={12} 
+                  <PopoverContent
+                    side="bottom" align="start" sideOffset={12}
                     className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
-                    avoidCollisions={true}
-                    collisionPadding={15}
+                    style={{ zIndex: 50000 }}
                   >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      initialFocus
-                    />
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
+                      selected={customStartDate} onSelect={setCustomStartDate} initialFocus />
                   </PopoverContent>
                 </Popover>
-                
-                <span aria-hidden="true" className="text-muted-foreground">to</span>
-                
+
+                <span aria-hidden className="text-muted-foreground">to</span>
+
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
+                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent 
-                    side="bottom" 
-                    align="start" 
-                    sideOffset={12} 
+                  <PopoverContent
+                    side="bottom" align="start" sideOffset={12}
                     className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
-                    avoidCollisions={true}
-                    collisionPadding={15}
+                    style={{ zIndex: 50000 }}
                   >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      initialFocus
-                    />
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
+                      selected={customEndDate} onSelect={setCustomEndDate} initialFocus />
                   </PopoverContent>
                 </Popover>
               </div>
             )}
+
+            <Button variant="outline" className="h-9" onClick={exportCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Overview Card */}
+      {/* KPI Row */}
       <Card className="border-0 shadow-md bg-white">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold text-slate-900">Insurance Revenue Overview</CardTitle>
@@ -262,20 +276,22 @@ export default function InsuranceProvidersPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">Total Revenue</p>
-                <p className="text-xl font-bold text-slate-900">USD {Math.round(totalSelectedUSD as number).toLocaleString()}</p>
+                <p className="text-xl font-bold text-slate-900">USD {fmtUSD(totalUSD)}</p>
+                <p className="text-xs text-slate-500">{periodLabel}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="bg-blue-50 p-2 rounded-lg">
                 <DollarSign className="h-5 w-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-sm text-slate-600">Active Providers</p>
-                <p className="text-xl font-bold text-slate-900">{Object.keys(insuranceBreakdown).length}</p>
+                <p className="text-xl font-bold text-slate-900">{providers.length}</p>
+                <p className="text-xs text-slate-500">with transactions</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="bg-emerald-50 p-2 rounded-lg">
                 {overallChange >= 0 ? (
@@ -286,16 +302,13 @@ export default function InsuranceProvidersPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">
-                  vs {
-                    timeRange === 'current-month' ? 'Last Month' :
-                    timeRange === 'last-month' ? 'Current Month' :
-                    timeRange === 'last-3-months' ? 'Previous Period' :
-                    timeRange === 'year' ? 'Previous Period' :
-                    'Previous Period'
-                  }
+                  vs {timeRange === "current-month" ? "Last Month" :
+                      timeRange === "last-month" ? "Current Month" : "Previous Period"}
                 </p>
-                <p className={`text-xl font-bold ${overallChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {overallChange >= 0 ? '+' : ''}{overallChange.toFixed(1)}%
+                <p className={cn("text-xl font-bold",
+                  overallChange >= 0 ? "text-emerald-600" : "text-red-600"
+                )}>
+                  {overallChange >= 0 ? "+" : ""}{overallChange.toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -303,95 +316,118 @@ export default function InsuranceProvidersPage() {
         </CardContent>
       </Card>
 
-      {/* Providers Grid */}
+      {/* Donut + Legend */}
+      <Card className="border-0 shadow-md bg-white">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-semibold text-slate-900">Share by Provider</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {providers.length === 0 ? (
+            <div className="h-56 flex items-center justify-center text-slate-500">
+              No insurance revenue in this period.
+            </div>
+          ) : (
+            <>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip formatter={(val: any, _name: any, p: any) => [`USD ${fmtUSD(Number(val))}`, p?.name]} />
+                    <Pie
+                      data={donutData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={72}
+                      outerRadius={110}
+                      paddingAngle={3}
+                    >
+                      {donutData.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                {providers.map((p, i) => {
+                  const share = totalUSD ? (p.usd / totalUSD) * 100 : 0;
+                  return (
+                    <div key={p.name} className="flex items-center gap-2 text-sm">
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} />
+                      <span className="truncate">{p.name}</span>
+                      <span className="ml-auto font-mono tabular-nums">USD {fmtUSD(p.usd)}</span>
+                      <Badge variant="secondary" className="ml-2">{share.toFixed(1)}%</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Provider cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Object.entries(insuranceBreakdown).map(([provider, amount]) => {
-          const currentAmount = parseFloat(amount as string);
-          const prevAmount = parseFloat(prevInsuranceBreakdown[provider] as string || '0');
-          const change = prevAmount > 0 ? ((currentAmount - prevAmount) / prevAmount) * 100 : 0;
-          const percentage = (totalSelectedUSD as number) > 0 ? (currentAmount / (totalSelectedUSD as number)) * 100 : 0;
-          
+        {providers.map((p, idx) => {
+          const share = totalUSD ? (p.usd / totalUSD) * 100 : 0;
+          const change = p.prev > 0 ? ((p.usd - p.prev) / p.prev) * 100 : 0;
+
           return (
-            <Card key={provider} className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+            <Card key={p.name} className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="bg-purple-50 p-1.5 rounded-lg">
+                    <div className="bg-purple-50 p-1.5 rounded-md border border-purple-100">
                       <Shield className="h-4 w-4 text-purple-600" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-900">{provider}</h3>
-                      <Badge variant="secondary" className="text-xs">
-                        {percentage.toFixed(1)}% of total
-                      </Badge>
-                    </div>
+                    <div className="font-semibold text-slate-900">{p.name}</div>
+                  </div>
+                  <Badge variant="outline" className="rounded-full">Rank #{idx + 1}</Badge>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-sm text-slate-600">Revenue</div>
+                  <div className="font-mono font-semibold text-slate-900">
+                    USD {fmtUSD(p.usd)}
                   </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">
-                      {timeRange === 'last-3-months' ? 'Total (3 months)' : 
-                       timeRange === 'year' ? 'Total (Year)' : 'Revenue'}
-                    </span>
-                    <span className="font-mono font-semibold text-slate-900">
-                      USD {Math.round(currentAmount).toLocaleString()}
-                    </span>
+
+                <div className="mt-2">
+                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-violet-500"
+                      style={{ width: `${Math.min(100, share)}%` }}
+                    />
                   </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">
-                      vs {
-                        timeRange === 'current-month' ? 'Last Month' :
-                        timeRange === 'last-month' ? 'Current Month' :
-                        timeRange === 'last-3-months' ? 'Previous 3 Months' :
-                        timeRange === 'year' ? 'Previous Year' :
-                        'Previous Period'
-                      }
-                    </span>
-                    <span className={`text-sm font-medium ${
-                      change > 0 ? 'text-emerald-600' :
-                      change < 0 ? 'text-red-600' : 
-                      'text-slate-500'
-                    }`}>
-                      {change > 0 ? '+' : ''}{change.toFixed(1)}%
-                    </span>
-                  </div>
-                  
-                  {/* Show monthly average for multi-month periods */}
-                  {(timeRange === 'last-3-months' || timeRange === 'year') && currentAmount > 0 && (
-                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                      <span className="text-xs text-slate-500">
-                        Monthly Average
-                      </span>
-                      <span className="text-xs font-mono text-slate-500">
-                        USD {Math.round(currentAmount / (timeRange === 'year' ? 12 : 3)).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {prevAmount > 0 && timeRange !== 'last-3-months' && timeRange !== 'year' && (
-                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                      <span className="text-xs text-slate-500">
-                        {
-                          timeRange === 'current-month' ? 'Previous' :
-                          timeRange === 'last-month' ? 'Current' :
-                          'Previous Period'
-                        }
-                      </span>
-                      <span className="text-xs font-mono text-slate-500">
-                        USD {Math.round(prevAmount).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
+                  <div className="mt-1 text-xs text-slate-500">{share.toFixed(1)}% of total</div>
                 </div>
+
+                <div className="mt-3 flex items-center justify-between text-sm">
+                  <div className="text-slate-600">
+                    vs {timeRange === "current-month" ? "last month" :
+                        timeRange === "last-month" ? "current month" : "previous period"}:
+                  </div>
+                  <div className={cn(
+                    "font-medium",
+                    change > 0 ? "text-emerald-600" : change < 0 ? "text-red-600" : "text-slate-500"
+                  )}>
+                    {change > 0 ? "+" : ""}{change.toFixed(1)}%
+                  </div>
+                </div>
+
+                {p.prev > 0 && (
+                  <div className="mt-1 flex items-center justify-between text-xs border-t border-slate-100 pt-1">
+                    <span className="text-slate-500">Prev</span>
+                    <span className="font-mono text-slate-500">USD {fmtUSD(p.prev)}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
-      
-      {Object.keys(insuranceBreakdown).length === 0 && (
+
+      {providers.length === 0 && (
         <Card className="border-0 shadow-md bg-white">
           <CardContent className="p-8 text-center">
             <Shield className="h-12 w-12 text-slate-400 mx-auto mb-3" />
