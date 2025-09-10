@@ -27,8 +27,6 @@ import {
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
-
-// NEW: responsive page container
 import AppContainer from "@/components/layout/AppContainer";
 
 // ---------- number formatting helpers ----------
@@ -205,9 +203,15 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header + date filters */}
-      <header className="mb-2">
-        <AppContainer className="py-4">
+      {/* Sticky Header + date filters */}
+      <header
+        className="
+          sticky top-0 z-30
+          bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60
+          border-b border-slate-200
+        "
+      >
+        <AppContainer className="py-3">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
             <div>
               <h1 className="text-3xl font-semibold leading-tight text-slate-900">
@@ -281,7 +285,7 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Page body */}
-      <AppContainer className="space-y-6 pb-10">
+      <AppContainer className="space-y-6 pb-10 pt-4">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
           {/* Total Revenue */}
