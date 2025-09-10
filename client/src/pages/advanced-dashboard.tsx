@@ -1,8 +1,7 @@
 // client/src/pages/advanced-dashboard.tsx
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,18 +11,19 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+import {
+  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
+} from "lucide-react";
+import { api } from "@/lib/queryClient";
 
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from "recharts";
 
-import {
-  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
-} from "lucide-react";
-
-import { api } from "@/lib/queryClient";
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
@@ -106,7 +106,7 @@ export default function AdvancedDashboard() {
         if (!d && (r as any).date) d = new Date((r as any).date).getDate();
         if (d >= 1 && d <= daysInMonth) {
           incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
-          incomeSeries[d - 1].amountSSP += Number((r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0);
+          incomeSeries[d - 1].amountSSP += Number((r as any).incomeSSP ?? 0);
           incomeSeries[d - 1].amount += Number((r as any).income ?? (r as any).amount ?? 0);
         }
       }
@@ -133,6 +133,7 @@ export default function AdvancedDashboard() {
     [incomeSeries]
   );
 
+  // X ticks: 1,5,10,15,20,25,last
   const xTicks = useMemo(() => {
     const n = incomeSeries.length;
     if (!n) return [];
@@ -159,95 +160,87 @@ export default function AdvancedDashboard() {
     );
   };
 
-  // ---------- robust department breakdown mapping ----------
-  /**
-   * The API might return department breakdown keyed by:
-   *   - department id (preferred) e.g. {"1": 100000}
-   *   - department code e.g. {"LAB": 100000}
-   *   - department name e.g. {"Laboratory": 100000}
-   *
-   * This function normalizes it into { [dept.id]: amount }
-   */
-  const normalizedDeptBreakdown: Record<string, number> = useMemo(() => {
-    const raw = (dashboardData as any)?.departmentBreakdown ?? (dashboardData as any)?.departmentTotals ?? {};
-    if (!raw || !departments) return raw ?? {};
+  // loading
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-lg">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
 
-    const list = Array.isArray(departments) ? (departments as any[]) : [];
-    const idSet = new Set(list.map((d) => String(d.id)));
+  // summary numbers
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
+  const sspRevenue = monthTotalSSP || sspIncome;
+  const sspNetIncome = sspRevenue - totalExpenses;
 
-    // If at least one key matches an id, assume it's id-keyed and return as-is.
-    const keys = Object.keys(raw || {});
-    if (keys.some((k) => idSet.has(String(k)))) {
-      const byId: Record<string, number> = {};
-      for (const k of keys) byId[String(k)] = Number(raw[k] ?? 0);
-      return byId;
+  const getPatientVolumeNavigation = () => {
+    const currentDate = new Date();
+    switch (timeRange) {
+      case "current-month": return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      case "last-month": {
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      }
+      case "last-3-months": {
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      }
+      case "year": return { year: currentDate.getFullYear(), month: 1 };
+      case "custom":
+        return customStartDate
+          ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
+          : { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      default: return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
     }
-
-    // Otherwise, remap by name/code -> id.
-    const byId: Record<string, number> = {};
-    for (const d of list) {
-      const v = raw[d.name] ?? raw[d.code] ?? 0;
-      byId[String(d.id)] = Number(v || 0);
-    }
-    return byId;
-  }, [(dashboardData as any)?.departmentBreakdown, (dashboardData as any)?.departmentTotals, departments]);
-
-  const sspRevenue =
-    Number((dashboardData as any)?.totalRevenueSSP ?? (dashboardData as any)?.sspRevenue ?? 0);
+  };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50">
-      {/* Simple header (kept as your working version) */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+    <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
+      {/* Header + date filters */}
+      <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900">Executive Dashboard</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Key financials · {periodLabel}</p>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+              Executive Dashboard
+            </h1>
+            <div className="mt-1 flex items-center gap-4">
+              <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
+            </div>
           </div>
 
-          {/* Time range + custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select
-              value={timeRange}
-              onValueChange={(v: any) => handleTimeRangeChange(v)}
-            >
-              <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue placeholder="Current Month" />
-              </SelectTrigger>
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="current-month">Current Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
                 <SelectItem value="last-3-months">Last 3 Months</SelectItem>
                 <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="custom">Custom…</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
 
             {timeRange === "custom" && (
-              <>
+              <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
-                    >
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
+                  <PopoverContent side="bottom" align="start" sideOffset={12}
                     className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
+                    avoidCollisions collisionPadding={15}
                   >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
                       selected={customStartDate}
                       onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
                       initialFocus
@@ -255,153 +248,214 @@ export default function AdvancedDashboard() {
                   </PopoverContent>
                 </Popover>
 
-                <span aria-hidden="true" className="text-muted-foreground">to</span>
+                <span aria-hidden className="text-muted-foreground">to</span>
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
-                    >
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                  <PopoverContent side="bottom" align="start" sideOffset={12}
+                    className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
+                    avoidCollisions collisionPadding={15}
                   >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
                       selected={customEndDate}
                       onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
-              </>
+              </div>
             )}
           </div>
         </div>
+      </header>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
+        {/* Total Revenue */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {nf0.format(Math.round(monthTotalSSP || sspIncome))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-emerald-50 p-1.5 rounded-lg">
+                {dashboardData?.changes?.incomeChangeSSP !== undefined &&
+                dashboardData.changes.incomeChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Total Expenses */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {nf0.format(Math.round(totalExpenses))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
+                      dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-red-50 p-1.5 rounded-lg">
+                {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+                dashboardData.changes.expenseChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-emerald-600" />
+                ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Net Income */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Net Income</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {nf0.format(Math.round(sspNetIncome))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-blue-50 p-1.5 rounded-lg">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Insurance (USD) */}
+        <Link href={`/insurance-providers?range=${timeRange}${
+          timeRange === "custom" && customStartDate && customEndDate
+            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}` : ""}`}>
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-4 sm:p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    USD {fmtUSD(Math.round(usdIncome))}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                      <span className={`text-xs font-medium ${
+                        dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
+                        dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                      }`}>
+                        {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
+                        {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-purple-600">
+                        {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
+                          ? "1 provider" : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Patient Volume */}
+        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${timeRange}`}>
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-4 sm:p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Total Patients</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    {(dashboardData?.totalPatients || 0).toLocaleString()}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    <span className="text-xs font-medium text-teal-600">Current period</span>
+                  </div>
+                </div>
+                <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* KPI band */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card className="border border-slate-200 shadow-sm">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-slate-600 text-sm">Total Revenue</div>
-                  <div className="text-slate-900 font-bold text-xl font-mono tabular-nums">
-                    SSP {nf0.format(Number((dashboardData as any)?.totalRevenueSSP || 0))}
-                  </div>
-                  <div className="text-slate-500 text-xs">0.0% vs last month</div>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200">
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-slate-200 shadow-sm">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-slate-600 text-sm">Total Expenses</div>
-                  <div className="text-slate-900 font-bold text-xl font-mono tabular-nums">
-                    SSP {nf0.format(Number((dashboardData as any)?.totalExpenses || 0))}
-                  </div>
-                  <div className="text-slate-500 text-xs">0.0% vs last month</div>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 border border-rose-200">
-                  <TrendingDown className="h-4 w-4 text-rose-600" />
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-slate-200 shadow-sm">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-slate-600 text-sm">Net Income</div>
-                  <div className="text-slate-900 font-bold text-xl font-mono tabular-nums">
-                    SSP {nf0.format(Number((dashboardData as any)?.netIncome || 0))}
-                  </div>
-                  <div className="text-slate-500 text-xs">0.0% vs last month</div>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 border border-indigo-200">
-                  <DollarSign className="h-4 w-4 text-indigo-600" />
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-slate-200 shadow-sm">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-slate-600 text-sm">Insurance (USD)</div>
-                  <div className="text-slate-900 font-bold text-xl font-mono tabular-nums">
-                    USD {fmtUSD(Number((dashboardData as any)?.insuranceRevenueUSD || 0))}
-                  </div>
-                  <div className="text-slate-500 text-xs">0.0% vs last month</div>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 border border-purple-200">
-                  <Shield className="h-4 w-4 text-purple-600" />
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-slate-200 shadow-sm">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-slate-600 text-sm">Total Patients</div>
-                  <div className="text-slate-900 font-bold text-xl font-mono tabular-nums">
-                    {Number((dashboardData as any)?.patientCount || 0)}
-                  </div>
-                  <div className="text-slate-500 text-xs">Current period</div>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-teal-50 border border-teal-200">
-                  <Users className="h-4 w-4 text-teal-600" />
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Chart */}
-        <Card className="border border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Revenue Analytics</CardTitle>
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
+        {/* Revenue Analytics */}
+        <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
-            {incomeSeries.length > 0 ? (
-              <div className="space-y-3">
-                <div className="h-80 lg:h-[420px]">
+          <CardContent className="pb-4">
+            {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
+              <div className="space-y-0">
+                <div className="h-80 lg:h-[420px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} barGap={8}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: hasAnyUSD ? 60 : 20, left: 10, bottom: 30 }}
+                      barGap={6}
+                      barCategoryGap="28%"
+                    >
+                      <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
+                      <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "10px" }} />
                       <XAxis
                         dataKey="day"
                         ticks={xTicks}
-                        axisLine={false}
+                        tickFormatter={(v: number) => String(v)}
+                        axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
                         tickLine={false}
                         tick={{ fontSize: 12, fill: "#64748b" }}
                         height={40}
                       />
+                      {/* Left Y axis (SSP) */}
                       <YAxis
                         yAxisId="ssp"
                         axisLine={false}
@@ -410,6 +464,7 @@ export default function AdvancedDashboard() {
                         tickFormatter={formatYAxisSSP}
                         label={{ value: "Revenue (SSP)", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#0f766e", fontSize: 11 } }}
                       />
+                      {/* Right Y axis (USD) */}
                       <YAxis
                         yAxisId="usd"
                         hide={!hasAnyUSD}
@@ -421,6 +476,7 @@ export default function AdvancedDashboard() {
                         label={{ value: "Revenue (USD)", angle: 90, position: "insideRight", offset: 8, style: { fill: "#1d4ed8", fontSize: 11 } }}
                       />
                       <Tooltip content={<CustomTooltip />} />
+                      {/* Avg line (SSP only) */}
                       {showAvgLine && monthlyAvgSSP > 0 && (
                         <ReferenceLine
                           yAxisId="ssp"
@@ -431,6 +487,7 @@ export default function AdvancedDashboard() {
                           label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 8 }}
                         />
                       )}
+                      {/* Thick grouped bars */}
                       <Bar yAxisId="ssp" dataKey="amountSSPPlot" name="SSP" fill="#14b8a6" barSize={24} radius={[4, 4, 0, 0]} />
                       {hasAnyUSD && (
                         <Bar yAxisId="usd" dataKey="amountUSDPlot" name="USD" fill="#0ea5e9" barSize={24} radius={[4, 4, 0, 0]} />
@@ -480,20 +537,17 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Right column — Departments */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2" />
-          <div className="lg:col-span-1">
-            <DepartmentsPanel
-              departments={Array.isArray(departments) ? (departments as any[]) : []}
-              departmentBreakdown={normalizedDeptBreakdown}
-              totalSSP={sspRevenue}
-            />
-          </div>
+        {/* Departments Panel */}
+        <div className="lg:col-span-1">
+          <DepartmentsPanel
+            departments={Array.isArray(departments) ? (departments as any[]) : []}
+            departmentBreakdown={dashboardData?.departmentBreakdown}
+            totalSSP={sspRevenue}
+          />
         </div>
 
-        {/* Quick Actions */}
-        <Card className="border border-slate-200 shadow-sm">
+        {/* Quick Actions — sits below chart (spans 2) */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
@@ -510,25 +564,69 @@ export default function AdvancedDashboard() {
                 </Button>
               </a>
               <a href="/patient-volume" className="block">
-                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-blue-50 hover:border-blue-200">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-slate-900">Patient Volume</span>
                     <span className="text-xs text-slate-500">Update patient count</span>
                   </div>
                 </Button>
               </a>
+              <a href="/reports" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Monthly Reports</span>
+                    <span className="text-xs text-slate-500">View generated reports</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/users" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">User Management</span>
+                    <span className="text-xs text-slate-500">Manage user accounts</span>
+                  </div>
+                </Button>
+              </a>
             </div>
           </CardContent>
         </Card>
-      </main>
 
-      {/* Drawer (unchanged) */}
+        {/* System Status — sits under Departments */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Database</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Last Sync</span>
+                <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+                  {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Active Users</span>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Expenses drawer */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
-        expenses={(dashboardData as any)?.expenseBreakdown ?? {}}
-        total={Number((dashboardData as any)?.totalExpenses ?? 0)}
         periodLabel={periodLabel}
+        expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
+        totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
+        onViewFullReport={() => { window.location.href = "/reports"; }}
       />
     </div>
   );
