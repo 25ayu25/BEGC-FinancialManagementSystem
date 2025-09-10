@@ -1,4 +1,3 @@
-// client/src/pages/advanced-dashboard.tsx
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -27,7 +26,10 @@ import {
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
+
+// layout helpers
 import AppContainer from "@/components/layout/AppContainer";
+import StickyPageHeader from "@/components/layout/StickyPageHeader";
 
 // ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -46,10 +48,6 @@ export default function AdvancedDashboard() {
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
-
-  const handleTimeRangeChange = (
-    range: "current-month" | "last-month" | "last-3-months" | "year" | "custom"
-  ) => setTimeRange(range);
 
   // ---------- queries ----------
   const { data: dashboardData, isLoading } = useQuery({
@@ -203,89 +201,89 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Sticky Header + date filters */}
-      <header
-        className="
-          sticky top-0 z-30
-          bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60
-          border-b border-slate-200
-        "
-      >
-        <AppContainer className="py-3">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
-            <div>
-              <h1 className="text-3xl font-semibold leading-tight text-slate-900">
-                Executive Dashboard
-              </h1>
-              <div className="mt-1 flex items-center gap-4">
-                <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
-              </div>
-            </div>
-
-            <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="current-month">Current Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {timeRange === "custom" && (
-                <div className="flex items-center gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent side="bottom" align="start" sideOffset={12}
-                      className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                      avoidCollisions collisionPadding={15}
-                    >
-                      <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
-                        selected={customStartDate}
-                        onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <span aria-hidden className="text-muted-foreground">to</span>
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent side="bottom" align="start" sideOffset={12}
-                      className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                      avoidCollisions collisionPadding={15}
-                    >
-                      <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
-                        selected={customEndDate}
-                        onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
+      {/* Fixed, blur header (stays steady while scrolling) */}
+      <StickyPageHeader>
+        <div className="py-3 grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
+          <div>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900">
+              Executive Dashboard
+            </h1>
+            <div className="mt-1 flex items-center gap-4">
+              <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
             </div>
           </div>
-        </AppContainer>
-      </header>
+
+          <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
+            <Select value={timeRange} onValueChange={(r) => setTimeRange(r as any)}>
+              <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current-month">Current Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {timeRange === "custom" && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customStartDate}
+                      onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <span aria-hidden className="text-muted-foreground">to</span>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customEndDate}
+                      onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
+        </div>
+      </StickyPageHeader>
 
       {/* Page body */}
-      <AppContainer className="space-y-6 pb-10 pt-4">
+      <AppContainer className="space-y-6 pb-10">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
           {/* Total Revenue */}
