@@ -1,22 +1,19 @@
-// client/src/context/date-filter-context.tsx
 import * as React from "react";
 
-export type TimeRange =
-  | "current-month"
-  | "last-month"
-  | "last-3-months"
-  | "year"
-  | "custom";
+export type TimeRange = "current-month" | "last-month" | "last-3-months" | "year" | "custom";
 
 type Ctx = {
   timeRange: TimeRange;
-  selectedYear: number;
-  selectedMonth: number; // 1-12
+  selectedYear: number;        // 1..9999
+  selectedMonth: number;       // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
   setTimeRange: (range: TimeRange) => void;
   setSpecificMonth: (year: number, month1to12: number) => void;
   setCustomRange: (start?: Date, end?: Date) => void;
+  /** Derived helpers for API calls and UI */
+  startDate?: Date;
+  endDate?: Date;
   periodLabel: string;
 };
 
@@ -72,17 +69,45 @@ export function DateFilterProvider({ children }: { children: React.ReactNode }) 
     setTimeRangeState("custom");
   }, []);
 
-  const periodLabel = React.useMemo(() => {
-    if (timeRange === "current-month") return "Current month";
-    if (timeRange === "last-month") return "Last month";
-    if (timeRange === "last-3-months") return "Last 3 months";
-    if (timeRange === "year") return "This year";
-    if (timeRange === "custom" && customStartDate && customEndDate) {
-      return `${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`;
+  // ---- Derived dates for API queries ----
+  const { startDate, endDate } = React.useMemo(() => {
+    const y = selectedYear;
+    const m = selectedMonth; // 1..12
+    switch (timeRange) {
+      case "current-month":
+        return { startDate: new Date(y, m - 1, 1), endDate: new Date(y, m, 0) };
+      case "last-month": {
+        const d = new Date(y, m - 2, 1);
+        return { startDate: d, endDate: new Date(d.getFullYear(), d.getMonth() + 1, 0) };
+      }
+      case "last-3-months": {
+        const end = new Date(y, m, 0);
+        const start = new Date(end.getFullYear(), end.getMonth() - 2, 1);
+        return { startDate: start, endDate: end };
+      }
+      case "year":
+        return { startDate: new Date(y, 0, 1), endDate: new Date(y, 11, 31) };
+      case "custom":
+        return { startDate: customStartDate, endDate: customEndDate };
+      default:
+        return { startDate: undefined, endDate: undefined };
     }
-    if (timeRange === "custom") return "Custom period";
-    return "Period";
-  }, [timeRange, customStartDate, customEndDate]);
+  }, [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]);
+
+  const periodLabel = React.useMemo(() => {
+    if (timeRange === "custom" && startDate && endDate) {
+      return `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+    }
+    return (
+      {
+        "current-month": "Current month",
+        "last-month": "Last month",
+        "last-3-months": "Last 3 months",
+        year: "This year",
+        custom: "Custom period",
+      } as const
+    )[timeRange];
+  }, [timeRange, startDate, endDate]);
 
   const value: Ctx = {
     timeRange,
@@ -93,6 +118,8 @@ export function DateFilterProvider({ children }: { children: React.ReactNode }) 
     setTimeRange,
     setSpecificMonth,
     setCustomRange,
+    startDate,
+    endDate,
     periodLabel,
   };
 
