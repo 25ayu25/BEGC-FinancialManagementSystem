@@ -86,11 +86,13 @@ export default function AdvancedDashboard() {
     queryFn: async () => {
       let url: string;
       if (timeRange === "custom" && customStartDate && customEndDate) {
-        // IMPORTANT: Do not include year/month for custom range
+        // Do not send year/month. Be liberal with param names to match server.
+        const s = format(customStartDate, "yyyy-MM-dd");
+        const e = format(customEndDate, "yyyy-MM-dd");
         url =
           `/api/dashboard?range=custom` +
-          `&startDate=${format(customStartDate, "yyyy-MM-dd")}` +
-          `&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+          `&startDate=${s}&endDate=${e}` +
+          `&start=${s}&end=${e}`;
       } else {
         url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
       }
@@ -113,13 +115,10 @@ export default function AdvancedDashboard() {
     queryFn: async () => {
       let url: string;
       if (timeRange === "custom" && customStartDate && customEndDate) {
-        // IMPORTANT: Do not include year/month for custom range
-        url =
-          `/api/income-trends?range=custom` +
-          `&startDate=${format(customStartDate, "yyyy-MM-dd")}` +
-          `&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+        const s = format(customStartDate, "yyyy-MM-dd");
+        const e = format(customEndDate, "yyyy-MM-dd");
+        url = `/api/income-trends?range=custom&startDate=${s}&endDate=${e}`;
       } else {
-        // Non-custom path is fine with year/month
         url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${timeRange}`;
       }
       const { data } = await api.get(url);
@@ -256,7 +255,12 @@ export default function AdvancedDashboard() {
 
   // summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  // Use chart's USD in custom range so KPI matches the graph
+  const usdIncome =
+    timeRange === "custom"
+      ? monthTotalUSD
+      : parseFloat(dashboardData?.totalIncomeUSD || "0");
+
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
