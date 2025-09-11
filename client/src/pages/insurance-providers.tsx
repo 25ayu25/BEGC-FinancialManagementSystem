@@ -31,6 +31,14 @@ import {
   Pie,
   Cell,
   Tooltip as ReTooltip,
+  // NEW (monthly trend)
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
 } from "recharts";
 
 /* -------------------------------- Helpers -------------------------------- */
@@ -144,6 +152,7 @@ export default function InsuranceProvidersPage() {
 
   /* ----------------------------- Queries ----------------------------- */
 
+  // Main dashboard slice (includes insuranceBreakdown)
   const { data: dashboardData } = useQuery({
     queryKey: [
       "/api/dashboard",
@@ -165,9 +174,11 @@ export default function InsuranceProvidersPage() {
       if (!res.ok) throw new Error("Failed to fetch dashboard data");
       return res.json();
     },
+    staleTime: 0,
+    gcTime: 0,
   });
 
-  // comparison only for month vs last-month (kept from your version)
+  // Comparison (month vs last-month) — kept from your version
   const { data: comparisonData } = useQuery({
     queryKey: ["/api/dashboard/comparison", selectedYear, selectedMonth, timeRange],
     queryFn: async () => {
@@ -188,7 +199,36 @@ export default function InsuranceProvidersPage() {
       return res.json();
     },
     enabled: timeRange === "current-month" || timeRange === "last-month",
+    staleTime: 0,
+    gcTime: 0,
   });
+
+  // NEW — Monthly series for trend (for "This Year" / multi-month ranges)
+  const { data: monthlySeries } = useQuery({
+    queryKey: [
+      "/api/insurance/monthly",
+      selectedYear,
+      timeRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({ year: String(selectedYear), range: timeRange });
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        params.set("startDate", format(customStartDate, "yyyy-MM-dd"));
+        params.set("endDate", format(customEndDate, "yyyy-MM-dd"));
+      }
+      const res = await fetch(`/api/insurance/monthly?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) return null; // gracefully hide if endpoint not present yet
+      return res.json(); // expected: [{ month: "Jan", usd: 1234 }, ...]
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  /* ----------------------- Build breakdown structures ---------------------- */
 
   const insuranceBreakdown: Record<string, number> =
     (dashboardData?.insuranceBreakdown as any) || {};
@@ -244,6 +284,18 @@ export default function InsuranceProvidersPage() {
     pct: totalSelectedUSD > 0 ? (d.value / totalSelectedUSD) * 100 : 0,
     color: colorMap[d.name],
   }));
+
+  /* --------------------------- CEO Insight metrics -------------------------- */
+
+  // Concentration: Herfindahl–Hirschman Index (0..1). Higher = more concentration.
+  const hhi = useMemo(() => {
+    if (!providers.length || totalSelectedUSD <= 0) return 0;
+    const shares = providers.map((p) => Math.pow(p.usd / totalSelectedUSD, 2));
+    return shares.reduce((s, x) => s + x, 0);
+  }, [providers, totalSelectedUSD]);
+
+  const topProvider = providers[0]?.name ?? "—";
+  const topShare = providers[0] ? (providers[0].usd / (totalSelectedUSD || 1)) * 100 : 0;
 
   /* ------------------------------- Render ------------------------------- */
 
@@ -503,6 +555,70 @@ export default function InsuranceProvidersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* NEW — Monthly Trend + CEO Insights (auto-hides if monthlySeries is missing) */}
+      {Array.isArray(monthlySeries) && monthlySeries.length > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Monthly Trend */}
+          <Card className="border-0 shadow-md bg-white xl:col-span-2">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-lg font-semibold text-slate-900">
+                Monthly Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlySeries} margin={{ top: 12, right: 16, bottom: 8, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="usd" name="USD" fill="#6366F1" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CEO Insights */}
+          <Card className="border-0 shadow-md bg-white">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-lg font-semibold text-slate-900">
+                Insights
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Top provider</span>
+                <span className="font-medium text-slate-900">{topProvider}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Top provider share</span>
+                <span className="font-medium text-slate-900">{nf1.format(topShare)}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Concentration (HHI)</span>
+                <span className="font-medium text-slate-900">{nf1.format(hhi * 100)} / 100</span>
+              </div>
+              {(timeRange === "year" || timeRange === "last-3-months") && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Run-rate (monthly avg)</span>
+                  <span className="font-medium text-slate-900">
+                    USD{" "}
+                    {nf0.format(
+                      Math.round(
+                        totalSelectedUSD / (timeRange === "year" ? 12 : 3)
+                      )
+                    )}
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Provider Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
