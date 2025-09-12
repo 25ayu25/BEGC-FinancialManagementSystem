@@ -3,12 +3,13 @@ import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed-data";
+import { registerInsuranceMonthly } from "./insurance-monthly"; // ✅ NEW
 
 // Simple logger for production
 function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
-    minute: "2-digit", 
+    minute: "2-digit",
     second: "2-digit",
     hour12: true,
   });
@@ -23,7 +24,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // Trust proxy for correct cookie handling in development
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 // Never cache API responses that change frequently
 app.use((req, res, next) => {
@@ -53,11 +54,7 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
+      if (logLine.length > 80) logLine = logLine.slice(0, 79) + "…";
       log(logLine);
     }
   });
@@ -68,40 +65,48 @@ app.use((req, res, next) => {
 (async () => {
   // Seed database with initial data
   await seedData();
-  
+
+  // Core routes
   await registerRoutes(app);
+
+  // ✅ Register the monthly insurance aggregation API
+  registerInsuranceMonthly(app);
+
   const server = createServer(app);
 
+  // Error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     res.status(status).json({ message });
     throw err;
   });
 
-  // Only setup vite in development with dynamic import
+  // Dev: Vite; Prod: API-only
   if (app.get("env") === "development") {
     try {
       const { setupVite } = await import("./vite");
       await setupVite(app, server);
-    } catch (e) {
+    } catch {
       log("Vite not available, running API-only mode");
     }
   } else {
     // In production, just serve API routes (no static files needed)
-    app.get('*', (req, res) => {
-      res.status(404).json({ error: 'API endpoint not found' });
+    app.get("*", (_req, res) => {
+      res.status(404).json({ error: "API endpoint not found" });
     });
   }
 
   // Start server on port from environment
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  const port = parseInt(process.env.PORT || "5000", 10);
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+    }
+  );
 })();
