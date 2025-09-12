@@ -639,8 +639,11 @@ export async function registerRoutes(app: Express): Promise<void> {
       const year  = Number(req.query.year)  || new Date().getUTCFullYear();
       const month = Number(req.query.month) || (new Date().getUTCMonth() + 1);
       const range = (req.query.range as string) || "current-month";
+      // When range === "custom", these will be passed to storage.getDashboardData
+      const startDate = req.query.startDate as string | undefined;
+      const endDate   = req.query.endDate as string | undefined;
 
-      const data = await storage.getDashboardData({ year, month, range });
+      const data = await storage.getDashboardData({ year, month, range, startDate, endDate });
       // absolutely no caching for dashboard responses
       res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
       res.json(data);
