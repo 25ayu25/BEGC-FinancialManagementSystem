@@ -72,7 +72,7 @@ export interface IStorage {
   deletePatientVolume(id: string): Promise<void>;
 
   // Analytics
-  getDashboardData({ year, month, range }: { year: number; month: number; range: string }): Promise<{
+  getDashboardData({ year, month, range, startDate: customStartDate, endDate: customEndDate }: { year: number; month: number; range: string; startDate?: string; endDate?: string; }): Promise<{
     totalIncome: string;
     totalIncomeSSP: string;
     totalIncomeUSD: string;
@@ -354,7 +354,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(receipts).where(eq(receipts.transactionId, transactionId));
   }
 
-  async getDashboardData({ year, month, range }: { year: number; month: number; range: string }): Promise<{
+  async getDashboardData({ year, month, range, startDate: customStartDate, endDate: customEndDate }: { year: number; month: number; range: string; startDate?: string; endDate?: string; }): Promise<{
     totalIncome: string;
     totalIncomeSSP: string;
     totalIncomeUSD: string;
@@ -390,28 +390,36 @@ export class DatabaseStorage implements IStorage {
     let startDate: Date;
     let endDate: Date;
 
-    switch (range) {
-      case "current-month":
-        startDate = startOfMonthUTC(year, month);
-        endDate = nextMonthUTC(year, month);
-        break;
-      case "last-month": {
-        const d = new Date(Date.UTC(year, month - 1, 1));
-        const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
-        startDate = startOfMonthUTC(y, m);
-        endDate = nextMonthUTC(y, m);
-        break;
+    if (range === "custom" && customStartDate && customEndDate) {
+      // Parse provided dates; treat them as UTC if in YYYY-MM-DD form.
+      startDate = new Date(customStartDate);
+      const tmp = new Date(customEndDate);
+      // Make end inclusive by advancing one day and using [start, end) semantics.
+      endDate = new Date(Date.UTC(tmp.getUTCFullYear(), tmp.getUTCMonth(), tmp.getUTCDate() + 1));
+    } else {
+      switch (range) {
+        case "current-month":
+          startDate = startOfMonthUTC(year, month);
+          endDate = nextMonthUTC(year, month);
+          break;
+        case "last-month": {
+          const d = new Date(Date.UTC(year, month - 1, 1));
+          const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
+          startDate = startOfMonthUTC(y, m);
+          endDate = nextMonthUTC(y, m);
+          break;
+        }
+        case "last-3-months": {
+          const from = new Date(Date.UTC(year, month - 3, 1));
+          startDate = startOfMonthUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
+          endDate = nextMonthUTC(year, month);
+          break;
+        }
+        case "year":
+        default:
+          startDate = new Date(Date.UTC(year, 0, 1));
+          endDate = new Date(Date.UTC(year + 1, 0, 1));
       }
-      case "last-3-months": {
-        const from = new Date(Date.UTC(year, month - 3, 1));
-        startDate = startOfMonthUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
-        endDate = nextMonthUTC(year, month);
-        break;
-      }
-      case "year":
-      default:
-        startDate = new Date(Date.UTC(year, 0, 1));
-        endDate = new Date(Date.UTC(year + 1, 0, 1));
     }
 
     // Pull transactions only once within the window [start, end)
