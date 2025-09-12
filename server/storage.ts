@@ -72,7 +72,7 @@ export interface IStorage {
   deletePatientVolume(id: string): Promise<void>;
 
   // Analytics
-  getDashboardData({ year, month, range }: { year: number; month: number; range: string }): Promise<{
+  getDashboardData({ year, month, range, startDate: customStartDate, endDate: customEndDate }: { year: number; month: number; range: string; startDate?: string; endDate?: string; }): Promise<{
     totalIncome: string;
     totalIncomeSSP: string;
     totalIncomeUSD: string;
@@ -354,7 +354,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(receipts).where(eq(receipts.transactionId, transactionId));
   }
 
-  async getDashboardData({ year, month, range }: { year: number; month: number; range: string }): Promise<{
+  async getDashboardData({ year, month, range, startDate: customStartDate, endDate: customEndDate }: { year: number; month: number; range: string; startDate?: string; endDate?: string; }): Promise<{
     totalIncome: string;
     totalIncomeSSP: string;
     totalIncomeUSD: string;
@@ -390,28 +390,36 @@ export class DatabaseStorage implements IStorage {
     let startDate: Date;
     let endDate: Date;
 
-    switch (range) {
-      case "current-month":
-        startDate = startOfMonthUTC(year, month);
-        endDate = nextMonthUTC(year, month);
-        break;
-      case "last-month": {
-        const d = new Date(Date.UTC(year, month - 1, 1));
-        const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
-        startDate = startOfMonthUTC(y, m);
-        endDate = nextMonthUTC(y, m);
-        break;
+    if (range === "custom" && customStartDate && customEndDate) {
+      // Parse provided dates; treat them as UTC if in YYYY-MM-DD form.
+      startDate = new Date(customStartDate);
+      const tmp = new Date(customEndDate);
+      // Make end inclusive by advancing one day and using [start, end) semantics.
+      endDate = new Date(Date.UTC(tmp.getUTCFullYear(), tmp.getUTCMonth(), tmp.getUTCDate() + 1));
+    } else {
+      switch (range) {
+        case "current-month":
+          startDate = startOfMonthUTC(year, month);
+          endDate = nextMonthUTC(year, month);
+          break;
+        case "last-month": {
+          const d = new Date(Date.UTC(year, month - 1, 1));
+          const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
+          startDate = startOfMonthUTC(y, m);
+          endDate = nextMonthUTC(y, m);
+          break;
+        }
+        case "last-3-months": {
+          const from = new Date(Date.UTC(year, month - 3, 1));
+          startDate = startOfMonthUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
+          endDate = nextMonthUTC(year, month);
+          break;
+        }
+        case "year":
+        default:
+          startDate = new Date(Date.UTC(year, 0, 1));
+          endDate = new Date(Date.UTC(year + 1, 0, 1));
       }
-      case "last-3-months": {
-        const from = new Date(Date.UTC(year, month - 3, 1));
-        startDate = startOfMonthUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
-        endDate = nextMonthUTC(year, month);
-        break;
-      }
-      case "year":
-      default:
-        startDate = new Date(Date.UTC(year, 0, 1));
-        endDate = new Date(Date.UTC(year + 1, 0, 1));
     }
 
     // Pull transactions only once within the window [start, end)
@@ -468,28 +476,22 @@ export class DatabaseStorage implements IStorage {
     const netIncomeUSDStr = (totalIncomeUSD - totalExpenseUSD).toString();
 
 
+    // Insurance breakdown - calculate actual insurance revenue by provider
+    // First, get all insurance providers to map IDs to names
+    const allProviders = await db.select().from(insuranceProviders);
+    const providerMap = new Map<string, string>();
+    allProviders.forEach(p => providerMap.set(p.id, p.name));
     
-    // Insurance breakdown – count transactions with insuranceProviderId OR type = 'insurance'
     const insuranceMap = new Map<string, number>();
     for (const t of txData) {
-      const isInsuranceTx =
-        (t as any).insuranceProviderId != null ||
-        (typeof (t as any).type !== "undefined" && String((t as any).type).toLowerCase() === "insurance");
-      if (!isInsuranceTx) continue;
-
-      const providerName = providerMap.get((t as any).insuranceProviderId) ?? "Other";
-
-      // Only count USD amounts, mirroring original behaviour
-      const amount = (t as any).currency === "USD" ? Number((t as any).amount || 0) : 0;
-
+      if (t.type !== "income") continue;
+      if (!t.insuranceProviderId) continue;
+      const providerName = providerMap.get(t.insuranceProviderId);
+      if (!providerName) continue;
+      const amount = t.currency === "USD" ? Number(t.amount || 0) : 0; // Insurance typically in USD
       insuranceMap.set(providerName, (insuranceMap.get(providerName) || 0) + amount);
     }
-
     const insuranceBreakdown: Record<string, string> = {};
-    Array.from(insuranceMap.entries()).forEach(([provider, amount]) => {
-      insuranceBreakdown[provider] = amount.toString();
-    });
-
     // Convert Map entries to object
     Array.from(insuranceMap.entries()).forEach(([provider, amount]) => {
       insuranceBreakdown[provider] = amount.toString();
