@@ -190,6 +190,28 @@ export default function InsuranceProvidersPage() {
     enabled: timeRange === "current-month" || timeRange === "last-month",
   });
 
+
+  // NEW: fetch monthly insurance totals for charts or lists
+  const { data: monthlyInsurance } = useQuery({
+    queryKey: [
+      "/api/insurance/monthly",
+      selectedYear,
+      selectedMonth,
+      timeRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
+    ],
+    queryFn: async () => {
+      let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+      }
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
+      return res.json();
+    },
+  });
+
   const insuranceBreakdown: Record<string, number> =
     (dashboardData?.insuranceBreakdown as any) || {};
   const prevInsuranceBreakdown: Record<string, number> =
@@ -654,6 +676,24 @@ export default function InsuranceProvidersPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    
+      {/* Example: show monthly insurance revenue below the donut */}
+      {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
+        <Card className="border-0 shadow-md bg-white">
+          <CardHeader>
+            <CardTitle>Insurance Revenue by Month</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul>
+              {monthlyInsurance.data.map((entry: any) => (
+                <li key={`${entry.year}-${entry.month}`}>
+                  {entry.month} {entry.year}: USD {nf0.format(Math.round(entry.usd))}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+</div>
   );
 }
