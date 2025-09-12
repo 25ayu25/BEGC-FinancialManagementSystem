@@ -469,29 +469,18 @@ export class DatabaseStorage implements IStorage {
 
 
     
-    // Insurance breakdown – robust insurance revenue calculation (USD only).
+    // Insurance breakdown – count transactions with insuranceProviderId OR type = 'insurance'
     const insuranceMap = new Map<string, number>();
     for (const t of txData) {
-      // Determine whether this transaction counts as an insurance payment.
       const isInsuranceTx =
         (t as any).insuranceProviderId != null ||
-        (typeof (t as any).isInsurance !== "undefined" && (t as any).isInsurance === 1) ||
         (typeof (t as any).type !== "undefined" && String((t as any).type).toLowerCase() === "insurance");
       if (!isInsuranceTx) continue;
 
-      // Resolve provider name; if no name, group under “Other”.
-      const providerName =
-        providerMap.get((t as any).insuranceProviderId) ?? "Other";
+      const providerName = providerMap.get((t as any).insuranceProviderId) ?? "Other";
 
-      // Compute USD amount: prefer explicit USD columns if present.
-      let amount = 0;
-      if (typeof (t as any).amountUsd !== "undefined" && (t as any).amountUsd !== null) {
-        amount = Number((t as any).amountUsd) || 0;
-      } else if (typeof (t as any).insuranceUsd !== "undefined" && (t as any).insuranceUsd !== null) {
-        amount = Number((t as any).insuranceUsd) || 0;
-      } else if ((t as any).currency === "USD") {
-        amount = Number((t as any).amount || 0);
-      }
+      // Only count USD amounts, mirroring original behaviour
+      const amount = (t as any).currency === "USD" ? Number((t as any).amount || 0) : 0;
 
       insuranceMap.set(providerName, (insuranceMap.get(providerName) || 0) + amount);
     }
