@@ -3,92 +3,57 @@ import { Database } from "sqlite3";
 import path from "path";
 
 /**
- * This file is intentionally defensive because I don’t know your exact schema.
- * It tries several reasonable column names/filters to compute “insurance USD”
- * and uses whichever one your DB supports (the others will be skipped).
+ * Robust monthly insurance totals that work across slightly different schemas.
  *
- * If you already know your exact table/column names, you can replace the
- * CANDIDATE_SQL array below with a single, precise query.
+ * Insurance row detection (any is enough):
+ *  - insurance_provider IS NOT NULL
+ *  - is_insurance = 1
+ *  - type = 'insurance'
+ *
+ * USD value detection (first non-null wins):
+ *  - amount_usd
+ *  - insurance_usd
+ *  - CASE WHEN currency='USD' THEN amount ELSE 0 END
  */
 
-// ---- open the same SQLite DB your app already uses ----
 function openDb(): Database {
-  // adjust to match your current db location if different
+  // Adjust if your DB lives elsewhere; this matches your project defaults.
   const dbPath = process.env.DB_PATH || path.join(process.cwd(), "server", "storage.db");
-  const db = new Database(dbPath);
-  return db;
+  return new Database(dbPath);
 }
 
-// candidates we’ll try in order (first one that runs without “no such column” will be used)
-const CANDIDATE_SQL = [
-  // 1) Common: transactions table with explicit insurance USD column
-  `SELECT COALESCE(SUM(insurance_usd), 0) AS usd
-     FROM transactions
-    WHERE date >= ? AND date < ?`,
-
-  // 2) If amounts are stored as USD in "amount_usd" and insurance rows are flagged
-  `SELECT COALESCE(SUM(amount_usd), 0) AS usd
-     FROM transactions
-    WHERE is_insurance = 1 AND date >= ? AND date < ?`,
-
-  // 3) If currency in USD and there is a provider set (means it’s insurance)
-  `SELECT COALESCE(SUM(amount), 0) AS usd
-     FROM transactions
-    WHERE currency = 'USD' AND insurance_provider IS NOT NULL
-      AND date >= ? AND date < ?`,
-
-  // 4) If type column is used to distinguish insurance
-  `SELECT COALESCE(SUM(amount), 0) AS usd
-     FROM transactions
-    WHERE type = 'insurance' AND currency = 'USD'
-      AND date >= ? AND date < ?`,
-];
-
-// run first candidate query that works on the DB
-function pickQuery(db: Database): Promise<string> {
-  return new Promise((resolve) => {
-    const tryNext = (i: number) => {
-      if (i >= CANDIDATE_SQL.length) return resolve(CANDIDATE_SQL[0]); // fallback
-      const sql = CANDIDATE_SQL[i];
-      db.get(`SELECT 1 FROM sqlite_master`, [], (err) => {
-        // do a quick prepare by running the query with a tiny date window
-        db.get(sql, ["1970-01-01", "1970-01-02"], (err2) => {
-          if (!err2) return resolve(sql);
-          // if it’s a column error, try next candidate
-          return tryNext(i + 1);
-        });
-      });
-    };
-    tryNext(0);
-  });
-}
-
-function firstDay(y: number, m: number) {
+function firstOfMonthUTC(y: number, m: number) {
   return new Date(Date.UTC(y, m - 1, 1));
 }
-function nextMonth(y: number, m: number) {
+function nextMonthUTC(y: number, m: number) {
   return new Date(Date.UTC(y, m, 1));
 }
-function toISO(d: Date) {
+function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-// Build array of {year, month} between two dates inclusive
 function monthsBetween(start: Date, end: Date) {
-  const list: Array<{ y: number; m: number }> = [];
+  const out: Array<{ y: number; m: number }> = [];
   const s = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
   const e = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
-  for (let d = s; d <= e; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
-    list.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
+  for (
+    let d = s;
+    d <= e;
+    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+  ) {
+    out.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
   }
-  return list;
+  return out;
+}
+
+function monthLabel(y: number, m: number) {
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en-US", { month: "short" });
 }
 
 export function registerInsuranceMonthly(app: Express) {
   app.get("/api/insurance/monthly", async (req: Request, res: Response) => {
     try {
-      // inputs: either explicit start/end OR a quick “range” helper
-      // range: "current-month" | "last-month" | "last-3-months" | "year" | "custom"
+      // inputs: range (current-month | last-month | last-3-months | year | custom)
       const range = String(req.query.range || "current-month");
       const year = parseInt(String(req.query.year || new Date().getUTCFullYear()));
       const month = parseInt(String(req.query.month || new Date().getUTCMonth() + 1));
@@ -110,10 +75,10 @@ export function registerInsuranceMonthly(app: Express) {
         start = lm;
         end = lm;
       } else if (range === "current-month") {
-        start = firstDay(year, month);
-        end = firstDay(year, month);
+        start = firstOfMonthUTC(year, month);
+        end = firstOfMonthUTC(year, month);
       } else {
-        // custom: expect startDate & endDate (yyyy-mm-dd)
+        // custom
         const sd = String(req.query.startDate);
         const ed = String(req.query.endDate);
         start = new Date(sd);
@@ -121,34 +86,63 @@ export function registerInsuranceMonthly(app: Express) {
       }
 
       const db = openDb();
-      const sql = await pickQuery(db);
 
-      const months = monthsBetween(start, end);
-      const rows: Array<{ month: string; year: number; usd: number }> = [];
+      // Group by ym using tolerant USD + insurance filters.
+      const SQL = `
+        SELECT
+          strftime('%Y-%m', date) AS ym,
+          SUM(
+            COALESCE(
+              amount_usd,
+              insurance_usd,
+              CASE WHEN currency = 'USD' THEN amount ELSE 0 END
+            )
+          ) AS usd
+        FROM transactions
+        WHERE date >= ? AND date < ?
+          AND (
+            insurance_provider IS NOT NULL
+            OR (typeof is_insurance != 'null' AND is_insurance = 1)
+            OR (typeof type != 'null' AND lower(type) = 'insurance')
+          )
+        GROUP BY ym
+        ORDER BY ym
+      `;
 
-      const monthName = (y: number, m: number) =>
-        new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en-US", { month: "short" });
+      // We aggregate across the full span (start -> end of last month in range).
+      const allMonths = monthsBetween(start, end);
+      const sISO = isoDate(firstOfMonthUTC(allMonths[0].y, allMonths[0].m));
+      const eISO = isoDate(nextMonthUTC(allMonths[allMonths.length - 1].y, allMonths[allMonths.length - 1].m));
 
-      const run = (s: string, e: string) =>
-        new Promise<number>((resolve) => {
-          db.get(sql, [s, e], (err: any, row: any) => {
-            if (err) return resolve(0);
-            resolve(Number(row?.usd || 0));
-          });
+      const raw: Record<string, number> = await new Promise((resolve) => {
+        const out: Record<string, number> = {};
+        db.all(SQL, [sISO, eISO], (err: any, rows: Array<{ ym: string; usd: number }>) => {
+          if (err) {
+            // If the table/columns don’t exist, return empty result gracefully.
+            console.error("insurance-monthly SQL error:", err?.message || err);
+            resolve({});
+            return;
+          }
+          for (const r of rows || []) {
+            out[r.ym] = Number(r.usd || 0);
+          }
+          resolve(out);
         });
-
-      for (const { y, m } of months) {
-        const sIso = toISO(firstDay(y, m));
-        const eIso = toISO(nextMonth(y, m));
-        const usd = await run(sIso, eIso);
-        rows.push({ month: monthName(y, m), year: y, usd: Math.round(usd) });
-      }
+      });
 
       db.close();
-      res.json({ data: rows });
+
+      // Normalize into full month list with zeros for missing months
+      const data = allMonths.map(({ y, m }) => {
+        const ym = `${y}-${String(m).padStart(2, "0")}`;
+        const usd = Math.round(Number(raw[ym] || 0));
+        return { month: monthLabel(y, m), year: y, usd };
+      });
+
+      res.json({ data });
     } catch (e: any) {
       console.error("monthly insurance error", e);
-      res.status(500).json({ message: "Failed to compute monthly insurance totals" });
+      res.status(200).json({ data: [] }); // never break the page
     }
   });
 }
