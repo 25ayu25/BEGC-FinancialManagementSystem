@@ -1,117 +1,130 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as DatePicker } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { CalendarIcon, Users } from "lucide-react";
-import { api } from "@/lib/queryClient";
+import { Link } from "wouter";
+import { Users } from "lucide-react";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
 import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
-// NEW: Expenses chart
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
-import { Link } from "wouter";
+
+import { api } from "@/lib/queryClient";
+import { useDateFilter } from "@/context/date-filter-context";
 
 export default function Dashboard() {
-  const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom'>('current-month');
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  // ---- Pull the active period from the shared context (includes month-select) ----
+  const {
+    timeRange,
+    selectedYear,
+    selectedMonth,
+    startDate,
+    endDate,
+  } = useDateFilter();
 
-  const handleTimeRangeChange = (range: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'custom') => {
-    setTimeRange(range);
-    
-    // Auto-set appropriate dates based on selection
-    const now = new Date();
-    switch(range) {
-      case 'current-month':
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(now.getMonth() + 1);
-        break;
-      case 'last-month':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-        setSelectedYear(lastMonth.getFullYear());
-        setSelectedMonth(lastMonth.getMonth() + 1);
-        break;
-      case 'last-3-months':
-        // For last 3 months, use current month but let the backend handle the 3-month range
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(now.getMonth() + 1);
-        break;
-      case 'year':
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(1); // January for year view
-        break;
-    }
-  };
+  // Normalize range for API compatibility:
+  // - When user picked an arbitrary month (month-select), tell the API "current-month"
+  //   but send the explicit year/month chosen by the user.
+  const normalizedRange =
+    timeRange === "month-select" ? "current-month" : timeRange;
 
-  // Function to determine the correct year/month for patient volume navigation
+  // Build the patient-volume navigation target based on the active range
   const getPatientVolumeNavigation = () => {
     const now = new Date();
-    switch(timeRange) {
-      case 'current-month':
+
+    switch (timeRange) {
+      case "current-month":
         return { year: now.getFullYear(), month: now.getMonth() + 1 };
-      case 'last-month':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-        return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
-      case 'last-3-months':
-        // Navigate to the start of the 3-month period (3 months ago)
-        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2);
-        return { year: threeMonthsAgo.getFullYear(), month: threeMonthsAgo.getMonth() + 1 };
-      case 'year':
-        return { year: now.getFullYear(), month: 1 }; // January
-      case 'custom':
-        if (customStartDate) {
-          return { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 };
+
+      case "last-month": {
+        const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return { year: last.getFullYear(), month: last.getMonth() + 1 };
+      }
+
+      case "last-3-months": {
+        // Show the start of the 3-month window
+        const start3 = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        return { year: start3.getFullYear(), month: start3.getMonth() + 1 };
+      }
+
+      case "year":
+        return { year: now.getFullYear(), month: 1 };
+
+      case "month-select":
+        return { year: selectedYear, month: selectedMonth };
+
+      case "custom":
+        if (startDate) {
+          return { year: startDate.getFullYear(), month: startDate.getMonth() + 1 };
         }
         return { year: now.getFullYear(), month: now.getMonth() + 1 };
+
       default:
         return { year: selectedYear, month: selectedMonth };
     }
   };
 
+  // ---- Dashboard data ----
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: [
+      "/api/dashboard",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      startDate?.toISOString(),
+      endDate?.toISOString(),
+    ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
-      if (timeRange === 'custom' && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      // Base: always send year/month (backend already expects these)
+      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
+
+      // Only include custom dates for custom mode
+      if (timeRange === "custom" && startDate && endDate) {
+        url += `&startDate=${format(startDate, "yyyy-MM-dd")}&endDate=${format(
+          endDate,
+          "yyyy-MM-dd"
+        )}`;
       }
+
       const response = await api.get(url);
       return response.data;
-    }
+    },
   });
 
+  // ---- Departments master data ----
   const { data: departments } = useQuery({
     queryKey: ["/api/departments"],
   });
 
-  const { data: insuranceProviders } = useQuery({
-    queryKey: ["/api/insurance-providers"],
-  });
-
-  // Get patient volume for the selected time period
+  // ---- Patient volume for the active period ----
   const { data: periodPatientVolume = [] } = useQuery({
-    queryKey: ["/api/patient-volume/period", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: [
+      "/api/patient-volume/period",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      startDate?.toISOString(),
+      endDate?.toISOString(),
+    ],
     queryFn: async () => {
-      let url = `/api/patient-volume/period/${selectedYear}/${selectedMonth}?range=${timeRange}`;
-      if (timeRange === 'custom' && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      let url = `/api/patient-volume/period/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
+
+      if (timeRange === "custom" && startDate && endDate) {
+        url += `&startDate=${format(startDate, "yyyy-MM-dd")}&endDate=${format(
+          endDate,
+          "yyyy-MM-dd"
+        )}`;
       }
+
       try {
         const response = await api.get(url);
         return Array.isArray(response.data) ? response.data : [];
-      } catch (error) {
-        console.warn('Patient volume unavailable for this period');
+      } catch {
+        console.warn("Patient volume unavailable for this period");
         return [];
       }
-    }
+    },
   });
 
   if (error) {
@@ -126,7 +139,9 @@ export default function Dashboard() {
             <CardContent className="pt-6">
               <div className="text-center text-red-600">
                 <p className="text-lg font-semibold">Error Loading Dashboard</p>
-                <p className="text-sm mt-2">Unable to fetch dashboard data. Please check your connection and try again.</p>
+                <p className="text-sm mt-2">
+                  Unable to fetch dashboard data. Please check your connection and try again.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -138,7 +153,6 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col h-full bg-slate-50">
-        {/* Simple Header with Skeleton */}
         <div className="bg-white border-b border-slate-200 px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -151,8 +165,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        
-        {/* Loading Content */}
+
         <main className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
@@ -174,126 +187,36 @@ export default function Dashboard() {
     );
   }
 
+  const pvNav = getPatientVolumeNavigation();
+
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50">
-      {/* Simplified Header with Time Range Controls */}
+      {/* NOTE: the sticky header + date picker now live in StickyPageHeader.
+         This page renders content only. */}
+
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900">Overview</h1>
+
             <div className="mt-1 flex items-center gap-4">
-              <p className="text-sm text-muted-foreground">
-                Key financials · {
-                  timeRange === 'current-month' ? 'Current month' :
-                  timeRange === 'last-month' ? 'Last month' :
-                  timeRange === 'last-3-months' ? 'Last 3 months' :
-                  timeRange === 'year' ? 'This year' :
-                  timeRange === 'custom' && customStartDate && customEndDate ? 
-                    `${format(customStartDate, 'MMM d, yyyy')} to ${format(customEndDate, 'MMM d, yyyy')}` :
-                    'Custom period'
-                }
-              </p>
               {/* Patient Volume Chip - Clickable */}
-              <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${timeRange}`} className="inline-block">
+              <Link
+                href={`/patient-volume?view=monthly&year=${pvNav.year}&month=${pvNav.month}&range=${normalizedRange}`}
+                className="inline-block"
+              >
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 rounded-md transition-colors cursor-pointer min-h-[44px]">
                   <Users className="w-4 h-4 text-teal-600" />
                   <span className="text-teal-600 text-sm font-medium font-variant-numeric-tabular">
-                    {timeRange === 'current-month' ? 'Current month' : 
-                     timeRange === 'last-month' ? 'Last month' : 
-                     'Selected period'}: {periodPatientVolume.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0)} patients
+                    {periodPatientVolume.reduce(
+                      (sum: number, v: any) => sum + (v.patientCount || 0),
+                      0
+                    )}{" "}
+                    patients in selected period
                   </span>
                 </div>
               </Link>
             </div>
-          </div>
-          
-          <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            {/* Time Period Dropdown */}
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="h-9 w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current-month">Current Month</SelectItem>
-                <SelectItem value="last-month">Last Month</SelectItem>
-                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Custom Date Range Controls */}
-            {timeRange === 'custom' && (
-              <>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent 
-                    side="bottom" 
-                    align="start" 
-                    sideOffset={12} 
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
-                    avoidCollisions={true}
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <span aria-hidden="true" className="text-muted-foreground">to</span>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent 
-                    side="bottom" 
-                    align="start" 
-                    sideOffset={12} 
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: 'rgb(255, 255, 255)' }}
-                    avoidCollisions={true}
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -306,25 +229,17 @@ export default function Dashboard() {
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Departments Chart */}
-          <SimpleTopDepartments 
-            data={dashboardData?.departmentBreakdown || {}} 
+          <SimpleTopDepartments
+            data={dashboardData?.departmentBreakdown || {}}
             departments={(departments as any) || []}
           />
 
-          {/* NEW: Expenses by Category (replaces Recent Transactions) */}
+          {/* Expenses Breakdown */}
           <SimpleExpenseBreakdown
             breakdown={(dashboardData as any)?.expenseBreakdown}
             total={parseFloat((dashboardData as any)?.totalExpenses || "0")}
             title="Expenses Breakdown"
-            periodLabel={
-              timeRange === "current-month" ? "Current month" :
-              timeRange === "last-month" ? "Last month" :
-              timeRange === "last-3-months" ? "Last 3 months" :
-              timeRange === "year" ? "This year" :
-              timeRange === "custom" && customStartDate && customEndDate
-                ? `${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`
-                : undefined
-            }
+            // The card itself is self-contained; no period label needed here
           />
         </div>
       </main>
