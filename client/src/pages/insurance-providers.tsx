@@ -31,6 +31,11 @@ import {
   Pie,
   Cell,
   Tooltip as ReTooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "recharts";
 
 /* -------------------------------- Helpers -------------------------------- */
@@ -190,7 +195,6 @@ export default function InsuranceProvidersPage() {
     enabled: timeRange === "current-month" || timeRange === "last-month",
   });
 
-
   // NEW: fetch monthly insurance totals for charts or lists
   const { data: monthlyInsurance } = useQuery({
     queryKey: [
@@ -204,7 +208,10 @@ export default function InsuranceProvidersPage() {
     queryFn: async () => {
       let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(
+          customEndDate,
+          "yyyy-MM-dd"
+        )}`;
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
@@ -266,6 +273,17 @@ export default function InsuranceProvidersPage() {
     pct: totalSelectedUSD > 0 ? (d.value / totalSelectedUSD) * 100 : 0,
     color: colorMap[d.name],
   }));
+
+  /* ------------------ Monthly chart series from endpoint ------------------ */
+
+  const monthlySeries = useMemo(() => {
+    const rows = (monthlyInsurance?.data ?? []) as any[];
+    return rows.map((e: any) => ({
+      key: `${e.year}-${e.month}`,
+      label: `${e.month} ${e.year}`,
+      usd: Math.round(Number(e.usd || 0)),
+    }));
+  }, [monthlyInsurance?.data]);
 
   /* ------------------------------- Render ------------------------------- */
 
@@ -676,24 +694,47 @@ export default function InsuranceProvidersPage() {
           </CardContent>
         </Card>
       )}
-    
-      {/* Example: show monthly insurance revenue below the donut */}
+
+      {/* Insurance revenue by month: chart + compact table */}
       {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
         <Card className="border-0 shadow-md bg-white">
           <CardHeader>
             <CardTitle>Insurance Revenue by Month</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul>
-              {monthlyInsurance.data.map((entry: any) => (
-                <li key={`${entry.year}-${entry.month}`}>
-                  {entry.month} {entry.year}: USD {nf0.format(Math.round(entry.usd))}
-                </li>
-              ))}
-            </ul>
+            <div className="w-full h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlySeries}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <ReTooltip />
+                  <Bar dataKey="usd" name="USD" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="py-2 pr-4">Month</th>
+                    <th className="py-2 pr-4">USD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlySeries.map((row: any) => (
+                    <tr key={row.key} className="border-t">
+                      <td className="py-2 pr-4">{row.label}</td>
+                      <td className="py-2 pr-4">USD {nf0.format(row.usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
-</div>
+    </div>
   );
 }
