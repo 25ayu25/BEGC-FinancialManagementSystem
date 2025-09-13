@@ -195,8 +195,8 @@ export default function InsuranceProvidersPage() {
     enabled: timeRange === "current-month" || timeRange === "last-month",
   });
 
-  // NEW: fetch monthly insurance totals for charts or lists
-  const { data: monthlyInsurance } = useQuery({
+  // Fetch monthly insurance totals — normalize response to always be an array
+  const { data: monthlyRowsRaw } = useQuery({
     queryKey: [
       "/api/insurance/monthly",
       selectedYear,
@@ -215,7 +215,9 @@ export default function InsuranceProvidersPage() {
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
-      return res.json();
+      const json = await res.json();
+      // Some servers return [] while others return { data: [] } — normalize here:
+      return Array.isArray(json) ? json : (json?.data ?? []);
     },
   });
 
@@ -244,18 +246,15 @@ export default function InsuranceProvidersPage() {
 
   /* ------------------------ Color map & donut data ------------------------ */
 
-  // Build consistent color map for all UI
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {};
     providers.forEach((p, i) => {
       map[p.name] = BASE_COLORS[i % BASE_COLORS.length];
     });
-    // Color for "Other"
     map["Other"] = "#CBD5E1"; // slate-300
     return map;
   }, [providers]);
 
-  // Donut = top N + "Other"
   const donutData = useMemo(() => {
     if (!providers.length) return [];
     const top = providers.slice(0, MAX_SEGMENTS);
@@ -266,7 +265,6 @@ export default function InsuranceProvidersPage() {
     return data.map((d) => ({ name: d.name, value: d.usd }));
   }, [providers]);
 
-  // Legend list for donut (matches donutData order)
   const donutLegend = donutData.map((d) => ({
     name: d.name,
     usd: d.value,
@@ -277,13 +275,13 @@ export default function InsuranceProvidersPage() {
   /* ------------------ Monthly chart series from endpoint ------------------ */
 
   const monthlySeries = useMemo(() => {
-    const rows = (monthlyInsurance?.data ?? []) as any[];
+    const rows = (monthlyRowsRaw ?? []) as any[];
     return rows.map((e: any) => ({
       key: `${e.year}-${e.month}`,
       label: `${e.month} ${e.year}`,
       usd: Math.round(Number(e.usd || 0)),
     }));
-  }, [monthlyInsurance?.data]);
+  }, [monthlyRowsRaw]);
 
   /* ------------------------------- Render ------------------------------- */
 
@@ -696,7 +694,7 @@ export default function InsuranceProvidersPage() {
       )}
 
       {/* Insurance revenue by month: chart + compact table */}
-      {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
+      {Array.isArray(monthlySeries) && monthlySeries.length > 0 && (
         <Card className="border-0 shadow-md bg-white">
           <CardHeader>
             <CardTitle>Insurance Revenue by Month</CardTitle>
