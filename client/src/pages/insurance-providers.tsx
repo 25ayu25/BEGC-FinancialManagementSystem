@@ -656,7 +656,7 @@ export default function InsuranceProvidersPage() {
       )}
     
       {/* Insurance by Month (Totals) */}
-      {monthlySeries && monthlySeries.length > 0 && (
+      {Array.isArray(monthlySeries) && monthlySeries.length > 0 && (
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Insurance Payments by Month</CardTitle>
