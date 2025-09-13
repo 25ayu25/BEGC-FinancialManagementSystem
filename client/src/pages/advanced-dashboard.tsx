@@ -1,4 +1,3 @@
-// client/src/pages/advanced-dashboard.tsx
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -41,20 +40,59 @@ export default function AdvancedDashboard() {
   const {
     timeRange, selectedYear, selectedMonth,
     customStartDate, customEndDate,
-    setTimeRange, setCustomRange, periodLabel,
+    setTimeRange, setCustomRange, setSpecificMonth, periodLabel,
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
+  // ---- NEW: “normalizedRange” keeps backend compatibility
+  // When user picks an arbitrary month via month-select, we still send range=current-month
+  // but include the explicit year/month they chose.
+  const normalizedRange =
+    timeRange === "month-select" ? "current-month" : timeRange;
+
+  // ---------- dropdown handlers ----------
   const handleTimeRangeChange = (
-    range: "current-month" | "last-month" | "last-3-months" | "year" | "custom"
+    range:
+      | "current-month"
+      | "last-month"
+      | "last-3-months"
+      | "year"
+      | "month-select"
+      | "custom"
   ) => setTimeRange(range);
+
+  // Month/year choices for month-select UI
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
+  const months = [
+    { label: "January", value: 1 },
+    { label: "February", value: 2 },
+    { label: "March", value: 3 },
+    { label: "April", value: 4 },
+    { label: "May", value: 5 },
+    { label: "June", value: 6 },
+    { label: "July", value: 7 },
+    { label: "August", value: 8 },
+    { label: "September", value: 9 },
+    { label: "October", value: 10 },
+    { label: "November", value: 11 },
+    { label: "December", value: 12 },
+  ];
 
   // ---------- queries ----------
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["/api/dashboard", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: [
+      "/api/dashboard",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
+    ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
+      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
@@ -66,9 +104,16 @@ export default function AdvancedDashboard() {
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
   const { data: rawIncome } = useQuery({
-    queryKey: ["/api/income-trends", selectedYear, selectedMonth, timeRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: [
+      "/api/income-trends",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
+    ],
     queryFn: async () => {
-      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${timeRange}`;
+      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
@@ -192,6 +237,7 @@ export default function AdvancedDashboard() {
         return { year: d.getFullYear(), month: d.getMonth() + 1 };
       }
       case "year": return { year: currentDate.getFullYear(), month: 1 };
+      case "month-select": return { year: selectedYear, month: selectedMonth };
       case "custom":
         return customStartDate
           ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
@@ -214,33 +260,85 @@ export default function AdvancedDashboard() {
             </div>
           </div>
 
+          {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+            {/* Quick range selector including new “Select Month…” */}
+            <Select
+              value={timeRange}
+              onValueChange={handleTimeRangeChange}
+            >
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="current-month">Current Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
                 <SelectItem value="last-3-months">Last 3 Months</SelectItem>
                 <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="month-select">Select Month…</SelectItem>
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
 
+            {/* If month-select: show Year + Month dropdowns */}
+            {timeRange === "month-select" && (
+              <>
+                <Select
+                  value={String(selectedYear)}
+                  onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
+                >
+                  <SelectTrigger className="h-9 w-[120px]">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={String(selectedMonth)}
+                  onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
+                >
+                  <SelectTrigger className="h-9 w-[140px]">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {/* If custom: show start/end date pickers */}
             {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12}
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
                     className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions collisionPadding={15}
+                    avoidCollisions
+                    collisionPadding={15}
                   >
-                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
                       selected={customStartDate}
                       onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
                       initialFocus
@@ -252,17 +350,27 @@ export default function AdvancedDashboard() {
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12}
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
                     className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions collisionPadding={15}
+                    avoidCollisions
+                    collisionPadding={15}
                   >
-                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
                       selected={customEndDate}
                       onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
                       initialFocus
@@ -284,7 +392,7 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(monthTotalSSP || sspIncome))}
+                  SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
                 </p>
                 <div className="flex items-center mt-1">
                   {dashboardData?.changes?.incomeChangeSSP !== undefined && (
@@ -316,7 +424,7 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(totalExpenses))}
+                  SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
                 </p>
                 <div className="flex items-center mt-1">
                   {dashboardData?.changes?.expenseChangeSSP !== undefined && (
@@ -347,7 +455,7 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(sspNetIncome))}
+                  SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
                 </p>
                 <div className="flex items-center mt-1">
                   {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
@@ -369,16 +477,18 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Insurance (USD) */}
-        <Link href={`/insurance-providers?range=${timeRange}${
+        <Link href={`/insurance-providers?range=${normalizedRange}${
           timeRange === "custom" && customStartDate && customEndDate
-            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}` : ""}`}>
+            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+            : `&year=${selectedYear}&month=${selectedMonth}`
+        }`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD {fmtUSD(Math.round(usdIncome))}
+                    USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
                   </p>
                   <div className="flex items-center mt-1">
                     {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
@@ -404,7 +514,7 @@ export default function AdvancedDashboard() {
         </Link>
 
         {/* Patient Volume */}
-        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${timeRange}`}>
+        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
