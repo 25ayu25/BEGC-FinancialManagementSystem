@@ -190,28 +190,6 @@ export default function InsuranceProvidersPage() {
     enabled: timeRange === "current-month" || timeRange === "last-month",
   });
 
-
-  // NEW: fetch monthly insurance totals for charts or lists
-  const { data: monthlyInsurance } = useQuery({
-    queryKey: [
-      "/api/insurance/monthly",
-      selectedYear,
-      selectedMonth,
-      timeRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
-    ],
-    queryFn: async () => {
-      let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
-      }
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
-      return res.json();
-    },
-  });
-
   const insuranceBreakdown: Record<string, number> =
     (dashboardData?.insuranceBreakdown as any) || {};
   const prevInsuranceBreakdown: Record<string, number> =
@@ -677,20 +655,45 @@ export default function InsuranceProvidersPage() {
         </Card>
       )}
     
-      {/* Example: show monthly insurance revenue below the donut */}
-      {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
-        <Card className="border-0 shadow-md bg-white">
+      {/* Insurance by Month (Totals) */}
+      {monthlySeries && monthlySeries.length > 0 && (
+        <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Insurance Revenue by Month</CardTitle>
+            <CardTitle>Insurance Payments by Month</CardTitle>
+            <CardDescription>Total USD per month (current selection)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ul>
-              {monthlyInsurance.data.map((entry: any) => (
-                <li key={`${entry.year}-${entry.month}`}>
-                  {entry.month} {entry.year}: USD {nf0.format(Math.round(entry.usd))}
-                </li>
-              ))}
-            </ul>
+            <div className="w-full h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlySeries}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="usd" name="USD" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Compact table below the chart */}
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="py-2 pr-4">Month</th>
+                    <th className="py-2 pr-4">USD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlySeries.map((row: any) => (
+                    <tr key={row.key} className="border-t">
+                      <td className="py-2 pr-4">{row.label}</td>
+                      <td className="py-2 pr-4">USD {nf0.format(row.usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
