@@ -36,6 +36,11 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
+// ---------- date helpers for canonical links ----------
+const toISO = (d: Date) => d.toISOString().slice(0, 10); // yyyy-mm-dd
+const startOfMonth = (y: number, m1: number) => new Date(y, m1 - 1, 1);
+const endOfMonth = (y: number, m1: number) => new Date(y, m1, 0);
+
 export default function AdvancedDashboard() {
   const {
     timeRange, selectedYear, selectedMonth,
@@ -46,8 +51,6 @@ export default function AdvancedDashboard() {
   const [openExpenses, setOpenExpenses] = useState(false);
 
   // ---- NEW: “normalizedRange” keeps backend compatibility
-  // When user picks an arbitrary month via month-select, we still send range=current-month
-  // but include the explicit year/month they chose.
   const normalizedRange =
     timeRange === "month-select" ? "current-month" : timeRange;
 
@@ -245,6 +248,70 @@ export default function AdvancedDashboard() {
       default: return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
     }
   };
+
+  // NEW: compute canonical window for the Insurance link
+  const getInsuranceWindow = () => {
+    const current = new Date();
+    let fromISO = "", toISO = "";
+
+    if (timeRange === "custom" && customStartDate && customEndDate) {
+      fromISO = format(customStartDate, "yyyy-MM-dd");
+      toISO = format(customEndDate, "yyyy-MM-dd");
+      return { fromISO, toISO };
+    }
+
+    // anchor month/year (match the dashboard period)
+    let anchorYear = selectedYear;
+    let anchorMonth = selectedMonth;
+
+    if (timeRange !== "month-select") {
+      // For non month-select presets, we anchor to "now" like other links do
+      anchorYear = current.getFullYear();
+      anchorMonth = current.getMonth() + 1;
+    }
+
+    switch (timeRange) {
+      case "current-month": {
+        const s = startOfMonth(anchorYear, anchorMonth);
+        const e = endOfMonth(anchorYear, anchorMonth);
+        fromISO = toISO(s); toISO = toISO(e);
+        break;
+      }
+      case "last-month": {
+        const d = new Date(anchorYear, anchorMonth - 2, 1); // previous month
+        const s = startOfMonth(d.getFullYear(), d.getMonth() + 1);
+        const e = endOfMonth(d.getFullYear(), d.getMonth() + 1);
+        fromISO = toISO(s); toISO = toISO(e);
+        break;
+      }
+      case "last-3-months": {
+        const end = endOfMonth(anchorYear, anchorMonth);
+        const start = new Date(end.getFullYear(), end.getMonth() - 2, 1);
+        fromISO = toISO(start); toISO = toISO(end);
+        break;
+      }
+      case "year": {
+        const y = anchorYear;
+        fromISO = `${y}-01-01`;
+        toISO = `${y}-12-31`;
+        break;
+      }
+      case "month-select": {
+        const s = startOfMonth(selectedYear, selectedMonth);
+        const e = endOfMonth(selectedYear, selectedMonth);
+        fromISO = toISO(s); toISO = toISO(e);
+        break;
+      }
+      default: {
+        const s = startOfMonth(anchorYear, anchorMonth);
+        const e = endOfMonth(anchorYear, anchorMonth);
+        fromISO = toISO(s); toISO = toISO(e);
+      }
+    }
+    return { fromISO, toISO };
+  };
+
+  const insuranceWindow = getInsuranceWindow();
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
@@ -476,12 +543,8 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Insurance (USD) */}
-        <Link href={`/insurance-providers?range=${normalizedRange}${
-          timeRange === "custom" && customStartDate && customEndDate
-            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-            : `&year=${selectedYear}&month=${selectedMonth}`
-        }`}>
+        {/* Insurance (USD) — UPDATED LINK: uses canonical from/to/bucket */}
+        <Link href={`/insurance-providers?from=${insuranceWindow.fromISO}&to=${insuranceWindow.toISO}&bucket=month`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
