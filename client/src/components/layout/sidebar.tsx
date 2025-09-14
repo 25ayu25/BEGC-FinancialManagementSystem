@@ -8,7 +8,6 @@ import {
   Building2,
   Users,
   Activity,
-  Shield, // NEW
   X,
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
@@ -19,8 +18,6 @@ const navigation = [
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
   { name: "Monthly Reports", href: "/reports", icon: FileText },
-  // NEW: independent Insurance entry (opens its own page/state)
-  { name: "Insurance", href: "/insurance-providers", icon: Shield },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
