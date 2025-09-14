@@ -1,7 +1,9 @@
 import * as React from "react";
+import { Link } from "wouter";
 import { TrendingUp, TrendingDown, DollarSign, Shield } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 
 interface ExecutiveStyleKPIsProps {
@@ -11,7 +13,7 @@ interface ExecutiveStyleKPIsProps {
     totalExpenses: string;
     netIncome: string;
     expenseBreakdown?: Record<string, string | number>;
-    insuranceBreakdown?: Record<string, string>;
+    insuranceBreakdown: Record<string, string>;
     changes?: {
       incomeChangeSSP?: number;
       expenseChangeSSP?: number;
@@ -36,13 +38,14 @@ export default function ExecutiveStyleKPIs({
   const sspNetIncome = parseFloat(data?.netIncome || "0");
   const usdIncome = parseFloat(data?.totalIncomeUSD || "0");
 
-  // Drawer state for the Expenses card
+  // Drawer state (shared component has transparent overlay)
   const [openExpenses, setOpenExpenses] = React.useState(false);
 
+  const openDrawer = () => setOpenExpenses(true);
   const kpiKeyHandler: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      setOpenExpenses(true);
+      openDrawer();
     }
   };
 
@@ -82,22 +85,22 @@ export default function ExecutiveStyleKPIs({
               <div className="bg-emerald-50 p-1.5 rounded-lg">
                 {data?.changes?.incomeChangeSSP !== undefined &&
                 data.changes.incomeChangeSSP < 0 ? (
-                  <TrendingDown className="h-4 w-4 text-red-700" />
+                  <TrendingDown className="h-4 w-4 text-red-600" />
                 ) : (
-                  <TrendingUp className="h-4 w-4 text-emerald-700" />
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
                 )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Total Expenses (opens drawer) */}
+        {/* Total Expenses — opens shared drawer */}
         <Card
           className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           role="button"
           tabIndex={0}
           aria-label="Open expense breakdown"
-          onClick={() => setOpenExpenses(true)}
+          onClick={openDrawer}
           onKeyDown={kpiKeyHandler}
           title="Click to view expense breakdown"
         >
@@ -178,29 +181,49 @@ export default function ExecutiveStyleKPIs({
           </CardContent>
         </Card>
 
-        {/* Insurance (USD) — NOT CLICKABLE */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  USD {Math.round(usdIncome).toLocaleString()}
-                </p>
-                <div className="mt-1 text-[11px] text-slate-500">
-                  Open detailed insurance analytics from the{" "}
-                  <span className="font-medium text-slate-700">sidebar</span>.
+        {/* Insurance Revenue */}
+        <Link href="/insurance-providers">
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    USD {Math.round(usdIncome).toLocaleString()}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    {data?.changes?.incomeChangeUSD !== undefined ? (
+                      <span
+                        className={`text-xs font-medium tabular-nums ${
+                          data.changes.incomeChangeUSD > 0
+                            ? "text-emerald-700"
+                            : data.changes.incomeChangeUSD < 0
+                            ? "text-red-700"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {data.changes.incomeChangeUSD > 0 ? "+" : ""}
+                        {data.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-purple-600">
+                        {Object.keys(data?.insuranceBreakdown || {}).length === 1
+                          ? "1 provider"
+                          : `${Object.keys(data?.insuranceBreakdown || {}).length} providers`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-purple-50 p-1.5 rounded-lg">
+                  <Shield className="h-4 w-4 text-purple-600" />
                 </div>
               </div>
-              <div className="bg-purple-50 p-1.5 rounded-lg">
-                <Shield className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
-      {/* Shared drawer for expenses */}
+      {/* Shared non-dimming drawer */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
