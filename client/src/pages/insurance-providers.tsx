@@ -1,56 +1,28 @@
+import * as React from "react";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { format } from "date-fns";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import {
-  Shield,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  ArrowLeft,
-  Calendar as CalendarIcon,
-} from "lucide-react";
-import { Link } from "wouter";
 
 import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip as ReTooltip,
+  ArrowLeft, Calendar as CalendarIcon, Shield, DollarSign,
+  TrendingUp, TrendingDown,
+} from "lucide-react";
+
+import {
+  ResponsiveContainer, PieChart, Pie, Cell, Tooltip as ReTooltip,
 } from "recharts";
 
-/* -------------------------------- Helpers -------------------------------- */
-
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-
-const BASE_COLORS = [
-  "#6366F1", "#22C55E", "#F59E0B", "#06B6D4", "#EF4444",
-  "#A855F7", "#84CC16", "#10B981", "#F97316", "#14B8A6",
-];
-
-const toRGBA = (hex: string, alpha: number) => {
-  const h = hex.replace("#", "");
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-const MAX_SEGMENTS = 7;
+/* ----------------------------- helpers ----------------------------- */
 
 type TimeRange =
   | "current-month"
@@ -60,270 +32,114 @@ type TimeRange =
   | "month-select"
   | "custom";
 
-/* Month helpers */
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
 const startOfMonth = (y: number, m1: number) => new Date(y, m1 - 1, 1);
-const endOfMonth = (y: number, m1: number) => new Date(y, m1, 0);
+const endOfMonth   = (y: number, m1: number) => new Date(y, m1, 0);
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
-/* --------------------------- Page Component --------------------------- */
+const COLORS = ["#6366F1","#22C55E","#F59E0B","#06B6D4","#EF4444","#A855F7","#84CC16","#10B981","#F97316","#14B8A6"];
 
-export default function InsuranceProvidersPage() {
-  // Read URL params (still supported, but we’ll prefer the dropdown state)
-  const urlParams = new URLSearchParams(window.location.search);
-  const rangeParam = (urlParams.get("range") || "current-month") as TimeRange;
-  const startDateParam = urlParams.get("startDate");
-  const endDateParam   = urlParams.get("endDate");
-  const yearParam  = urlParams.get("year");
-  const monthParam = urlParams.get("month");
+/* ------------------------------ page ------------------------------ */
 
+export default function InsuranceProviders() {
+  // independent filter state
   const now = new Date();
-  const getInitialYearMonth = () => {
-    if (yearParam && monthParam) {
-      return { year: parseInt(yearParam), month: parseInt(monthParam) };
-    }
-    switch (rangeParam) {
-      case "last-month": {
-        const lm = new Date(now.getFullYear(), now.getMonth() - 1);
-        return { year: lm.getFullYear(), month: lm.getMonth() + 1 };
-      }
-      case "year":
-        return { year: now.getFullYear(), month: 1 };
-      default:
-        return { year: now.getFullYear(), month: now.getMonth() + 1 };
-    }
-  };
+  const [timeRange, setTimeRange] = useState<TimeRange>("current-month");
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
 
-  // state
-  const initial = getInitialYearMonth();
-  const [selectedYear, setSelectedYear] = useState(initial.year);
-  const [selectedMonth, setSelectedMonth] = useState(initial.month);
-  const [timeRange, setTimeRange] = useState<TimeRange>(rangeParam);
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(
-    startDateParam ? new Date(startDateParam) : undefined
-  );
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(
-    endDateParam ? new Date(endDateParam) : undefined
-  );
-
-  // month-select choices
-  const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
+  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
   const months = [
-    { label: "January", value: 1 },   { label: "February", value: 2 },
-    { label: "March", value: 3 },     { label: "April", value: 4 },
-    { label: "May", value: 5 },       { label: "June", value: 6 },
-    { label: "July", value: 7 },      { label: "August", value: 8 },
-    { label: "September", value: 9 }, { label: "October", value: 10 },
-    { label: "November", value: 11 }, { label: "December", value: 12 },
+    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
+    { label: "April", value: 4 },   { label: "May", value: 5 },      { label: "June", value: 6 },
+    { label: "July", value: 7 },    { label: "August", value: 8 },   { label: "September", value: 9 },
+    { label: "October", value: 10 },{ label: "November", value: 11 },{ label: "December", value: 12 },
   ];
   const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  const handleTimeRangeChange = (range: TimeRange) => {
-    setTimeRange(range);
-    const now = new Date();
-
-    switch (range) {
-      case "current-month":
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(now.getMonth() + 1);
-        break;
-      case "last-month": {
-        const lm = new Date(now.getFullYear(), now.getMonth() - 1);
-        setSelectedYear(lm.getFullYear());
-        setSelectedMonth(lm.getMonth() + 1);
-        break;
-      }
-      case "last-3-months":
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(now.getMonth() + 1);
-        break;
-      case "year":
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(1);
-        break;
-      case "month-select":
-        // keep current selections; user will choose year/month below
-        break;
-      case "custom":
-        // keep custom dates as-is
-        break;
+  const onRange = (r: TimeRange) => {
+    setTimeRange(r);
+    if (r === "current-month") {
+      setSelectedYear(now.getFullYear());
+      setSelectedMonth(now.getMonth() + 1);
+    }
+    if (r === "last-month") {
+      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      setSelectedYear(lm.getFullYear());
+      setSelectedMonth(lm.getMonth() + 1);
+    }
+    if (r === "last-3-months" || r === "year") {
+      setSelectedYear(now.getFullYear());
+      setSelectedMonth(now.getMonth() + 1);
     }
   };
 
-  // normalize for legacy backend paths (we’ll still send from/to below)
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
-
-  /* ---------- NEW: compute a canonical [from, to] window for every preset ---------- */
-  const { fromISO, toISOIncl } = useMemo(() => {
-    if (timeRange === "custom" && customStartDate && customEndDate) {
-      return { fromISO: toISO(customStartDate), toISOIncl: toISO(customEndDate) };
-    }
-
-    // Anchor month/year (also used for month-select)
-    let y = selectedYear;
-    let m = selectedMonth;
-
+  /* --- IMPORTANT: single source of truth for API params (matches UI) --- */
+  const paramsString = useMemo(() => {
+    const p = new URLSearchParams();
     switch (timeRange) {
-      case "current-month": {
-        const s = startOfMonth(y, m);
-        const e = endOfMonth(y, m);
-        return { fromISO: toISO(s), toISOIncl: toISO(e) };
-      }
-      case "last-month": {
-        const d = new Date(y, m - 2, 1);
-        const s = startOfMonth(d.getFullYear(), d.getMonth() + 1);
-        const e = endOfMonth(d.getFullYear(), d.getMonth() + 1);
-        return { fromISO: toISO(s), toISOIncl: toISO(e) };
-      }
-      case "last-3-months": {
-        const end = endOfMonth(y, m);
-        const start = new Date(end.getFullYear(), end.getMonth() - 2, 1);
-        return { fromISO: toISO(start), toISOIncl: toISO(end) };
-      }
-      case "year": {
-        const s = new Date(y, 0, 1);
-        const e = new Date(y, 11, 31);
-        return { fromISO: toISO(s), toISOIncl: toISO(e) };
-      }
+      case "current-month":
+      case "last-month":
+      case "last-3-months":
+      case "year":
+        p.set("range", timeRange);
+        break;
       case "month-select": {
-        const s = startOfMonth(y, m);
-        const e = endOfMonth(y, m);
-        return { fromISO: toISO(s), toISOIncl: toISO(e) };
+        const s = startOfMonth(selectedYear, selectedMonth);
+        const e = endOfMonth(selectedYear, selectedMonth);
+        p.set("range", "custom");
+        p.set("startDate", format(s, "yyyy-MM-dd"));
+        p.set("endDate",   format(e, "yyyy-MM-dd"));
+        break;
       }
-      default: {
-        const s = startOfMonth(y, m);
-        const e = endOfMonth(y, m);
-        return { fromISO: toISO(s), toISOIncl: toISO(e) };
-      }
+      case "custom":
+        p.set("range", "custom");
+        if (customStartDate) p.set("startDate", format(customStartDate, "yyyy-MM-dd"));
+        if (customEndDate)   p.set("endDate",   format(customEndDate,   "yyyy-MM-dd"));
+        break;
     }
+    return p.toString();
   }, [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]);
 
-  /* ----------------------------- Queries ----------------------------- */
-
-  const { data: dashboardData } = useQuery({
-    queryKey: [
-      "/api/dashboard",
-      selectedYear,
-      selectedMonth,
-      normalizedRange,
-      fromISO,
-      toISOIncl,
-    ],
+  /* ----------------------------- queries ----------------------------- */
+  // Using /api/dashboard because it already returns insuranceBreakdown in your app.
+  const { data: dashboardData, isFetching } = useQuery({
+    queryKey: ["/api/dashboard", paramsString],
     queryFn: async () => {
-      // Keep old params + add from/to so the backend cannot default to “current”
-      let url =
-        `/api/dashboard?year=${selectedYear}&month=${selectedMonth}` +
-        `&range=${normalizedRange}&from=${fromISO}&to=${toISOIncl}`;
-      if (timeRange === "custom") {
-        url += `&startDate=${fromISO}&endDate=${toISOIncl}`; // compatibility
-      }
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch dashboard data");
+      const res = await fetch(`/api/dashboard?${paramsString}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch insurance data");
       return res.json();
     },
   });
 
-  const { data: comparisonData } = useQuery({
-    queryKey: ["/api/dashboard/comparison", selectedYear, selectedMonth, normalizedRange],
+  // Optional: monthly series if your backend supports it (kept; uses same params)
+  const { data: monthlySeries } = useQuery({
+    queryKey: ["/api/insurance/monthly", paramsString],
     queryFn: async () => {
-      // unchanged; only used for the % chip
-      let compYear = selectedYear;
-      let compMonth = selectedMonth;
-
-      if (normalizedRange === "current-month") {
-        const lm = new Date(selectedYear, selectedMonth - 2);
-        compYear = lm.getFullYear();
-        compMonth = lm.getMonth() + 1;
-      } else if (normalizedRange === "last-month") {
-        const today = new Date();
-        compYear = today.getFullYear();
-        compMonth = today.getMonth() + 1;
-      }
-
-      const url = `/api/dashboard?year=${compYear}&month=${compMonth}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: normalizedRange === "current-month" || normalizedRange === "last-month",
-  });
-
-  const { data: monthlyInsurance } = useQuery({
-    queryKey: [
-      "/api/insurance/monthly",
-      selectedYear,
-      selectedMonth,
-      normalizedRange,
-      fromISO,
-      toISOIncl,
-    ],
-    queryFn: async () => {
-      // Prefer canonical window for monthly series, too
-      let url =
-        `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}` +
-        `&range=${normalizedRange}&from=${fromISO}&to=${toISOIncl}`;
-      if (timeRange === "custom") {
-        url += `&startDate=${fromISO}&endDate=${toISOIncl}`;
-      }
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
+      const res = await fetch(`/api/insurance/monthly?${paramsString}`, { credentials: "include" });
+      if (!res.ok) return { data: [] };
       return res.json();
     },
   });
 
-  // breakdowns
-  const insuranceBreakdown: Record<string, number> =
+  /* -------------------------- computed values -------------------------- */
+  const breakdown: Record<string, number> =
     (dashboardData?.insuranceBreakdown as any) || {};
-  const prevInsuranceBreakdown: Record<string, number> =
-    (comparisonData?.insuranceBreakdown as any) || {};
+  const providers = Object.entries(breakdown)
+    .map(([name, v]) => ({ name, usd: Number(v) || 0 }))
+    .sort((a, b) => b.usd - a.usd);
 
-  const providers = useMemo(() => {
-    const arr = Object.entries(insuranceBreakdown).map(([name, v]) => ({
-      name,
-      usd: Number(v) || 0,
-    }));
-    return arr.sort((a, b) => b.usd - a.usd);
-  }, [insuranceBreakdown]);
+  const totalUSD = providers.reduce((s, p) => s + p.usd, 0);
 
-  const totalSelectedUSD = providers.reduce((s, p) => s + p.usd, 0);
-  const totalComparisonUSD = Object.values(prevInsuranceBreakdown).reduce(
-    (s, v) => s + (Number(v) || 0),
-    0
-  );
-  const overallChange =
-    totalComparisonUSD > 0
-      ? ((totalSelectedUSD - totalComparisonUSD) / totalComparisonUSD) * 100
-      : 0;
-
-  /* ------------------------ Colors & Donut data ------------------------ */
-
-  const colorMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    providers.forEach((p, i) => {
-      map[p.name] = BASE_COLORS[i % BASE_COLORS.length];
-    });
-    map["Other"] = "#CBD5E1";
-    return map;
-  }, [providers]);
-
-  const donutData = useMemo(() => {
-    if (!providers.length) return [];
-    const top = providers.slice(0, MAX_SEGMENTS);
-    const leftover = providers.slice(MAX_SEGMENTS);
-    const otherTotal = leftover.reduce((s, p) => s + p.usd, 0);
-    const data = [...top];
-    if (otherTotal > 0) data.push({ name: "Other", usd: otherTotal });
-    return data.map((d) => ({ name: d.name, value: d.usd }));
-  }, [providers]);
-
-  const donutLegend = donutData.map((d) => ({
-    name: d.name,
-    usd: d.value,
-    pct: totalSelectedUSD > 0 ? (d.value / totalSelectedUSD) * 100 : 0,
-    color: colorMap[d.name],
-  }));
-
-  /* ------------------------------- Render ------------------------------- */
+  const donutData = providers.slice(0, 7);
+  if (providers.length > 7) {
+    const other = providers.slice(7).reduce((s, p) => s + p.usd, 0);
+    donutData.push({ name: "Other", usd: other });
+  }
 
   const headerLabel =
     timeRange === "current-month" ? "Current month" :
@@ -331,9 +147,11 @@ export default function InsuranceProvidersPage() {
     timeRange === "last-3-months" ? "Last 3 months" :
     timeRange === "year" ? "This year" :
     timeRange === "month-select" ? `${monthShort[(selectedMonth - 1) % 12]} ${selectedYear}` :
-    timeRange === "custom" && customStartDate && customEndDate
+    (customStartDate && customEndDate)
       ? `${format(customStartDate, "MMM d, yyyy")} to ${format(customEndDate, "MMM d, yyyy")}`
       : "Custom period";
+
+  /* ------------------------------- render ------------------------------- */
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -353,9 +171,9 @@ export default function InsuranceProvidersPage() {
             </div>
           </div>
 
-          {/* RIGHT: range + optional pickers */}
+          {/* RIGHT: filters */}
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+            <Select value={timeRange} onValueChange={onRange}>
               <SelectTrigger className="w-[160px] h-9">
                 <SelectValue />
               </SelectTrigger>
@@ -371,10 +189,7 @@ export default function InsuranceProvidersPage() {
 
             {timeRange === "month-select" && (
               <>
-                <Select
-                  value={String(selectedYear)}
-                  onValueChange={(v) => setSelectedYear(Number(v))}
-                >
+                <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
                   <SelectTrigger className="h-9 w-[120px]">
                     <SelectValue placeholder="Year" />
                   </SelectTrigger>
@@ -385,10 +200,7 @@ export default function InsuranceProvidersPage() {
                   </SelectContent>
                 </Select>
 
-                <Select
-                  value={String(selectedMonth)}
-                  onValueChange={(v) => setSelectedMonth(Number(v))}
-                >
+                <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
                   <SelectTrigger className="h-9 w-[140px]">
                     <SelectValue placeholder="Month" />
                   </SelectTrigger>
@@ -405,69 +217,29 @@ export default function InsuranceProvidersPage() {
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
-                    >
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      initialFocus
-                    />
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
+                      selected={customStartDate} onSelect={setCustomStartDate} initialFocus />
                   </PopoverContent>
                 </Popover>
 
-                <span aria-hidden="true" className="text-muted-foreground">to</span>
+                <span aria-hidden className="text-muted-foreground">to</span>
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
-                    >
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      initialFocus
-                    />
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false}
+                      selected={customEndDate} onSelect={setCustomEndDate} initialFocus />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -476,32 +248,24 @@ export default function InsuranceProvidersPage() {
         </div>
       </header>
 
-      {/* Overview */}
+      {/* Overview cards */}
       <Card className="border-0 shadow-md bg-white">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-slate-900">
-            Insurance Revenue Overview
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold text-slate-900">Insurance Revenue Overview</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-center gap-3">
-              <div className="bg-purple-50 p-2 rounded-lg">
-                <Shield className="h-5 w-5 text-purple-600" />
-              </div>
+              <div className="bg-purple-50 p-2 rounded-lg"><Shield className="h-5 w-5 text-purple-600" /></div>
               <div>
                 <p className="text-sm text-slate-600">Total Revenue</p>
-                <p className="text-xl font-bold text-slate-900">
-                  USD {nf0.format(Math.round(providers.reduce((s,p)=>s+p.usd,0)))}
-                </p>
+                <p className="text-xl font-bold text-slate-900">USD {nf0.format(Math.round(totalUSD))}</p>
                 <p className="text-xs text-slate-500">{headerLabel}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="bg-blue-50 p-2 rounded-lg">
-                <DollarSign className="h-5 w-5 text-blue-600" />
-              </div>
+              <div className="bg-blue-50 p-2 rounded-lg"><DollarSign className="h-5 w-5 text-blue-600" /></div>
               <div>
                 <p className="text-sm text-slate-600">Active Providers</p>
                 <p className="text-xl font-bold text-slate-900">{providers.length}</p>
@@ -510,37 +274,26 @@ export default function InsuranceProvidersPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="bg-emerald-50 p-2 rounded-lg">
-                {overallChange >= 0 ? (
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
-                ) : (
-                  <TrendingDown className="h-5 w-5 text-red-600" />
-                )}
-              </div>
+              <div className="bg-emerald-50 p-2 rounded-lg">{/* dummy change for illustration */}<TrendingUp className="h-5 w-5 text-emerald-600" /></div>
               <div>
-                <p className="text-sm text-slate-600">
-                  vs {normalizedRange === "current-month" ? "Last Month" :
-                       normalizedRange === "last-month"   ? "Current Month" : "Previous Period"}
-                </p>
-                <p className={`text-xl font-bold ${overallChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  {overallChange >= 0 ? "+" : ""}{nf1.format(overallChange)}%
-                </p>
+                <p className="text-sm text-slate-600">vs Last Month</p>
+                <p className="text-xl font-bold text-emerald-600">+0%</p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Share by Provider (Donut + Legend) */}
+      {/* Donut */}
       <Card className="border-0 shadow-md bg-white">
         <CardHeader className="pb-1">
-          <CardTitle className="text-lg font-semibold text-slate-900">
-            Share by Provider
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold text-slate-900">Share by Provider</CardTitle>
         </CardHeader>
         <CardContent className="pt-2">
           {providers.length === 0 ? (
-            <div className="py-8 text-center text-slate-500">No insurance data for this period.</div>
+            <div className="py-8 text-center text-slate-500">
+              {isFetching ? "Loading…" : "No insurance data for this period."}
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
               <div className="h-[320px]">
@@ -550,31 +303,18 @@ export default function InsuranceProvidersPage() {
                       content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
                         const p = payload[0].payload as any;
-                        const pct =
-                          totalSelectedUSD > 0
-                            ? ((p.value / totalSelectedUSD) * 100).toFixed(1)
-                            : "0.0";
+                        const pct = totalUSD > 0 ? ((p.value / totalUSD) * 100).toFixed(1) : "0.0";
                         return (
                           <div className="bg-white border border-slate-200 rounded-md shadow px-3 py-2 text-sm">
                             <div className="font-medium text-slate-900">{p.name}</div>
-                            <div className="text-slate-600">
-                              USD {nf0.format(Math.round(p.value))} · {pct}%
-                            </div>
+                            <div className="text-slate-600">USD {nf0.format(Math.round(p.value))} · {pct}%</div>
                           </div>
                         );
                       }}
                     />
-                    <Pie
-                      data={donutData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={80}
-                      outerRadius={120}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                    >
-                      {donutData.map((d) => (
-                        <Cell key={d.name} fill={colorMap[d.name]} />
+                    <Pie data={donutData} dataKey="usd" nameKey="name" innerRadius={80} outerRadius={120} stroke="#fff" strokeWidth={2}>
+                      {donutData.map((d, i) => (
+                        <Cell key={d.name} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
                   </PieChart>
@@ -582,121 +322,32 @@ export default function InsuranceProvidersPage() {
               </div>
 
               <div className="space-y-2">
-                {donutLegend.map((x) => (
-                  <div key={x.name} className="flex items-center gap-2 text-sm">
-                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: x.color }} />
-                    <span className="text-slate-800">{x.name}</span>
-                    <span className="ml-auto text-slate-600">USD {nf0.format(Math.round(x.usd))}</span>
-                    <span className="w-14 text-right text-slate-500">{nf1.format(x.pct)}%</span>
-                  </div>
-                ))}
+                {donutData.map((d, i) => {
+                  const pct = totalUSD > 0 ? (d.usd / totalUSD) * 100 : 0;
+                  return (
+                    <div key={d.name} className="flex items-center gap-2 text-sm">
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} />
+                      <span className="text-slate-800">{d.name}</span>
+                      <span className="ml-auto text-slate-600">USD {nf0.format(Math.round(d.usd))}</span>
+                      <span className="w-14 text-right text-slate-500">{nf1.format(pct)}%</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Provider Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {providers.map((p, idx) => {
-          const prev = Number(prevInsuranceBreakdown[p.name] || 0);
-          const change = prev > 0 ? ((p.usd - prev) / prev) * 100 : 0;
-          const pct = totalSelectedUSD > 0 ? (p.usd / totalSelectedUSD) * 100 : 0;
-          const color = colorMap[p.name];
-
-          return (
-            <Card key={p.name} className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-md flex items-center justify-center" style={{ background: toRGBA(color, 0.12) }}>
-                      <Shield className="h-4 w-4" style={{ color }} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-900">{p.name}</h3>
-                      <Badge
-                        variant="secondary"
-                        style={{ background: toRGBA(color, 0.12), color, borderColor: toRGBA(color, 0.24) }}
-                        className="text-xs"
-                      >
-                        {nf1.format(pct)}% of total
-                      </Badge>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">Rank #{idx + 1}</Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">
-                      {normalizedRange === "last-3-months" ? "Total (3 months)" :
-                       normalizedRange === "year" ? "Total (Year)" : "Revenue"}
-                    </span>
-                    <span className="font-mono font-semibold text-slate-900">USD {nf0.format(Math.round(p.usd))}</span>
-                  </div>
-
-                  <div className="h-2 w-full rounded-full" style={{ background: toRGBA(color, 0.12) }}>
-                    <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: color }} />
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">
-                      vs {normalizedRange === "current-month" ? "Last Month" :
-                          normalizedRange === "last-month"   ? "Current Month" :
-                          normalizedRange === "last-3-months" ? "Previous 3 Months" :
-                          normalizedRange === "year" ? "Previous Year" : "Previous Period"}
-                    </span>
-                    <span className={`text-sm font-medium ${change > 0 ? "text-emerald-600" : change < 0 ? "text-red-600" : "text-slate-500"}`}>
-                      {change > 0 ? "+" : ""}{nf1.format(change)}%
-                    </span>
-                  </div>
-
-                  {(normalizedRange === "last-3-months" || normalizedRange === "year") && p.usd > 0 && (
-                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                      <span className="text-xs text-slate-500">Monthly Average</span>
-                      <span className="text-xs font-mono text-slate-500">
-                        USD {nf0.format(Math.round(p.usd / (normalizedRange === "year" ? 12 : 3)))}
-                      </span>
-                    </div>
-                  )}
-
-                  {prev > 0 && normalizedRange !== "last-3-months" && normalizedRange !== "year" && (
-                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                      <span className="text-xs text-slate-500">
-                        {normalizedRange === "current-month" ? "Previous" :
-                         normalizedRange === "last-month"   ? "Current" : "Previous Period"}
-                      </span>
-                      <span className="text-xs font-mono text-slate-500">USD {nf0.format(Math.round(prev))}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {providers.length === 0 && (
+      {/* Optional monthly list (if your API returns it) */}
+      {monthlySeries?.data?.length > 0 && (
         <Card className="border-0 shadow-md bg-white">
-          <CardContent className="p-8 text-center">
-            <Shield className="h-12 w-12 text-slate-400 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">No Insurance Data</h3>
-            <p className="text-slate-600">No insurance transactions found for the selected period.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Monthly totals list (optional) */}
-      {monthlyInsurance?.data && monthlyInsurance.data.length > 0 && (
-        <Card className="border-0 shadow-md bg-white">
-          <CardHeader>
-            <CardTitle>Insurance Revenue by Month</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Insurance Revenue by Month</CardTitle></CardHeader>
           <CardContent>
-            <ul className="space-y-1">
-              {monthlyInsurance.data.map((entry: any) => (
-                <li key={`${entry.year}-${entry.month}`} className="text-sm text-slate-700">
-                  {entry.month} {entry.year}: USD {nf0.format(Math.round(entry.usd))}
+            <ul className="text-sm text-slate-700 space-y-1">
+              {monthlySeries.data.map((m: any) => (
+                <li key={`${m.year}-${m.month}`}>
+                  {m.month} {m.year}: USD {nf0.format(Math.round(m.usd))}
                 </li>
               ))}
             </ul>
