@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 
-// Recharts
 import {
   ResponsiveContainer,
   PieChart,
@@ -39,19 +38,10 @@ const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
 const BASE_COLORS = [
-  "#6366F1", // indigo
-  "#22C55E", // green
-  "#F59E0B", // amber
-  "#06B6D4", // cyan
-  "#EF4444", // red
-  "#A855F7", // violet
-  "#84CC16", // lime
-  "#10B981", // emerald
-  "#F97316", // orange
-  "#14B8A6", // teal
+  "#6366F1", "#22C55E", "#F59E0B", "#06B6D4", "#EF4444",
+  "#A855F7", "#84CC16", "#10B981", "#F97316", "#14B8A6",
 ];
 
-// light track color for progress bars
 const toRGBA = (hex: string, alpha: number) => {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
@@ -60,28 +50,27 @@ const toRGBA = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-// max # of visible providers in donut (the rest grouped as "Other")
 const MAX_SEGMENTS = 7;
-
-/* --------------------------- Page Component --------------------------- */
 
 type TimeRange =
   | "current-month"
   | "last-month"
   | "last-3-months"
   | "year"
-  | "month-select" // NEW
+  | "month-select"
   | "custom";
 
+/* Month helpers */
+const startOfMonth = (y: number, m1: number) => new Date(y, m1 - 1, 1);
+const endOfMonth = (y: number, m1: number) => new Date(y, m1, 0);
+const toISO = (d: Date) => d.toISOString().slice(0, 10);
+
+/* --------------------------- Page Component --------------------------- */
+
 export default function InsuranceProvidersPage() {
-  // read URL params (compat with links coming from dashboard)
+  // Read URL params (still supported, but we’ll prefer the dropdown state)
   const urlParams = new URLSearchParams(window.location.search);
-  const rangeParam = (urlParams.get("range") || "current-month") as
-    | "current-month"
-    | "last-month"
-    | "last-3-months"
-    | "year"
-    | "custom";
+  const rangeParam = (urlParams.get("range") || "current-month") as TimeRange;
   const startDateParam = urlParams.get("startDate");
   const endDateParam   = urlParams.get("endDate");
   const yearParam  = urlParams.get("year");
@@ -120,18 +109,12 @@ export default function InsuranceProvidersPage() {
   const thisYear = now.getFullYear();
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
   const months = [
-    { label: "January", value: 1 },
-    { label: "February", value: 2 },
-    { label: "March", value: 3 },
-    { label: "April", value: 4 },
-    { label: "May", value: 5 },
-    { label: "June", value: 6 },
-    { label: "July", value: 7 },
-    { label: "August", value: 8 },
-    { label: "September", value: 9 },
-    { label: "October", value: 10 },
-    { label: "November", value: 11 },
-    { label: "December", value: 12 },
+    { label: "January", value: 1 },   { label: "February", value: 2 },
+    { label: "March", value: 3 },     { label: "April", value: 4 },
+    { label: "May", value: 5 },       { label: "June", value: 6 },
+    { label: "July", value: 7 },      { label: "August", value: 8 },
+    { label: "September", value: 9 }, { label: "October", value: 10 },
+    { label: "November", value: 11 }, { label: "December", value: 12 },
   ];
   const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -167,8 +150,53 @@ export default function InsuranceProvidersPage() {
     }
   };
 
-  // normalize: when month-select is active, tell backend "current-month" but include explicit year/month
+  // normalize for legacy backend paths (we’ll still send from/to below)
   const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
+
+  /* ---------- NEW: compute a canonical [from, to] window for every preset ---------- */
+  const { fromISO, toISOIncl } = useMemo(() => {
+    if (timeRange === "custom" && customStartDate && customEndDate) {
+      return { fromISO: toISO(customStartDate), toISOIncl: toISO(customEndDate) };
+    }
+
+    // Anchor month/year (also used for month-select)
+    let y = selectedYear;
+    let m = selectedMonth;
+
+    switch (timeRange) {
+      case "current-month": {
+        const s = startOfMonth(y, m);
+        const e = endOfMonth(y, m);
+        return { fromISO: toISO(s), toISOIncl: toISO(e) };
+      }
+      case "last-month": {
+        const d = new Date(y, m - 2, 1);
+        const s = startOfMonth(d.getFullYear(), d.getMonth() + 1);
+        const e = endOfMonth(d.getFullYear(), d.getMonth() + 1);
+        return { fromISO: toISO(s), toISOIncl: toISO(e) };
+      }
+      case "last-3-months": {
+        const end = endOfMonth(y, m);
+        const start = new Date(end.getFullYear(), end.getMonth() - 2, 1);
+        return { fromISO: toISO(start), toISOIncl: toISO(end) };
+      }
+      case "year": {
+        const s = new Date(y, 0, 1);
+        const e = new Date(y, 11, 31);
+        return { fromISO: toISO(s), toISOIncl: toISO(e) };
+      }
+      case "month-select": {
+        const s = startOfMonth(y, m);
+        const e = endOfMonth(y, m);
+        return { fromISO: toISO(s), toISOIncl: toISO(e) };
+      }
+      default: {
+        const s = startOfMonth(y, m);
+        const e = endOfMonth(y, m);
+        return { fromISO: toISO(s), toISOIncl: toISO(e) };
+      }
+    }
+  }, [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]);
 
   /* ----------------------------- Queries ----------------------------- */
 
@@ -178,16 +206,16 @@ export default function InsuranceProvidersPage() {
       selectedYear,
       selectedMonth,
       normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      fromISO,
+      toISOIncl,
     ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(
-          customEndDate,
-          "yyyy-MM-dd"
-        )}`;
+      // Keep old params + add from/to so the backend cannot default to “current”
+      let url =
+        `/api/dashboard?year=${selectedYear}&month=${selectedMonth}` +
+        `&range=${normalizedRange}&from=${fromISO}&to=${toISOIncl}`;
+      if (timeRange === "custom") {
+        url += `&startDate=${fromISO}&endDate=${toISOIncl}`; // compatibility
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch dashboard data");
@@ -195,10 +223,10 @@ export default function InsuranceProvidersPage() {
     },
   });
 
-  // comparison (kept: only meaningful for current-month vs last-month navigation)
   const { data: comparisonData } = useQuery({
     queryKey: ["/api/dashboard/comparison", selectedYear, selectedMonth, normalizedRange],
     queryFn: async () => {
+      // unchanged; only used for the % chip
       let compYear = selectedYear;
       let compMonth = selectedMonth;
 
@@ -220,20 +248,22 @@ export default function InsuranceProvidersPage() {
     enabled: normalizedRange === "current-month" || normalizedRange === "last-month",
   });
 
-  // monthly insurance totals
   const { data: monthlyInsurance } = useQuery({
     queryKey: [
       "/api/insurance/monthly",
       selectedYear,
       selectedMonth,
       normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      fromISO,
+      toISOIncl,
     ],
     queryFn: async () => {
-      let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+      // Prefer canonical window for monthly series, too
+      let url =
+        `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}` +
+        `&range=${normalizedRange}&from=${fromISO}&to=${toISOIncl}`;
+      if (timeRange === "custom") {
+        url += `&startDate=${fromISO}&endDate=${toISOIncl}`;
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
@@ -265,14 +295,14 @@ export default function InsuranceProvidersPage() {
       ? ((totalSelectedUSD - totalComparisonUSD) / totalComparisonUSD) * 100
       : 0;
 
-  /* ------------------------ Color map & donut data ------------------------ */
+  /* ------------------------ Colors & Donut data ------------------------ */
 
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {};
     providers.forEach((p, i) => {
       map[p.name] = BASE_COLORS[i % BASE_COLORS.length];
     });
-    map["Other"] = "#CBD5E1"; // slate-300
+    map["Other"] = "#CBD5E1";
     return map;
   }, [providers]);
 
@@ -295,7 +325,6 @@ export default function InsuranceProvidersPage() {
 
   /* ------------------------------- Render ------------------------------- */
 
-  // header label
   const headerLabel =
     timeRange === "current-month" ? "Current month" :
     timeRange === "last-month" ? "Last month" :
@@ -658,7 +687,7 @@ export default function InsuranceProvidersPage() {
       )}
 
       {/* Monthly totals list (optional) */}
-      {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
+      {monthlyInsurance?.data && monthlyInsurance.data.length > 0 && (
         <Card className="border-0 shadow-md bg-white">
           <CardHeader>
             <CardTitle>Insurance Revenue by Month</CardTitle>
