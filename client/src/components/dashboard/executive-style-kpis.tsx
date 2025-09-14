@@ -1,10 +1,7 @@
 import * as React from "react";
-import { Link } from "wouter";
 import { TrendingUp, TrendingDown, DollarSign, Shield } from "lucide-react";
-import { useDateFilter } from "@/context/date-filter-context";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 
 interface ExecutiveStyleKPIsProps {
@@ -14,7 +11,7 @@ interface ExecutiveStyleKPIsProps {
     totalExpenses: string;
     netIncome: string;
     expenseBreakdown?: Record<string, string | number>;
-    insuranceBreakdown: Record<string, string>;
+    insuranceBreakdown?: Record<string, string>;
     changes?: {
       incomeChangeSSP?: number;
       expenseChangeSSP?: number;
@@ -25,10 +22,6 @@ interface ExecutiveStyleKPIsProps {
   /** Optional label for the current period (e.g., “Current month”) */
   periodLabel?: string;
 }
-
-const toISO = (d: Date) => d.toISOString().slice(0, 10);
-const startOfMonth = (y: number, m1: number) => new Date(y, m1 - 1, 1);
-const endOfMonth = (y: number, m1: number) => new Date(y, m1, 0);
 
 function formatSSP(n: number) {
   return `SSP ${Math.round(n).toLocaleString()}`;
@@ -43,77 +36,13 @@ export default function ExecutiveStyleKPIs({
   const sspNetIncome = parseFloat(data?.netIncome || "0");
   const usdIncome = parseFloat(data?.totalIncomeUSD || "0");
 
-  // Date filter context to build canonical Insurance link
-  const {
-    timeRange, selectedYear, selectedMonth, customStartDate, customEndDate,
-  } = useDateFilter?.() ?? ({} as any);
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
-
-  const getInsuranceWindow = () => {
-    // Fallback: if context is missing, use current month
-    const now = new Date();
-    let fromISO: string, toISO_: string;
-
-    if (timeRange === "custom" && customStartDate && customEndDate) {
-      fromISO = toISO(customStartDate);
-      toISO_  = toISO(customEndDate);
-      return { fromISO, toISO: toISO_ };
-    }
-    if (!timeRange) {
-      const s = startOfMonth(now.getFullYear(), now.getMonth()+1);
-      const e = endOfMonth(now.getFullYear(), now.getMonth()+1);
-      return { fromISO: toISO(s), toISO: toISO(e) };
-    }
-
-    let anchorYear = now.getFullYear();
-    let anchorMonth = now.getMonth()+1;
-
-    switch (normalizedRange) {
-      case "current-month": {
-        const s = startOfMonth(anchorYear, anchorMonth);
-        const e = endOfMonth(anchorYear, anchorMonth);
-        return { fromISO: toISO(s), toISO: toISO(e) };
-      }
-      case "last-month": {
-        const d = new Date(anchorYear, anchorMonth - 2, 1);
-        const s = startOfMonth(d.getFullYear(), d.getMonth()+1);
-        const e = endOfMonth(d.getFullYear(), d.getMonth()+1);
-        return { fromISO: toISO(s), toISO: toISO(e) };
-      }
-      case "last-3-months": {
-        const end = endOfMonth(anchorYear, anchorMonth);
-        const start = new Date(end.getFullYear(), end.getMonth()-2, 1);
-        return { fromISO: toISO(start), toISO: toISO(end) };
-      }
-      case "year": {
-        const y = selectedYear ?? now.getFullYear();
-        return { fromISO: `${y}-01-01`, toISO: `${y}-12-31` };
-      }
-      case "month-select": {
-        const y = selectedYear ?? now.getFullYear();
-        const m = selectedMonth ?? (now.getMonth()+1);
-        const s = startOfMonth(y, m);
-        const e = endOfMonth(y, m);
-        return { fromISO: toISO(s), toISO: toISO(e) };
-      }
-      default: {
-        const s = startOfMonth(anchorYear, anchorMonth);
-        const e = endOfMonth(anchorYear, anchorMonth);
-        return { fromISO: toISO(s), toISO: toISO(e) };
-      }
-    }
-  };
-
-  const insuranceWindow = getInsuranceWindow();
-
-  // Drawer state (shared component has transparent overlay)
+  // Drawer state for the Expenses card
   const [openExpenses, setOpenExpenses] = React.useState(false);
 
-  const openDrawer = () => setOpenExpenses(true);
   const kpiKeyHandler: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      openDrawer();
+      setOpenExpenses(true);
     }
   };
 
@@ -162,13 +91,13 @@ export default function ExecutiveStyleKPIs({
           </CardContent>
         </Card>
 
-        {/* Total Expenses — opens shared drawer */}
+        {/* Total Expenses (opens drawer) */}
         <Card
           className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           role="button"
           tabIndex={0}
           aria-label="Open expense breakdown"
-          onClick={openDrawer}
+          onClick={() => setOpenExpenses(true)}
           onKeyDown={kpiKeyHandler}
           title="Click to view expense breakdown"
         >
@@ -249,49 +178,29 @@ export default function ExecutiveStyleKPIs({
           </CardContent>
         </Card>
 
-        {/* Insurance Revenue — contextual link */}
-        <Link href={`/insurance-providers?from=${insuranceWindow.fromISO}&to=${insuranceWindow.toISO}&bucket=month`}>
-          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD {Math.round(usdIncome).toLocaleString()}
-                  </p>
-                  <div className="flex items-center mt-1">
-                    {data?.changes?.incomeChangeUSD !== undefined ? (
-                      <span
-                        className={`text-xs font-medium tabular-nums ${
-                          data.changes.incomeChangeUSD > 0
-                            ? "text-emerald-700"
-                            : data.changes.incomeChangeUSD < 0
-                            ? "text-red-700"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {data.changes.incomeChangeUSD > 0 ? "+" : ""}
-                        {data.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                      </span>
-                    ) : (
-                      <span className="text-xs font-medium text-purple-600">
-                        {Object.keys(data?.insuranceBreakdown || {}).length === 1
-                          ? "1 provider"
-                          : `${Object.keys(data?.insuranceBreakdown || {}).length} providers`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-purple-50 p-1.5 rounded-lg">
-                  <Shield className="h-4 w-4 text-purple-600" />
+        {/* Insurance (USD) — NOT CLICKABLE */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  USD {Math.round(usdIncome).toLocaleString()}
+                </p>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Open detailed insurance analytics from the{" "}
+                  <span className="font-medium text-slate-700">sidebar</span>.
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </Link>
+              <div className="bg-purple-50 p-1.5 rounded-lg">
+                <Shield className="h-4 w-4 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Shared non-dimming drawer */}
+      {/* Shared drawer for expenses */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
