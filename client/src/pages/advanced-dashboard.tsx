@@ -1,9 +1,6 @@
-// ...imports...
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-// KEEP Link import if you still link Patient Volume elsewhere:
 import { Link } from "wouter";
-import { format } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,24 +10,24 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
-  TrendingUp, TrendingDown, DollarSign, Users, Shield,
-  Calendar as CalendarIcon, RefreshCw,
+  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
 } from "lucide-react";
+import { api } from "@/lib/queryClient";
 
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip as ReTooltip, ReferenceLine, Legend,
+  CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from "recharts";
 
-import { api } from "@/lib/queryClient";
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
-/* formatting helpers */
+// ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
@@ -38,11 +35,6 @@ const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
-
-/* dates */
-const dateToISO = (d: Date) => d.toISOString().slice(0, 10);
-const startOfMonth = (y: number, m1: number) => new Date(y, m1 - 1, 1);
-const endOfMonth = (y: number, m1: number) => new Date(y, m1, 0);
 
 export default function AdvancedDashboard() {
   const {
@@ -52,23 +44,44 @@ export default function AdvancedDashboard() {
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
 
-  const onChangeRange = (
-    r: "current-month" | "last-month" | "last-3-months" | "year" | "month-select" | "custom"
-  ) => setTimeRange(r);
+  // ---- NEW: “normalizedRange” keeps backend compatibility
+  // When user picks an arbitrary month via month-select, we still send range=current-month
+  // but include the explicit year/month they chose.
+  const normalizedRange =
+    timeRange === "month-select" ? "current-month" : timeRange;
 
+  // ---------- dropdown handlers ----------
+  const handleTimeRangeChange = (
+    range:
+      | "current-month"
+      | "last-month"
+      | "last-3-months"
+      | "year"
+      | "month-select"
+      | "custom"
+  ) => setTimeRange(range);
+
+  // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = [thisYear, thisYear - 1, thisYear - 2];
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
   const months = [
-    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
-    { label: "April", value: 4 },   { label: "May", value: 5 },      { label: "June", value: 6 },
-    { label: "July", value: 7 },    { label: "August", value: 8 },   { label: "September", value: 9 },
-    { label: "October", value: 10 },{ label: "November", value: 11 },{ label: "December", value: 12 },
+    { label: "January", value: 1 },
+    { label: "February", value: 2 },
+    { label: "March", value: 3 },
+    { label: "April", value: 4 },
+    { label: "May", value: 5 },
+    { label: "June", value: 6 },
+    { label: "July", value: 7 },
+    { label: "August", value: 8 },
+    { label: "September", value: 9 },
+    { label: "October", value: 10 },
+    { label: "November", value: 11 },
+    { label: "December", value: 12 },
   ];
 
-  /* queries */
+  // ---------- queries ----------
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
@@ -88,10 +101,7 @@ export default function AdvancedDashboard() {
     },
   });
 
-  const { data: departments } = useQuery({
-    queryKey: ["/api/departments"],
-    queryFn: async () => (await api.get("/api/departments")).data,
-  });
+  const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
   const { data: rawIncome } = useQuery({
     queryKey: [
@@ -112,59 +122,43 @@ export default function AdvancedDashboard() {
     },
   });
 
-  /* build income series */
-  type DayRow = {
-    day: number; label: string; fullDate: string;
-    amount: number; amountSSP: number; amountUSD: number;
-    amountSSPPlot: number | null; amountUSDPlot: number | null;
-  };
-
-  let incomeSeries: DayRow[] = [];
+  // ---------- build income series ----------
+  let incomeSeries: Array<{
+    day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
+  }> = [];
   if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
-    incomeSeries = (rawIncome as any[]).map((r: any, i: number) => ({
+    incomeSeries = rawIncome.map((r: any, i: number) => ({
       day: i + 1,
+      amount: Number(r.income ?? r.amount ?? 0),
+      amountUSD: Number(r.incomeUSD ?? 0),
+      amountSSP: Number(r.incomeSSP ?? (r.income ?? r.amount ?? 0)),
       label: r.date,
       fullDate: r.date,
-      amount: Number(r.income ?? r.amount ?? 0),
-      amountSSP: Number(r.incomeSSP ?? r.income ?? r.amount ?? 0),
-      amountUSD: Number(r.incomeUSD ?? 0),
-      amountSSPPlot: null,
-      amountUSDPlot: null,
     }));
   } else {
-    const y = selectedYear, m = selectedMonth;
+    const y = selectedYear;
+    const m = selectedMonth;
     const daysInMonth = new Date(y, m, 0).getDate();
-    incomeSeries = Array.from({ length: daysInMonth }, (_, i) => {
-      const d = new Date(y, m - 1, i + 1);
-      return {
-        day: i + 1,
-        label: `${i + 1}`,
-        fullDate: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        amount: 0, amountSSP: 0, amountUSD: 0, amountSSPPlot: null, amountUSDPlot: null,
-      };
-    });
+    incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
+      day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
+      label: `${i + 1}`,
+      fullDate: new Date(y, m - 1, i + 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    }));
     if (Array.isArray(rawIncome)) {
       for (const r of rawIncome as any[]) {
         let d = (r as any).day;
         if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
         if (!d && (r as any).date) d = new Date((r as any).date).getDate();
         if (d >= 1 && d <= daysInMonth) {
-          const row = incomeSeries[d - 1];
-          row.amountUSD += Number((r as any).incomeUSD ?? 0);
-          row.amountSSP += Number((r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0);
-          row.amount += Number((r as any).income ?? (r as any).amount ?? 0);
+          incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
+          incomeSeries[d - 1].amountSSP += Number((r as any).incomeSSP ?? 0);
+          incomeSeries[d - 1].amount += Number((r as any).income ?? (r as any).amount ?? 0);
         }
       }
     }
   }
 
-  incomeSeries = incomeSeries.map(d => ({
-    ...d,
-    amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
-    amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
-  }));
-
-  /* aggregates */
+  // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
@@ -174,6 +168,17 @@ export default function AdvancedDashboard() {
   const showAvgLine = daysWithSSP >= 2;
   const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
 
+  // hide zero bars: null skips drawing
+  const chartData = useMemo(
+    () => incomeSeries.map(d => ({
+      ...d,
+      amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
+      amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
+    })),
+    [incomeSeries]
+  );
+
+  // X ticks: 1,5,10,15,20,25,last
   const xTicks = useMemo(() => {
     const n = incomeSeries.length;
     if (!n) return [];
@@ -181,6 +186,9 @@ export default function AdvancedDashboard() {
     if (!base.includes(n)) base.push(n);
     return base;
   }, [incomeSeries.length]);
+
+  const formatYAxisSSP = kfmt;
+  const formatYAxisUSD = kfmt;
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -197,42 +205,68 @@ export default function AdvancedDashboard() {
     );
   };
 
+  // loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex items-center space-x-2">
           <RefreshCw className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-lg">Loading dashboard…</span>
+          <span className="text-lg">Loading dashboard...</span>
         </div>
       </div>
     );
   }
 
+  // summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
 
+  const getPatientVolumeNavigation = () => {
+    const currentDate = new Date();
+    switch (timeRange) {
+      case "current-month": return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      case "last-month": {
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      }
+      case "last-3-months": {
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      }
+      case "year": return { year: currentDate.getFullYear(), month: 1 };
+      case "month-select": return { year: selectedYear, month: selectedMonth };
+      case "custom":
+        return customStartDate
+          ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
+          : { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      default: return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+    }
+  };
+
   return (
-    <div className="bg-white p-6 dashboard-content">
-      {/* Header */}
+    <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
+      {/* Header + date filters */}
       <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900">
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
               Executive Dashboard
             </h1>
             <div className="mt-1 flex items-center gap-4">
-              <p className="text-sm text-muted-foreground">
-                Key financials · {periodLabel}
-              </p>
+              <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
             </div>
           </div>
 
-          {/* Presets / Month-select / Custom */}
+          {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select value={timeRange} onValueChange={onChangeRange}>
+            {/* Quick range selector including new “Select Month…” */}
+            <Select
+              value={timeRange}
+              onValueChange={handleTimeRangeChange}
+            >
               <SelectTrigger className="h-9 w-[160px]">
                 <SelectValue />
               </SelectTrigger>
@@ -246,6 +280,7 @@ export default function AdvancedDashboard() {
               </SelectContent>
             </Select>
 
+            {/* If month-select: show Year + Month dropdowns */}
             {timeRange === "month-select" && (
               <>
                 <Select
@@ -278,16 +313,28 @@ export default function AdvancedDashboard() {
               </>
             )}
 
+            {/* If custom: show start/end date pickers */}
             {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
                     <DatePicker
                       mode="single"
                       numberOfMonths={1}
@@ -303,12 +350,23 @@ export default function AdvancedDashboard() {
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
                     <DatePicker
                       mode="single"
                       numberOfMonths={1}
@@ -334,17 +392,19 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(monthTotalSSP || sspIncome))}
+                  SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
                 </p>
-                {dashboardData?.changes?.incomeChangeSSP !== undefined && (
-                  <span className={`text-xs font-medium ${
-                    dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
-                    dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                  }`}>
-                    {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
-                    {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
-                  </span>
-                )}
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
                 {dashboardData?.changes?.incomeChangeSSP !== undefined &&
@@ -357,23 +417,26 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Total Expenses */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(totalExpenses))}
+                  SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
                 </p>
-                {dashboardData?.changes?.expenseChangeSSP !== undefined && (
-                  <span className={`text-xs font-medium ${
-                    dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
-                    dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
-                  }`}>
-                    {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
-                    {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
-                  </span>
-                )}
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
+                      dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="bg-red-50 p-1.5 rounded-lg">
                 {dashboardData?.changes?.expenseChangeSSP !== undefined &&
@@ -392,17 +455,19 @@ export default function AdvancedDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(sspNetIncome))}
+                  SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
                 </p>
-                {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
-                  <span className={`text-xs font-medium ${
-                    dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
-                    dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                  }`}>
-                    {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
-                    {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
-                  </span>
-                )}
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="bg-blue-50 p-1.5 rounded-lg">
                 <DollarSign className="h-4 w-4 text-blue-600" />
@@ -411,28 +476,45 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Insurance (USD) — NOT CLICKABLE */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-          <CardContent className="p-4 sm:p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  USD {fmtUSD(Math.round(usdIncome))}
-                </p>
-                <div className="mt-1 text-[11px] text-slate-500">
-                  Open detailed insurance analytics from the <span className="font-medium text-slate-700">sidebar</span>.
+        {/* Insurance (USD) */}
+        <Link href={`/insurance-providers?range=${normalizedRange}${
+          timeRange === "custom" && customStartDate && customEndDate
+            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+            : `&year=${selectedYear}&month=${selectedMonth}`
+        }`}>
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-4 sm:p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                      <span className={`text-xs font-medium ${
+                        dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
+                        dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                      }`}>
+                        {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
+                        {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-purple-600">
+                        {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
+                          ? "1 provider" : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
               </div>
-              <div className="bg-purple-50 p-1.5 rounded-lg">
-                <Shield className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* Patient Volume (keep linking if desired) */}
-        <Link href={`/patient-volume?view=monthly&year=${new Date().getFullYear()}&month=${new Date().getMonth() + 1}&range=${normalizedRange}`}>
+        {/* Patient Volume */}
+        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
@@ -445,17 +527,16 @@ export default function AdvancedDashboard() {
                     <span className="text-xs font-medium text-teal-600">Current period</span>
                   </div>
                 </div>
-                <div className="bg-teal-50 p-1.5 rounded-lg">
-                  <Users className="h-4 w-4 text-teal-600" />
-                </div>
+                <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
               </div>
             </CardContent>
           </Card>
         </Link>
       </div>
 
-      {/* Main grid (chart + panels) — unchanged */}
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
+        {/* Revenue Analytics */}
         <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -467,21 +548,91 @@ export default function AdvancedDashboard() {
               <div className="space-y-0">
                 <div className="h-80 lg:h-[420px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={incomeSeries} margin={{ top: 20, right: hasAnyUSD ? 60 : 20, left: 10, bottom: 30 }} barGap={6} barCategoryGap="28%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: hasAnyUSD ? 60 : 20, left: 10, bottom: 30 }}
+                      barGap={6}
+                      barCategoryGap="28%"
+                    >
                       <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
                       <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "10px" }} />
-                      <XAxis dataKey="day" ticks={xTicks} tickFormatter={(v: number) => String(v)} axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }} tickLine={false} tick={{ fontSize: 12, fill: "#64748b" }} height={40} />
-                      <YAxis yAxisId="ssp" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#0f766e" }} tickFormatter={kfmt} label={{ value: "Revenue (SSP)", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#0f766e", fontSize: 11 } }} />
-                      <YAxis yAxisId="usd" hide={!hasAnyUSD} orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#1d4ed8" }} tickFormatter={kfmt} label={{ value: "Revenue (USD)", angle: 90, position: "insideRight", offset: 8, style: { fill: "#1d4ed8", fontSize: 11 } }} />
-                      <ReTooltip content={<CustomTooltip />} />
+                      <XAxis
+                        dataKey="day"
+                        ticks={xTicks}
+                        tickFormatter={(v: number) => String(v)}
+                        axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        height={40}
+                      />
+                      {/* Left Y axis (SSP) */}
+                      <YAxis
+                        yAxisId="ssp"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: "#0f766e" }}
+                        tickFormatter={formatYAxisSSP}
+                        label={{ value: "Revenue (SSP)", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#0f766e", fontSize: 11 } }}
+                      />
+                      {/* Right Y axis (USD) */}
+                      <YAxis
+                        yAxisId="usd"
+                        hide={!hasAnyUSD}
+                        orientation="right"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: "#1d4ed8" }}
+                        tickFormatter={formatYAxisUSD}
+                        label={{ value: "Revenue (USD)", angle: 90, position: "insideRight", offset: 8, style: { fill: "#1d4ed8", fontSize: 11 } }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      {/* Avg line (SSP only) */}
                       {showAvgLine && monthlyAvgSSP > 0 && (
-                        <ReferenceLine yAxisId="ssp" y={monthlyAvgSSP} stroke="#0d9488" strokeWidth={1} strokeDasharray="4 2"
-                          label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 8 }} />
+                        <ReferenceLine
+                          yAxisId="ssp"
+                          y={monthlyAvgSSP}
+                          stroke="#0d9488"
+                          strokeWidth={1}
+                          strokeDasharray="4 2"
+                          label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 8 }}
+                        />
                       )}
+                      {/* Thick grouped bars */}
                       <Bar yAxisId="ssp" dataKey="amountSSPPlot" name="SSP" fill="#14b8a6" barSize={24} radius={[4, 4, 0, 0]} />
-                      {hasAnyUSD && <Bar yAxisId="usd" dataKey="amountUSDPlot" name="USD" fill="#0ea5e9" barSize={24} radius={[4, 4, 0, 0]} />}
+                      {hasAnyUSD && (
+                        <Bar yAxisId="usd" dataKey="amountUSDPlot" name="USD" fill="#0ea5e9" barSize={24} radius={[4, 4, 0, 0]} />
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+
+                {/* Totals */}
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
+                      <div className="space-y-1">
+                        {monthTotalSSP > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">SSP {nf0.format(monthTotalSSP)}</span>}
+                        {monthTotalUSD > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">USD {fmtUSD(monthTotalUSD)}</span>}
+                        {monthTotalSSP === 0 && monthTotalUSD === 0 && <span className="text-sm text-slate-500">No revenue in this range</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {nf0.format(peakSSP)}</span>
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200 text-xs px-1.5 py-0.5">Peak</Badge>
+                      </div>
+                      {peakDaySSP && <span className="text-xs text-slate-500 mt-1">{peakDaySSP.fullDate}</span>}
+                    </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {nf0.format(monthlyAvgSSP)}</span>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs px-1.5 py-0.5">Avg</Badge>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -496,6 +647,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
+        {/* Departments Panel */}
         <div className="lg:col-span-1">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
@@ -504,9 +656,80 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Quick Actions & System Status kept as-is */}
+        {/* Quick Actions — sits below chart (spans 2) */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <a href="/transactions" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Add Transaction</span>
+                    <span className="text-xs text-slate-500">Record new income or expense</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/patient-volume" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Patient Volume</span>
+                    <span className="text-xs text-slate-500">Update patient count</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/reports" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">Monthly Reports</span>
+                    <span className="text-xs text-slate-500">View generated reports</span>
+                  </div>
+                </Button>
+              </a>
+              <a href="/users" className="block">
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-slate-900">User Management</span>
+                    <span className="text-xs text-slate-500">Manage user accounts</span>
+                  </div>
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System Status — sits under Departments */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Database</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Last Sync</span>
+                <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+                  {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">Active Users</span>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Expenses drawer */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
