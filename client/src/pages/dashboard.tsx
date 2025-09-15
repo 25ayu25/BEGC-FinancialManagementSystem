@@ -15,6 +15,7 @@ import { api } from "@/lib/queryClient";
 import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
+import MonthlyIncome from "@/components/dashboard/monthly-income";
 import { Link } from "wouter";
 
 type TimeRange =
