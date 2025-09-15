@@ -46,7 +46,7 @@ function computeWindow(
   const out: { y: number; m: number }[] = [];
 
   if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
-    return [{ y: year, m: month }]; // show only one month on the chart
+    return [{ y: year, m: month }]; // single month on the chart
   }
 
   if (timeRange === "year") {
@@ -114,7 +114,7 @@ export default function MonthlyIncome({
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
-  // for non-month views, fetch once for the whole span and aggregate by month
+  // overall span for non-single-month windows
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -125,8 +125,11 @@ export default function MonthlyIncome({
     return new Date(last.y, last.m, 0);
   }, [months]);
 
-  const useTrendsEndpoint =
+  const isSingleMonth =
     timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month";
+
+  const monthStart = useMemo(() => new Date(selectedYear, selectedMonth - 1, 1), [selectedYear, selectedMonth]);
+  const monthEnd   = useMemo(() => new Date(selectedYear, selectedMonth, 0), [selectedYear, selectedMonth]);
 
   // ---- data queries ----
   const { data = [], isLoading } = useQuery({
@@ -139,29 +142,38 @@ export default function MonthlyIncome({
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      if (useTrendsEndpoint) {
-        // ✅ single-month: rely on server’s daily income trends (more reliable for month windows)
-        const { data } = await api.get(
-          `/api/income-trends/${selectedYear}/${selectedMonth}?range=current-month`
-        );
-        // expect array of daily rows with incomeSSP/incomeUSD (names may vary; normalize)
-        const days = Array.isArray(data) ? data : data?.data || [];
-        const totals = days.reduce(
-          (acc: { ssp: number; usd: number }, r: any) => {
-            const ssp = Number(r.incomeSSP ?? r.ssp ?? r.amountSSP ?? 0);
-            const usd = Number(r.incomeUSD ?? r.usd ?? r.amountUSD ?? 0);
-            acc.ssp += ssp;
-            acc.usd += usd;
-            return acc;
-          },
-          { ssp: 0, usd: 0 }
-        );
-        return [{ label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp: totals.ssp, usd: totals.usd }];
+      // SINGLE MONTH → try trends first; if empty/zero, fallback to transactions
+      if (isSingleMonth) {
+        const qs = `range=custom&startDate=${format(monthStart, "yyyy-MM-dd")}&endDate=${format(monthEnd, "yyyy-MM-dd")}`;
+        const { data } = await api.get(`/api/income-trends/${selectedYear}/${selectedMonth}?${qs}`);
+        const rows = Array.isArray(data) ? data : data?.data || [];
+
+        // aggregate rows defensively (server fields vary)
+        let ssp = 0, usd = 0;
+        for (const r of rows) {
+          ssp += Number(r.incomeSSP ?? r.amountSSP ?? r.ssp ?? r.income ?? 0);
+          usd += Number(r.incomeUSD ?? r.amountUSD ?? r.usd ?? 0);
+        }
+
+        if (ssp > 0 || usd > 0) {
+          return [{ label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd }];
+        }
+
+        // fallback: compute from transactions
+        const startISO = format(monthStart, "yyyy-MM-dd");
+        const endISO   = format(monthEnd, "yyyy-MM-dd");
+        const tx = await fetchTransactions(startISO, endISO);
+        for (const t of tx as any[]) {
+          const amount = Number(t.amount ?? 0);
+          const cur = normCurrency(t.currency);
+          if (cur === "USD") usd += amount; else ssp += amount;
+        }
+        return [{ label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd }];
       }
 
-      // other windows: fetch transactions and bucket client-side by month
+      // MULTI-MONTH → fetch once and bucket by month
       const startISO = format(spanStart, "yyyy-MM-dd");
-      const endISO = format(spanEnd, "yyyy-MM-dd");
+      const endISO   = format(spanEnd, "yyyy-MM-dd");
       const rows = await fetchTransactions(startISO, endISO);
 
       // initialize map with all requested buckets (keeps empty months visible)
@@ -172,8 +184,7 @@ export default function MonthlyIncome({
       });
 
       for (const t of rows as any[]) {
-        const rawDate =
-          t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
+        const rawDate = t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
         const d = rawDate ? new Date(rawDate) : null;
         if (!d || Number.isNaN(d.getTime())) continue;
         const y = d.getFullYear();
