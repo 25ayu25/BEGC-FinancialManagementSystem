@@ -2,11 +2,19 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
+
+/* -------------------------------- Types -------------------------------- */
 
 type TimeRange =
   | "current-month"
@@ -18,15 +26,37 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;
-  selectedMonth: number; // 1..12
+  selectedYear: number;   // 4-digit year
+  selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
 
-const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+/* ----------------------------- Constants ------------------------------ */
+
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
+/* -------------------------------- Utils -------------------------------- */
+
+const normCurrency = (x: any) =>
+  String(x ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
+
+/** Which months to draw on the chart, as {y, m} buckets. */
 function computeWindow(
   timeRange: TimeRange,
   year: number,
@@ -35,13 +65,21 @@ function computeWindow(
   customEnd?: Date
 ) {
   const out: { y: number; m: number }[] = [];
-  if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
+
+  // Single-month modes → only one bucket
+  if (
+    timeRange === "month-select" ||
+    timeRange === "current-month" ||
+    timeRange === "last-month"
+  ) {
     return [{ y: year, m: month }];
   }
+
   if (timeRange === "year") {
     for (let m = 1; m <= 12; m++) out.push({ y: year, m });
     return out;
   }
+
   if (timeRange === "last-3-months") {
     const end = new Date(year, month - 1, 1);
     for (let k = 2; k >= 0; k--) {
@@ -50,6 +88,7 @@ function computeWindow(
     }
     return out;
   }
+
   if (timeRange === "custom" && customStart && customEnd) {
     let d = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
     const finish = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
@@ -59,15 +98,19 @@ function computeWindow(
     }
     return out;
   }
+
+  // Fallback: the whole selected year
   for (let m = 1; m <= 12; m++) out.push({ y: year, m });
   return out;
 }
 
+/** Fetch income transactions within a span (handles pagination). */
 async function fetchTransactions(startISO: string, endISO: string) {
   const pageSize = 1000;
   let page = 1;
   let hasMore = true;
   const all: any[] = [];
+
   while (hasMore) {
     const { data } = await api.get(
       `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`
@@ -81,7 +124,7 @@ async function fetchTransactions(startISO: string, endISO: string) {
   return all;
 }
 
-const normCurrency = (x: any) => String(x ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
+/* ------------------------------- Component ------------------------------ */
 
 export default function MonthlyIncome({
   timeRange,
@@ -91,10 +134,18 @@ export default function MonthlyIncome({
   customEndDate,
 }: Props) {
   const months = useMemo(
-    () => computeWindow(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate),
+    () =>
+      computeWindow(
+        timeRange,
+        selectedYear,
+        selectedMonth,
+        customStartDate,
+        customEndDate
+      ),
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
+  // Span for multi-month windows
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -106,10 +157,18 @@ export default function MonthlyIncome({
   }, [months]);
 
   const isSingleMonth =
-    timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month";
+    timeRange === "month-select" ||
+    timeRange === "current-month" ||
+    timeRange === "last-month";
 
-  const monthStart = useMemo(() => new Date(selectedYear, selectedMonth - 1, 1), [selectedYear, selectedMonth]);
-  const monthEnd   = useMemo(() => new Date(selectedYear, selectedMonth, 0), [selectedYear, selectedMonth]);
+  const monthStart = useMemo(
+    () => new Date(selectedYear, selectedMonth - 1, 1),
+    [selectedYear, selectedMonth]
+  );
+  const monthEnd = useMemo(
+    () => new Date(selectedYear, selectedMonth, 0),
+    [selectedYear, selectedMonth]
+  );
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
@@ -121,47 +180,79 @@ export default function MonthlyIncome({
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      // ---- SINGLE MONTH: trends first, fallback to transactions
+      /* ---------- SINGLE MONTH: trends first, fallback to transactions ---------- */
       if (isSingleMonth) {
-        const qs = `range=custom&startDate=${format(monthStart, "yyyy-MM-dd")}&endDate=${format(monthEnd, "yyyy-MM-dd")}`;
-        const { data } = await api.get(`/api/income-trends/${selectedYear}/${selectedMonth}?${qs}`);
-        const rows = Array.isArray(data) ? data : data?.data || [];
-        let ssp = 0, usd = 0;
-        for (const r of rows) {
-          ssp += Number(r.incomeSSP ?? r.amountSSP ?? r.ssp ?? r.income ?? 0);
-          usd += Number(r.incomeUSD ?? r.amountUSD ?? r.usd ?? 0);
+        const qs = `range=custom&startDate=${format(
+          monthStart,
+          "yyyy-MM-dd"
+        )}&endDate=${format(monthEnd, "yyyy-MM-dd")}`;
+
+        // Try server daily trends first (usually most accurate for a month)
+        try {
+          const { data } = await api.get(
+            `/api/income-trends/${selectedYear}/${selectedMonth}?${qs}`
+          );
+          const rows = Array.isArray(data) ? data : data?.data || [];
+          let ssp = 0;
+          let usd = 0;
+          for (const r of rows) {
+            ssp += Number(
+              r.incomeSSP ?? r.amountSSP ?? r.ssp ?? r.income ?? 0
+            );
+            usd += Number(r.incomeUSD ?? r.amountUSD ?? r.usd ?? 0);
+          }
+          if (ssp > 0 || usd > 0) {
+            return [
+              {
+                label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`,
+                ssp,
+                usd,
+              },
+            ];
+          }
+        } catch {
+          // swallow and fall back to transactions
         }
-        if (ssp > 0 || usd > 0) {
-          return [{ label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd }];
-        }
-        const startISO = format(monthStart, "yyyy-MM-dd");
-        const endISO   = format(monthEnd, "yyyy-MM-dd");
-        const tx = await fetchTransactions(startISO, endISO);
+
+        // Fallback: sum income transactions for that month
+        const tx = await fetchTransactions(
+          format(monthStart, "yyyy-MM-dd"),
+          format(monthEnd, "yyyy-MM-dd")
+        );
+
+        let ssp = 0;
+        let usd = 0;
         for (const t of tx as any[]) {
           const amount = Number(t.amount ?? 0);
           const cur = normCurrency(t.currency);
-          if (cur === "USD") usd += amount; else ssp += amount;
+          if (cur === "USD") usd += amount;
+          else ssp += amount;
         }
-        return [{ label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd }];
+        return [
+          { label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd },
+        ];
       }
 
-      // ---- MULTI-MONTH: transactions bucketed by month + merge insurance USD
+      /* ---------- MULTI-MONTH: bucket transactions + merge insurance USD ---------- */
+
+      // 1) Base series from transactions
       const startISO = format(spanStart, "yyyy-MM-dd");
-      const endISO   = format(spanEnd, "yyyy-MM-dd");
+      const endISO = format(spanEnd, "yyyy-MM-dd");
       const rows = await fetchTransactions(startISO, endISO);
 
-      // start with empty buckets for all months in the window
+      // init buckets (keeps empty months visible)
       const map = new Map<string, { label: string; ssp: number; usd: number }>();
       months.forEach(({ y, m }) => {
         const key = `${y}-${String(m).padStart(2, "0")}`;
         map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
       });
 
-      // 1) add income transactions
       for (const t of rows as any[]) {
-        const rawDate = t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
+        const rawDate =
+          t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
         const d = rawDate ? new Date(rawDate) : null;
         if (!d || Number.isNaN(d.getTime())) continue;
+
         const y = d.getFullYear();
         const m = d.getMonth() + 1;
         const key = `${y}-${String(m).padStart(2, "0")}`;
@@ -173,24 +264,31 @@ export default function MonthlyIncome({
         else map.get(key)!.ssp += amount;
       }
 
-      // 2) merge insurance USD per month (covers months with only insurance USD)
-      const normalizedRange = timeRange; // same values your pages use
-      let insUrl = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
+      // 2) Merge insurance USD per month (covers months with only insurance USD)
+      //    Uses the same 'range' semantics your pages already send.
+      let insUrl = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
-        insUrl += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+        insUrl += `&startDate=${format(
+          customStartDate,
+          "yyyy-MM-dd"
+        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       try {
-        const ins = await api.get(insUrl);
-        const list: Array<{ year: number; month: number; usd: number }> =
-          ins?.data?.data || ins?.data || [];
-        for (const row of list) {
-          const key = `${row.year}-${String(row.month).padStart(2, "0")}`;
-          if (map.has(key)) {
-            map.get(key)!.usd += Number(row.usd || 0);
+        const res = await api.get(insUrl);
+        const list:
+          | Array<{ year: number; month: number; usd: number }>
+          | undefined = res?.data?.data || res?.data;
+
+        if (Array.isArray(list)) {
+          for (const row of list) {
+            const key = `${row.year}-${String(row.month).padStart(2, "0")}`;
+            if (map.has(key)) {
+              map.get(key)!.usd += Number(row.usd || 0);
+            }
           }
         }
       } catch {
-        // if API is not available, just skip merging
+        // if the API is absent or errors, skip merging (chart still shows tx income)
       }
 
       return Array.from(map.values());
@@ -201,8 +299,12 @@ export default function MonthlyIncome({
   const totalUSD = data.reduce((s: number, r: any) => s + (r.usd || 0), 0);
   const peakSSP = Math.max(0, ...data.map((r: any) => r.ssp || 0));
   const peakUSD = Math.max(0, ...data.map((r: any) => r.usd || 0));
-  const peakSSPLabel = data.find((r: any) => (r.ssp || 0) === peakSSP)?.label ?? "—";
-  const peakUSDLabel = data.find((r: any) => (r.usd || 0) === peakUSD)?.label ?? "—";
+  const peakSSPLabel =
+    data.find((r: any) => (r.ssp || 0) === peakSSP)?.label ?? "—";
+  const peakUSDLabel =
+    data.find((r: any) => (r.usd || 0) === peakUSD)?.label ?? "—";
+
+  /* ------------------------------- Render -------------------------------- */
 
   return (
     <Card className="border-0 shadow-md bg-white">
@@ -211,10 +313,16 @@ export default function MonthlyIncome({
           Monthly Income
         </CardTitle>
       </CardHeader>
+
       <CardContent className="pt-2">
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 28 }} barGap={6} barCategoryGap="28%">
+            <BarChart
+              data={data}
+              margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
+              barGap={6}
+              barCategoryGap="28%"
+            >
               <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -226,24 +334,51 @@ export default function MonthlyIncome({
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#64748b" }}
-                tickFormatter={(v: number) => (v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v))}
+                tickFormatter={(v: number) =>
+                  v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
+                }
               />
-              <Tooltip formatter={(val: any, name: any) => [nf0.format(Math.round(Number(val))), name === "ssp" ? "SSP" : "USD"]}/>
+              <Tooltip
+                formatter={(val: any, name: any) => {
+                  const key = String(name).toLowerCase(); // normalize SSP/USD
+                  const label = key.includes("ssp") ? "SSP" : "USD";
+                  return [nf0.format(Math.round(Number(val))), label];
+                }}
+              />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="ssp" name="SSP" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="usd" name="USD" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+              {/* SSP */}
+              <Bar
+                dataKey="ssp"
+                name="SSP"
+                fill="#14b8a6"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
+              {/* USD */}
+              <Bar
+                dataKey="usd"
+                name="USD"
+                fill="#0ea5e9"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
+        {/* Quick totals */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
           <div className="text-center">
             <p className="text-xs text-slate-500">Total SSP</p>
-            <p className="text-sm font-semibold tabular-nums">SSP {nf0.format(totalSSP)}</p>
+            <p className="text-sm font-semibold tabular-nums">
+              SSP {nf0.format(totalSSP)}
+            </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Total USD</p>
-            <p className="text-sm font-semibold tabular-nums">USD {nf0.format(totalUSD)}</p>
+            <p className="text-sm font-semibold tabular-nums">
+              USD {nf0.format(totalUSD)}
+            </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Peak (SSP)</p>
@@ -255,7 +390,11 @@ export default function MonthlyIncome({
           </div>
         </div>
 
-        {isLoading && <div className="text-center text-slate-500 text-sm mt-3">Loading monthly income…</div>}
+        {isLoading && (
+          <div className="text-center text-slate-500 text-sm mt-3">
+            Loading monthly income…
+          </div>
+        )}
       </CardContent>
     </Card>
   );
