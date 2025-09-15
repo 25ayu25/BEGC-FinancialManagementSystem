@@ -31,10 +31,9 @@ type Props = {
 };
 
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
-/** Compute the months to display, given the current range & selection. */
+/** Build a list of (y,m) buckets we want to plot. */
 function computeWindow(
   timeRange: TimeRange,
   year: number,
@@ -42,8 +41,12 @@ function computeWindow(
   customStart?: Date,
   customEnd?: Date
 ) {
-  // Return an array of { y, m } pairs (1..12).
   const out: { y: number; m: number }[] = [];
+
+  if (timeRange === "month-select") {
+    // ✅ Show ONLY the explicitly selected month
+    return [{ y: year, m: month }];
+  }
 
   if (timeRange === "year") {
     for (let m = 1; m <= 12; m++) out.push({ y: year, m });
@@ -60,7 +63,6 @@ function computeWindow(
   }
 
   if (timeRange === "custom" && customStart && customEnd) {
-    // inclusive start..end, month by month
     let d = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
     const finish = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
     while (d <= finish) {
@@ -70,12 +72,17 @@ function computeWindow(
     return out;
   }
 
-  // current-month / last-month / month-select → show the whole selected year for a clean "monthly" view
+  // current-month / last-month → show only that month’s bucket
+  if (timeRange === "current-month" || timeRange === "last-month") {
+    return [{ y: year, m: month }];
+  }
+
+  // fallback: selected year
   for (let m = 1; m <= 12; m++) out.push({ y: year, m });
   return out;
 }
 
-/** Fetch all income transactions for the date window (paginate if needed) */
+/** Fetch income transactions for a span (handles pagination). */
 async function fetchIncomeForWindow(startISO: string, endISO: string) {
   const pageSize = 1000;
   let page = 1;
@@ -85,12 +92,22 @@ async function fetchIncomeForWindow(startISO: string, endISO: string) {
   while (hasMore) {
     const url = `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`;
     const { data } = await api.get(url);
-    all.push(...(data?.transactions || []));
+    const rows = data?.transactions || [];
+    all.push(...rows);
     hasMore = Boolean(data?.hasMore);
     page += 1;
-    if (!data?.transactions?.length) break;
+    if (!rows.length) break;
   }
   return all;
+}
+
+/** Robust date parser for various server field names. */
+function getTxDate(tx: any): Date | null {
+  const raw =
+    tx?.dateISO || tx?.date || tx?.createdAt || tx?.created_at || tx?.timestamp;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 export default function MonthlyIncome({
@@ -105,7 +122,7 @@ export default function MonthlyIncome({
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
-  // Overall date span to fetch once
+  // Fetch a single span covering all displayed months
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -113,8 +130,7 @@ export default function MonthlyIncome({
 
   const spanEnd = useMemo(() => {
     const last = months[months.length - 1];
-    // last day of that month
-    return new Date(last.y, last.m, 0);
+    return new Date(last.y, last.m, 0); // last day of last month
   }, [months]);
 
   const { data: rows = [], isLoading } = useQuery({
@@ -131,7 +147,7 @@ export default function MonthlyIncome({
     },
   });
 
-  // Aggregate to {monthLabel, ssp, usd}
+  // Aggregate to {label, ssp, usd} per month
   const series = useMemo(() => {
     const map = new Map<string, { label: string; ssp: number; usd: number }>();
     months.forEach(({ y, m }) => {
@@ -140,20 +156,30 @@ export default function MonthlyIncome({
     });
 
     for (const t of rows as any[]) {
-      const d = new Date(t.date || t.createdAt || t.timestamp);
+      const d = getTxDate(t);
+      if (!d) continue;
       const y = d.getFullYear();
       const m = d.getMonth() + 1;
       const key = `${y}-${String(m).padStart(2, "0")}`;
       if (!map.has(key)) continue;
-      const entry = map.get(key)!;
-      const amount = Number(t.amount || 0);
-      const currency = (t.currency || "SSP").toUpperCase();
-      if (currency === "USD") entry.usd += amount;
-      else entry.ssp += amount;
+
+      const amount = Number(t.amount ?? 0);
+      // normalize currency strings like 'usd', 'USD ', 'Us$', etc.
+      const cur = String(t.currency ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
+      if (cur === "USD") map.get(key)!.usd += amount;
+      else map.get(key)!.ssp += amount;
     }
 
     return Array.from(map.values());
   }, [rows, months]);
+
+  // Totals and peaks
+  const totalSSP = series.reduce((s, r) => s + r.ssp, 0);
+  const totalUSD = series.reduce((s, r) => s + r.usd, 0);
+  const peakSSPVal = Math.max(0, ...series.map((r) => r.ssp));
+  const peakUSDVal = Math.max(0, ...series.map((r) => r.usd));
+  const peakSSPLabel = series.find((r) => r.ssp === peakSSPVal)?.label ?? "—";
+  const peakUSDLabel = series.find((r) => r.usd === peakUSDVal)?.label ?? "—";
 
   return (
     <Card className="border-0 shadow-md bg-white">
@@ -162,38 +188,39 @@ export default function MonthlyIncome({
           Monthly Income
         </CardTitle>
       </CardHeader>
+
       <CardContent className="pt-2">
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={series}
-              margin={{ top: 8, right: 16, left: 0, bottom: 24 }}
+              margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
               barGap={6}
-              barCategoryGap="24%"
+              barCategoryGap="28%"
             >
               <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
               <XAxis
                 dataKey="label"
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 interval={0}
-                angle={-35}
-                textAnchor="end"
-                height={50}
+                angle={series.length > 6 ? -30 : 0}
+                textAnchor={series.length > 6 ? "end" : "middle"}
+                height={series.length > 6 ? 42 : 20}
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 tickFormatter={(v: number) => (v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v))}
               />
               <Tooltip
-                formatter={(val: any, name: any) =>
-                  [nf0.format(Math.round(Number(val))), name === "ssp" ? "SSP" : "USD"]
-                }
+                formatter={(val: any, name: any) => [
+                  nf0.format(Math.round(Number(val))),
+                  name === "ssp" ? "SSP" : "USD",
+                ]}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              {/* SSP bars (left axis default) */}
-              <Bar dataKey="ssp" name="SSP" radius={[4, 4, 0, 0]} />
-              {/* USD bars */}
-              <Bar dataKey="usd" name="USD" radius={[4, 4, 0, 0]} />
+              {/* ✔ Modern colors */}
+              <Bar dataKey="ssp" name="SSP" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="usd" name="USD" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -203,31 +230,29 @@ export default function MonthlyIncome({
           <div className="text-center">
             <p className="text-xs text-slate-500">Total SSP</p>
             <p className="text-sm font-semibold tabular-nums">
-              SSP {nf0.format(series.reduce((s, r) => s + r.ssp, 0))}
+              SSP {nf0.format(totalSSP)}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Total USD</p>
             <p className="text-sm font-semibold tabular-nums">
-              USD {nf0.format(series.reduce((s, r) => s + r.usd, 0))}
+              USD {nf0.format(totalUSD)}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Peak (SSP)</p>
-            <p className="text-sm font-semibold tabular-nums">
-              {series.length ? `${series[series.findIndex(r => r.ssp === Math.max(...series.map(x=>x.ssp)))].label}` : "—"}
-            </p>
+            <p className="text-sm font-semibold tabular-nums">{peakSSPLabel}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Peak (USD)</p>
-            <p className="text-sm font-semibold tabular-nums">
-              {series.length ? `${series[series.findIndex(r => r.usd === Math.max(...series.map(x=>x.usd)))].label}` : "—"}
-            </p>
+            <p className="text-sm font-semibold tabular-nums">{peakUSDLabel}</p>
           </div>
         </div>
 
         {isLoading && (
-          <div className="text-center text-slate-500 text-sm mt-3">Loading monthly income…</div>
+          <div className="text-center text-slate-500 text-sm mt-3">
+            Loading monthly income…
+          </div>
         )}
       </CardContent>
     </Card>
