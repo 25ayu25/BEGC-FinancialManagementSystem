@@ -33,7 +33,8 @@ type Props = {
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
-/** Build a list of (y,m) buckets we want to plot. */
+/* -------------------- helpers -------------------- */
+
 function computeWindow(
   timeRange: TimeRange,
   year: number,
@@ -41,11 +42,11 @@ function computeWindow(
   customStart?: Date,
   customEnd?: Date
 ) {
+  // which month buckets we want to show
   const out: { y: number; m: number }[] = [];
 
-  if (timeRange === "month-select") {
-    // ✅ Show ONLY the explicitly selected month
-    return [{ y: year, m: month }];
+  if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
+    return [{ y: year, m: month }]; // show only one month on the chart
   }
 
   if (timeRange === "year") {
@@ -72,26 +73,22 @@ function computeWindow(
     return out;
   }
 
-  // current-month / last-month → show only that month’s bucket
-  if (timeRange === "current-month" || timeRange === "last-month") {
-    return [{ y: year, m: month }];
-  }
-
-  // fallback: selected year
+  // fallback: whole selected year
   for (let m = 1; m <= 12; m++) out.push({ y: year, m });
   return out;
 }
 
-/** Fetch income transactions for a span (handles pagination). */
-async function fetchIncomeForWindow(startISO: string, endISO: string) {
+async function fetchTransactions(startISO: string, endISO: string) {
+  // generic income fetch with pagination
   const pageSize = 1000;
   let page = 1;
   let hasMore = true;
   const all: any[] = [];
 
   while (hasMore) {
-    const url = `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`;
-    const { data } = await api.get(url);
+    const { data } = await api.get(
+      `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`
+    );
     const rows = data?.transactions || [];
     all.push(...rows);
     hasMore = Boolean(data?.hasMore);
@@ -101,14 +98,9 @@ async function fetchIncomeForWindow(startISO: string, endISO: string) {
   return all;
 }
 
-/** Robust date parser for various server field names. */
-function getTxDate(tx: any): Date | null {
-  const raw =
-    tx?.dateISO || tx?.date || tx?.createdAt || tx?.created_at || tx?.timestamp;
-  if (!raw) return null;
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? null : d;
-}
+const normCurrency = (x: any) => String(x ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
+
+/* -------------------- component -------------------- */
 
 export default function MonthlyIncome({
   timeRange,
@@ -122,7 +114,7 @@ export default function MonthlyIncome({
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
-  // Fetch a single span covering all displayed months
+  // for non-month views, fetch once for the whole span and aggregate by month
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -130,56 +122,81 @@ export default function MonthlyIncome({
 
   const spanEnd = useMemo(() => {
     const last = months[months.length - 1];
-    return new Date(last.y, last.m, 0); // last day of last month
+    return new Date(last.y, last.m, 0);
   }, [months]);
 
-  const { data: rows = [], isLoading } = useQuery({
+  const useTrendsEndpoint =
+    timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month";
+
+  // ---- data queries ----
+  const { data = [], isLoading } = useQuery({
     queryKey: [
       "monthly-income",
-      months.map((x) => `${x.y}-${x.m}`).join(","),
-      spanStart.toISOString(),
-      spanEnd.toISOString(),
+      timeRange,
+      selectedYear,
+      selectedMonth,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
+      if (useTrendsEndpoint) {
+        // ✅ single-month: rely on server’s daily income trends (more reliable for month windows)
+        const { data } = await api.get(
+          `/api/income-trends/${selectedYear}/${selectedMonth}?range=current-month`
+        );
+        // expect array of daily rows with incomeSSP/incomeUSD (names may vary; normalize)
+        const days = Array.isArray(data) ? data : data?.data || [];
+        const totals = days.reduce(
+          (acc: { ssp: number; usd: number }, r: any) => {
+            const ssp = Number(r.incomeSSP ?? r.ssp ?? r.amountSSP ?? 0);
+            const usd = Number(r.incomeUSD ?? r.usd ?? r.amountUSD ?? 0);
+            acc.ssp += ssp;
+            acc.usd += usd;
+            return acc;
+          },
+          { ssp: 0, usd: 0 }
+        );
+        return [{ label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp: totals.ssp, usd: totals.usd }];
+      }
+
+      // other windows: fetch transactions and bucket client-side by month
       const startISO = format(spanStart, "yyyy-MM-dd");
       const endISO = format(spanEnd, "yyyy-MM-dd");
-      return fetchIncomeForWindow(startISO, endISO);
+      const rows = await fetchTransactions(startISO, endISO);
+
+      // initialize map with all requested buckets (keeps empty months visible)
+      const map = new Map<string, { label: string; ssp: number; usd: number }>();
+      months.forEach(({ y, m }) => {
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
+      });
+
+      for (const t of rows as any[]) {
+        const rawDate =
+          t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
+        const d = rawDate ? new Date(rawDate) : null;
+        if (!d || Number.isNaN(d.getTime())) continue;
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        if (!map.has(key)) continue;
+
+        const amount = Number(t.amount ?? 0);
+        const cur = normCurrency(t.currency);
+        if (cur === "USD") map.get(key)!.usd += amount;
+        else map.get(key)!.ssp += amount;
+      }
+
+      return Array.from(map.values());
     },
   });
 
-  // Aggregate to {label, ssp, usd} per month
-  const series = useMemo(() => {
-    const map = new Map<string, { label: string; ssp: number; usd: number }>();
-    months.forEach(({ y, m }) => {
-      const key = `${y}-${String(m).padStart(2, "0")}`;
-      map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
-    });
-
-    for (const t of rows as any[]) {
-      const d = getTxDate(t);
-      if (!d) continue;
-      const y = d.getFullYear();
-      const m = d.getMonth() + 1;
-      const key = `${y}-${String(m).padStart(2, "0")}`;
-      if (!map.has(key)) continue;
-
-      const amount = Number(t.amount ?? 0);
-      // normalize currency strings like 'usd', 'USD ', 'Us$', etc.
-      const cur = String(t.currency ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
-      if (cur === "USD") map.get(key)!.usd += amount;
-      else map.get(key)!.ssp += amount;
-    }
-
-    return Array.from(map.values());
-  }, [rows, months]);
-
-  // Totals and peaks
-  const totalSSP = series.reduce((s, r) => s + r.ssp, 0);
-  const totalUSD = series.reduce((s, r) => s + r.usd, 0);
-  const peakSSPVal = Math.max(0, ...series.map((r) => r.ssp));
-  const peakUSDVal = Math.max(0, ...series.map((r) => r.usd));
-  const peakSSPLabel = series.find((r) => r.ssp === peakSSPVal)?.label ?? "—";
-  const peakUSDLabel = series.find((r) => r.usd === peakUSDVal)?.label ?? "—";
+  const totalSSP = data.reduce((s: number, r: any) => s + (r.ssp || 0), 0);
+  const totalUSD = data.reduce((s: number, r: any) => s + (r.usd || 0), 0);
+  const peakSSP = Math.max(0, ...data.map((r: any) => r.ssp || 0));
+  const peakUSD = Math.max(0, ...data.map((r: any) => r.usd || 0));
+  const peakSSPLabel = data.find((r: any) => (r.ssp || 0) === peakSSP)?.label ?? "—";
+  const peakUSDLabel = data.find((r: any) => (r.usd || 0) === peakUSD)?.label ?? "—";
 
   return (
     <Card className="border-0 shadow-md bg-white">
@@ -193,7 +210,7 @@ export default function MonthlyIncome({
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={series}
+              data={data}
               margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
               barGap={6}
               barCategoryGap="28%"
@@ -203,9 +220,9 @@ export default function MonthlyIncome({
                 dataKey="label"
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 interval={0}
-                angle={series.length > 6 ? -30 : 0}
-                textAnchor={series.length > 6 ? "end" : "middle"}
-                height={series.length > 6 ? 42 : 20}
+                angle={data.length > 6 ? -30 : 0}
+                textAnchor={data.length > 6 ? "end" : "middle"}
+                height={data.length > 6 ? 42 : 20}
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#64748b" }}
@@ -218,7 +235,6 @@ export default function MonthlyIncome({
                 ]}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              {/* ✔ Modern colors */}
               <Bar dataKey="ssp" name="SSP" fill="#14b8a6" radius={[4, 4, 0, 0]} />
               <Bar dataKey="usd" name="USD" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -229,15 +245,11 @@ export default function MonthlyIncome({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
           <div className="text-center">
             <p className="text-xs text-slate-500">Total SSP</p>
-            <p className="text-sm font-semibold tabular-nums">
-              SSP {nf0.format(totalSSP)}
-            </p>
+            <p className="text-sm font-semibold tabular-nums">SSP {nf0.format(totalSSP)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Total USD</p>
-            <p className="text-sm font-semibold tabular-nums">
-              USD {nf0.format(totalUSD)}
-            </p>
+            <p className="text-sm font-semibold tabular-nums">USD {nf0.format(totalUSD)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Peak (SSP)</p>
