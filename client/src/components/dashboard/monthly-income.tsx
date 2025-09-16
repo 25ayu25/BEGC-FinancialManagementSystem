@@ -9,6 +9,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
@@ -41,7 +42,7 @@ const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const normCurrency = (x: any) =>
   String(x ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
 
-/** Build the list of {y,m} buckets to show. */
+/** Which months to draw on the chart, as {y, m} buckets. */
 function computeWindow(
   timeRange: TimeRange,
   year: number,
@@ -51,8 +52,12 @@ function computeWindow(
 ) {
   const out: { y: number; m: number }[] = [];
 
-  // Single-month modes → single bucket
-  if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
+  // Single-month modes → only one bucket
+  if (
+    timeRange === "month-select" ||
+    timeRange === "current-month" ||
+    timeRange === "last-month"
+  ) {
     return [{ y: year, m: month }];
   }
 
@@ -80,7 +85,7 @@ function computeWindow(
     return out;
   }
 
-  // Fallback: whole selected year
+  // Fallback: the whole selected year
   for (let m = 1; m <= 12; m++) out.push({ y: year, m });
   return out;
 }
@@ -105,7 +110,7 @@ async function fetchTransactions(startISO: string, endISO: string) {
   return all;
 }
 
-/** Fetch insurance USD totals per month for current window. */
+/** Fetch insurance monthly USD for the current filter window. */
 async function fetchInsuranceMonthlyUSD(
   timeRange: TimeRange,
   selectedYear: number,
@@ -117,7 +122,12 @@ async function fetchInsuranceMonthlyUSD(
   if (timeRange === "custom" && start && end) {
     url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`;
   }
-  if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
+  // In single-month mode we still pass range=custom + exact dates so backend matches window.
+  if (
+    timeRange === "month-select" ||
+    timeRange === "current-month" ||
+    timeRange === "last-month"
+  ) {
     const s = start ?? new Date(selectedYear, selectedMonth - 1, 1);
     const e = end ?? new Date(selectedYear, selectedMonth, 0);
     url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=custom&startDate=${format(
@@ -134,21 +144,26 @@ async function fetchInsuranceMonthlyUSD(
       | number
       | undefined;
 
-    const map = new Map<string, number>();
     if (Array.isArray(list)) {
+      // return a map: "YYYY-MM" -> usd
+      const map = new Map<string, number>();
       for (const row of list) {
         map.set(`${row.year}-${String(row.month).padStart(2, "0")}`, Number(row.usd || 0));
       }
-    } else {
-      const single =
-        typeof list === "number"
-          ? list
-          : typeof list === "object" && list
-          ? Number((list as any).usd || 0)
-          : 0;
-      const key = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-      map.set(key, single);
+      return map;
     }
+
+    // some backends may return a single numeric or object for one month
+    const single =
+      typeof list === "number"
+        ? list
+        : typeof list === "object" && list
+        ? Number((list as any).usd || 0)
+        : 0;
+
+    const key = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+    const map = new Map<string, number>();
+    map.set(key, single);
     return map;
   } catch {
     return new Map<string, number>();
@@ -176,6 +191,7 @@ export default function MonthlyIncome({
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
+  // Span for multi-month windows
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -202,7 +218,7 @@ export default function MonthlyIncome({
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
-      "monthly-income-v2",
+      "monthly-income",
       timeRange,
       selectedYear,
       selectedMonth,
@@ -210,20 +226,73 @@ export default function MonthlyIncome({
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      // Initialize buckets
+      /* ---------- SINGLE MONTH: trends → transactions fallback → + insurance USD ---------- */
+      if (isSingleMonth) {
+        const qs = `range=custom&startDate=${format(
+          monthStart,
+          "yyyy-MM-dd"
+        )}&endDate=${format(monthEnd, "yyyy-MM-dd")}`;
+
+        let ssp = 0;
+        let usd = 0;
+
+        // 1) Try server daily trends (best for month windows)
+        try {
+          const { data } = await api.get(
+            `/api/income-trends/${selectedYear}/${selectedMonth}?${qs}`
+          );
+          const rows = Array.isArray(data) ? data : data?.data || [];
+          for (const r of rows) {
+            ssp += Number(r.incomeSSP ?? r.amountSSP ?? r.ssp ?? r.income ?? 0);
+            usd += Number(r.incomeUSD ?? r.amountUSD ?? r.usd ?? 0);
+          }
+        } catch {
+          // ignore; fallback next
+        }
+
+        // 2) If still zero, fallback to income transactions
+        if (ssp === 0 && usd === 0) {
+          const tx = await fetchTransactions(
+            format(monthStart, "yyyy-MM-dd"),
+            format(monthEnd, "yyyy-MM-dd")
+          );
+          for (const t of tx as any[]) {
+            const amount = Number(t.amount ?? 0);
+            const cur = normCurrency(t.currency);
+            if (cur === "USD") usd += amount;
+            else ssp += amount;
+          }
+        }
+
+        // 3) Merge insurance USD for that month (covers “insurance only” months)
+        const insMap = await fetchInsuranceMonthlyUSD(
+          "month-select", // treated as custom internally
+          selectedYear,
+          selectedMonth,
+          monthStart,
+          monthEnd
+        );
+        const key = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+        usd += insMap.get(key) || 0;
+
+        return [
+          { label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd },
+        ];
+      }
+
+      /* ---------- MULTI-MONTH: bucket transactions + merge insurance USD ---------- */
+
+      // 1) Base series from transactions
+      const startISO = format(spanStart, "yyyy-MM-dd");
+      const endISO = format(spanEnd, "yyyy-MM-dd");
+      const rows = await fetchTransactions(startISO, endISO);
+
+      // init buckets (keeps empty months visible)
       const map = new Map<string, { label: string; ssp: number; usd: number }>();
       months.forEach(({ y, m }) => {
         const key = `${y}-${String(m).padStart(2, "0")}`;
         map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
       });
-
-      // Fetch income transactions (for single or multi month – same code path, simpler & reliable)
-      const txStart = isSingleMonth ? monthStart : spanStart;
-      const txEnd = isSingleMonth ? monthEnd : spanEnd;
-      const rows = await fetchTransactions(
-        format(txStart, "yyyy-MM-dd"),
-        format(txEnd, "yyyy-MM-dd")
-      );
 
       for (const t of rows as any[]) {
         const rawDate =
@@ -242,13 +311,13 @@ export default function MonthlyIncome({
         else map.get(key)!.ssp += amount;
       }
 
-      // Merge insurance USD (covers months with only insurance)
+      // 2) Merge insurance USD per month (covers months with only insurance USD)
       const insMap = await fetchInsuranceMonthlyUSD(
         timeRange,
         selectedYear,
         selectedMonth,
-        isSingleMonth ? monthStart : customStartDate,
-        isSingleMonth ? monthEnd : customEndDate
+        customStartDate,
+        customEndDate
       );
       for (const [key, usd] of insMap.entries()) {
         if (map.has(key)) map.get(key)!.usd += Number(usd || 0);
@@ -260,117 +329,101 @@ export default function MonthlyIncome({
 
   const totalSSP = data.reduce((s: number, r: any) => s + (r.ssp || 0), 0);
   const totalUSD = data.reduce((s: number, r: any) => s + (r.usd || 0), 0);
+  const peakSSP = Math.max(0, ...data.map((r: any) => r.ssp || 0));
+  const peakUSD = Math.max(0, ...data.map((r: any) => r.usd || 0));
+  const peakSSPLabel =
+    data.find((r: any) => (r.ssp || 0) === peakSSP)?.label ?? "—";
+  const peakUSDLabel =
+    data.find((r: any) => (r.usd || 0) === peakUSD)?.label ?? "—";
 
   /* ------------------------------- Render -------------------------------- */
 
-  // Split into two series for two charts
-  const sspSeries = data.map(({ label, ssp }) => ({ label, value: ssp }));
-  const usdSeries = data.map(({ label, usd }) => ({ label, value: usd }));
-
-  const tooltipFmt = (v: any) => nf0.format(Math.round(Number(v)));
-
   return (
     <Card className="border-0 shadow-md bg-white">
-      <CardHeader className="pb-0">
+      <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold text-slate-900">
           Monthly Income
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="pt-4 space-y-8">
-        {/* SSP chart */}
-        <div>
-          <p className="text-sm font-medium text-slate-700 mb-2">SSP (Monthly)</p>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={sspSeries}
-                margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
-              >
-                <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  interval={0}
-                  angle={sspSeries.length > 6 ? -30 : 0}
-                  textAnchor={sspSeries.length > 6 ? "end" : "middle"}
-                  height={sspSeries.length > 6 ? 42 : 20}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
-                  }
-                />
-                <Tooltip formatter={(v) => [tooltipFmt(v as number), "SSP"]} />
-                <Bar
-                  dataKey="value"
-                  name="SSP"
-                  fill="#14b8a6"
-                  radius={[4, 4, 0, 0]}
-                  minPointSize={2}
-                  maxBarSize={32}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      <CardContent className="pt-2">
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={data}
+              margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
+              barGap={6}
+              barCategoryGap="28%"
+            >
+              <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: "#64748b" }}
+                interval={0}
+                angle={data.length > 6 ? -30 : 0}
+                textAnchor={data.length > 6 ? "end" : "middle"}
+                height={data.length > 6 ? 42 : 20}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#64748b" }}
+                tickFormatter={(v: number) =>
+                  v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
+                }
+              />
+              <Tooltip
+                formatter={(val: any, name: any) => {
+                  const key = String(name).toLowerCase(); // normalize SSP/USD
+                  const label = key.includes("ssp") ? "SSP" : "USD";
+                  return [nf0.format(Math.round(Number(val))), label];
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {/* SSP */}
+              <Bar
+                dataKey="ssp"
+                name="SSP"
+                fill="#14b8a6"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
+              {/* USD */}
+              <Bar
+                dataKey="usd"
+                name="USD"
+                fill="#0ea5e9"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* USD chart */}
-        <div>
-          <p className="text-sm font-medium text-slate-700 mb-2">USD (Monthly)</p>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={usdSeries}
-                margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
-              >
-                <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  interval={0}
-                  angle={usdSeries.length > 6 ? -30 : 0}
-                  textAnchor={usdSeries.length > 6 ? "end" : "middle"}
-                  height={usdSeries.length > 6 ? 42 : 20}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
-                  }
-                />
-                <Tooltip formatter={(v) => [tooltipFmt(v as number), "USD"]} />
-                <Bar
-                  dataKey="value"
-                  name="USD"
-                  fill="#0ea5e9"
-                  radius={[4, 4, 0, 0]}
-                  minPointSize={2}
-                  maxBarSize={32}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            USD includes insurance payouts for the selected period.
-          </p>
-        </div>
-
-        {/* Totals row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Quick totals */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
           <div className="text-center">
             <p className="text-xs text-slate-500">Total SSP</p>
-            <p className="text-sm font-semibold tabular-nums">SSP {nf0.format(totalSSP)}</p>
+            <p className="text-sm font-semibold tabular-nums">
+              SSP {nf0.format(totalSSP)}
+            </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Total USD</p>
-            <p className="text-sm font-semibold tabular-nums">USD {nf0.format(totalUSD)}</p>
+            <p className="text-sm font-semibold tabular-nums">
+              USD {nf0.format(totalUSD)}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-slate-500">Peak (SSP)</p>
+            <p className="text-sm font-semibold tabular-nums">{peakSSPLabel}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-slate-500">Peak (USD)</p>
+            <p className="text-sm font-semibold tabular-nums">{peakUSDLabel}</p>
           </div>
         </div>
 
         {isLoading && (
-          <div className="text-center text-slate-500 text-sm">
+          <div className="text-center text-slate-500 text-sm mt-3">
             Loading monthly income…
           </div>
         )}
