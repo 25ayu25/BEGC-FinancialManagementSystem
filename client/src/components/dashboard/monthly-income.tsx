@@ -9,6 +9,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  LabelList, // <- for labels above bars
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
@@ -326,7 +327,7 @@ export default function MonthlyIncome({
               </div>
             </div>
 
-            {/* USD chart */}
+            {/* USD chart with on-bar totals */}
             <div>
               <p className="text-sm font-medium text-slate-700 mb-2">USD (Monthly)</p>
               <div className="h-64">
@@ -361,13 +362,18 @@ export default function MonthlyIncome({
                       radius={[4, 4, 0, 0]}
                       minPointSize={2}
                       maxBarSize={32}
-                    />
+                    >
+                      {/* Value labels above bars */}
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        formatter={(v: any) => nf0.format(Math.round(Number(v)))}
+                        className="fill-slate-700 text-[11px]"
+                      />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                USD includes insurance payouts for the selected period.
-              </p>
             </div>
 
             {/* Totals row */}
