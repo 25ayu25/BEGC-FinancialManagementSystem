@@ -63,13 +63,12 @@ function computeWindow(
 ) {
   const out: { y: number; m: number }[] = [];
 
-  // Single-month modes → single bucket
   if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
     return [{ y: year, m: month }];
   }
 
   if (timeRange === "year") {
-    for (let m = 1; m <= 12; m++) out.push({ y: year, m });
+    for (let m = 1; m <= 12; m++) out.push({ y, m });
     return out;
   }
 
@@ -92,8 +91,7 @@ function computeWindow(
     return out;
   }
 
-  // Fallback: whole selected year
-  for (let m = 1; m <= 12; m++) out.push({ y: year, m });
+  for (let m = 1; m <= 12; m++) out.push({ y, m });
   return out;
 }
 
@@ -240,14 +238,12 @@ export default function MonthlyIncome({
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      // Initialize buckets
       const map = new Map<string, { label: string; ssp: number; usd: number }>();
       months.forEach(({ y, m }) => {
         const key = `${y}-${String(m).padStart(2, "0")}`;
         map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
       });
 
-      // 1) Income transactions
       const txStart = isSingleMonth ? monthStart : spanStart;
       const txEnd = isSingleMonth ? monthEnd : spanEnd;
       const rows = await fetchTransactions(
@@ -272,7 +268,6 @@ export default function MonthlyIncome({
         else map.get(key)!.ssp += amount;
       }
 
-      // 2) Insurance USD (covers months with only insurance)
       const insMap = await fetchInsuranceMonthlyUSD(
         timeRange,
         selectedYear,
@@ -296,7 +291,7 @@ export default function MonthlyIncome({
   const sspSeries = data.map(({ label, ssp }) => ({ label, value: ssp }));
   const usdSeries = data.map(({ label, usd }) => ({ label, value: usd }));
 
-  // 3-month rolling average for SSP (for months with enough history)
+  // 3-month rolling average for SSP
   const sspRolling = sspSeries.map((d, i, arr) => {
     const slice = arr.slice(Math.max(0, i - 2), i + 1);
     const avg = slice.reduce((s, r) => s + (r.value || 0), 0) / slice.length;
@@ -307,13 +302,10 @@ export default function MonthlyIncome({
   const lastIdx = sspSeries.map(s => s.value).findLastIndex(v => v !== 0);
   const lastVal = lastIdx >= 0 ? sspSeries[lastIdx].value : null;
   const prevVal = lastIdx > 0 ? sspSeries[lastIdx - 1].value : null;
-
   const momPct =
     lastVal !== null && prevVal !== null && prevVal !== 0
       ? ((lastVal - prevVal) / prevVal) * 100
       : null;
-
-  // YoY only makes sense when we have at least 13 months in the series
   const yoyIdx = lastIdx - 12;
   const yoyVal =
     lastIdx >= 0 && yoyIdx >= 0 ? sspSeries[yoyIdx].value : null;
@@ -326,6 +318,12 @@ export default function MonthlyIncome({
 
   const bothEmpty =
     sspSeries.every((d) => !d.value) && usdSeries.every((d) => !d.value);
+
+  // Ensure labels never clip at the top (dynamic headroom)
+  const maxSSP = Math.max(0, ...sspSeries.map(d => d.value || 0));
+  const maxUSD = Math.max(0, ...usdSeries.map(d => d.value || 0));
+  const yMaxSSP = Math.ceil(maxSSP * 1.12);
+  const yMaxUSD = Math.ceil(maxUSD * 1.18);
 
   /* ------------------------------ Handlers ------------------------------ */
 
@@ -349,14 +347,12 @@ export default function MonthlyIncome({
             SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
           </div>
 
-          {/* Variance chips */}
           <div className="mt-2 flex gap-2">
             {momPct !== null && (
               <span
                 className={`px-2 py-0.5 text-xs rounded-full ${
                   momPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
                 }`}
-                aria-label="Month over month change"
               >
                 MoM {momPct >= 0 ? "▲" : "▼"} {Math.abs(momPct).toFixed(1)}%
               </span>
@@ -366,7 +362,6 @@ export default function MonthlyIncome({
                 className={`px-2 py-0.5 text-xs rounded-full ${
                   yoyPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
                 }`}
-                aria-label="Year over year change"
               >
                 YoY {yoyPct >= 0 ? "▲" : "▼"} {Math.abs(yoyPct).toFixed(1)}%
               </span>
@@ -374,11 +369,9 @@ export default function MonthlyIncome({
           </div>
         </div>
 
-        {/* Export */}
         <button
           onClick={() => exportCSV(data)}
           className="text-xs px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-700"
-          aria-label="Export monthly income CSV"
         >
           Export CSV
         </button>
@@ -410,12 +403,12 @@ export default function MonthlyIncome({
                       height={sspSeries.length > 6 ? 42 : 20}
                     />
                     <YAxis
+                      domain={[0, yMaxSSP]}
                       tick={{ fontSize: 11, fill: "#64748b" }}
                       tickFormatter={(v: number) =>
                         v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
                       }
                     />
-                    {/* Rolling average line */}
                     <Line
                       type="monotone"
                       data={sspRolling}
@@ -425,7 +418,6 @@ export default function MonthlyIncome({
                       dot={false}
                       name="3-mo avg"
                     />
-                    {/* Optional goal/reference line */}
                     {typeof monthlySSPTarget === "number" && monthlySSPTarget > 0 && (
                       <ReferenceLine
                         y={monthlySSPTarget}
@@ -453,10 +445,10 @@ export default function MonthlyIncome({
                       maxBarSize={32}
                       onClick={(_, index) => handleBarClick(index, "SSP")}
                     >
-                      {/* Value labels above bars */}
                       <LabelList
                         dataKey="value"
                         position="top"
+                        offset={10}
                         formatter={(v: any) => nf0.format(Math.round(Number(v)))}
                         className="fill-slate-700 text-[11px]"
                       />
@@ -466,7 +458,7 @@ export default function MonthlyIncome({
               </div>
             </div>
 
-            {/* USD chart with on-bar totals */}
+            {/* USD chart */}
             <div aria-label="USD monthly chart">
               <p className="text-sm font-medium text-slate-700 mb-2">USD (Monthly)</p>
               <div className="h-64">
@@ -485,6 +477,7 @@ export default function MonthlyIncome({
                       height={usdSeries.length > 6 ? 42 : 20}
                     />
                     <YAxis
+                      domain={[0, yMaxUSD]}
                       tick={{ fontSize: 11, fill: "#64748b" }}
                       tickFormatter={(v: number) =>
                         v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
@@ -503,10 +496,10 @@ export default function MonthlyIncome({
                       maxBarSize={32}
                       onClick={(_, index) => handleBarClick(index, "USD")}
                     >
-                      {/* Value labels above bars */}
                       <LabelList
                         dataKey="value"
                         position="top"
+                        offset={10}
                         formatter={(v: any) => nf0.format(Math.round(Number(v)))}
                         className="fill-slate-700 text-[11px]"
                       />
