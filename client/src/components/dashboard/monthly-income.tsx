@@ -68,7 +68,7 @@ function computeWindow(
   }
 
   if (timeRange === "year") {
-    for (let m = 1; m <= 12; m++) out.push({ y, m });
+    for (let m = 1; m <= 12; m++) out.push({ y: year, m });
     return out;
   }
 
@@ -91,7 +91,7 @@ function computeWindow(
     return out;
   }
 
-  for (let m = 1; m <= 12; m++) out.push({ y, m });
+  for (let m = 1; m <= 12; m++) out.push({ y: year, m });
   return out;
 }
 
@@ -181,6 +181,16 @@ function exportCSV(rows: Array<{ label: string; ssp: number; usd: number }>, fil
   URL.revokeObjectURL(url);
 }
 
+/* ----------------------------- Safe helpers ----------------------------- */
+
+/** Avoids Array.prototype.findLastIndex for broad browser/bundle support */
+function lastNonZeroIndex(values: number[]): number {
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (Number(values[i]) !== 0) return i;
+  }
+  return -1;
+}
+
 /* ------------------------------- Component ------------------------------ */
 
 export default function MonthlyIncome({
@@ -230,7 +240,7 @@ export default function MonthlyIncome({
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
-      "monthly-income-v3",
+      "monthly-income-v4",
       timeRange,
       selectedYear,
       selectedMonth,
@@ -293,22 +303,28 @@ export default function MonthlyIncome({
 
   // 3-month rolling average for SSP
   const sspRolling = sspSeries.map((d, i, arr) => {
-    const slice = arr.slice(Math.max(0, i - 2), i + 1);
-    const avg = slice.reduce((s, r) => s + (r.value || 0), 0) / slice.length;
+    const start = Math.max(0, i - 2);
+    const slice = arr.slice(start, i + 1);
+    const sum = slice.reduce((s, r) => s + (Number(r.value) || 0), 0);
+    const avg = slice.length ? sum / slice.length : 0;
     return { label: d.label, avg };
   });
 
-  // Variance chips (SSP)
-  const lastIdx = sspSeries.map(s => s.value).findLastIndex(v => v !== 0);
-  const lastVal = lastIdx >= 0 ? sspSeries[lastIdx].value : null;
-  const prevVal = lastIdx > 0 ? sspSeries[lastIdx - 1].value : null;
+  // Variance chips (SSP) — robust and polyfill-free
+  const values = sspSeries.map((s) => Number(s.value) || 0);
+  const lastIdx = lastNonZeroIndex(values);
+  const lastVal = lastIdx >= 0 ? values[lastIdx] : null;
+  const prevVal = lastIdx > 0 ? values[lastIdx - 1] : null;
+
   const momPct =
     lastVal !== null && prevVal !== null && prevVal !== 0
       ? ((lastVal - prevVal) / prevVal) * 100
       : null;
+
+  // YoY only if we have at least 13 months & a non-negative target index
   const yoyIdx = lastIdx - 12;
   const yoyVal =
-    lastIdx >= 0 && yoyIdx >= 0 ? sspSeries[yoyIdx].value : null;
+    lastIdx >= 0 && yoyIdx >= 0 && yoyIdx < values.length ? values[yoyIdx] : null;
   const yoyPct =
     lastVal !== null && yoyVal !== null && yoyVal !== 0
       ? ((lastVal - yoyVal) / yoyVal) * 100
@@ -320,8 +336,8 @@ export default function MonthlyIncome({
     sspSeries.every((d) => !d.value) && usdSeries.every((d) => !d.value);
 
   // Ensure labels never clip at the top (dynamic headroom)
-  const maxSSP = Math.max(0, ...sspSeries.map(d => d.value || 0));
-  const maxUSD = Math.max(0, ...usdSeries.map(d => d.value || 0));
+  const maxSSP = Math.max(0, ...sspSeries.map(d => Number(d.value) || 0));
+  const maxUSD = Math.max(0, ...usdSeries.map(d => Number(d.value) || 0));
   const yMaxSSP = Math.ceil(maxSSP * 1.12);
   const yMaxUSD = Math.ceil(maxUSD * 1.18);
 
@@ -348,7 +364,7 @@ export default function MonthlyIncome({
           </div>
 
           <div className="mt-2 flex gap-2">
-            {momPct !== null && (
+            {momPct !== null && Number.isFinite(momPct) && (
               <span
                 className={`px-2 py-0.5 text-xs rounded-full ${
                   momPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
@@ -357,7 +373,7 @@ export default function MonthlyIncome({
                 MoM {momPct >= 0 ? "▲" : "▼"} {Math.abs(momPct).toFixed(1)}%
               </span>
             )}
-            {yoyPct !== null && (
+            {yoyPct !== null && Number.isFinite(yoyPct) && (
               <span
                 className={`px-2 py-0.5 text-xs rounded-full ${
                   yoyPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
