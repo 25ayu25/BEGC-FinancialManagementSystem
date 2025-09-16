@@ -34,7 +34,21 @@ type Props = {
 
 /* ----------------------------- Constants ------------------------------ */
 
-const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 /* -------------------------------- Utils -------------------------------- */
@@ -110,66 +124,6 @@ async function fetchTransactions(startISO: string, endISO: string) {
   return all;
 }
 
-/** Fetch insurance monthly USD for the current filter window. */
-async function fetchInsuranceMonthlyUSD(
-  timeRange: TimeRange,
-  selectedYear: number,
-  selectedMonth: number,
-  start?: Date,
-  end?: Date
-) {
-  let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
-  if (timeRange === "custom" && start && end) {
-    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`;
-  }
-  // In single-month mode we still pass range=custom + exact dates so backend matches window.
-  if (
-    timeRange === "month-select" ||
-    timeRange === "current-month" ||
-    timeRange === "last-month"
-  ) {
-    const s = start ?? new Date(selectedYear, selectedMonth - 1, 1);
-    const e = end ?? new Date(selectedYear, selectedMonth, 0);
-    url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=custom&startDate=${format(
-      s,
-      "yyyy-MM-dd"
-    )}&endDate=${format(e, "yyyy-MM-dd")}`;
-  }
-
-  try {
-    const res = await api.get(url);
-    const list = (res?.data?.data || res?.data) as
-      | Array<{ year: number; month: number; usd: number }>
-      | { usd?: number }
-      | number
-      | undefined;
-
-    if (Array.isArray(list)) {
-      // return a map: "YYYY-MM" -> usd
-      const map = new Map<string, number>();
-      for (const row of list) {
-        map.set(`${row.year}-${String(row.month).padStart(2, "0")}`, Number(row.usd || 0));
-      }
-      return map;
-    }
-
-    // some backends may return a single numeric or object for one month
-    const single =
-      typeof list === "number"
-        ? list
-        : typeof list === "object" && list
-        ? Number((list as any).usd || 0)
-        : 0;
-
-    const key = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-    const map = new Map<string, number>();
-    map.set(key, single);
-    return map;
-  } catch {
-    return new Map<string, number>();
-  }
-}
-
 /* ------------------------------- Component ------------------------------ */
 
 export default function MonthlyIncome({
@@ -226,55 +180,54 @@ export default function MonthlyIncome({
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      /* ---------- SINGLE MONTH: trends → transactions fallback → + insurance USD ---------- */
+      /* ---------- SINGLE MONTH: trends first, fallback to transactions ---------- */
       if (isSingleMonth) {
         const qs = `range=custom&startDate=${format(
           monthStart,
           "yyyy-MM-dd"
         )}&endDate=${format(monthEnd, "yyyy-MM-dd")}`;
 
-        let ssp = 0;
-        let usd = 0;
-
-        // 1) Try server daily trends (best for month windows)
+        // Try server daily trends first (usually most accurate for a month)
         try {
           const { data } = await api.get(
             `/api/income-trends/${selectedYear}/${selectedMonth}?${qs}`
           );
           const rows = Array.isArray(data) ? data : data?.data || [];
+          let ssp = 0;
+          let usd = 0;
           for (const r of rows) {
-            ssp += Number(r.incomeSSP ?? r.amountSSP ?? r.ssp ?? r.income ?? 0);
+            ssp += Number(
+              r.incomeSSP ?? r.amountSSP ?? r.ssp ?? r.income ?? 0
+            );
             usd += Number(r.incomeUSD ?? r.amountUSD ?? r.usd ?? 0);
           }
-        } catch {
-          // ignore; fallback next
-        }
-
-        // 2) If still zero, fallback to income transactions
-        if (ssp === 0 && usd === 0) {
-          const tx = await fetchTransactions(
-            format(monthStart, "yyyy-MM-dd"),
-            format(monthEnd, "yyyy-MM-dd")
-          );
-          for (const t of tx as any[]) {
-            const amount = Number(t.amount ?? 0);
-            const cur = normCurrency(t.currency);
-            if (cur === "USD") usd += amount;
-            else ssp += amount;
+          if (ssp > 0 || usd > 0) {
+            return [
+              {
+                label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`,
+                ssp,
+                usd,
+              },
+            ];
           }
+        } catch {
+          // swallow and fall back to transactions
         }
 
-        // 3) Merge insurance USD for that month (covers “insurance only” months)
-        const insMap = await fetchInsuranceMonthlyUSD(
-          "month-select", // treated as custom internally
-          selectedYear,
-          selectedMonth,
-          monthStart,
-          monthEnd
+        // Fallback: sum income transactions for that month
+        const tx = await fetchTransactions(
+          format(monthStart, "yyyy-MM-dd"),
+          format(monthEnd, "yyyy-MM-dd")
         );
-        const key = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-        usd += insMap.get(key) || 0;
 
+        let ssp = 0;
+        let usd = 0;
+        for (const t of tx as any[]) {
+          const amount = Number(t.amount ?? 0);
+          const cur = normCurrency(t.currency);
+          if (cur === "USD") usd += amount;
+          else ssp += amount;
+        }
         return [
           { label: `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`, ssp, usd },
         ];
@@ -312,15 +265,30 @@ export default function MonthlyIncome({
       }
 
       // 2) Merge insurance USD per month (covers months with only insurance USD)
-      const insMap = await fetchInsuranceMonthlyUSD(
-        timeRange,
-        selectedYear,
-        selectedMonth,
-        customStartDate,
-        customEndDate
-      );
-      for (const [key, usd] of insMap.entries()) {
-        if (map.has(key)) map.get(key)!.usd += Number(usd || 0);
+      //    Uses the same 'range' semantics your pages already send.
+      let insUrl = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        insUrl += `&startDate=${format(
+          customStartDate,
+          "yyyy-MM-dd"
+        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+      }
+      try {
+        const res = await api.get(insUrl);
+        const list:
+          | Array<{ year: number; month: number; usd: number }>
+          | undefined = res?.data?.data || res?.data;
+
+        if (Array.isArray(list)) {
+          for (const row of list) {
+            const key = `${row.year}-${String(row.month).padStart(2, "0")}`;
+            if (map.has(key)) {
+              map.get(key)!.usd += Number(row.usd || 0);
+            }
+          }
+        }
+      } catch {
+        // if the API is absent or errors, skip merging (chart still shows tx income)
       }
 
       return Array.from(map.values());
