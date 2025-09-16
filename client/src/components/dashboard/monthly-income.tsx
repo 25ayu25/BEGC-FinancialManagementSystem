@@ -9,7 +9,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  LabelList, // <- for labels above bars
+  LabelList,
+  Line,
+  ReferenceLine,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
@@ -30,6 +32,15 @@ type Props = {
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
+
+  /** Optional: draw a goal/reference line on the SSP chart (per-month target). */
+  monthlySSPTarget?: number;
+
+  /**
+   * Optional: bar click handler for drill-down.
+   * If provided, clicking a bar will pass (year, month, currency).
+   */
+  onBarClick?: (year: number, month: number, currency: "SSP" | "USD") => void;
 };
 
 /* ----------------------------- Constants ------------------------------ */
@@ -156,6 +167,22 @@ async function fetchInsuranceMonthlyUSD(
   }
 }
 
+/* ------------------------------- CSV Export ------------------------------ */
+
+function exportCSV(rows: Array<{ label: string; ssp: number; usd: number }>, filename = "monthly-income.csv") {
+  const header = "Month,SSP,USD\n";
+  const body = rows
+    .map((r) => `${r.label},${Math.round(r.ssp)},${Math.round(r.usd)}`)
+    .join("\n");
+  const blob = new Blob([header + body], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /* ------------------------------- Component ------------------------------ */
 
 export default function MonthlyIncome({
@@ -164,6 +191,8 @@ export default function MonthlyIncome({
   selectedMonth,
   customStartDate,
   customEndDate,
+  monthlySSPTarget,
+  onBarClick,
 }: Props) {
   const months = useMemo(
     () =>
@@ -203,7 +232,7 @@ export default function MonthlyIncome({
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
-      "monthly-income-v2",
+      "monthly-income-v3",
       timeRange,
       selectedYear,
       selectedMonth,
@@ -259,24 +288,100 @@ export default function MonthlyIncome({
     },
   });
 
+  /* ----------------------------- Aggregations ---------------------------- */
+
   const totalSSP = data.reduce((s: number, r: any) => s + (r.ssp || 0), 0);
   const totalUSD = data.reduce((s: number, r: any) => s + (r.usd || 0), 0);
 
-  // Split into two series for two charts
   const sspSeries = data.map(({ label, ssp }) => ({ label, value: ssp }));
   const usdSeries = data.map(({ label, usd }) => ({ label, value: usd }));
+
+  // 3-month rolling average for SSP (for months with enough history)
+  const sspRolling = sspSeries.map((d, i, arr) => {
+    const slice = arr.slice(Math.max(0, i - 2), i + 1);
+    const avg = slice.reduce((s, r) => s + (r.value || 0), 0) / slice.length;
+    return { label: d.label, avg };
+  });
+
+  // Variance chips (SSP)
+  const lastIdx = sspSeries.map(s => s.value).findLastIndex(v => v !== 0);
+  const lastVal = lastIdx >= 0 ? sspSeries[lastIdx].value : null;
+  const prevVal = lastIdx > 0 ? sspSeries[lastIdx - 1].value : null;
+
+  const momPct =
+    lastVal !== null && prevVal !== null && prevVal !== 0
+      ? ((lastVal - prevVal) / prevVal) * 100
+      : null;
+
+  // YoY only makes sense when we have at least 13 months in the series
+  const yoyIdx = lastIdx - 12;
+  const yoyVal =
+    lastIdx >= 0 && yoyIdx >= 0 ? sspSeries[yoyIdx].value : null;
+  const yoyPct =
+    lastVal !== null && yoyVal !== null && yoyVal !== 0
+      ? ((lastVal - yoyVal) / yoyVal) * 100
+      : null;
 
   const tooltipFmt = (v: any) => nf0.format(Math.round(Number(v)));
 
   const bothEmpty =
     sspSeries.every((d) => !d.value) && usdSeries.every((d) => !d.value);
 
+  /* ------------------------------ Handlers ------------------------------ */
+
+  const handleBarClick = (index: number, currency: "SSP" | "USD") => {
+    if (!onBarClick) return;
+    const bucket = months[index];
+    if (bucket) onBarClick(bucket.y, bucket.m, currency);
+  };
+
+  /* -------------------------------- Render ------------------------------- */
+
   return (
     <Card className="border-0 shadow-md bg-white">
-      <CardHeader className="pb-0">
-        <CardTitle className="text-lg font-semibold text-slate-900">
-          Monthly Income
-        </CardTitle>
+      <CardHeader className="pb-0 flex items-start justify-between">
+        <div>
+          <CardTitle className="text-lg font-semibold text-slate-900">
+            Monthly Income
+          </CardTitle>
+          <div className="mt-1 text-sm text-slate-600">
+            <span className="font-medium">YTD:</span>{" "}
+            SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+          </div>
+
+          {/* Variance chips */}
+          <div className="mt-2 flex gap-2">
+            {momPct !== null && (
+              <span
+                className={`px-2 py-0.5 text-xs rounded-full ${
+                  momPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                }`}
+                aria-label="Month over month change"
+              >
+                MoM {momPct >= 0 ? "▲" : "▼"} {Math.abs(momPct).toFixed(1)}%
+              </span>
+            )}
+            {yoyPct !== null && (
+              <span
+                className={`px-2 py-0.5 text-xs rounded-full ${
+                  yoyPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                }`}
+                aria-label="Year over year change"
+              >
+                YoY {yoyPct >= 0 ? "▲" : "▼"} {Math.abs(yoyPct).toFixed(1)}%
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Export */}
+        <button
+          onClick={() => exportCSV(data)}
+          className="text-xs px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-700"
+          aria-label="Export monthly income CSV"
+        >
+          Export CSV
+        </button>
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
@@ -287,7 +392,7 @@ export default function MonthlyIncome({
         ) : (
           <>
             {/* SSP chart */}
-            <div>
+            <div aria-label="SSP monthly chart">
               <p className="text-sm font-medium text-slate-700 mb-2">SSP (Monthly)</p>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -310,6 +415,31 @@ export default function MonthlyIncome({
                         v >= 1000 ? `${nf0.format(v / 1000)}k` : nf0.format(v)
                       }
                     />
+                    {/* Rolling average line */}
+                    <Line
+                      type="monotone"
+                      data={sspRolling}
+                      dataKey="avg"
+                      stroke="#7c3aed"
+                      strokeWidth={2}
+                      dot={false}
+                      name="3-mo avg"
+                    />
+                    {/* Optional goal/reference line */}
+                    {typeof monthlySSPTarget === "number" && monthlySSPTarget > 0 && (
+                      <ReferenceLine
+                        y={monthlySSPTarget}
+                        stroke="#0ea5e9"
+                        strokeDasharray="4 4"
+                        ifOverflow="extendDomain"
+                        label={{
+                          value: `Target: SSP ${nf0.format(monthlySSPTarget)}`,
+                          position: "right",
+                          fill: "#0ea5e9",
+                          fontSize: 11,
+                        }}
+                      />
+                    )}
                     <Tooltip
                       formatter={(v) => [`SSP ${tooltipFmt(v as number)}`, ""]}
                       labelFormatter={(l) => l as string}
@@ -321,14 +451,23 @@ export default function MonthlyIncome({
                       radius={[4, 4, 0, 0]}
                       minPointSize={2}
                       maxBarSize={32}
-                    />
+                      onClick={(_, index) => handleBarClick(index, "SSP")}
+                    >
+                      {/* Value labels above bars */}
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        formatter={(v: any) => nf0.format(Math.round(Number(v)))}
+                        className="fill-slate-700 text-[11px]"
+                      />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* USD chart with on-bar totals */}
-            <div>
+            <div aria-label="USD monthly chart">
               <p className="text-sm font-medium text-slate-700 mb-2">USD (Monthly)</p>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -362,6 +501,7 @@ export default function MonthlyIncome({
                       radius={[4, 4, 0, 0]}
                       minPointSize={2}
                       maxBarSize={32}
+                      onClick={(_, index) => handleBarClick(index, "USD")}
                     >
                       {/* Value labels above bars */}
                       <LabelList
