@@ -7,6 +7,9 @@ import { useDateFilter } from "../../context/date-filter-context";
 /**
  * Right-side date range control with direct month selection.
  * Uses the shared date filter context.
+ *
+ * Mobile-safe: on small screens we render this control on its own row
+ * so it never collides with the title/back content.
  */
 function DateRangeControl() {
   const {
@@ -18,13 +21,9 @@ function DateRangeControl() {
     periodLabel,
   } = useDateFilter();
 
-  // Build year choices: current year and previous year (expand if you need more)
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = React.useMemo(() => {
-    // Add more history if needed, e.g., [...Array(6)].map((_,i)=>thisYear-i)
-    return [thisYear, thisYear - 1];
-  }, [thisYear]);
+  const years = React.useMemo(() => [thisYear, thisYear - 1], [thisYear]);
 
   const months = [
     { label: "January", value: 1 },
@@ -65,11 +64,12 @@ function DateRangeControl() {
   return (
     <div className="flex items-center gap-3">
       {/* Quick range */}
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-slate-600">Range</label>
+      <div className="flex items-center gap-2 min-w-0">
+        <label className="text-sm text-slate-600 shrink-0">Range</label>
         <select
           value={timeRange}
           onChange={onQuickChange}
+          aria-label="Select date range"
           className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         >
           <option value="current-month">Current Month</option>
@@ -88,6 +88,7 @@ function DateRangeControl() {
           <select
             value={selectedYear}
             onChange={onYearChange}
+            aria-label="Select year"
             className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
             {years.map((y) => (
@@ -100,6 +101,7 @@ function DateRangeControl() {
           <select
             value={selectedMonth}
             onChange={onMonthChange}
+            aria-label="Select month"
             className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
             {months.map((m) => (
@@ -111,7 +113,7 @@ function DateRangeControl() {
         </div>
       )}
 
-      {/* Current label */}
+      {/* Current period label (hide on very small screens) */}
       <div className="hidden sm:block text-sm text-slate-500 pl-1">
         {periodLabel}
       </div>
@@ -130,12 +132,9 @@ type Props = {
 };
 
 /**
- * Fixed page header that stays put while the page scrolls.
- * It renders a spacer with the header's measured height so content
- * below doesn't jump.
- *
- * Original sticky container preserved and extended with a right-side
- * date filter control for quick ranges + direct month selection.
+ * Sticky page header with auto-height spacer. Mobile-first layout:
+ * - md+: children (left) + date filter (right) in a single row
+ * - <md: children on first row; date filter rendered on a second row
  */
 export default function StickyPageHeader({
   children,
@@ -173,13 +172,30 @@ export default function StickyPageHeader({
           className
         }
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left: caller-provided header content (title, breadcrumbs, buttons) */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
+          {/* Desktop row: left + right */}
+          <div className="hidden md:flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">{children}</div>
+            {showDateFilter && (
+              <div className="relative z-50">
+                <DateRangeControl />
+              </div>
+            )}
+          </div>
 
-            {/* Right: date range control */}
-            {showDateFilter && <DateRangeControl />}
+          {/* Mobile stack: children first, filter below */}
+          <div className="md:hidden">
+            <div className="min-w-0">{children}</div>
+            {showDateFilter && (
+              <div className="mt-3 relative z-50 overflow-visible">
+                {/* wrap to avoid clipping and allow horizontal scrolling if needed */}
+                <div className="overflow-x-auto no-scrollbar">
+                  <div className="inline-flex">
+                    <DateRangeControl />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
