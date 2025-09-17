@@ -70,18 +70,13 @@ type TimeRange =
   | "last-month"
   | "last-3-months"
   | "year"
-  | "month-select" // NEW
+  | "month-select"
   | "custom";
 
 export default function InsuranceProvidersPage() {
   // read URL params (compat with links coming from dashboard)
   const urlParams = new URLSearchParams(window.location.search);
-  const rangeParam = (urlParams.get("range") || "current-month") as
-    | "current-month"
-    | "last-month"
-    | "last-3-months"
-    | "year"
-    | "custom";
+  const rangeParam = (urlParams.get("range") || "current-month") as TimeRange;
   const startDateParam = urlParams.get("startDate");
   const endDateParam   = urlParams.get("endDate");
   const yearParam  = urlParams.get("year");
@@ -307,142 +302,159 @@ export default function InsuranceProvidersPage() {
       : "Custom period";
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <header className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="p-4 md:p-6 space-y-6 bg-gray-50 min-h-screen">
+      {/* Header (mobile-first, stacks filter below title) */}
+      <header className="bg-white rounded-lg shadow-sm border p-4 md:p-6">
+        <div className="flex flex-col gap-4 md:gap-6">
+          {/* Row 1: back + titles */}
+          <div className="flex items-start gap-4">
             <Link href="/" className="inline-flex">
               <Button variant="ghost" size="sm" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Dashboard
               </Button>
             </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Insurance Providers</h1>
-              <p className="text-slate-600 mt-1">Detailed breakdown · {headerLabel}</p>
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
+                Insurance
+                <br className="hidden md:block" />
+                {" "}Providers
+              </h1>
+              <p className="text-slate-600 mt-1 md:mt-2">
+                Detailed breakdown · {headerLabel}
+              </p>
             </div>
           </div>
 
-          {/* RIGHT: range + optional pickers */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current-month">Current Month</SelectItem>
-                <SelectItem value="last-month">Last Month</SelectItem>
-                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="month-select">Select Month…</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Row 2: date filter (z-50 so popovers are never clipped) */}
+          <div className="relative z-50">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              {/* Left spacer on desktop keeps alignment with title block */}
+              <div className="hidden md:block w-[280px]" aria-hidden="true" />
 
-            {timeRange === "month-select" && (
-              <>
-                <Select
-                  value={String(selectedYear)}
-                  onValueChange={(v) => setSelectedYear(Number(v))}
-                >
-                  <SelectTrigger className="h-9 w-[120px]">
-                    <SelectValue placeholder="Year" />
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+                <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+                  <SelectTrigger className="h-9 w-full sm:w-[160px]">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
+                    <SelectItem value="current-month">Current Month</SelectItem>
+                    <SelectItem value="last-month">Last Month</SelectItem>
+                    <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="month-select">Select Month…</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
                   </SelectContent>
                 </Select>
 
-                <Select
-                  value={String(selectedMonth)}
-                  onValueChange={(v) => setSelectedMonth(Number(v))}
-                >
-                  <SelectTrigger className="h-9 w-[140px]">
-                    <SelectValue placeholder="Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
-
-            {timeRange === "custom" && (
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
+                {timeRange === "month-select" && (
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                    <Select
+                      value={String(selectedYear)}
+                      onValueChange={(v) => setSelectedYear(Number(v))}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                      <SelectTrigger className="h-9 w-full sm:w-[120px]">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {years.map((y) => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                <span aria-hidden="true" className="text-muted-foreground">to</span>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
+                    <Select
+                      value={String(selectedMonth)}
+                      onValueChange={(v) => setSelectedMonth(Number(v))}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                      <SelectTrigger className="h-9 w-full sm:w-[140px]">
+                        <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {timeRange === "custom" && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "h-9 justify-start text-left font-normal w-full sm:w-auto",
+                            !customStartDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="bottom"
+                        align="start"
+                        sideOffset={12}
+                        className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                        style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                        avoidCollisions
+                        collisionPadding={15}
+                      >
+                        <DatePicker
+                          mode="single"
+                          numberOfMonths={1}
+                          showOutsideDays={false}
+                          selected={customStartDate}
+                          onSelect={setCustomStartDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    <span aria-hidden="true" className="text-muted-foreground mx-1 hidden sm:inline">
+                      to
+                    </span>
+
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "h-9 justify-start text-left font-normal w-full sm:w-auto",
+                            !customEndDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="bottom"
+                        align="start"
+                        sideOffset={12}
+                        className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                        style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                        avoidCollisions
+                        collisionPadding={15}
+                      >
+                        <DatePicker
+                          mode="single"
+                          numberOfMonths={1}
+                          showOutsideDays={false}
+                          selected={customEndDate}
+                          onSelect={setCustomEndDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </header>
