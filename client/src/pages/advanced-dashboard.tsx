@@ -1,4 +1,3 @@
-// client/src/pages/advanced-dashboard.tsx
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -11,12 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
-import {
-  format,
-  startOfMonth, endOfMonth,
-  startOfYear, endOfYear,
-  subMonths
-} from "date-fns";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
@@ -32,9 +26,6 @@ import {
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
-
-// NEW: Data Health card
-import MissingPostingsCard from "@/components/quality/MissingPostingsCard";
 
 // ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -55,6 +46,8 @@ export default function AdvancedDashboard() {
   const [openExpenses, setOpenExpenses] = useState(false);
 
   // ---- NEW: “normalizedRange” keeps backend compatibility
+  // When user picks an arbitrary month via month-select, we still send range=current-month
+  // but include the explicit year/month they chose.
   const normalizedRange =
     timeRange === "month-select" ? "current-month" : timeRange;
 
@@ -72,7 +65,7 @@ export default function AdvancedDashboard() {
   // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
   const months = [
     { label: "January", value: 1 },
     { label: "February", value: 2 },
@@ -253,44 +246,6 @@ export default function AdvancedDashboard() {
     }
   };
 
-  // ---- NEW: compute concrete start/end dates for the Data Health card
-  const rangeDates = (() => {
-    const today = new Date();
-    switch (timeRange) {
-      case "current-month": {
-        const start = startOfMonth(today);
-        // up to today (not future)
-        const end = today;
-        return { start, end };
-      }
-      case "last-month": {
-        const d = subMonths(today, 1);
-        return { start: startOfMonth(d), end: endOfMonth(d) };
-      }
-      case "last-3-months": {
-        const start = startOfMonth(subMonths(today, 2));
-        return { start, end: endOfMonth(today) };
-      }
-      case "year": {
-        return { start: startOfYear(today), end: endOfYear(today) };
-      }
-      case "month-select": {
-        const y = selectedYear || thisYear;
-        const m = selectedMonth || today.getMonth() + 1;
-        const start = new Date(y, m - 1, 1);
-        const end = endOfMonth(start);
-        return { start, end };
-      }
-      case "custom": {
-        const start = customStartDate ?? today;
-        const end = customEndDate ?? today;
-        return { start, end };
-      }
-      default:
-        return { start: startOfMonth(today), end: today };
-    }
-  })();
-
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
       {/* Header + date filters */}
@@ -429,7 +384,7 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
         {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
@@ -554,7 +509,7 @@ export default function AdvancedDashboard() {
                 </div>
                 <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
               </div>
-            </div>
+            </CardContent>
           </Card>
         </Link>
 
@@ -577,15 +532,6 @@ export default function AdvancedDashboard() {
             </CardContent>
           </Card>
         </Link>
-      </div>
-
-      {/* NEW: Data Health / Missing Postings */}
-      <div className="mb-6">
-        <MissingPostingsCard
-          start={rangeDates.start}
-          end={rangeDates.end}
-          onFix={() => (window.location.href = "/missing-postings")}
-        />
       </div>
 
       {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
