@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -15,6 +15,8 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
 
+/* ----------------------------- Types ----------------------------- */
+
 type TimeRange =
   | "current-month"
   | "last-month"
@@ -25,11 +27,13 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // 4-digit year
+  selectedYear: number;   // e.g. 2025
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
+
+/* ------------------------ Number Formatters ---------------------- */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("en-US", {
@@ -37,9 +41,12 @@ const compact = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+/* ----------------------------- Utils ----------------------------- */
+
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate(); // month is 1..12
 }
+
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
@@ -62,8 +69,8 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
-/* --------------------------- nice tick helpers --------------------------- */
-/** Return a "nice" step (1, 2, **2.5**, 5, 10 × 10^n) for a given rough step. */
+/* --------------------- Nice ticks for Y-axis --------------------- */
+/** Return a "nice" step (1, 2, 2.5, 5, 10 × 10^n) for a given rough step. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -71,7 +78,7 @@ function niceStep(roughStep: number) {
   const frac = roughStep / base;
   let niceFrac: number;
 
-  // include 2.5 for 250/2.5k/25k style ticks
+  // include 2.5 to get 250/2.5k/etc when needed
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
@@ -81,7 +88,7 @@ function niceStep(roughStep: number) {
   return niceFrac * base;
 }
 
-/** Build 5 ticks (0..max) with a nice step so labels are round and spacing feels right. */
+/** Build 5 ticks (0..max) with a nice step so spacing/labels look right. */
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
@@ -90,7 +97,23 @@ function buildNiceTicks(dataMax: number) {
   return { max, ticks };
 }
 
-/* --------------------------- Custom Tooltip --------------------------- */
+/* ------------------------ Mobile helper hook --------------------- */
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, [breakpoint]);
+  return isMobile;
+}
+
+/* ------------------------- Tooltip component --------------------- */
+
 type RTProps = {
   active?: boolean;
   payload?: any[];
@@ -118,7 +141,7 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
   );
 }
 
-/* -------------------------------- Main -------------------------------- */
+/* ------------------------------- Main ---------------------------- */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -130,6 +153,16 @@ export default function RevenueAnalyticsDaily({
   const year = selectedYear;
   const month = selectedMonth;
   const days = daysInMonth(year, month);
+  const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
+
+  // X-axis label density for mobile vs desktop
+  const desiredXTicks = isMobile ? 12 : days; // ~12 labels on mobile, all on desktop
+  const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
+  const xTickFont = isMobile ? 10 : 11;
+  const xTickMargin = isMobile ? 4 : 8;
+  const chartHeightClass = isMobile ? "h-52" : "h-56";
+  const sspBarSize = isMobile ? 14 : 18;
+  const usdBarSize = isMobile ? 14 : 18;
 
   const baseDays = useMemo(
     () => Array.from({ length: days }, (_, i) => i + 1),
@@ -211,7 +244,7 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
             </span>
           </div>
-          <div className="h-56 rounded-lg border border-slate-200">
+          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={ssp}
@@ -221,9 +254,10 @@ export default function RevenueAnalyticsDaily({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="day"
-                  interval={0}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickMargin={8}
+                  interval={xInterval}            // fewer labels on mobile
+                  minTickGap={isMobile ? 2 : 0}   // let recharts drop a few if tight
+                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
+                  tickMargin={xTickMargin}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -241,7 +275,7 @@ export default function RevenueAnalyticsDaily({
                   name="SSP"
                   fill="#14b8a6"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={18}
+                  maxBarSize={sspBarSize}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -258,7 +292,7 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
             </span>
           </div>
-          <div className="h-56 rounded-lg border border-slate-200">
+          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usd}
@@ -268,9 +302,10 @@ export default function RevenueAnalyticsDaily({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="day"
-                  interval={0}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickMargin={8}
+                  interval={xInterval}
+                  minTickGap={isMobile ? 2 : 0}
+                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
+                  tickMargin={xTickMargin}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -288,7 +323,7 @@ export default function RevenueAnalyticsDaily({
                   name="USD"
                   fill="#0ea5e9"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={18}
+                  maxBarSize={usdBarSize}
                 />
               </BarChart>
             </ResponsiveContainer>
