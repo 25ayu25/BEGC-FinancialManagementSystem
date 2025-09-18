@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -27,6 +29,9 @@ import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
+// NEW: daily analytics (split SSP & USD) for the Exec view
+import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
+
 // ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
@@ -46,8 +51,6 @@ export default function AdvancedDashboard() {
   const [openExpenses, setOpenExpenses] = useState(false);
 
   // ---- NEW: “normalizedRange” keeps backend compatibility
-  // When user picks an arbitrary month via month-select, we still send range=current-month
-  // but include the explicit year/month they chose.
   const normalizedRange =
     timeRange === "month-select" ? "current-month" : timeRange;
 
@@ -536,116 +539,16 @@ export default function AdvancedDashboard() {
 
       {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
-        {/* Revenue Analytics */}
-        <Card className="lg:col-span-2 border border-slate-200 shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-semibold text-slate-900">Revenue Analytics</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pb-4">
-            {(monthTotalSSP > 0 || monthTotalUSD > 0) ? (
-              <div className="space-y-0">
-                <div className="h-80 lg:h-[420px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 20, right: hasAnyUSD ? 60 : 20, left: 10, bottom: 30 }}
-                      barGap={6}
-                      barCategoryGap="28%"
-                    >
-                      <CartesianGrid strokeDasharray="1 1" stroke="#f1f5f9" strokeWidth={0.3} opacity={0.3} vertical={false} />
-                      <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: "12px", paddingBottom: "10px" }} />
-                      <XAxis
-                        dataKey="day"
-                        ticks={xTicks}
-                        tickFormatter={(v: number) => String(v)}
-                        axisLine={{ stroke: "#eef2f7", strokeWidth: 1 }}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: "#64748b" }}
-                        height={40}
-                      />
-                      {/* Left Y axis (SSP) */}
-                      <YAxis
-                        yAxisId="ssp"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fill: "#0f766e" }}
-                        tickFormatter={formatYAxisSSP}
-                        label={{ value: "Revenue (SSP)", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#0f766e", fontSize: 11 } }}
-                      />
-                      {/* Right Y axis (USD) */}
-                      <YAxis
-                        yAxisId="usd"
-                        hide={!hasAnyUSD}
-                        orientation="right"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fill: "#1d4ed8" }}
-                        tickFormatter={formatYAxisUSD}
-                        label={{ value: "Revenue (USD)", angle: 90, position: "insideRight", offset: 8, style: { fill: "#1d4ed8", fontSize: 11 } }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      {/* Avg line (SSP only) */}
-                      {showAvgLine && monthlyAvgSSP > 0 && (
-                        <ReferenceLine
-                          yAxisId="ssp"
-                          y={monthlyAvgSSP}
-                          stroke="#0d9488"
-                          strokeWidth={1}
-                          strokeDasharray="4 2"
-                          label={{ value: `Avg (SSP) ${kfmt(monthlyAvgSSP)}`, position: "insideTopRight", style: { fontSize: 10, fill: "#0d9488", fontWeight: 500 }, offset: 8 }}
-                        />
-                      )}
-                      {/* Thick grouped bars */}
-                      <Bar yAxisId="ssp" dataKey="amountSSPPlot" name="SSP" fill="#14b8a6" barSize={24} radius={[4, 4, 0, 0]} />
-                      {hasAnyUSD && (
-                        <Bar yAxisId="usd" dataKey="amountUSDPlot" name="USD" fill="#0ea5e9" barSize={24} radius={[4, 4, 0, 0]} />
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Totals */}
-                <div className="border-t border-slate-100 pt-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="flex flex-col text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
-                      <div className="space-y-1">
-                        {monthTotalSSP > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">SSP {nf0.format(monthTotalSSP)}</span>}
-                        {monthTotalUSD > 0 && <span className="block text-sm font-bold text-slate-900 font-mono tabular-nums">USD {fmtUSD(monthTotalUSD)}</span>}
-                        {monthTotalSSP === 0 && monthTotalUSD === 0 && <span className="text-sm text-slate-500">No revenue in this range</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-col text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide">Peak Day</span>
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {nf0.format(peakSSP)}</span>
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200 text-xs px-1.5 py-0.5">Peak</Badge>
-                      </div>
-                      {peakDaySSP && <span className="text-xs text-slate-500 mt-1">{peakDaySSP.fullDate}</span>}
-                    </div>
-                    <div className="flex flex-col text-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wide">Monthly Avg</span>
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-lg font-bold text-slate-900 font-mono tabular-nums">SSP {nf0.format(monthlyAvgSSP)}</span>
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs px-1.5 py-0.5">Avg</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-80 lg:h-[420px] bg-slate-50/50 rounded-lg flex items-center justify-center border border-slate-100">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3" />
-                  <p className="text-slate-600 text-sm font-medium">No revenue in this range</p>
-                  <p className="text-slate-500 text-xs mt-1">Try selecting a different time period</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Revenue Analytics (REPLACED with the new daily split charts) */}
+        <div className="lg:col-span-2">
+          <RevenueAnalyticsDaily
+            timeRange={timeRange}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            customStartDate={customStartDate ?? undefined}
+            customEndDate={customEndDate ?? undefined}
+          />
+        </div>
 
         {/* Departments Panel */}
         <div className="lg:col-span-1">
