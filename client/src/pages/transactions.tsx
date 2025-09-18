@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { api } from '@/lib/queryClient';
@@ -10,14 +10,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-/* ── Types ─────────────────────────────────────────────────────────── */
+/* ───────────────────────── Types ───────────────────────── */
 
 type Currency = 'SSP' | 'USD';
 type TxType = 'income' | 'expense';
@@ -45,15 +48,15 @@ type TxQuery = {
   type: 'all' | TxType;
   dept: 'all' | string;
   provider: 'all' | string;
-  start: string;      // yyyy-MM-dd
-  end: string;        // yyyy-MM-dd
-  page: string;       // keep string for URL stability
-  pageSize: string;   // keep string for URL stability
+  start: string;     // yyyy-MM-dd
+  end: string;       // yyyy-MM-dd
+  page: string;      // keep string for URL stability
+  pageSize: string;  // keep string for URL stability
   sort: 'date' | 'amount';
   order: 'asc' | 'desc';
 };
 
-/* ── Helpers ───────────────────────────────────────────────────────── */
+/* ────────────────── Helpers & UI Utils ─────────────────── */
 
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
@@ -80,7 +83,6 @@ function useURLState<T extends Record<string, any>>(initial: T) {
   useEffect(() => {
     const usp = new URLSearchParams();
     Object.entries(state).forEach(([k, v]) => {
-      // keep URL tidy
       if (v !== '' && v !== 'all' && v !== undefined && v !== null) {
         usp.set(k, String(v));
       }
@@ -91,7 +93,7 @@ function useURLState<T extends Record<string, any>>(initial: T) {
   return [state, setState] as const;
 }
 
-/* ── API ───────────────────────────────────────────────────────────── */
+/* ─────────────────────── API Calls ─────────────────────── */
 
 async function fetchDepartments(): Promise<Department[]> {
   const { data } = await api.get('/api/departments');
@@ -103,26 +105,106 @@ async function fetchProviders(): Promise<Provider[]> {
   return data ?? [];
 }
 
+/** Send tolerant params and normalize responses so rows always render */
 async function fetchTransactions(params: Partial<TxQuery>): Promise<Paged<Txn>> {
-  const { data } = await api.get('/api/transactions', { params });
-  return data ?? { items: [], total: 0 };
+  // Map UI state -> *all likely* backend param names
+  const p: Record<string, any> = {
+    // search
+    q: params.q || '',
+
+    // type (omit if "all")
+    type: params.type && params.type !== 'all' ? params.type : undefined,
+
+    // date range (send both variants)
+    startDate: params.start || undefined,
+    endDate: params.end || undefined,
+    start: params.start || undefined,
+    end: params.end || undefined,
+
+    // department
+    departmentId: params.dept && params.dept !== 'all' ? params.dept : undefined,
+    dept: params.dept && params.dept !== 'all' ? params.dept : undefined,
+
+    // provider / insurance provider
+    providerId: params.provider && params.provider !== 'all' ? params.provider : undefined,
+    insuranceProviderId: params.provider && params.provider !== 'all' ? params.provider : undefined,
+    provider: params.provider && params.provider !== 'all' ? params.provider : undefined,
+
+    // paging / sort (send a few common variants)
+    page: params.page || '1',
+    pageIndex: params.page || '1',
+    pageNumber: params.page || '1',
+    pageSize: params.pageSize || '50',
+    sort: params.sort || 'date',
+    order: params.order || 'desc',
+  };
+
+  // strip undefined values
+  Object.keys(p).forEach((k) => p[k] === undefined && delete p[k]);
+
+  const { data } = await api.get('/api/transactions', { params: p });
+
+  // Normalize response: array | {items,total} | {data,total} | {records,totalCount} | {result,count}
+  let items: any[] = [];
+  let total = 0;
+
+  if (Array.isArray(data)) {
+    items = data;
+    total = data.length;
+  } else if (data?.items && Array.isArray(data.items)) {
+    items = data.items;
+    total = data.total ?? data.items.length ?? 0;
+  } else if (data?.data && Array.isArray(data.data)) {
+    items = data.data;
+    total = data.total ?? data.data.length ?? 0;
+  } else if (data?.records && Array.isArray(data.records)) {
+    items = data.records;
+    total = data.totalCount ?? data.records.length ?? 0;
+  } else if (data?.result && Array.isArray(data.result)) {
+    items = data.result;
+    total = data.count ?? data.result.length ?? 0;
+  }
+
+  return { items, total };
 }
 
+/** CSV export uses same tolerant mapping */
 async function exportCsv(params: Partial<TxQuery>) {
+  const p: Record<string, any> = {
+    q: params.q || '',
+    type: params.type && params.type !== 'all' ? params.type : undefined,
+
+    startDate: params.start || undefined,
+    endDate: params.end || undefined,
+    start: params.start || undefined,
+    end: params.end || undefined,
+
+    departmentId: params.dept && params.dept !== 'all' ? params.dept : undefined,
+    providerId: params.provider && params.provider !== 'all' ? params.provider : undefined,
+    insuranceProviderId: params.provider && params.provider !== 'all' ? params.provider : undefined,
+
+    page: params.page || '1',
+    pageSize: params.pageSize || '50',
+    sort: params.sort || 'date',
+    order: params.order || 'desc',
+  };
+  Object.keys(p).forEach((k) => p[k] === undefined && delete p[k]);
+
   const { data } = await api.get('/api/transactions/export', {
-    params,
+    params: p,
     responseType: 'blob',
   });
   const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }));
   const a = document.createElement('a');
-  a.href = url; a.download = 'transactions.csv'; a.click();
+  a.href = url;
+  a.download = 'transactions.csv';
+  a.click();
   URL.revokeObjectURL(url);
 }
 
-/* ── Page ──────────────────────────────────────────────────────────── */
+/* ───────────────────────── Page ───────────────────────── */
 
-export default function TransactionsSimple() {
-  // sensible defaults: this month, table view only
+export default function TransactionsPage() {
   const thisMonthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const thisMonthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
@@ -139,18 +221,21 @@ export default function TransactionsSimple() {
     order: 'desc',
   });
 
-  const { data: departments = [] } = useQuery({ queryKey: ['depts'], queryFn: fetchDepartments });
-  const { data: providers = [] } = useQuery({ queryKey: ['provs'], queryFn: fetchProviders });
+  const { data: departments = [] } = useQuery({
+    queryKey: ['depts'],
+    queryFn: fetchDepartments,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: providers = [] } = useQuery({
+    queryKey: ['provs'],
+    queryFn: fetchProviders,
+    staleTime: 5 * 60_000,
+  });
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['tx', filters],
-    queryFn: () =>
-      fetchTransactions({
-        ...filters,
-        type: filters.type === 'all' ? '' : filters.type,
-        dept: filters.dept === 'all' ? '' : filters.dept,
-        provider: filters.provider === 'all' ? '' : filters.provider,
-      }),
+    queryFn: () => fetchTransactions(filters),
     keepPreviousData: true,
     staleTime: 30_000,
   });
@@ -158,16 +243,16 @@ export default function TransactionsSimple() {
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  /* Quick date presets */
-  function setThisMonth() {
+  /* Quick presets */
+  const setThisMonth = () =>
     setFilters((s) => ({
       ...s,
       start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
       end: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
       page: '1',
     }));
-  }
-  function setLastMonth() {
+
+  const setLastMonth = () => {
     const d = subMonths(new Date(), 1);
     setFilters((s) => ({
       ...s,
@@ -175,20 +260,21 @@ export default function TransactionsSimple() {
       end: format(endOfMonth(d), 'yyyy-MM-dd'),
       page: '1',
     }));
-  }
-  function clearDates() {
-    setFilters((s) => ({ ...s, start: '', end: '', page: '1' }));
-  }
+  };
 
-  const onExport = () =>
-    exportCsv({
-      ...filters,
-      type: filters.type === 'all' ? '' : filters.type,
-      dept: filters.dept === 'all' ? '' : filters.dept,
-      provider: filters.provider === 'all' ? '' : filters.provider,
-    });
+  const clearDates = () =>
+    setFilters((s) => ({
+      ...s,
+      start: '',
+      end: '',
+      page: '1',
+    }));
 
-  /* ── UI ─────────────────────────────────────────────────────────── */
+  const handleExport = () => exportCsv(filters);
+
+  const from = (Number(filters.page) - 1) * Number(filters.pageSize) + 1;
+  const to = Number(filters.page) * Number(filters.pageSize);
+  const safeTotal = total || items.length;
 
   return (
     <div className="space-y-4">
@@ -201,14 +287,14 @@ export default function TransactionsSimple() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onExport}>Export CSV</Button>
+          <Button variant="outline" onClick={handleExport}>Export CSV</Button>
           <Button onClick={() => window.dispatchEvent(new CustomEvent('open-add-tx'))}>
             + Add Transaction
           </Button>
         </div>
       </div>
 
-      {/* Filters (simple) */}
+      {/* Filters */}
       <Card>
         <CardContent className="pt-6 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -225,7 +311,9 @@ export default function TransactionsSimple() {
               <Label>Type</Label>
               <Select
                 value={filters.type}
-                onValueChange={(v) => setFilters((s) => ({ ...s, type: v as 'all' | TxType, page: '1' }))}
+                onValueChange={(v) =>
+                  setFilters((s) => ({ ...s, type: v as 'all' | TxType, page: '1' }))
+                }
               >
                 <SelectTrigger><SelectValue placeholder="All types" /></SelectTrigger>
                 <SelectContent>
@@ -330,9 +418,13 @@ export default function TransactionsSimple() {
                 ) : (
                   items.map((t) => (
                     <tr key={t.id} className="border-t">
-                      <td className="px-3 py-2 tabular-nums">{format(new Date(t.date), 'M/d/yyyy')}</td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {format(new Date(t.date), 'M/d/yyyy')}
+                      </td>
                       <td className="px-3 py-2 truncate max-w-[360px]">{t.description}</td>
-                      <td className="px-3 py-2">{t.departmentName ?? <span className="text-slate-400">—</span>}</td>
+                      <td className="px-3 py-2">
+                        {t.departmentName ?? <span className="text-slate-400">—</span>}
+                      </td>
                       <td className="px-3 py-2">
                         {t.type === 'income'
                           ? <Badge className="bg-emerald-600">Income</Badge>
@@ -359,7 +451,9 @@ export default function TransactionsSimple() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => window.dispatchEvent(new CustomEvent('open-edit-tx', { detail: { id: t.id } }))}
+                          onClick={() =>
+                            window.dispatchEvent(new CustomEvent('open-edit-tx', { detail: { id: t.id } }))
+                          }
                         >
                           Edit
                         </Button>
@@ -374,8 +468,7 @@ export default function TransactionsSimple() {
           {/* Pagination */}
           <div className="mt-3 flex items-center justify-between text-sm">
             <div className="text-slate-500">
-              Showing {(Number(filters.page) - 1) * Number(filters.pageSize) + 1}–
-              {Math.min(Number(filters.page) * Number(filters.pageSize), total)} of {total}
+              Showing {items.length ? from : 0}–{Math.min(to, safeTotal)} of {safeTotal}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -387,7 +480,7 @@ export default function TransactionsSimple() {
               </Button>
               <Button
                 variant="outline" size="sm"
-                disabled={Number(filters.page) * Number(filters.pageSize) >= total}
+                disabled={Number(filters.page) * Number(filters.pageSize) >= safeTotal}
                 onClick={() => setFilters((s) => ({ ...s, page: String(Number(s.page) + 1) }))}
               >
                 Next
