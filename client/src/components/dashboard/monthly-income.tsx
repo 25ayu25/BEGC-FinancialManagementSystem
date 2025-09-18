@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -11,55 +11,165 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Line,
+  ReferenceLine,
 } from "recharts";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
 
-/* ------------------------------------------------------------------ */
-/* Types & helpers                                                     */
-/* ------------------------------------------------------------------ */
+/* -------------------------------- Types -------------------------------- */
 
 type TimeRange =
   | "current-month"
   | "last-month"
-  | "month-select"
   | "last-3-months"
   | "year"
+  | "month-select"
   | "custom";
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // 4-digit year (e.g. 2025)
+  selectedYear: number;   // 4-digit year
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
+
+  /** Optional: draw a goal/reference line on the SSP chart (per-month target). */
+  monthlySSPTarget?: number;
+
+  /**
+   * Optional: bar click handler for drill-down.
+   * If provided, clicking a bar will pass (year, month, currency).
+   */
+  onBarClick?: (year: number, month: number, currency: "SSP" | "USD") => void;
 };
 
+/* ----------------------------- Constants ------------------------------ */
+
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
 
-const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+/* -------------------------------- Utils -------------------------------- */
 
-function normalizedRange(range: TimeRange) {
-  return range === "month-select" ? "current-month" : range;
+const normCurrency = (x: any) =>
+  String(x ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
+
+function computeWindow(
+  timeRange: TimeRange,
+  year: number,
+  month: number,
+  customStart?: Date,
+  customEnd?: Date
+) {
+  const out: { y: number; m: number }[] = [];
+
+  if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
+    return [{ y: year, m: month }];
+  }
+
+  if (timeRange === "year") {
+    for (let m = 1; m <= 12; m++) out.push({ y: year, m });
+    return out;
+  }
+
+  if (timeRange === "last-3-months") {
+    const end = new Date(year, month - 1, 1);
+    for (let k = 2; k >= 0; k--) {
+      const d = new Date(end.getFullYear(), end.getMonth() - k, 1);
+      out.push({ y: d.getFullYear(), m: d.getMonth() + 1 });
+    }
+    return out;
+  }
+
+  if (timeRange === "custom" && customStart && customEnd) {
+    let d = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
+    const finish = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
+    while (d <= finish) {
+      out.push({ y: d.getFullYear(), m: d.getMonth() + 1 });
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    }
+    return out;
+  }
+
+  for (let m = 1; m <= 12; m++) out.push({ y: year, m });
+  return out;
 }
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener?.("change", update);
-    return () => mq.removeEventListener?.("change", update);
-  }, [breakpoint]);
-  return isMobile;
+/** Fetch income transactions within a span (handles pagination). */
+async function fetchTransactions(startISO: string, endISO: string) {
+  const pageSize = 1000;
+  let page = 1;
+  let hasMore = true;
+  const all: any[] = [];
+
+  while (hasMore) {
+    const { data } = await api.get(
+      `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`
+    );
+    const rows = data?.transactions || [];
+    all.push(...rows);
+    hasMore = Boolean(data?.hasMore);
+    page += 1;
+    if (!rows.length) break;
+  }
+  return all;
 }
 
+/** Fetch insurance USD totals per month for current window. */
+async function fetchInsuranceMonthlyUSD(
+  timeRange: TimeRange,
+  selectedYear: number,
+  selectedMonth: number,
+  start?: Date,
+  end?: Date
+) {
+  let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${timeRange}`;
+  if (timeRange === "custom" && start && end) {
+    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`;
+  }
+  if (timeRange === "month-select" || timeRange === "current-month" || timeRange === "last-month") {
+    const s = start ?? new Date(selectedYear, selectedMonth - 1, 1);
+    const e = end ?? new Date(selectedYear, selectedMonth, 0);
+    url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=custom&startDate=${format(
+      s,
+      "yyyy-MM-dd"
+    )}&endDate=${format(e, "yyyy-MM-dd")}`;
+  }
+
+  try {
+    const res = await api.get(url);
+    const list = (res?.data?.data || res?.data) as
+      | Array<{ year: number; month: number; usd: number }>
+      | { usd?: number }
+      | number
+      | undefined;
+
+    const map = new Map<string, number>();
+    if (Array.isArray(list)) {
+      for (const row of list) {
+        map.set(`${row.year}-${String(row.month).padStart(2, "0")}`, Number(row.usd || 0));
+      }
+    } else {
+      const single =
+        typeof list === "number"
+          ? list
+          : typeof list === "object" && list
+          ? Number((list as any).usd || 0)
+          : 0;
+      const key = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+      map.set(key, single);
+    }
+    return map;
+  } catch {
+    return new Map<string, number>();
+  }
+}
+
+/* --------------------------- Nice tick helpers -------------------------- */
 /** Return a "nice" step (1, 2, **2.5**, 5, 10 × 10^n) for a given rough step. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
@@ -67,153 +177,193 @@ function niceStep(roughStep: number) {
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
   let niceFrac: number;
+
+  // include 2.5 for round, well-spaced ticks
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
   else if (frac <= 5)   niceFrac = 5;
   else                  niceFrac = 10;
+
   return niceFrac * base;
 }
-
-/** Build 5 ticks (0..max) with a nice step so labels are round and spacing feels right. */
-function buildNiceTicks(dataMax: number) {
-  if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
-  const step = niceStep(dataMax / 4);
-  const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
+function buildNiceTicks(max: number) {
+  if (max <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
+  const step = niceStep(max / 4);
+  const niceMax = step * 4;
+  return { max: niceMax, ticks: [0, step, step * 2, step * 3, niceMax] };
 }
 
-/* ------------------------------------------------------------------ */
-/* Data fetch                                                          */
-/* ------------------------------------------------------------------ */
+/* ------------------------------ Tooltip UI ------------------------------ */
 
-async function fetchIncomeTrendsMonthly(
-  year: number,
-  range: TimeRange,
-  start?: Date,
-  end?: Date
-) {
-  // If your backend uses a different endpoint, keep the URL you had and only reuse the rendering bits below.
-  let url = `/api/income-trends/${year}?range=${normalizedRange(range)}`;
-  if (range === "custom" && start && end) {
-    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`;
-  }
-  const { data } = await api.get(url);
-  return Array.isArray(data) ? data : [];
-}
-
-/* ------------------------------------------------------------------ */
-/* Tooltip                                                             */
-/* ------------------------------------------------------------------ */
-
-type TTProps = {
+function MonthTooltip({
+  active,
+  payload,
+  currency,
+}: {
   active?: boolean;
   payload?: any[];
-  year: number;
   currency: "SSP" | "USD";
-};
-
-function MonthTooltip({ active, payload, year, currency }: TTProps) {
-  if (!active || !payload || !payload.length) return null;
+}) {
+  if (!active || !payload?.length) return null;
   const p = payload[0]?.payload;
-  const m = Number(p?.month);
+  const label: string = p?.label ?? "";
   const value = Number(p?.value ?? 0);
-  const label = isFinite(m) ? `${MONTHS_SHORT[m - 1]} ${year}` : "";
 
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[160px]">
       <div className="font-semibold text-slate-900 mb-1">{label}</div>
       <div className="text-sm text-slate-700 font-mono">
-        {currency} {compact.format(Math.round(value))}
+        {currency} {nf0.format(Math.round(value))}
       </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Component                                                           */
-/* ------------------------------------------------------------------ */
+/* ------------------------------- Component ------------------------------ */
 
 export default function MonthlyIncome({
   timeRange,
   selectedYear,
-  selectedMonth,        // not strictly needed for "year", but kept for parity
+  selectedMonth,
   customStartDate,
   customEndDate,
+  monthlySSPTarget,
+  onBarClick,
 }: Props) {
-  const year = selectedYear;
-  const isMobile = useIsMobile(768);
+  const months = useMemo(
+    () =>
+      computeWindow(
+        timeRange,
+        selectedYear,
+        selectedMonth,
+        customStartDate,
+        customEndDate
+      ),
+    [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
+  );
 
-  const { data: raw = [], isLoading } = useQuery({
+  const spanStart = useMemo(() => {
+    const first = months[0];
+    return new Date(first.y, first.m - 1, 1);
+  }, [months]);
+
+  const spanEnd = useMemo(() => {
+    const last = months[months.length - 1];
+    return new Date(last.y, last.m, 0);
+  }, [months]);
+
+  const isSingleMonth =
+    timeRange === "month-select" ||
+    timeRange === "current-month" ||
+    timeRange === "last-month";
+
+  const monthStart = useMemo(
+    () => new Date(selectedYear, selectedMonth - 1, 1),
+    [selectedYear, selectedMonth]
+  );
+  const monthEnd = useMemo(
+    () => new Date(selectedYear, selectedMonth, 0),
+    [selectedYear, selectedMonth]
+  );
+
+  const { data = [], isLoading } = useQuery({
     queryKey: [
-      "overview-monthly-income",
-      year,
-      normalizedRange(timeRange),
+      "monthly-income-v5",
+      timeRange,
+      selectedYear,
+      selectedMonth,
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
-    queryFn: () =>
-      fetchIncomeTrendsMonthly(year, timeRange, customStartDate, customEndDate),
-    staleTime: 60_000,
-    retry: 1,
+    queryFn: async () => {
+      const map = new Map<string, { label: string; ssp: number; usd: number }>();
+      months.forEach(({ y, m }) => {
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
+      });
+
+      // Pull all transactions in one span (single month or range)
+      const txStart = isSingleMonth ? monthStart : spanStart;
+      const txEnd = isSingleMonth ? monthEnd : spanEnd;
+      const rows = await fetchTransactions(
+        format(txStart, "yyyy-MM-dd"),
+        format(txEnd, "yyyy-MM-dd")
+      );
+
+      for (const t of rows as any[]) {
+        const rawDate =
+          t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
+        const d = rawDate ? new Date(rawDate) : null;
+        if (!d || Number.isNaN(d.getTime())) continue;
+
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        if (!map.has(key)) continue;
+
+        const amount = Number(t.amount ?? 0);
+        const cur = normCurrency(t.currency);
+        if (cur === "USD") map.get(key)!.usd += amount;
+        else map.get(key)!.ssp += amount;
+      }
+
+      // Add insurance USD
+      const insMap = await fetchInsuranceMonthlyUSD(
+        timeRange,
+        selectedYear,
+        selectedMonth,
+        isSingleMonth ? monthStart : customStartDate,
+        isSingleMonth ? monthEnd : customEndDate
+      );
+      for (const [key, usd] of insMap.entries()) {
+        if (map.has(key)) map.get(key)!.usd += Number(usd || 0);
+      }
+
+      return Array.from(map.values());
+    },
   });
 
-  // Base 12 months
-  const base = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        month: i + 1,
-        label: MONTHS_SHORT[i],
-        ssp: 0,
-        usd: 0,
-      })),
-    []
-  );
+  /* ----------------------------- Aggregations ---------------------------- */
 
-  // Merge raw -> base
-  for (const r of raw as any[]) {
-    let m: number | undefined = (r as any).month;
-    if (!m && (r as any).dateISO) m = new Date((r as any).dateISO).getMonth() + 1;
-    if (!m && (r as any).date)    m = new Date((r as any).date).getMonth() + 1;
-    if (typeof m === "number" && m >= 1 && m <= 12) {
-      const idx = m - 1;
-      base[idx].ssp += Number(
-        (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
-      );
-      base[idx].usd += Number((r as any).incomeUSD ?? 0);
-    }
-  }
+  const sspSeries = data.map(({ label, ssp }) => ({ label, value: Number(ssp) || 0 }));
+  const usdSeries = data.map(({ label, usd }) => ({ label, value: Number(usd) || 0 }));
 
-  // Split series for Recharts
-  const sspSeries = base.map((b) => ({ month: b.month, label: b.label, value: b.ssp }));
-  const usdSeries = base.map((b) => ({ month: b.month, label: b.label, value: b.usd }));
+  const totalSSP = sspSeries.reduce((s, r) => s + r.value, 0);
+  const totalUSD = usdSeries.reduce((s, r) => s + r.value, 0);
 
-  const totalSSP = sspSeries.reduce((s, d) => s + d.value, 0);
-  const totalUSD = usdSeries.reduce((s, d) => s + d.value, 0);
-  const activeMonthsSSP = sspSeries.filter((d) => d.value > 0).length || 0;
-  const activeMonthsUSD = usdSeries.filter((d) => d.value > 0).length || 0;
-  const avgSSP = activeMonthsSSP ? Math.round(totalSSP / activeMonthsSSP) : 0;
-  const avgUSD = activeMonthsUSD ? Math.round(totalUSD / activeMonthsUSD) : 0;
+  // Average over active months (ignore months with zero value)
+  const activeMonthsSSP = sspSeries.filter(d => d.value > 0).length || 0;
+  const activeMonthsUSD = usdSeries.filter(d => d.value > 0).length || 0;
+  const avgMoSSP = activeMonthsSSP ? Math.round(totalSSP / activeMonthsSSP) : 0;
+  const avgMoUSD = activeMonthsUSD ? Math.round(totalUSD / activeMonthsUSD) : 0;
 
-  // Nice ticks for even spacing & round values
-  const dataMaxSSP = Math.max(0, ...sspSeries.map((d) => d.value));
-  const dataMaxUSD = Math.max(0, ...usdSeries.map((d) => d.value));
-  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(dataMaxSSP);
-  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(dataMaxUSD);
+  // Rolling avg (3-mo) for SSP (kept subtle, like your daily design)
+  const sspRolling = sspSeries.map((d, i, arr) => {
+    const start = Math.max(0, i - 2);
+    const slice = arr.slice(start, i + 1);
+    const sum = slice.reduce((s, r) => s + r.value, 0);
+    return { label: d.label, avg: slice.length ? sum / slice.length : 0 };
+  });
 
-  // Mobile x-axis density
-  const desiredTicks = isMobile ? 6 : 12;
-  const xInterval = Math.max(0, Math.ceil(12 / desiredTicks) - 1);
-  const xTickFont = isMobile ? 10 : 11;
-  const xTickMargin = isMobile ? 4 : 8;
+  // Nice ticks to keep spacing even and labels round
+  const maxSSP = Math.max(0, ...sspSeries.map(d => d.value));
+  const maxUSD = Math.max(0, ...usdSeries.map(d => d.value));
+  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(maxSSP);
+  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(maxUSD);
 
-  const renderSSPTooltip = (p: any) => (
-    <MonthTooltip {...p} year={year} currency="SSP" />
-  );
-  const renderUSDTooltip = (p: any) => (
-    <MonthTooltip {...p} year={year} currency="USD" />
-  );
+  const headerLabel = (() => {
+    if (isSingleMonth) return `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`;
+    if (timeRange === "last-3-months") return "Last 3 months";
+    if (timeRange === "year") return `${selectedYear}`;
+    return "Selected period";
+  })();
+
+  const handleBarClick = (index: number, currency: "SSP" | "USD") => {
+    if (!onBarClick) return;
+    const bucket = months[index];
+    if (bucket) onBarClick(bucket.y, bucket.m, currency);
+  };
 
   return (
     <Card className="border-0 shadow-md bg-white">
@@ -222,35 +372,37 @@ export default function MonthlyIncome({
           Monthly Income
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          Key financials · {year} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+          {headerLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
         </div>
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
-        {/* SSP (Monthly) */}
+        {/* SSP Monthly */}
         <section aria-label="SSP monthly">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-slate-700">SSP (Monthly)</p>
             <span className="text-xs text-slate-500">
               Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
               <span className="mx-2">•</span>
-              Avg/month: <span className="font-semibold">SSP {nf0.format(avgSSP)}</span>
+              Avg/mo: <span className="font-semibold">SSP {nf0.format(avgMoSSP)}</span>
             </span>
           </div>
-          <div className="h-56 rounded-lg border border-slate-200">
+
+          <div className="h-64 rounded-lg border border-slate-200">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={sspSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                margin={{ top: 10, right: 12, left: 12, bottom: 28 }}
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  interval={xInterval}
-                  minTickGap={isMobile ? 2 : 0}
-                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                  tickMargin={xTickMargin}
+                  interval={0}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  angle={sspSeries.length > 6 ? -30 : 0}
+                  textAnchor={sspSeries.length > 6 ? "end" : "middle"}
+                  height={sspSeries.length > 6 ? 42 : 20}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -258,47 +410,73 @@ export default function MonthlyIncome({
                   domain={[0, yMaxSSP]}
                   ticks={ticksSSP}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v)}
+                  tickFormatter={(v) => compact.format(v as number)}
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip content={renderSSPTooltip} />
+                <Tooltip content={<MonthTooltip currency="SSP" />} />
+                <Line
+                  type="monotone"
+                  data={sspRolling}
+                  dataKey="avg"
+                  stroke="#7c3aed"
+                  strokeWidth={2}
+                  dot={false}
+                  name="3-mo avg"
+                />
+                {typeof monthlySSPTarget === "number" && monthlySSPTarget > 0 && (
+                  <ReferenceLine
+                    y={monthlySSPTarget}
+                    stroke="#0ea5e9"
+                    strokeDasharray="4 4"
+                    ifOverflow="extendDomain"
+                    label={{
+                      value: `Target: SSP ${nf0.format(monthlySSPTarget)}`,
+                      position: "right",
+                      fill: "#0ea5e9",
+                      fontSize: 11,
+                    }}
+                  />
+                )}
                 <Bar
                   dataKey="value"
                   name="SSP"
                   fill="#14b8a6"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={isMobile ? 14 : 18}
+                  maxBarSize={28}
+                  onClick={(_, i) => handleBarClick(i, "SSP")}
                 />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </section>
 
-        {/* USD (Monthly) */}
+        {/* USD Monthly */}
         <section aria-label="USD monthly">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-slate-700">USD (Monthly)</p>
             <span className="text-xs text-slate-500">
               Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
               <span className="mx-2">•</span>
-              Avg/month: <span className="font-semibold">USD {nf0.format(avgUSD)}</span>
+              Avg/mo: <span className="font-semibold">USD {nf0.format(avgMoUSD)}</span>
             </span>
           </div>
-          <div className="h-56 rounded-lg border border-slate-200">
+
+          <div className="h-64 rounded-lg border border-slate-200">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usdSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                margin={{ top: 10, right: 12, left: 12, bottom: 28 }}
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  interval={xInterval}
-                  minTickGap={isMobile ? 2 : 0}
-                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                  tickMargin={xTickMargin}
+                  interval={0}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  angle={usdSeries.length > 6 ? -30 : 0}
+                  textAnchor={usdSeries.length > 6 ? "end" : "middle"}
+                  height={usdSeries.length > 6 ? 42 : 20}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -306,17 +484,18 @@ export default function MonthlyIncome({
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v)}
+                  tickFormatter={(v) => compact.format(v as number)}
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip content={renderUSDTooltip} />
+                <Tooltip content={<MonthTooltip currency="USD" />} />
                 <Bar
                   dataKey="value"
                   name="USD"
                   fill="#0ea5e9"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={isMobile ? 14 : 18}
+                  maxBarSize={28}
+                  onClick={(_, i) => handleBarClick(i, "USD")}
                 />
               </BarChart>
             </ResponsiveContainer>
