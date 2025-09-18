@@ -37,10 +37,7 @@ type Props = {
   /** Optional: draw a goal/reference line on the SSP chart (per-month target). */
   monthlySSPTarget?: number;
 
-  /**
-   * Optional: bar click handler for drill-down.
-   * If provided, clicking a bar will pass (year, month, currency).
-   */
+  /** Optional drill-down when a bar is clicked. */
   onBarClick?: (year: number, month: number, currency: "SSP" | "USD") => void;
 };
 
@@ -170,7 +167,7 @@ async function fetchInsuranceMonthlyUSD(
 }
 
 /* --------------------------- Nice tick helpers -------------------------- */
-/** Return a "nice" step (1, 2, **2.5**, 5, 10 × 10^n) for a given rough step. */
+
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -178,7 +175,7 @@ function niceStep(roughStep: number) {
   const frac = roughStep / base;
   let niceFrac: number;
 
-  // include 2.5 for round, well-spaced ticks
+  // include 2.5 for pleasing spacing
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
@@ -243,6 +240,7 @@ export default function MonthlyIncome({
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
+  // span for API pull
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -269,7 +267,7 @@ export default function MonthlyIncome({
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
-      "monthly-income-v5",
+      "monthly-income-v6",
       timeRange,
       selectedYear,
       selectedMonth,
@@ -280,10 +278,11 @@ export default function MonthlyIncome({
       const map = new Map<string, { label: string; ssp: number; usd: number }>();
       months.forEach(({ y, m }) => {
         const key = `${y}-${String(m).padStart(2, "0")}`;
-        map.set(key, { label: `${MONTH_SHORT[m - 1]} ${y}`, ssp: 0, usd: 0 });
+        // label is MONTH ONLY (no year)
+        map.set(key, { label: MONTH_SHORT[m - 1], ssp: 0, usd: 0 });
       });
 
-      // Pull all transactions in one span (single month or range)
+      // Pull all transactions in one span
       const txStart = isSingleMonth ? monthStart : spanStart;
       const txEnd = isSingleMonth ? monthEnd : spanEnd;
       const rows = await fetchTransactions(
@@ -338,7 +337,7 @@ export default function MonthlyIncome({
   const avgMoSSP = activeMonthsSSP ? Math.round(totalSSP / activeMonthsSSP) : 0;
   const avgMoUSD = activeMonthsUSD ? Math.round(totalUSD / activeMonthsUSD) : 0;
 
-  // Rolling avg (3-mo) for SSP (kept subtle, like your daily design)
+  // Rolling avg (3-mo) for SSP
   const sspRolling = sspSeries.map((d, i, arr) => {
     const start = Math.max(0, i - 2);
     const slice = arr.slice(start, i + 1);
@@ -352,16 +351,19 @@ export default function MonthlyIncome({
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(maxSSP);
   const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(maxUSD);
 
-  const headerLabel = (() => {
-    if (isSingleMonth) return `${MONTH_SHORT[selectedMonth - 1]} ${selectedYear}`;
-    if (timeRange === "last-3-months") return "Last 3 months";
-    if (timeRange === "year") return `${selectedYear}`;
-    return "Selected period";
-  })();
+  // Axis label rotation only when necessary
+  const needRotateSSP = sspSeries.length > 6;
+  const needRotateUSD = usdSeries.length > 6;
 
   const handleBarClick = (index: number, currency: "SSP" | "USD") => {
     if (!onBarClick) return;
-    const bucket = months[index];
+    const bucket = computeWindow(
+      timeRange,
+      selectedYear,
+      selectedMonth,
+      customStartDate,
+      customEndDate
+    )[index];
     if (bucket) onBarClick(bucket.y, bucket.m, currency);
   };
 
@@ -372,7 +374,7 @@ export default function MonthlyIncome({
           Monthly Income
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          {headerLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+          SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
         </div>
       </CardHeader>
 
@@ -392,7 +394,7 @@ export default function MonthlyIncome({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={sspSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: 28 }}
+                margin={{ top: 10, right: 12, left: 12, bottom: needRotateSSP ? 28 : 18 }}
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -400,9 +402,9 @@ export default function MonthlyIncome({
                   dataKey="label"
                   interval={0}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  angle={sspSeries.length > 6 ? -30 : 0}
-                  textAnchor={sspSeries.length > 6 ? "end" : "middle"}
-                  height={sspSeries.length > 6 ? 42 : 20}
+                  angle={needRotateSSP ? -20 : 0}
+                  textAnchor={needRotateSSP ? "end" : "middle"}
+                  height={needRotateSSP ? 34 : 20}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -466,7 +468,7 @@ export default function MonthlyIncome({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usdSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: 28 }}
+                margin={{ top: 10, right: 12, left: 12, bottom: needRotateUSD ? 28 : 18 }}
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -474,9 +476,9 @@ export default function MonthlyIncome({
                   dataKey="label"
                   interval={0}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  angle={usdSeries.length > 6 ? -30 : 0}
-                  textAnchor={usdSeries.length > 6 ? "end" : "middle"}
-                  height={usdSeries.length > 6 ? 42 : 20}
+                  angle={needRotateUSD ? -20 : 0}
+                  textAnchor={needRotateUSD ? "end" : "middle"}
+                  height={needRotateUSD ? 34 : 20}
                   axisLine={false}
                   tickLine={false}
                 />
