@@ -36,9 +36,11 @@ const kfmt = (v: number) =>
   v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v));
 
 function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate(); // month is 1..12
+  // month is 1..12
+  return new Date(year, month, 0).getDate();
 }
 function normalizedRange(range: TimeRange) {
+  // keep backend API compatibility
   return range === "month-select" ? "current-month" : range;
 }
 
@@ -59,6 +61,38 @@ async function fetchIncomeTrendsDaily(
   const { data } = await api.get(url);
   return Array.isArray(data) ? data : [];
 }
+
+/* --------------------------- Custom Tooltip --------------------------- */
+
+type RTProps = {
+  active?: boolean;
+  payload?: any[];
+  label?: any;
+  year: number;
+  month: number; // 1..12
+  currency: "SSP" | "USD";
+};
+
+function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
+  if (!active || !payload || !payload.length) return null;
+  const d = payload[0]?.payload?.day as number | undefined;
+  const value = Number(payload[0]?.payload?.value ?? 0);
+  const dateStr =
+    typeof d === "number"
+      ? format(new Date(year, month - 1, d), "MMM d, yyyy")
+      : "";
+
+  return (
+    <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
+      <div className="font-semibold text-slate-900 mb-1">{dateStr}</div>
+      <div className="text-sm text-slate-700 font-mono">
+        {currency} {nf0.format(Math.round(value))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- Main -------------------------------- */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -110,20 +144,25 @@ export default function RevenueAnalyticsDaily({
   const totalSSP = ssp.reduce((s, r) => s + r.value, 0);
   const totalUSD = usd.reduce((s, r) => s + r.value, 0);
 
-  // "active-day" averages (ignores zero days so a few end-of-month zeros don't dilute the signal)
-  const activeDaysSSP = ssp.filter(d => d.value > 0).length || 0;
-  const activeDaysUSD = usd.filter(d => d.value > 0).length || 0;
+  // "active-day" averages (ignores completely-zero days)
+  const activeDaysSSP = ssp.filter((d) => d.value > 0).length || 0;
+  const activeDaysUSD = usd.filter((d) => d.value > 0).length || 0;
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  // headroom so the tallest bar doesn’t touch the top
-  const yMaxSSP = Math.ceil(Math.max(0, ...ssp.map(d => d.value)) * 1.12);
-  const yMaxUSD = Math.ceil(Math.max(0, ...usd.map(d => d.value)) * 1.18);
-
-  const tooltipSSP = (v: any) => [`SSP ${nf0.format(Math.round(Number(v)))}`, ""];
-  const tooltipUSD = (v: any) => [`USD ${nf0.format(Math.round(Number(v)))}`, ""];
+  // headroom so tallest bar doesn’t touch the top
+  const yMaxSSP = Math.ceil(Math.max(0, ...ssp.map((d) => d.value)) * 1.12);
+  const yMaxUSD = Math.ceil(Math.max(0, ...usd.map((d) => d.value)) * 1.18);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMM yyyy");
+
+  // tooltip renderers (need access to year/month)
+  const renderSSPTooltip = (p: any) => (
+    <RevenueTooltip {...p} year={year} month={month} currency="SSP" />
+  );
+  const renderUSDTooltip = (p: any) => (
+    <RevenueTooltip {...p} year={year} month={month} currency="USD" />
+  );
 
   return (
     <Card className="border-0 shadow-md bg-white">
@@ -161,7 +200,7 @@ export default function RevenueAnalyticsDaily({
                   interval={0}             // show every day (like Patient Volume)
                   tick={{ fontSize: 11, fill: "#64748b" }}
                   tickMargin={8}
-                  axisLine={false}         // remove the baseline line
+                  axisLine={false}         // remove baseline
                   tickLine={false}         // remove little tick marks
                 />
                 <YAxis
@@ -170,12 +209,13 @@ export default function RevenueAnalyticsDaily({
                   tickFormatter={kfmt}
                   axisLine={false}
                   tickLine={false}
+                  tickCount={5}            // EVEN SPACING like PV chart
                 />
-                <Tooltip formatter={tooltipSSP} labelFormatter={(l) => `Day ${l}`} />
+                <Tooltip content={renderSSPTooltip} />
                 <Bar
                   dataKey="value"
                   name="SSP"
-                  fill="#14b8a6"           // teal (matches Patient Volume vibe)
+                  fill="#14b8a6"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={18}
                 />
@@ -216,12 +256,13 @@ export default function RevenueAnalyticsDaily({
                   tickFormatter={kfmt}
                   axisLine={false}
                   tickLine={false}
+                  tickCount={5}            // EVEN SPACING like PV chart
                 />
-                <Tooltip formatter={tooltipUSD} labelFormatter={(l) => `Day ${l}`} />
+                <Tooltip content={renderUSDTooltip} />
                 <Bar
                   dataKey="value"
                   name="USD"
-                  fill="#0ea5e9"           // blue pairs nicely with teal
+                  fill="#0ea5e9"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={18}
                 />
