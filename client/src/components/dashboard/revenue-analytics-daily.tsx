@@ -23,36 +23,32 @@ type TimeRange =
   | "custom";
 
 type Props = {
-  // We will render the focused month (selectedYear/selectedMonth).
-  // If the top-level date filter is not a single month, we still
-  // show the chosen month on Exec Dashboard to keep it simple.
   timeRange: TimeRange;
-  selectedYear: number;   // 2025
+  selectedYear: number;   // 4-digit year
   selectedMonth: number;  // 1..12
+  customStartDate?: Date;
+  customEndDate?: Date;
 };
 
-// number formatter: integers, no decimals
+// number formatting helpers
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const kfmt = (v: number) =>
+  v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v));
 
-/* ----------------------------- Helpers ----------------------------- */
+/* ----------------------------- helpers ----------------------------- */
 
 function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate(); // month is 1..12
+  // month is 1..12
+  return new Date(year, month, 0).getDate();
 }
 
-function startOfMonth(year: number, month: number) {
-  return new Date(year, month - 1, 1);
-}
-function endOfMonth(year: number, month: number) {
-  return new Date(year, month, 0);
+function normalizedRange(range: TimeRange) {
+  // keep backend compatible: month-select behaves like current-month server-side
+  return range === "month-select" ? "current-month" : range;
 }
 
-function currencyNorm(x: any) {
-  return String(x ?? "SSP").replace(/[^a-z]/gi, "").toUpperCase();
-}
-
-// simple 7-day rolling avg
 function rollingAvg(series: Array<{ day: number; value: number }>, window = 7) {
+  // simple 7-day moving average, safe on any browser
   return series.map((p, i) => {
     const s = Math.max(0, i - (window - 1));
     const slice = series.slice(s, i + 1);
@@ -61,99 +57,98 @@ function rollingAvg(series: Array<{ day: number; value: number }>, window = 7) {
   });
 }
 
-/* ------------------------------ Fetch ------------------------------ */
+/* ------------------------------ fetch ------------------------------ */
 
-async function fetchIncomeDaily(year: number, month: number) {
-  const startISO = format(startOfMonth(year, month), "yyyy-MM-dd");
-  const endISO   = format(endOfMonth(year, month), "yyyy-MM-dd");
-
-  // paginate in case there are many rows
-  const pageSize = 1000;
-  let page = 1;
-  let hasMore = true;
-  const all: any[] = [];
-
-  while (hasMore) {
-    const { data } = await api.get(
-      `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`
-    );
-    const rows = data?.transactions || [];
-    all.push(...rows);
-    hasMore = Boolean(data?.hasMore);
-    page += 1;
-    if (!rows.length) break;
+async function fetchIncomeTrendsDaily(
+  year: number,
+  month: number,
+  range: TimeRange,
+  start?: Date,
+  end?: Date
+) {
+  let url = `/api/income-trends/${year}/${month}?range=${normalizedRange(range)}`;
+  if (range === "custom" && start && end) {
+    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
+      end,
+      "yyyy-MM-dd"
+    )}`;
   }
-  return all;
+  const { data } = await api.get(url);
+  return Array.isArray(data) ? data : [];
 }
 
-/* ---------------------------- Component ---------------------------- */
+/* ---------------------------- component ---------------------------- */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
   selectedYear,
   selectedMonth,
+  customStartDate,
+  customEndDate,
 }: Props) {
-  // We always focus on the chosen month to keep Exec view predictable.
-  const year  = selectedYear;
+  // Focus the Exec view on a single month (the selected one).
+  const year = selectedYear;
   const month = selectedMonth;
-  const days  = daysInMonth(year, month);
+  const days = daysInMonth(year, month);
 
-  // Prebuild 1..days with zeros so X-axis includes the full month
+  // prebuild 1..N days so the X-axis always shows the full month
   const baseDays = useMemo(
     () => Array.from({ length: days }, (_, i) => i + 1),
     [days]
   );
 
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["exec-daily-income", year, month],
-    queryFn: async () => {
-      const rows = await fetchIncomeDaily(year, month);
-
-      // Aggregate by day and currency
-      const sspBucket: Record<number, number> = {};
-      const usdBucket: Record<number, number> = {};
-
-      for (const t of rows as any[]) {
-        const raw = t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
-        const d = raw ? new Date(raw) : null;
-        if (!d || Number.isNaN(d.getTime())) continue;
-
-        const day = d.getDate();
-        const amt = Number(t.amount ?? 0);
-        const cur = currencyNorm(t.currency);
-
-        if (cur === "USD") usdBucket[day] = (usdBucket[day] || 0) + amt;
-        else               sspBucket[day] = (sspBucket[day] || 0) + amt;
-      }
-
-      // Build continuous series for the whole month
-      const ssp = baseDays.map((day) => ({ day, value: Number(sspBucket[day] || 0) }));
-      const usd = baseDays.map((day) => ({ day, value: Number(usdBucket[day] || 0) }));
-
-      return { ssp, usd };
-    },
+  const { data: raw = [], isLoading } = useQuery({
+    queryKey: [
+      "exec-daily-income",
+      year,
+      month,
+      normalizedRange(timeRange),
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
+    ],
+    queryFn: () =>
+      fetchIncomeTrendsDaily(
+        year,
+        month,
+        timeRange,
+        customStartDate,
+        customEndDate
+      ),
   });
 
-  const sspSeries = data?.ssp ?? baseDays.map((day) => ({ day, value: 0 }));
-  const usdSeries = data?.usd ?? baseDays.map((day) => ({ day, value: 0 }));
+  // aggregate into continuous daily series for each currency
+  const ssp = baseDays.map((day) => ({ day, value: 0 }));
+  const usd = baseDays.map((day) => ({ day, value: 0 }));
 
-  // Summaries
-  const totalSSP = sspSeries.reduce((s, r) => s + r.value, 0);
-  const totalUSD = usdSeries.reduce((s, r) => s + r.value, 0);
+  for (const r of raw as any[]) {
+    // try day first, then parse date fields
+    let d = (r as any).day;
+    if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
+    if (!d && (r as any).date) d = new Date((r as any).date).getDate();
 
-  // dynamic headroom so labels won't clip if added later
-  const yMaxSSP = Math.ceil(Math.max(0, ...sspSeries.map(d => d.value)) * 1.15);
-  const yMaxUSD = Math.ceil(Math.max(0, ...usdSeries.map(d => d.value)) * 1.20);
+    if (typeof d === "number" && d >= 1 && d <= days) {
+      ssp[d - 1].value += Number((r as any).incomeSSP ?? (r as any).income ?? 0);
+      usd[d - 1].value += Number((r as any).incomeUSD ?? 0);
+    }
+  }
 
-  // 7-day moving average
-  const sspAvg = rollingAvg(sspSeries, 7);
-  const usdAvg = rollingAvg(usdSeries, 7);
+  const sspTotal = ssp.reduce((s, r) => s + r.value, 0);
+  const usdTotal = usd.reduce((s, r) => s + r.value, 0);
 
-  // Make day ticks readable (show roughly 8–10 ticks)
-  const approxTicks = 8;
+  // add headroom so bars/labels never clip
+  const yMaxSSP = Math.ceil(Math.max(0, ...ssp.map((p) => p.value)) * 1.15);
+  const yMaxUSD = Math.ceil(Math.max(0, ...usd.map((p) => p.value)) * 1.2);
+
+  // 7-day moving averages (trend hints)
+  const sspAvg = rollingAvg(ssp, 7);
+  const usdAvg = rollingAvg(usd, 7);
+
+  // show ~8–10 X ticks, but still render *all* days as data
+  const approxTicks = 9;
   const tickInterval = Math.max(1, Math.floor(days / approxTicks));
 
-  const tooltipFmt = (v: any) => nf0.format(Math.round(Number(v)));
+  const tooltipSSP = (v: any) => [`SSP ${nf0.format(Math.round(Number(v)))}`, ""];
+  const tooltipUSD = (v: any) => [`USD ${nf0.format(Math.round(Number(v)))}`, ""];
 
   return (
     <Card className="border-0 shadow-md bg-white">
@@ -162,37 +157,39 @@ export default function RevenueAnalyticsDaily({
           Revenue Analytics
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          {format(startOfMonth(year, month), "MMM yyyy")} ·{" "}
-          <span className="font-medium">SSP {nf0.format(totalSSP)}</span> ·{" "}
-          <span className="font-medium">USD {nf0.format(totalUSD)}</span>
+          {format(new Date(year, month - 1, 1), "MMM yyyy")} ·{" "}
+          <span className="font-medium">
+            SSP {nf0.format(sspTotal)}
+          </span>{" "}
+          ·{" "}
+          <span className="font-medium">
+            USD {nf0.format(usdTotal)}
+          </span>
         </div>
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
         {/* SSP daily */}
-        <div aria-label="SSP daily chart">
+        <section aria-label="SSP daily">
           <p className="text-sm font-medium text-slate-700 mb-2">SSP (Daily)</p>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={sspSeries}
+                data={ssp}
                 margin={{ top: 6, right: 12, left: 8, bottom: 24 }}
               >
                 <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
                 <XAxis
                   dataKey="day"
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  interval={tickInterval - 1} // show ~8–10 ticks
+                  interval={tickInterval - 1}
                 />
                 <YAxis
                   domain={[0, yMaxSSP]}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v: number) => (v >= 1000 ? `${nf0.format(v/1000)}k` : nf0.format(v))}
+                  tickFormatter={kfmt}
                 />
-                <Tooltip
-                  formatter={(v) => [`SSP ${tooltipFmt(v as number)}`, ""]}
-                  labelFormatter={(l) => `Day ${l}`}
-                />
+                <Tooltip formatter={tooltipSSP} labelFormatter={(l) => `Day ${l}`} />
                 <Line
                   type="monotone"
                   data={sspAvg}
@@ -212,15 +209,15 @@ export default function RevenueAnalyticsDaily({
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </section>
 
         {/* USD daily */}
-        <div aria-label="USD daily chart">
+        <section aria-label="USD daily">
           <p className="text-sm font-medium text-slate-700 mb-2">USD (Daily)</p>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={usdSeries}
+                data={usd}
                 margin={{ top: 6, right: 12, left: 8, bottom: 24 }}
               >
                 <CartesianGrid strokeDasharray="2 2" stroke="#eef2f7" vertical={false} />
@@ -232,12 +229,9 @@ export default function RevenueAnalyticsDaily({
                 <YAxis
                   domain={[0, yMaxUSD]}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v: number) => (v >= 1000 ? `${nf0.format(v/1000)}k` : nf0.format(v))}
+                  tickFormatter={kfmt}
                 />
-                <Tooltip
-                  formatter={(v) => [`USD ${tooltipFmt(v as number)}`, ""]}
-                  labelFormatter={(l) => `Day ${l}`}
-                />
+                <Tooltip formatter={tooltipUSD} labelFormatter={(l) => `Day ${l}`} />
                 <Line
                   type="monotone"
                   data={usdAvg}
@@ -257,7 +251,7 @@ export default function RevenueAnalyticsDaily({
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </section>
 
         {isLoading && (
           <div className="text-center text-slate-500 text-sm">
