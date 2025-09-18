@@ -32,15 +32,15 @@ type Props = {
 };
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const kfmt = (v: number) =>
-  v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v));
+const compact = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 function daysInMonth(year: number, month: number) {
-  // month is 1..12
-  return new Date(year, month, 0).getDate();
+  return new Date(year, month, 0).getDate(); // month is 1..12
 }
 function normalizedRange(range: TimeRange) {
-  // keep backend API compatibility
   return range === "month-select" ? "current-month" : range;
 }
 
@@ -62,12 +62,34 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
+/* --------------------------- nice tick helper --------------------------- */
+/** Return a "nice" step (1, 2, 5 × 10^n) for a given rough step. */
+function niceStep(roughStep: number) {
+  if (roughStep <= 0) return 1;
+  const exp = Math.floor(Math.log10(roughStep));
+  const base = Math.pow(10, exp);
+  const frac = roughStep / base;
+  let niceFrac: number;
+  if (frac <= 1) niceFrac = 1;
+  else if (frac <= 2) niceFrac = 2;
+  else if (frac <= 5) niceFrac = 5;
+  else niceFrac = 10;
+  return niceFrac * base;
+}
+/** Build 5 ticks (0..max) with a nice step so labels are round and spacing feels right. */
+function buildNiceTicks(dataMax: number) {
+  if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
+  const step = niceStep(dataMax / 4);
+  const max = step * 4;
+  const ticks = [0, step, step * 2, step * 3, max];
+  return { max, ticks };
+}
+
 /* --------------------------- Custom Tooltip --------------------------- */
 
 type RTProps = {
   active?: boolean;
   payload?: any[];
-  label?: any;
   year: number;
   month: number; // 1..12
   currency: "SSP" | "USD";
@@ -92,7 +114,7 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
   );
 }
 
-/* ------------------------------- Main -------------------------------- */
+/* -------------------------------- Main -------------------------------- */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -150,13 +172,13 @@ export default function RevenueAnalyticsDaily({
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  // headroom so tallest bar doesn’t touch the top
-  const yMaxSSP = Math.ceil(Math.max(0, ...ssp.map((d) => d.value)) * 1.12);
-  const yMaxUSD = Math.ceil(Math.max(0, ...usd.map((d) => d.value)) * 1.18);
+  // nice ticks to avoid odd top label and big “empty” look
+  const dataMaxSSP = Math.max(0, ...ssp.map((d) => d.value));
+  const dataMaxUSD = Math.max(0, ...usd.map((d) => d.value));
+  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(dataMaxSSP);
+  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(dataMaxUSD);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMM yyyy");
-
-  // tooltip renderers (need access to year/month)
   const renderSSPTooltip = (p: any) => (
     <RevenueTooltip {...p} year={year} month={month} currency="SSP" />
   );
@@ -193,23 +215,22 @@ export default function RevenueAnalyticsDaily({
                 margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
                 barCategoryGap="28%"
               >
-                {/* Light horizontal grid, no vertical lines */}
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="day"
-                  interval={0}             // show every day (like Patient Volume)
+                  interval={0}
                   tick={{ fontSize: 11, fill: "#64748b" }}
                   tickMargin={8}
-                  axisLine={false}         // remove baseline
-                  tickLine={false}         // remove little tick marks
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis
                   domain={[0, yMaxSSP]}
+                  ticks={ticksSSP}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={kfmt}
+                  tickFormatter={(v) => compact.format(v)}
                   axisLine={false}
                   tickLine={false}
-                  tickCount={5}            // EVEN SPACING like PV chart
                 />
                 <Tooltip content={renderSSPTooltip} />
                 <Bar
@@ -252,11 +273,11 @@ export default function RevenueAnalyticsDaily({
                 />
                 <YAxis
                   domain={[0, yMaxUSD]}
+                  ticks={ticksUSD}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={kfmt}
+                  tickFormatter={(v) => compact.format(v)}
                   axisLine={false}
                   tickLine={false}
-                  tickCount={5}            // EVEN SPACING like PV chart
                 />
                 <Tooltip content={renderUSDTooltip} />
                 <Bar
