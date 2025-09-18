@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { api } from '@/lib/queryClient';
 
@@ -19,14 +19,11 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/* Types                                                                   */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ─── Types ─────────────────────────────────────────────────────────────── */
 
 type Currency = 'SSP' | 'USD';
 type TxType = 'income' | 'expense';
@@ -40,33 +37,39 @@ type Txn = {
   departmentName?: string;
   type: TxType;
   currency: Currency;
-  amount: number;        // signed or positive? we treat type for sign
-  method?: string;       // cash/bank/momo etc
+  amount: number;
+  method?: string;
   status: SyncStatus;
-  providerName?: string; // insurance provider if any
+  providerName?: string;
 };
 
 type Department = { id: string; name: string };
 type Provider = { id: string; name: string };
 
-type Paged<T> = {
-  items: T[];
-  total: number;
+type Paged<T> = { items: T[]; total: number };
+
+type TxQuery = {
+  q: string;
+  type: TxType | '' | 'all';
+  dept: string | 'all';
+  provider: string | 'all';
+  start: string;
+  end: string;
+  page: string;     // keep as string for URL stability
+  pageSize: string; // keep as string for URL stability
+  sort: 'date' | 'amount';
+  order: 'asc' | 'desc';
 };
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/* Helpers                                                                  */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ─── Helpers ───────────────────────────────────────────────────────────── */
 
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 
 function fmtAmount(n: number, c: Currency, type: TxType) {
   const sign = type === 'expense' ? -1 : 1;
   const val = sign * n;
-  const isLoss = val < 0;
   return (
-    <span className={cn(isLoss ? 'text-rose-600' : 'text-emerald-600', 'tabular-nums')}>
+    <span className={cn(val < 0 ? 'text-rose-600' : 'text-emerald-600', 'tabular-nums')}>
       {c} {nf0.format(Math.abs(val))}
     </span>
   );
@@ -85,7 +88,7 @@ function useURLState<T extends Record<string, any>>(initial: T) {
   useEffect(() => {
     const usp = new URLSearchParams();
     Object.entries(state).forEach(([k, v]) => {
-      if (v !== '' && v !== undefined && v !== null) usp.set(k, String(v));
+      if (v !== '' && v !== 'all' && v !== undefined && v !== null) usp.set(k, String(v));
     });
     const url = `${location.pathname}?${usp.toString()}`;
     window.history.replaceState({}, '', url);
@@ -93,16 +96,16 @@ function useURLState<T extends Record<string, any>>(initial: T) {
   return [state, setState] as const;
 }
 
-function toDate(x?: string) {
-  if (!x) return undefined;
-  const d = new Date(x);
-  if (Number.isNaN(+d)) return undefined;
-  return d;
+function monthSortKey(label: string) {
+  // "September 2025" -> Date("2025-09-01")
+  const [name, yearStr] = label.split(' ');
+  const year = Number(yearStr) || 1970;
+  const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const idx = monthNames.indexOf(name.toLowerCase());
+  return new Date(year, Math.max(0, idx), 1).getTime();
 }
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/* API calls                                                                */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ─── API ───────────────────────────────────────────────────────────────── */
 
 async function fetchDepartments(): Promise<Department[]> {
   const { data } = await api.get('/api/departments');
@@ -114,53 +117,35 @@ async function fetchProviders(): Promise<Provider[]> {
   return data ?? [];
 }
 
-type TxQuery = {
-  q?: string;
-  type?: TxType | '';
-  dept?: string;
-  provider?: string;
-  start?: string; // yyyy-mm-dd
-  end?: string;   // yyyy-mm-dd
-  page?: number;
-  pageSize?: number;
-  sort?: string;    // date|amount
-  order?: 'asc'|'desc';
-};
-
-async function fetchTransactions(params: TxQuery): Promise<Paged<Txn>> {
+async function fetchTransactions(params: Partial<TxQuery>): Promise<Paged<Txn>> {
   const { data } = await api.get('/api/transactions', { params });
-  // expected { items, total }
   return data ?? { items: [], total: 0 };
 }
 
-async function exportCsv(params: TxQuery) {
+async function exportCsv(params: Partial<TxQuery>) {
   const { data } = await api.get('/api/transactions/export', {
     params,
     responseType: 'blob',
   });
   const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }));
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'transactions.csv';
-  a.click();
+  a.href = url; a.download = 'transactions.csv'; a.click();
   URL.revokeObjectURL(url);
 }
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/* Main Page                                                                */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ─── Page ──────────────────────────────────────────────────────────────── */
 
 export default function TransactionsPro() {
-  // URL-persisted filters
+  // NOTE: default everything to strings so selects ALWAYS get a string
   const [filters, setFilters] = useURLState<TxQuery>({
     q: '',
-    type: '',
-    dept: '',
-    provider: '',
-    start: '', // yyyy-mm-dd
+    type: 'all',
+    dept: 'all',
+    provider: 'all',
+    start: '',
     end: '',
-    page: 1,
-    pageSize: 50,
+    page: '1',
+    pageSize: '50',
     sort: 'date',
     order: 'desc',
   });
@@ -172,9 +157,20 @@ export default function TransactionsPro() {
   const { data: departments = [] } = useQuery({ queryKey: ['depts'], queryFn: fetchDepartments });
   const { data: providers = [] } = useQuery({ queryKey: ['provs'], queryFn: fetchProviders });
 
-  const { data: txPage, isLoading } = useQuery({
+  const {
+    data: txPage,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['tx', filters],
-    queryFn: () => fetchTransactions(filters),
+    queryFn: () => fetchTransactions({
+      ...filters,
+      // convert 'all' to nothing for the API
+      type: filters.type === 'all' ? '' : filters.type,
+      dept: filters.dept === 'all' ? '' : filters.dept,
+      provider: filters.provider === 'all' ? '' : filters.provider,
+    }),
     keepPreviousData: true,
     staleTime: 30_000,
   });
@@ -182,25 +178,20 @@ export default function TransactionsPro() {
   const items = txPage?.items ?? [];
   const total = txPage?.total ?? 0;
 
-  // KPI strip (filtered)
+  // KPI strip (filtered set)
   const kpis = useMemo(() => {
     let sspInc = 0, sspExp = 0, usdInc = 0, usdExp = 0;
     for (const t of items) {
       if (t.currency === 'SSP') {
-        if (t.type === 'income') sspInc += t.amount;
-        else sspExp += t.amount;
+        if (t.type === 'income') sspInc += t.amount; else sspExp += t.amount;
       } else {
-        if (t.type === 'income') usdInc += t.amount;
-        else usdExp += t.amount;
+        if (t.type === 'income') usdInc += t.amount; else usdExp += t.amount;
       }
     }
-    return {
-      sspInc, sspExp, sspNet: sspInc - sspExp,
-      usdInc, usdExp, usdNet: usdInc - usdExp,
-    };
+    return { sspInc, sspExp, sspNet: sspInc - sspExp, usdInc, usdExp, usdNet: usdInc - usdExp };
   }, [items]);
 
-  // group by month for the Monthly view
+  // group by month label
   const grouped = useMemo(() => {
     const map = new Map<string, Txn[]>();
     for (const t of items) {
@@ -208,28 +199,31 @@ export default function TransactionsPro() {
       if (!map.has(m)) map.set(m, []);
       map.get(m)!.push(t);
     }
-    const result = Array.from(map.entries()).map(([month, list]) => {
-      let ssp = 0, usd = 0;
-      list.forEach((t) => {
-        const v = t.type === 'expense' ? -t.amount : t.amount;
-        if (t.currency === 'SSP') ssp += v;
-        else usd += v;
-      });
-      return { month, list, totalSSP: ssp, totalUSD: usd };
-    });
-    // sort desc by month date
-    return result.sort((a, b) =>
-      +new Date(a.month) < +new Date(b.month) ? 1 : -1
-    );
+    return Array.from(map.entries())
+      .map(([month, list]) => {
+        let ssp = 0, usd = 0;
+        list.forEach((t) => {
+          const v = t.type === 'expense' ? -t.amount : t.amount;
+          if (t.currency === 'SSP') ssp += v; else usd += v;
+        });
+        return { month, list, totalSSP: ssp, totalUSD: usd, key: monthSortKey(month) };
+      })
+      .sort((a, b) => b.key - a.key);
   }, [items]);
 
-  const onExport = () => exportCsv(filters);
-  const clearAll = () => setFilters({
-    q: '', type: '', dept: '', provider: '', start: '', end: '',
-    page: 1, pageSize: 50, sort: 'date', order: 'desc',
+  const onExport = () => exportCsv({
+    ...filters,
+    type: filters.type === 'all' ? '' : filters.type,
+    dept: filters.dept === 'all' ? '' : filters.dept,
+    provider: filters.provider === 'all' ? '' : filters.provider,
   });
 
-  /* ───────── UI ───────── */
+  const clearAll = () => setFilters({
+    q: '', type: 'all', dept: 'all', provider: 'all',
+    start: '', end: '', page: '1', pageSize: '50', sort: 'date', order: 'desc',
+  });
+
+  /* ─── UI ─────────────────────────────────────────────────────────────── */
 
   return (
     <div className="space-y-4">
@@ -237,9 +231,7 @@ export default function TransactionsPro() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">Transaction Management</h1>
-          <p className="text-sm text-slate-500">
-            Add and manage daily income and expense transactions
-          </p>
+          <p className="text-sm text-slate-500">Add and manage daily income and expense transactions</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onExport}>Export CSV</Button>
@@ -248,18 +240,14 @@ export default function TransactionsPro() {
               <Button>+ Add Transaction</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-add-tx', { detail: { type: 'income' } }))}>
-                + Income
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-add-tx', { detail: { type: 'expense' } }))}>
-                + Expense
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-add-tx', { detail: { type: 'income' } }))}>+ Income</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-add-tx', { detail: { type: 'expense' } }))}>+ Expense</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {/* Sticky filters + chips */}
+      {/* Sticky Filters */}
       <Card className="sticky top-16 z-10">
         <CardContent className="pt-6 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -267,48 +255,51 @@ export default function TransactionsPro() {
               <Label>Search</Label>
               <Input
                 placeholder="Search descriptions, refs, notes…"
-                value={filters.q ?? ''}
-                onChange={(e) => setFilters((s) => ({ ...s, q: e.target.value, page: 1 }))}
+                value={filters.q}
+                onChange={(e) => setFilters((s) => ({ ...s, q: e.target.value, page: '1' }))}
               />
             </div>
+
             <div>
               <Label>Transaction Type</Label>
               <Select
-                value={filters.type ?? ''}
-                onValueChange={(v) => setFilters((s) => ({ ...s, type: v as any, page: 1 }))}
+                value={filters.type} // ALWAYS a string
+                onValueChange={(v) => setFilters((s) => ({ ...s, type: v as any, page: '1' }))}
               >
                 <SelectTrigger><SelectValue placeholder="All types" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
             <div>
               <Label>Department</Label>
               <Select
-                value={filters.dept ?? ''}
-                onValueChange={(v) => setFilters((s) => ({ ...s, dept: v, page: 1 }))}
+                value={filters.dept}
+                onValueChange={(v) => setFilters((s) => ({ ...s, dept: v, page: '1' }))}
               >
                 <SelectTrigger><SelectValue placeholder="All departments" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All departments</SelectItem>
+                  <SelectItem value="all">All departments</SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             <div>
               <Label>Insurance Provider</Label>
               <Select
-                value={filters.provider ?? ''}
-                onValueChange={(v) => setFilters((s) => ({ ...s, provider: v, page: 1 }))}
+                value={filters.provider}
+                onValueChange={(v) => setFilters((s) => ({ ...s, provider: v, page: '1' }))}
               >
                 <SelectTrigger><SelectValue placeholder="All providers" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All providers</SelectItem>
+                  <SelectItem value="all">All providers</SelectItem>
                   {providers.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
@@ -320,44 +311,49 @@ export default function TransactionsPro() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <Label>Start Date</Label>
-              <Input
-                type="date"
-                value={filters.start ?? ''}
-                onChange={(e) => setFilters((s) => ({ ...s, start: e.target.value, page: 1 }))}
-              />
+              <Input type="date" value={filters.start} onChange={(e) => setFilters((s) => ({ ...s, start: e.target.value, page: '1' }))} />
             </div>
             <div>
               <Label>End Date</Label>
-              <Input
-                type="date"
-                value={filters.end ?? ''}
-                onChange={(e) => setFilters((s) => ({ ...s, end: e.target.value, page: 1 }))}
-              />
+              <Input type="date" value={filters.end} onChange={(e) => setFilters((s) => ({ ...s, end: e.target.value, page: '1' }))} />
             </div>
             <div className="flex items-end gap-2">
               <Button variant="outline" onClick={clearAll}>Clear All</Button>
-              <ViewToggle view={view} setView={setView} />
+              <div className="inline-flex rounded-md border">
+                <button
+                  className={cn('px-3 py-2 text-sm', view==='monthly' ? 'bg-slate-900 text-white' : 'text-slate-700')}
+                  onClick={()=>setView('monthly')}
+                >
+                  Monthly
+                </button>
+                <button
+                  className={cn('px-3 py-2 text-sm border-l', view==='table' ? 'bg-slate-900 text-white' : 'text-slate-700')}
+                  onClick={()=>setView('table')}
+                >
+                  Table
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Filter chips */}
+          {/* Chips */}
           <div className="flex flex-wrap gap-2">
-            {filters.q ? <Chip label={`Search: "${filters.q}"`} onClear={() => setFilters((s)=>({ ...s, q:'', page:1 }))} /> : null}
-            {filters.type ? <Chip label={`Type: ${filters.type}`} onClear={() => setFilters((s)=>({ ...s, type:'', page:1 }))} /> : null}
-            {filters.dept ? (
+            {filters.q !== '' && <Chip label={`Search: "${filters.q}"`} onClear={()=>setFilters((s)=>({ ...s, q:'', page:'1' }))} />}
+            {filters.type !== 'all' && <Chip label={`Type: ${filters.type}`} onClear={()=>setFilters((s)=>({ ...s, type:'all', page:'1' }))} />}
+            {filters.dept !== 'all' && (
               <Chip
                 label={`Dept: ${departments.find(d=>d.id===filters.dept)?.name ?? filters.dept}`}
-                onClear={() => setFilters((s)=>({ ...s, dept:'', page:1 }))}
+                onClear={()=>setFilters((s)=>({ ...s, dept:'all', page:'1' }))}
               />
-            ) : null}
-            {filters.provider ? (
+            )}
+            {filters.provider !== 'all' && (
               <Chip
                 label={`Provider: ${providers.find(p=>p.id===filters.provider)?.name ?? filters.provider}`}
-                onClear={() => setFilters((s)=>({ ...s, provider:'', page:1 }))}
+                onClear={()=>setFilters((s)=>({ ...s, provider:'all', page:'1' }))}
               />
-            ) : null}
-            {filters.start ? <Chip label={`From: ${filters.start}`} onClear={()=>setFilters((s)=>({ ...s, start:'', page:1 }))} /> : null}
-            {filters.end ? <Chip label={`To: ${filters.end}`} onClear={()=>setFilters((s)=>({ ...s, end:'', page:1 }))} /> : null}
+            )}
+            {filters.start && <Chip label={`From: ${filters.start}`} onClear={()=>setFilters((s)=>({ ...s, start:'', page:'1' }))} />}
+            {filters.end && <Chip label={`To: ${filters.end}`} onClear={()=>setFilters((s)=>({ ...s, end:'', page:'1' }))} />}
           </div>
         </CardContent>
       </Card>
@@ -374,8 +370,17 @@ export default function TransactionsPro() {
         </CardContent>
       </Card>
 
-      {/* Content */}
-      {view === 'monthly' ? (
+      {/* Error/empty states */}
+      {isError ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm text-rose-600 font-medium">Couldn’t load transactions.</div>
+            <div className="text-xs text-slate-500 mt-1">
+              {String((error as any)?.message || 'Check authentication / permissions (401).')}
+            </div>
+          </CardContent>
+        </Card>
+      ) : view === 'monthly' ? (
         <MonthlyGroups
           grouped={grouped}
           isLoading={isLoading}
@@ -394,12 +399,10 @@ export default function TransactionsPro() {
         />
       )}
 
-      {/* Drawer for details */}
+      {/* Drawer */}
       <Sheet open={drawer.open} onOpenChange={(v)=>setDrawer((s)=>({ ...s, open:v }))}>
         <SheetContent className="w-[420px] sm:w-[460px]">
-          <SheetHeader>
-            <SheetTitle>Transaction details</SheetTitle>
-          </SheetHeader>
+          <SheetHeader><SheetTitle>Transaction details</SheetTitle></SheetHeader>
           {drawer.tx ? <Details tx={drawer.tx} /> : <div className="p-4 text-slate-500">No transaction.</div>}
         </SheetContent>
       </Sheet>
@@ -407,9 +410,7 @@ export default function TransactionsPro() {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/* Sub-components                                                           */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ─── Sub-components ────────────────────────────────────────────────────── */
 
 function KPI({ title, value, positive }: { title: string; value: string; positive?: boolean }) {
   return (
@@ -431,40 +432,18 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
-function ViewToggle({ view, setView }: { view: 'monthly'|'table'; setView: (v:'monthly'|'table')=>void }) {
-  return (
-    <div className="inline-flex rounded-md border">
-      <button
-        className={cn('px-3 py-2 text-sm', view==='monthly' ? 'bg-slate-900 text-white' : 'text-slate-700')}
-        onClick={()=>setView('monthly')}
-      >
-        Monthly
-      </button>
-      <button
-        className={cn('px-3 py-2 text-sm border-l', view==='table' ? 'bg-slate-900 text-white' : 'text-slate-700')}
-        onClick={()=>setView('table')}
-      >
-        Table
-      </button>
-    </div>
-  );
-}
-
-/* Monthly view */
 function MonthlyGroups({
   grouped,
   isLoading,
   onOpen,
 }: {
-  grouped: { month: string; list: Txn[]; totalSSP: number; totalUSD: number }[];
+  grouped: { month: string; list: Txn[]; totalSSP: number; totalUSD: number; key: number }[];
   isLoading: boolean;
   onOpen: (tx: Txn) => void;
 }) {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Recent Transactions</CardTitle>
-      </CardHeader>
+      <CardHeader className="pb-2"><CardTitle className="text-base">Recent Transactions</CardTitle></CardHeader>
       <CardContent className="space-y-6">
         {isLoading ? (
           <Skeleton className="h-40 w-full" />
@@ -472,7 +451,7 @@ function MonthlyGroups({
           <div className="text-sm text-slate-500">No transactions for this period.</div>
         ) : (
           grouped.map((g) => (
-            <div key={g.month}>
+            <div key={g.key}>
               <div className="flex items-center justify-between border-b pb-2">
                 <div className="font-medium">{g.month}</div>
                 <div className="text-xs text-slate-500 space-x-4">
@@ -488,9 +467,7 @@ function MonthlyGroups({
                     <div className="col-span-2 text-slate-600">{t.departmentName ?? '-'}</div>
                     <div className="col-span-2">{fmtAmount(t.amount, t.currency, t.type)}</div>
                     <div className="col-span-2">
-                      <Badge variant={t.status === 'synced' ? 'secondary' : t.status === 'pending' ? 'outline' : 'destructive'}>
-                        {t.status}
-                      </Badge>
+                      <Badge variant={t.status === 'synced' ? 'secondary' : t.status === 'pending' ? 'outline' : 'destructive'}>{t.status}</Badge>
                     </div>
                     <div className="col-span-1 text-right">
                       <Button variant="ghost" size="sm" onClick={() => onOpen(t)}>View</Button>
@@ -506,7 +483,6 @@ function MonthlyGroups({
   );
 }
 
-/* Table view */
 function TransactionsTable({
   items, total, filters, setFilters, selection, setSelection, onOpen, isLoading,
 }: {
@@ -524,11 +500,8 @@ function TransactionsTable({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Transactions</CardTitle>
-      </CardHeader>
+      <CardHeader className="pb-2"><CardTitle className="text-base">Transactions</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        {/* Bulk actions */}
         {selection.length > 0 && (
           <div className="flex items-center justify-between rounded-md border p-2 bg-slate-50">
             <div className="text-sm">{selection.length} selected</div>
@@ -546,11 +519,12 @@ function TransactionsTable({
                 <th className="w-10 px-3 py-2">
                   <Checkbox
                     checked={allChecked}
-                    onCheckedChange={(v) => setSelection(v ? items.map(i=>i.id) : [])}
                     indeterminate={someChecked}
+                    onCheckedChange={(v) => setSelection(v ? items.map(i=>i.id) : [])}
                   />
                 </th>
-                <th className="px-3 py-2 cursor-pointer" onClick={()=>setFilters((s)=>({ ...s, sort:'date', order: s.order==='asc' ? 'desc' : 'asc' }))}>
+                <th className="px-3 py-2 cursor-pointer"
+                    onClick={()=>setFilters((s)=>({ ...s, sort:'date', order: s.order==='asc' ? 'desc' : 'asc' }))}>
                   Date
                 </th>
                 <th className="px-3 py-2">Description</th>
@@ -582,9 +556,7 @@ function TransactionsTable({
                       <td className="px-3 py-2"><Badge variant="outline">{t.currency}</Badge></td>
                       <td className="px-3 py-2 text-right">{fmtAmount(t.amount, t.currency, t.type)}</td>
                       <td className="px-3 py-2">
-                        <Badge variant={t.status === 'synced' ? 'secondary' : t.status === 'pending' ? 'outline' : 'destructive'}>
-                          {t.status}
-                        </Badge>
+                        <Badge variant={t.status === 'synced' ? 'secondary' : t.status === 'pending' ? 'outline' : 'destructive'}>{t.status}</Badge>
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Button size="sm" variant="ghost" onClick={()=>onOpen(t)}>View</Button>
@@ -604,21 +576,15 @@ function TransactionsTable({
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
-              size="sm"
+              variant="outline" size="sm"
               disabled={Number(filters.page) <= 1}
-              onClick={()=>setFilters((s)=>({ ...s, page: Number(s.page)-1 }))}
-            >
-              Previous
-            </Button>
+              onClick={()=>setFilters((s)=>({ ...s, page: String(Number(s.page)-1) }))}
+            >Previous</Button>
             <Button
-              variant="outline"
-              size="sm"
+              variant="outline" size="sm"
               disabled={Number(filters.page)*Number(filters.pageSize) >= total}
-              onClick={()=>setFilters((s)=>({ ...s, page: Number(s.page)+1 }))}
-            >
-              Next
-            </Button>
+              onClick={()=>setFilters((s)=>({ ...s, page: String(Number(s.page)+1) }))}
+            >Next</Button>
           </div>
         </div>
       </CardContent>
@@ -626,18 +592,11 @@ function TransactionsTable({
   );
 }
 
-/* Drawer details */
 function Details({ tx }: { tx: Txn }) {
   return (
     <div className="space-y-4 pt-4">
-      <div>
-        <div className="text-xs text-slate-500">Date</div>
-        <div className="font-medium">{format(new Date(tx.date), 'PPP')}</div>
-      </div>
-      <div>
-        <div className="text-xs text-slate-500">Description</div>
-        <div className="font-medium">{tx.description}</div>
-      </div>
+      <Field label="Date" value={format(new Date(tx.date), 'PPP')} />
+      <Field label="Description" value={tx.description} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Department" value={tx.departmentName ?? '-'} />
         <Field label="Type" value={tx.type} />
@@ -647,9 +606,7 @@ function Details({ tx }: { tx: Txn }) {
         <Field label="Status" value={tx.status} />
         {tx.providerName ? <Field label="Provider" value={tx.providerName} /> : null}
       </div>
-      <div className="pt-2">
-        <Button>Edit</Button>
-      </div>
+      <div className="pt-2"><Button>Edit</Button></div>
     </div>
   );
 }
