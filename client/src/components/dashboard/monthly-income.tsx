@@ -174,14 +174,11 @@ function niceStep(roughStep: number) {
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
   let niceFrac: number;
-
-  // include 2.5 for pleasing spacing
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
   else if (frac <= 5)   niceFrac = 5;
   else                  niceFrac = 10;
-
   return niceFrac * base;
 }
 function buildNiceTicks(max: number) {
@@ -278,8 +275,7 @@ export default function MonthlyIncome({
       const map = new Map<string, { label: string; ssp: number; usd: number }>();
       months.forEach(({ y, m }) => {
         const key = `${y}-${String(m).padStart(2, "0")}`;
-        // label is MONTH ONLY (no year)
-        map.set(key, { label: MONTH_SHORT[m - 1], ssp: 0, usd: 0 });
+        map.set(key, { label: MONTH_SHORT[m - 1], ssp: 0, usd: 0 }); // month only
       });
 
       // Pull all transactions in one span
@@ -351,10 +347,6 @@ export default function MonthlyIncome({
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(maxSSP);
   const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(maxUSD);
 
-  // Axis label rotation only when necessary
-  const needRotateSSP = sspSeries.length > 6;
-  const needRotateUSD = usdSeries.length > 6;
-
   const handleBarClick = (index: number, currency: "SSP" | "USD") => {
     if (!onBarClick) return;
     const bucket = computeWindow(
@@ -373,9 +365,7 @@ export default function MonthlyIncome({
         <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
           Monthly Income
         </CardTitle>
-        <div className="mt-1 text-sm text-slate-600">
-          SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
-        </div>
+        {/* Subheader removed per your request */}
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
@@ -394,7 +384,7 @@ export default function MonthlyIncome({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={sspSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: needRotateSSP ? 28 : 18 }}
+                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -402,9 +392,9 @@ export default function MonthlyIncome({
                   dataKey="label"
                   interval={0}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  angle={needRotateSSP ? -20 : 0}
-                  textAnchor={needRotateSSP ? "end" : "middle"}
-                  height={needRotateSSP ? 34 : 20}
+                  angle={0}
+                  textAnchor="middle"
+                  height={20}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -468,7 +458,7 @@ export default function MonthlyIncome({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usdSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: needRotateUSD ? 28 : 18 }}
+                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -476,9 +466,9 @@ export default function MonthlyIncome({
                   dataKey="label"
                   interval={0}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  angle={needRotateUSD ? -20 : 0}
-                  textAnchor={needRotateUSD ? "end" : "middle"}
-                  height={needRotateUSD ? 34 : 20}
+                  angle={0}
+                  textAnchor="middle"
+                  height={20}
                   axisLine={false}
                   tickLine={false}
                 />
