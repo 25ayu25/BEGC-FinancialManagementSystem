@@ -62,20 +62,25 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
-/* --------------------------- nice tick helper --------------------------- */
-/** Return a "nice" step (1, 2, 5 × 10^n) for a given rough step. */
+/* --------------------------- nice tick helpers --------------------------- */
+/** Return a "nice" step (1, 2, **2.5**, 5, 10 × 10^n) for a given rough step. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
   let niceFrac: number;
-  if (frac <= 1) niceFrac = 1;
-  else if (frac <= 2) niceFrac = 2;
-  else if (frac <= 5) niceFrac = 5;
-  else niceFrac = 10;
+
+  // include 2.5 for 250/2.5k/25k style ticks
+  if (frac <= 1)        niceFrac = 1;
+  else if (frac <= 2)   niceFrac = 2;
+  else if (frac <= 2.5) niceFrac = 2.5;
+  else if (frac <= 5)   niceFrac = 5;
+  else                  niceFrac = 10;
+
   return niceFrac * base;
 }
+
 /** Build 5 ticks (0..max) with a nice step so labels are round and spacing feels right. */
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
@@ -86,7 +91,6 @@ function buildNiceTicks(dataMax: number) {
 }
 
 /* --------------------------- Custom Tooltip --------------------------- */
-
 type RTProps = {
   active?: boolean;
   payload?: any[];
@@ -108,7 +112,7 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
       <div className="font-semibold text-slate-900 mb-1">{dateStr}</div>
       <div className="text-sm text-slate-700 font-mono">
-        {currency} {nf0.format(Math.round(value))}
+        {currency} {compact.format(Math.round(value))}
       </div>
     </div>
   );
@@ -127,7 +131,6 @@ export default function RevenueAnalyticsDaily({
   const month = selectedMonth;
   const days = daysInMonth(year, month);
 
-  // full month on the X axis (like Patient Volume)
   const baseDays = useMemo(
     () => Array.from({ length: days }, (_, i) => i + 1),
     [days]
@@ -146,7 +149,7 @@ export default function RevenueAnalyticsDaily({
       fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Build continuous series with zeros for missing days (SSP & USD)
+  // Continuous series with zeros for missing days (SSP & USD)
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
 
@@ -166,13 +169,13 @@ export default function RevenueAnalyticsDaily({
   const totalSSP = ssp.reduce((s, r) => s + r.value, 0);
   const totalUSD = usd.reduce((s, r) => s + r.value, 0);
 
-  // "active-day" averages (ignores completely-zero days)
+  // "active-day" averages (ignores zero days)
   const activeDaysSSP = ssp.filter((d) => d.value > 0).length || 0;
   const activeDaysUSD = usd.filter((d) => d.value > 0).length || 0;
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  // nice ticks to avoid odd top label and big “empty” look
+  // Nice ticks for even spacing & rounded labels
   const dataMaxSSP = Math.max(0, ...ssp.map((d) => d.value));
   const dataMaxUSD = Math.max(0, ...usd.map((d) => d.value));
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(dataMaxSSP);
