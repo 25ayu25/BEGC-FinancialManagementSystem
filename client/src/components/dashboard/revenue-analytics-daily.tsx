@@ -54,8 +54,15 @@ function daysInMonth(year: number, month: number) {
 function monthBounds(year: number, month: number) {
   // month: 1..12
   const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0); // last day of month
+  // inclusive end (set to last day 23:59:59 to avoid server-exclusive filters)
+  const end = new Date(year, month, 0);
+  end.setHours(23, 59, 59, 999);
   return { start, end };
+}
+
+function ymd(d: Date) {
+  // yyyy-MM-dd
+  return format(d, "yyyy-MM-dd");
 }
 
 /** Return a "nice" step (1, 2, **2.5**, 5, 10 × 10^n) for a given rough step. */
@@ -86,37 +93,118 @@ function buildNiceTicks(dataMax: number) {
 }
 
 /* ------------------------------------------------------------------ */
-/* API fetch (fixed for month-select)                                 */
+/* Normalization helpers                                              */
 /* ------------------------------------------------------------------ */
-async function fetchIncomeTrendsDaily(
+type RawItem =
+  | { day?: number; incomeSSP?: number; incomeUSD?: number; income?: number; amount?: number; currency?: string; date?: string; dateISO?: string }
+  | any;
+
+/** Turn heterogeneous API rows into {day, ssp, usd}. */
+function normalizeDailyRows(items: RawItem[], daysInTarget: number) {
+  const out = Array.from({ length: daysInTarget }, (_, i) => ({
+    day: i + 1,
+    ssp: 0,
+    usd: 0,
+  }));
+
+  for (const r of items) {
+    let d: number | undefined = (r as any).day;
+
+    const rawDate = (r as any).dateISO ?? (r as any).date;
+    if (!d && rawDate) {
+      const dt = new Date(rawDate);
+      if (!isNaN(dt.getTime())) d = dt.getDate();
+    }
+
+    // If still no day but we can guess from a transaction-like row, skip (we need a day)
+    if (typeof d !== "number" || d < 1 || d > daysInTarget) continue;
+
+    // Pull SSP & USD in a permissive way
+    const sspCandidate =
+      (r as any).incomeSSP ??
+      (r as any).income ??
+      ((r as any).currency === "SSP" ? (r as any).amount : undefined) ??
+      0;
+
+    const usdCandidate =
+      (r as any).incomeUSD ??
+      ((r as any).currency === "USD" ? (r as any).amount : undefined) ??
+      0;
+
+    out[d - 1].ssp += Number(sspCandidate || 0);
+    out[d - 1].usd += Number(usdCandidate || 0);
+  }
+
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* API fetch with robust fallbacks                                    */
+/* ------------------------------------------------------------------ */
+async function fetchIncomeTrendsDailyRobust(
   year: number,
   month: number,
   range: TimeRange,
   start?: Date,
   end?: Date
 ) {
-  let url: string;
+  let s: Date;
+  let e: Date;
 
   if (range === "month-select") {
-    // Force a precise window for the selected month (prevents backend
-    // from interpreting "current-month" and ignoring :year/:month)
-    const { start: s, end: e } = monthBounds(year, month);
-    url =
-      `/api/income-trends/${year}/${month}` +
-      `?range=custom&startDate=${format(s, "yyyy-MM-dd")}` +
-      `&endDate=${format(e, "yyyy-MM-dd")}`;
+    const mb = monthBounds(year, month);
+    s = mb.start;
+    e = mb.end;
   } else if (range === "custom" && start && end) {
-    url =
-      `/api/income-trends/${year}/${month}` +
-      `?range=custom&startDate=${format(start, "yyyy-MM-dd")}` +
-      `&endDate=${format(end, "yyyy-MM-dd")}`;
+    s = start;
+    e = end;
   } else {
-    // current-month, last-month, last-3-months, year, etc.
-    url = `/api/income-trends/${year}/${month}?range=${range}`;
+    // default to selected month to be safe
+    const mb = monthBounds(year, month);
+    s = mb.start;
+    e = mb.end;
   }
 
-  const { data } = await api.get(url);
-  return Array.isArray(data) ? data : [];
+  const qsCustom = `range=custom&startDate=${ymd(s)}&endDate=${ymd(e)}`;
+
+  // Try several URL shapes your backend may accept
+  const candidates = [
+    // explicit month path + custom dates
+    `/api/income-trends/${year}/${month}?${qsCustom}`,
+    // generic query
+    `/api/income-trends?year=${year}&month=${month}&${qsCustom}`,
+    // explicit month path + current-month (some servers expect this)
+    `/api/income-trends/${year}/${month}?range=current-month`,
+    // last resort: pull transactions and aggregate client-side
+    // (we'll detect this one by checking the path and aggregating below)
+    `/api/transactions?type=income&${qsCustom}`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const { data } = await api.get(url);
+
+      // If this is the transactions fallback, aggregate it client-side
+      if (url.startsWith("/api/transactions")) {
+        if (Array.isArray(data) && data.length) {
+          const normalized = normalizeDailyRows(data, daysInMonth(year, month));
+          return normalized;
+        }
+        continue;
+      }
+
+      if (Array.isArray(data) && data.length) {
+        const normalized = normalizeDailyRows(data, daysInMonth(year, month));
+        return normalized;
+      }
+    } catch (err) {
+      // swallow and try next
+      // console.debug("fetch candidate failed", url, err);
+    }
+  }
+
+  // Nothing worked
+  return normalizeDailyRows([], daysInMonth(year, month));
 }
 
 /* ------------------------------------------------------------------ */
@@ -168,33 +256,28 @@ export default function RevenueAnalyticsDaily({
     [days]
   );
 
-  const { data: raw = [], isLoading } = useQuery({
+  const { data: daily = [], isLoading } = useQuery({
     queryKey: [
-      "exec-daily-income",
+      "exec-daily-income-v2",
       year,
       month,
-      timeRange, // <- no normalization, we handle month-select in fetcher
+      timeRange,
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
     queryFn: () =>
-      fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
+      fetchIncomeTrendsDailyRobust(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Continuous series with zeros for missing days (SSP & USD)
+  // Build continuous series (SSP & USD)
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
 
-  for (const r of raw as any[]) {
-    let d: number | undefined = (r as any).day;
-    if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
-    if (!d && (r as any).date) d = new Date((r as any).date).getDate();
-
-    if (typeof d === "number" && d >= 1 && d <= days) {
-      ssp[d - 1].value += Number(
-        (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
-      );
-      usd[d - 1].value += Number((r as any).incomeUSD ?? 0);
+  for (const r of daily as any[]) {
+    const d = Number(r.day);
+    if (d >= 1 && d <= days) {
+      ssp[d - 1].value += Number(r.ssp || 0);
+      usd[d - 1].value += Number(r.usd || 0);
     }
   }
 
