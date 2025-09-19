@@ -1,15 +1,15 @@
+'use client';
+
 import * as React from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 
-// IMPORTANT: adjust the relative import if your folder layout differs
+// uses your shared date filter context
 import { useDateFilter } from "../../context/date-filter-context";
 
 /**
- * Right-side date range control with direct month selection.
- * Uses the shared date filter context.
- *
- * Mobile-safe: on small screens we render this control on its own row
- * so it never collides with the title/back content.
+ * Right-side date range control with direct month / year selection.
+ * - When Range = "This Year", show only the Year dropdown
+ * - When Range = "Select Month…", show Year + Month dropdowns
  */
 function DateRangeControl() {
   const {
@@ -23,7 +23,12 @@ function DateRangeControl() {
 
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = React.useMemo(() => [thisYear, thisYear - 1], [thisYear]);
+
+  // Last 5 years (tweak as you like)
+  const years = React.useMemo(
+    () => Array.from({ length: 5 }, (_, i) => thisYear - i),
+    [thisYear]
+  );
 
   const months = [
     { label: "January", value: 1 },
@@ -53,13 +58,19 @@ function DateRangeControl() {
 
   const onYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const y = Number(e.target.value);
-    if (!Number.isNaN(y)) setSpecificMonth(y, selectedMonth || 1);
+    if (!Number.isNaN(y)) {
+      // Keep current month selection; month is ignored when range === 'year'
+      setSpecificMonth(y, selectedMonth || 1);
+    }
   };
 
   const onMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const m = Number(e.target.value);
     if (!Number.isNaN(m)) setSpecificMonth(selectedYear || thisYear, m);
   };
+
+  const showYearPicker =
+    timeRange === "year" || timeRange === "month-select";
 
   return (
     <div className="flex items-center gap-3">
@@ -81,10 +92,10 @@ function DateRangeControl() {
         </select>
       </div>
 
-      {/* Month selection (only when "Select Month…" is active) */}
-      {timeRange === "month-select" && (
+      {/* Year picker when viewing a full year OR selecting a month */}
+      {showYearPicker && (
         <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600">Month</label>
+          <label className="text-sm text-slate-600">Year</label>
           <select
             value={selectedYear}
             onChange={onYearChange}
@@ -98,18 +109,24 @@ function DateRangeControl() {
             ))}
           </select>
 
-          <select
-            value={selectedMonth}
-            onChange={onMonthChange}
-            aria-label="Select month"
-            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-          >
-            {months.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+          {/* Month appears only when explicitly selecting a month */}
+          {timeRange === "month-select" && (
+            <>
+              <label className="text-sm text-slate-600">Month</label>
+              <select
+                value={selectedMonth}
+                onChange={onMonthChange}
+                aria-label="Select month"
+                className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+              >
+                {months.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       )}
 
@@ -124,17 +141,14 @@ function DateRangeControl() {
 type Props = {
   children: React.ReactNode;
   className?: string;
-  /**
-   * Show or hide the right-side date filter control.
-   * Defaults to true for convenience.
-   */
+  /** Show or hide the right-side date filter control. */
   showDateFilter?: boolean;
 };
 
 /**
- * Sticky page header with auto-height spacer. Mobile-first layout:
- * - md+: children (left) + date filter (right) in a single row
- * - <md: children on first row; date filter rendered on a second row
+ * Sticky page header with auto-height spacer.
+ * - md+: children (left) + date filter (right)
+ * - <md: children first, date filter below
  */
 export default function StickyPageHeader({
   children,
@@ -173,7 +187,7 @@ export default function StickyPageHeader({
         }
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
-          {/* Desktop row: left + right */}
+          {/* Desktop row */}
           <div className="hidden md:flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">{children}</div>
             {showDateFilter && (
@@ -183,12 +197,11 @@ export default function StickyPageHeader({
             )}
           </div>
 
-          {/* Mobile stack: children first, filter below */}
+          {/* Mobile stack */}
           <div className="md:hidden">
             <div className="min-w-0">{children}</div>
             {showDateFilter && (
               <div className="mt-3 relative z-50 overflow-visible">
-                {/* wrap to avoid clipping and allow horizontal scrolling if needed */}
                 <div className="overflow-x-auto no-scrollbar">
                   <div className="inline-flex">
                     <DateRangeControl />
