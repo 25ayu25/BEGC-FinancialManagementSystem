@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import {useMemo, useState, useCallback} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {format} from 'date-fns';
 import {
   ResponsiveContainer,
   BarChart,
@@ -11,60 +11,102 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-} from "recharts";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { api } from "@/lib/queryClient";
+} from 'recharts';
+import {Card, CardHeader, CardTitle, CardContent} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {api} from '@/lib/queryClient';
 
-/* ----------------------------- Types ----------------------------- */
+/* ------------------------------------------------------------------ */
+/* Types                                                              */
+/* ------------------------------------------------------------------ */
 
 type TimeRange =
-  | "current-month"
-  | "last-month"
-  | "month-select"
-  | "last-3-months"
-  | "year"
-  | "custom";
+  | 'current-month'
+  | 'last-month'
+  | 'month-select'
+  | 'last-3-months'
+  | 'year'
+  | 'custom';
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;
-  selectedMonth: number; // 1..12
+  selectedYear: number;   // four-digit year
+  selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
 
-type Currency = "SSP" | "USD";
-
-type Txn = {
-  id?: string | number;
+type TrendRow = {
+  day?: number;
+  dateISO?: string;
   date?: string;
-  department?: string;
-  description?: string;
   incomeSSP?: number;
   incomeUSD?: number;
+  income?: number;
   amount?: number;
 };
 
-/* ------------------------ Number Formatters ---------------------- */
+type TxRow = {
+  id?: string | number;
+  date?: string;
+  createdAt?: string;
+  currency?: 'SSP' | 'USD' | string;
+  amount?: number;
+  amountSSP?: number;
+  amountUSD?: number;
+  description?: string;
+  department?: { id?: string | number; name?: string } | null;
+  departmentName?: string;
+};
 
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const nf2 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-const compact = new Intl.NumberFormat("en-US", {
-  notation: "compact",
+/* ------------------------------------------------------------------ */
+/* Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const nf0 = new Intl.NumberFormat('en-US', {maximumFractionDigits: 0});
+const compact = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
   maximumFractionDigits: 1,
 });
 
-/* ----------------------------- Utils ----------------------------- */
-
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate();
+function daysInMonth(year: number, month1to12: number) {
+  return new Date(year, month1to12, 0).getDate();
 }
 function normalizedRange(range: TimeRange) {
-  return range === "month-select" ? "current-month" : range;
+  return range === 'month-select' ? 'current-month' : range;
 }
 
-/** Aggregated daily totals for the charts */
+/** “Nice” ticks so the y-axis looks even. */
+function niceStep(roughStep: number) {
+  if (roughStep <= 0) return 1;
+  const exp = Math.floor(Math.log10(roughStep));
+  const base = Math.pow(10, exp);
+  const frac = roughStep / base;
+  let niceFrac: number;
+  if (frac <= 1) niceFrac = 1;
+  else if (frac <= 2) niceFrac = 2;
+  else if (frac <= 2.5) niceFrac = 2.5;
+  else if (frac <= 5) niceFrac = 5;
+  else niceFrac = 10;
+  return niceFrac * base;
+}
+function buildNiceTicks(maxVal: number) {
+  if (maxVal <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
+  const step = niceStep(maxVal / 4);
+  const max = step * 4;
+  return { max, ticks: [0, step, step * 2, step * 3, max] };
+}
+
+/* ------------------------------------------------------------------ */
+/* Data fetchers                                                      */
+/* ------------------------------------------------------------------ */
+
 async function fetchIncomeTrendsDaily(
   year: number,
   month: number,
@@ -72,110 +114,51 @@ async function fetchIncomeTrendsDaily(
   start?: Date,
   end?: Date
 ) {
-  let url = `/api/income-trends/${year}/${month}?range=${normalizedRange(range)}`;
-  if (range === "custom" && start && end) {
-    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
-      end,
-      "yyyy-MM-dd"
-    )}`;
+  const rng = normalizedRange(range);
+  const url = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+  url.searchParams.set('range', rng);
+  if (range === 'custom' && start && end) {
+    url.searchParams.set('startDate', format(start, 'yyyy-MM-dd'));
+    url.searchParams.set('endDate', format(end, 'yyyy-MM-dd'));
   }
-  const { data } = await api.get(url);
-  return Array.isArray(data) ? data : [];
+  const { data } = await api.get(url.toString());
+  return Array.isArray(data) ? (data as TrendRow[]) : [];
 }
 
-/** Try multiple day endpoints; return first non-empty response */
-async function fetchIncomesForDay(year: number, month: number, day: number) {
-  const localDate = new Date(year, month - 1, day);
-  const d = format(localDate, "yyyy-MM-dd");
-  const startUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
-  const endUTC   = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
-
-  const candidates = [
-    // 1) from/to (date-only)
-    `/api/transactions?type=income&from=${d}&to=${d}`,
-    // 2) startDate/endDate (full UTC day)
-    `/api/transactions?type=income&startDate=${encodeURIComponent(
-      startUTC
-    )}&endDate=${encodeURIComponent(endUTC)}`,
-    // 3) single date
-    `/api/transactions?type=income&date=${d}`,
-  ];
-
-  for (const url of candidates) {
-    try {
-      const { data } = await api.get(url);
-      const items = Array.isArray(data)
-        ? data
-        : Array.isArray((data as any)?.items)
-        ? (data as any).items
-        : [];
-
-      if (items.length) return items as Txn[];
-    } catch {
-      // try next
-    }
-  }
-
-  return [] as Txn[];
+/** FETCH TRANSACTIONS FOR EXACT DAY (FULL ISO DATE) */
+async function fetchTransactionsForDay(isoDate: string) {
+  // We send both styles so either backend shape works:
+  const url = new URL('/api/transactions', window.location.origin);
+  url.searchParams.set('type', 'income');
+  url.searchParams.set('date', isoDate);       // if server expects ?date=yyyy-MM-dd
+  url.searchParams.set('start', isoDate);      // if server expects range
+  url.searchParams.set('end', isoDate);
+  const { data } = await api.get(url.toString());
+  return Array.isArray(data) ? (data as TxRow[]) : [];
 }
 
-/* --------------------- Nice ticks for Y-axis --------------------- */
-function niceStep(roughStep: number) {
-  if (roughStep <= 0) return 1;
-  const exp = Math.floor(Math.log10(roughStep));
-  const base = Math.pow(10, exp);
-  const frac = roughStep / base;
-  let niceFrac: number;
-
-  if (frac <= 1)        niceFrac = 1;
-  else if (frac <= 2)   niceFrac = 2;
-  else if (frac <= 2.5) niceFrac = 2.5;
-  else if (frac <= 5)   niceFrac = 5;
-  else                  niceFrac = 10;
-
-  return niceFrac * base;
-}
-function buildNiceTicks(dataMax: number) {
-  if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
-  const step = niceStep(dataMax / 4);
-  const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
-}
-
-/* ------------------------ Mobile helper hook --------------------- */
-
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener?.("change", update);
-    return () => mq.removeEventListener?.("change", update);
-  }, [breakpoint]);
-  return isMobile;
-}
-
-/* ------------------------- Tooltip component --------------------- */
-
-type RTProps = {
+/* ------------------------------------------------------------------ */
+/* Tooltip                                                            */
+/* ------------------------------------------------------------------ */
+function RevenueTooltip({
+  active,
+  payload,
+  year,
+  month,
+  currency,
+}: {
   active?: boolean;
   payload?: any[];
   year: number;
   month: number;
-  currency: Currency;
-};
-
-function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
+  currency: 'SSP' | 'USD';
+}) {
   if (!active || !payload || !payload.length) return null;
   const d = payload[0]?.payload?.day as number | undefined;
   const value = Number(payload[0]?.payload?.value ?? 0);
-  const dateStr =
-    typeof d === "number"
-      ? format(new Date(year, month - 1, d), "MMM d, yyyy")
-      : "";
+  const dateStr = typeof d === 'number'
+    ? format(new Date(year, month - 1, d), 'MMM d, yyyy')
+    : '';
 
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
@@ -187,136 +170,9 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
   );
 }
 
-/* -------------------------- Drill-down UI ------------------------ */
-
-function DayDetail({
-  open,
-  onOpenChange,
-  year,
-  month,
-  day,
-  currency,
-  fallbackSSP,
-  fallbackUSD,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  year: number;
-  month: number;
-  day: number | null;
-  currency: Currency | null;
-  fallbackSSP: number;
-  fallbackUSD: number;
-}) {
-  const enabled = !!day;
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["income-day", year, month, day],
-    queryFn: () => fetchIncomesForDay(year, month, day as number),
-    enabled,
-  });
-
-  const rows = (data as Txn[]).map((t, i) => ({
-    id: t.id ?? i,
-    department: t.department ?? "—",
-    description: t.description ?? "",
-    ssp: Number(t.incomeSSP ?? (t.amount ?? 0)),
-    usd: Number(t.incomeUSD ?? 0),
-  }));
-
-  const apiSumSSP = rows.reduce((s, r) => s + (r.ssp || 0), 0);
-  const apiSumUSD = rows.reduce((s, r) => s + (r.usd || 0), 0);
-
-  const useFallback = rows.length === 0 && (fallbackSSP > 0 || fallbackUSD > 0);
-  const sumSSP = useFallback ? fallbackSSP : apiSumSSP;
-  const sumUSD = useFallback ? fallbackUSD : apiSumUSD;
-
-  // roll-up
-  const byDept = rows.reduce<Record<string, { ssp: number; usd: number }>>((acc, r) => {
-    acc[r.department] ??= { ssp: 0, usd: 0 };
-    acc[r.department].ssp += r.ssp || 0;
-    acc[r.department].usd += r.usd || 0;
-    return acc;
-  }, {});
-  const deptList = Object.entries(byDept)
-    .map(([dept, v]) => ({ dept, ssp: v.ssp, usd: v.usd }))
-    .sort((a, b) =>
-      (currency === "USD" ? b.usd - a.usd : b.ssp - a.ssp)
-    );
-
-  const dateStr = day ? format(new Date(year, month - 1, day), "MMM d, yyyy") : "";
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>
-            {dateStr} · {currency ?? ""} breakdown
-          </SheetTitle>
-        </SheetHeader>
-
-        <div className="mt-4 space-y-6">
-          <div className="rounded-lg border border-slate-200 p-3">
-            <div className="text-sm text-slate-600">Totals for the day</div>
-            <div className="mt-1 font-semibold">
-              SSP {nf0.format(sumSSP)} <span className="mx-2 text-slate-300">•</span>
-              USD {nf0.format(sumUSD)}
-            </div>
-            {useFallback && (
-              <div className="mt-1 text-xs text-amber-600">
-                Showing aggregated totals from the chart (API returned no line items for this day).
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-lg border border-slate-200 p-3">
-            <div className="font-medium mb-2">By Department</div>
-            <div className="space-y-1">
-              {deptList.length === 0 && (
-                <div className="text-sm text-slate-500">No per-transaction data available.</div>
-              )}
-              {deptList.map((d) => (
-                <div key={d.dept} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-700">{d.dept}</span>
-                  <span className="font-mono">
-                    SSP {nf0.format(d.ssp)}{" "}
-                    <span className="mx-2 text-slate-300">•</span>
-                    USD {nf0.format(d.usd)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-slate-200">
-            <div className="px-3 py-2 border-b border-slate-200 font-medium">Transactions</div>
-            <div className="divide-y divide-slate-200">
-              {isLoading && <div className="p-3 text-sm text-slate-500">Loading…</div>}
-              {!isLoading && rows.length === 0 && !useFallback && (
-                <div className="p-3 text-sm text-slate-500">No income recorded.</div>
-              )}
-              {rows.map((r) => (
-                <div key={r.id} className="px-3 py-2 text-sm flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium text-slate-800 truncate">{r.department}</div>
-                    {r.description && (
-                      <div className="text-slate-500 truncate">{r.description}</div>
-                    )}
-                  </div>
-                  <div className="font-mono text-right whitespace-nowrap">
-                    <div>SSP {nf0.format(r.ssp || 0)}</div>
-                    <div className="text-slate-500">USD {nf2.format(r.usd || 0)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-/* ------------------------------- Main ---------------------------- */
+/* ------------------------------------------------------------------ */
+/* Component                                                          */
+/* ------------------------------------------------------------------ */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -326,26 +182,14 @@ export default function RevenueAnalyticsDaily({
   customEndDate,
 }: Props) {
   const year = selectedYear;
-  const month = selectedMonth;
+  const month = selectedMonth; // 1..12
+
   const days = daysInMonth(year, month);
-  const isMobile = useIsMobile(768);
-
-  const desiredXTicks = isMobile ? 12 : days;
-  const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
-  const xTickFont = isMobile ? 10 : 11;
-  const xTickMargin = isMobile ? 4 : 8;
-  const chartHeightClass = isMobile ? "h-52" : "h-56";
-  const sspBarSize = isMobile ? 14 : 18;
-  const usdBarSize = isMobile ? 14 : 18;
-
-  const baseDays = useMemo(
-    () => Array.from({ length: days }, (_, i) => i + 1),
-    [days]
-  );
+  const baseDays = useMemo(() => Array.from({ length: days }, (_, i) => i + 1), [days]);
 
   const { data: raw = [], isLoading } = useQuery({
     queryKey: [
-      "exec-daily-income",
+      'exec-daily-income',
       year,
       month,
       normalizedRange(timeRange),
@@ -356,67 +200,86 @@ export default function RevenueAnalyticsDaily({
       fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Build series + lookup for fallback totals per day
+  // Continuous series for both currencies
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
-  const fallbackByDay = new Map<number, { ssp: number; usd: number }>();
-  baseDays.forEach((d) => fallbackByDay.set(d, { ssp: 0, usd: 0 }));
 
-  for (const r of raw as any[]) {
-    let d: number | undefined = (r as any).day;
-    if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
-    if (!d && (r as any).date) d = new Date((r as any).date).getDate();
-
-    if (typeof d === "number" && d >= 1 && d <= days) {
-      const sspVal = Number(
-        (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
-      );
-      const usdVal = Number((r as any).incomeUSD ?? 0);
-
-      ssp[d - 1].value += sspVal;
-      usd[d - 1].value += usdVal;
-
-      const agg = fallbackByDay.get(d)!;
-      agg.ssp += sspVal;
-      agg.usd += usdVal;
+  for (const r of raw) {
+    let d = r.day;
+    if (!d && r.dateISO) d = new Date(r.dateISO).getDate();
+    if (!d && r.date) d = new Date(r.date).getDate();
+    if (typeof d === 'number' && d >= 1 && d <= days) {
+      ssp[d - 1].value += Number(r.incomeSSP ?? r.income ?? r.amount ?? 0);
+      usd[d - 1].value += Number(r.incomeUSD ?? 0);
     }
   }
 
   const totalSSP = ssp.reduce((s, r) => s + r.value, 0);
   const totalUSD = usd.reduce((s, r) => s + r.value, 0);
-
   const activeDaysSSP = ssp.filter((d) => d.value > 0).length || 0;
   const activeDaysUSD = usd.filter((d) => d.value > 0).length || 0;
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  const dataMaxSSP = Math.max(0, ...ssp.map((d) => d.value));
-  const dataMaxUSD = Math.max(0, ...usd.map((d) => d.value));
-  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(dataMaxSSP);
-  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(dataMaxUSD);
+  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(Math.max(...ssp.map(d => d.value), 0));
+  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(Math.max(...usd.map(d => d.value), 0));
 
-  const monthLabel = format(new Date(year, month - 1, 1), "MMM yyyy");
+  const [open, setOpen] = useState(false);
+  const [clickedDay, setClickedDay] = useState<number | null>(null);
+  const isoForDay = clickedDay
+    ? format(new Date(year, month - 1, clickedDay), 'yyyy-MM-dd')
+    : null;
+
+  const { data: dayTx = [], isFetching: loadingDay } = useQuery({
+    enabled: !!isoForDay && open,
+    queryKey: ['day-income-transactions', isoForDay],
+    queryFn: () => fetchTransactionsForDay(isoForDay as string),
+  });
+
+  // Group by department
+  const byDept = useMemo(() => {
+    const map = new Map<
+      string,
+      { ssp: number; usd: number; rows: TxRow[] }
+    >();
+    for (const t of dayTx) {
+      const dept =
+        t.department?.name ||
+        t.departmentName ||
+        'Unspecified';
+      const entry = map.get(dept) || { ssp: 0, usd: 0, rows: [] };
+      const cur = String(t.currency || '').toUpperCase();
+      const val =
+        typeof t.amount === 'number'
+          ? t.amount
+          : cur === 'USD'
+          ? Number(t.amountUSD ?? 0)
+          : Number(t.amountSSP ?? 0);
+      if (cur === 'USD') entry.usd += val;
+      else entry.ssp += val;
+      entry.rows.push(t);
+      map.set(dept, entry);
+    }
+    return Array.from(map.entries())
+      .map(([dept, v]) => ({ dept, ...v }))
+      .sort((a, b) => b.ssp + b.usd - (a.ssp + a.usd));
+  }, [dayTx]);
+
+  const onBarClick = useCallback((payload: any) => {
+    const d = payload?.activeLabel ?? payload?.payload?.day;
+    if (typeof d === 'number' && d >= 1 && d <= days) {
+      setClickedDay(d);
+      setOpen(true);
+    }
+  }, [days]);
+
+  const monthLabel = format(new Date(year, month - 1, 1), 'MMM yyyy');
   const renderSSPTooltip = (p: any) => (
     <RevenueTooltip {...p} year={year} month={month} currency="SSP" />
   );
   const renderUSDTooltip = (p: any) => (
     <RevenueTooltip {...p} year={year} month={month} currency="USD" />
   );
-
-  // NEW: click-to-drill state
-  const [open, setOpen] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
-
-  const openDay = (day: number, cur: Currency) => {
-    setSelectedDay(day);
-    setSelectedCurrency(cur);
-    setOpen(true);
-  };
-
-  const fallbackTotalsForSelected = selectedDay
-    ? fallbackByDay.get(selectedDay) ?? { ssp: 0, usd: 0 }
-    : { ssp: 0, usd: 0 };
 
   return (
     <>
@@ -438,30 +301,32 @@ export default function RevenueAnalyticsDaily({
               <span className="text-xs text-slate-500">
                 Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
                 <span className="mx-2">•</span>
-                Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
+                Avg/day:{' '}
+                <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
               </span>
             </div>
-            <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
+
+            <div className="h-56 rounded-lg border border-slate-200">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={ssp}
                   margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
                   barCategoryGap="28%"
+                  onClick={(state) => onBarClick(state?.activePayload?.[0])}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                   <XAxis
                     dataKey="day"
-                    interval={xInterval}
-                    minTickGap={isMobile ? 2 : 0}
-                    tick={{ fontSize: isMobile ? 10 : 11, fill: "#64748b" }}
-                    tickMargin={isMobile ? 4 : 8}
+                    interval={0}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
                     domain={[0, yMaxSSP]}
                     ticks={ticksSSP}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                     tickFormatter={(v) => compact.format(v)}
                     axisLine={false}
                     tickLine={false}
@@ -472,9 +337,7 @@ export default function RevenueAnalyticsDaily({
                     name="SSP"
                     fill="#14b8a6"
                     radius={[3, 3, 0, 0]}
-                    maxBarSize={isMobile ? 14 : 18}
-                    cursor="pointer"
-                    onClick={(_, index) => openDay(ssp[index].day, "SSP")}
+                    maxBarSize={18}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -488,30 +351,32 @@ export default function RevenueAnalyticsDaily({
               <span className="text-xs text-slate-500">
                 Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
                 <span className="mx-2">•</span>
-                Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
+                Avg/day:{' '}
+                <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
               </span>
             </div>
-            <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
+
+            <div className="h-56 rounded-lg border border-slate-200">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={usd}
                   margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
                   barCategoryGap="28%"
+                  onClick={(state) => onBarClick(state?.activePayload?.[0])}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                   <XAxis
                     dataKey="day"
-                    interval={xInterval}
-                    minTickGap={isMobile ? 2 : 0}
-                    tick={{ fontSize: isMobile ? 10 : 11, fill: "#64748b" }}
-                    tickMargin={isMobile ? 4 : 8}
+                    interval={0}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
                     domain={[0, yMaxUSD]}
                     ticks={ticksUSD}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                     tickFormatter={(v) => compact.format(v)}
                     axisLine={false}
                     tickLine={false}
@@ -522,9 +387,7 @@ export default function RevenueAnalyticsDaily({
                     name="USD"
                     fill="#0ea5e9"
                     radius={[3, 3, 0, 0]}
-                    maxBarSize={isMobile ? 14 : 18}
-                    cursor="pointer"
-                    onClick={(_, index) => openDay(usd[index].day, "USD")}
+                    maxBarSize={18}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -539,17 +402,64 @@ export default function RevenueAnalyticsDaily({
         </CardContent>
       </Card>
 
-      {/* Drill-down Sheet */}
-      <DayDetail
-        open={open}
-        onOpenChange={setOpen}
-        year={year}
-        month={month}
-        day={selectedDay}
-        currency={selectedCurrency}
-        fallbackSSP={fallbackTotalsForSelected.ssp}
-        fallbackUSD={fallbackTotalsForSelected.usd}
-      />
+      {/* Details sheet/dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {clickedDay
+                ? `${format(new Date(year, month - 1, clickedDay), 'MMM d, yyyy')} • SSP & USD breakdown`
+                : 'Day breakdown'}
+            </DialogTitle>
+            {/* Silence the shadcn warning while keeping a11y happy */}
+            <DialogDescription className="sr-only">
+              Detailed income for the selected day grouped by department
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            {/* Totals row */}
+            <div className="flex items-center justify-between text-sm">
+              <div className="text-slate-600">Totals for the day</div>
+              <div className="font-medium text-slate-900">
+                SSP {nf0.format(byDept.reduce((s, d) => s + d.ssp, 0))}
+                <span className="mx-2">•</span>
+                USD {nf0.format(byDept.reduce((s, d) => s + d.usd, 0))}
+              </div>
+            </div>
+
+            {/* Departments */}
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">
+                By Department
+              </div>
+
+              {loadingDay ? (
+                <div className="text-sm text-slate-500">Loading…</div>
+              ) : byDept.length === 0 ? (
+                <div className="text-sm text-slate-500">
+                  No income recorded for this day.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {byDept.map((d) => (
+                    <div
+                      key={d.dept}
+                      className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"
+                    >
+                      <div className="font-medium text-slate-800">{d.dept}</div>
+                      <div className="text-sm tabular-nums text-slate-700">
+                        <span className="mr-3">SSP {nf0.format(d.ssp)}</span>
+                        <span>USD {nf0.format(d.usd)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
