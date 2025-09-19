@@ -215,8 +215,8 @@ function MonthTooltip({
   );
 }
 
-/* --------------------------- Value labels --------------------------- */
-/** Compact (SSP) */
+/* --------------------------- Value labels ------------------------------- */
+
 function ValueLabel(props: any) {
   const { x, y, width, value } = props;
   const v = Number(value || 0);
@@ -237,7 +237,7 @@ function ValueLabel(props: any) {
   );
 }
 
-/** Full numbers (USD) */
+/** FULL number label for USD bars */
 function ValueLabelFull(props: any) {
   const { x, y, width, value } = props;
   const v = Number(value || 0);
@@ -385,7 +385,7 @@ export default function MonthlyIncome({
     return { label: d.label, avg: slice.length ? sum / slice.length : 0 };
   });
 
-  // Nice ticks
+  // Nice ticks to keep spacing even and labels round
   const maxSSP = Math.max(0, ...sspSeries.map(d => d.value));
   const maxUSD = Math.max(0, ...usdSeries.map(d => d.value));
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(maxSSP);
@@ -481,7 +481,6 @@ export default function MonthlyIncome({
                   maxBarSize={28}
                   onClick={(_, i) => handleBarClick(i, "SSP")}
                 >
-                  {/* compact labels for SSP */}
                   <LabelList content={(p) => <ValueLabel {...p} />} />
                 </Bar>
               </BarChart>
@@ -522,7 +521,7 @@ export default function MonthlyIncome({
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => nf0.format(v as number)}  {/* FULL numbers for USD */}
+                  tickFormatter={(v) => nf0.format(v as number)}  // FULL numbers
                   axisLine={false}
                   tickLine={false}
                 />
@@ -535,7 +534,7 @@ export default function MonthlyIncome({
                   maxBarSize={28}
                   onClick={(_, i) => handleBarClick(i, "USD")}
                 >
-                  {/* FULL labels for USD */}
+                  {/* FULL numbers on labels */}
                   <LabelList content={(p) => <ValueLabelFull {...p} />} />
                 </Bar>
               </BarChart>
