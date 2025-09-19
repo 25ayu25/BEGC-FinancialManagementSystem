@@ -12,11 +12,8 @@ import {
 } from '@/components/ui/select';
 import { useDateFilter } from '@/context/date-filter-context';
 
-/**
- * Helper: build a list of recent years.
- * Default: current year going back 6 years. Adjust as you need.
- */
-function buildYearOptions(span = 7) {
+/** Build a small list of recent years (current year going back 7). */
+function buildYearOptions(span = 8) {
   const thisYear = new Date().getFullYear();
   return Array.from({ length: span }, (_, i) => String(thisYear - i));
 }
@@ -36,13 +33,9 @@ const MONTHS = [
   { label: 'December', value: '12' },
 ];
 
-export default function StickyPageHeader({
-  className,
-}: {
-  className?: string;
-}) {
+export default function StickyPageHeader({ className }: { className?: string }) {
   const {
-    timeRange,
+    timeRange,            // 'year' | 'month-select' | 'last-month' | 'last-3-months' | 'current-month' | 'custom'
     setTimeRange,
     selectedYear,
     setSelectedYear,
@@ -50,7 +43,6 @@ export default function StickyPageHeader({
     setSelectedMonth,
   } = useDateFilter();
 
-  // year options for picker
   const yearOptions = useMemo(() => buildYearOptions(8), []);
 
   // Ensure defaults when switching modes
@@ -58,12 +50,14 @@ export default function StickyPageHeader({
     const now = new Date();
     if (timeRange === 'year') {
       if (!selectedYear) setSelectedYear(now.getFullYear());
-    }
-    if (timeRange === 'month-select') {
+    } else if (timeRange === 'month-select') {
       if (!selectedYear) setSelectedYear(now.getFullYear());
       if (!selectedMonth) setSelectedMonth(now.getMonth() + 1);
     }
   }, [timeRange, selectedYear, selectedMonth, setSelectedYear, setSelectedMonth]);
+
+  const showYear = timeRange === 'year' || timeRange === 'month-select';
+  const showMonth = timeRange === 'month-select';
 
   return (
     <div
@@ -74,43 +68,36 @@ export default function StickyPageHeader({
       )}
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-3">
+        {/* IMPORTANT: flex-wrap + gaps; the min-widths keep controls visible */}
         <div className="flex flex-wrap items-center gap-3">
 
           {/* Range selector */}
           <Select
             value={timeRange}
             onValueChange={(v) => {
-              // Reset month when leaving month-select
-              if (v !== 'month-select') {
-                // keep year (useful for switching year views)
-              }
               setTimeRange(v as any);
             }}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] min-w-[180px]" data-testid="df-range">
               <SelectValue placeholder="Range" />
             </SelectTrigger>
             <SelectContent>
-              {/* year view */}
               <SelectItem value="year">This Year</SelectItem>
-
-              {/* month-by-month view (needs year + month pickers) */}
               <SelectItem value="month-select">Select Month…</SelectItem>
-
-              {/* keep your other quick ranges */}
+              <SelectItem value="current-month">Current Month</SelectItem>
               <SelectItem value="last-month">Last Month</SelectItem>
               <SelectItem value="last-3-months">Last 3 Months</SelectItem>
               <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
 
-          {/* Show YEAR picker for year & month-select modes */}
-          {(timeRange === 'year' || timeRange === 'month-select') && (
+          {/* YEAR — show for This Year OR Select Month… */}
+          {showYear && (
             <Select
               value={String(selectedYear ?? '')}
               onValueChange={(v) => setSelectedYear(Number(v))}
             >
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[128px] min-w-[128px]" data-testid="df-year">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
@@ -123,13 +110,13 @@ export default function StickyPageHeader({
             </Select>
           )}
 
-          {/* Show MONTH picker only for month-select mode */}
-          {timeRange === 'month-select' && (
+          {/* MONTH — only for Select Month… */}
+          {showMonth && (
             <Select
               value={String(selectedMonth ?? '')}
               onValueChange={(v) => setSelectedMonth(Number(v))}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[140px] min-w-[140px]" data-testid="df-month">
                 <SelectValue placeholder="Month" />
               </SelectTrigger>
               <SelectContent>
