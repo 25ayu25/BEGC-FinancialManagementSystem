@@ -13,6 +13,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api } from "@/lib/queryClient";
 
 /* ----------------------------- Types ----------------------------- */
@@ -33,9 +34,22 @@ type Props = {
   customEndDate?: Date;
 };
 
+type Currency = "SSP" | "USD";
+
+type Txn = {
+  id?: string | number;
+  date?: string;           // ISO
+  department?: string;
+  description?: string;
+  incomeSSP?: number;
+  incomeUSD?: number;
+  amount?: number;         // fallback
+};
+
 /* ------------------------ Number Formatters ---------------------- */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -46,11 +60,11 @@ const compact = new Intl.NumberFormat("en-US", {
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate(); // month is 1..12
 }
-
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
 
+/** Aggregated daily totals for the charts */
 async function fetchIncomeTrendsDaily(
   year: number,
   month: number,
@@ -69,8 +83,19 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
+/** Day drill-down: list income transactions for a single date */
+async function fetchIncomesForDay(year: number, month: number, day: number) {
+  const d = format(new Date(year, month - 1, day), "yyyy-MM-dd");
+  // If your API differs, update this one line:
+  const { data } = await api.get(
+    `/api/transactions?type=income&from=${d}&to=${d}`
+  );
+  // accept either {items: [...] } or [...] directly
+  const list: Txn[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  return list;
+}
+
 /* --------------------- Nice ticks for Y-axis --------------------- */
-/** Return a "nice" step (1, 2, 2.5, 5, 10 × 10^n) for a given rough step. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -78,7 +103,6 @@ function niceStep(roughStep: number) {
   const frac = roughStep / base;
   let niceFrac: number;
 
-  // include 2.5 to get 250/2.5k/etc when needed
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
@@ -87,8 +111,6 @@ function niceStep(roughStep: number) {
 
   return niceFrac * base;
 }
-
-/** Build 5 ticks (0..max) with a nice step so spacing/labels look right. */
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
@@ -119,7 +141,7 @@ type RTProps = {
   payload?: any[];
   year: number;
   month: number; // 1..12
-  currency: "SSP" | "USD";
+  currency: Currency;
 };
 
 function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
@@ -138,6 +160,127 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
         {currency} {compact.format(Math.round(value))}
       </div>
     </div>
+  );
+}
+
+/* -------------------------- Drill-down UI ------------------------ */
+
+function DayDetail({
+  open,
+  onOpenChange,
+  year,
+  month,
+  day,
+  currency,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  year: number;
+  month: number;
+  day: number | null;
+  currency: Currency | null;
+}) {
+  const enabled = !!day;
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["income-day", year, month, day],
+    queryFn: () => fetchIncomesForDay(year, month, day as number),
+    enabled,
+  });
+
+  const rows = (data as Txn[]).map((t, i) => ({
+    id: t.id ?? i,
+    department: t.department ?? "—",
+    description: t.description ?? "",
+    ssp: Number(t.incomeSSP ?? (t.amount ?? 0)),
+    usd: Number(t.incomeUSD ?? 0),
+  }));
+
+  const sumSSP = rows.reduce((s, r) => s + (r.ssp || 0), 0);
+  const sumUSD = rows.reduce((s, r) => s + (r.usd || 0), 0);
+
+  // department roll-up (by selected currency)
+  const byDept = rows.reduce<Record<string, { ssp: number; usd: number }>>((acc, r) => {
+    acc[r.department] ??= { ssp: 0, usd: 0 };
+    acc[r.department].ssp += r.ssp || 0;
+    acc[r.department].usd += r.usd || 0;
+    return acc;
+  }, {});
+  const deptList = Object.entries(byDept)
+    .map(([dept, v]) => ({ dept, ssp: v.ssp, usd: v.usd }))
+    .sort((a, b) =>
+      (currency === "USD" ? b.usd - a.usd : b.ssp - a.ssp)
+    );
+
+  const dateStr = day ? format(new Date(year, month - 1, day), "MMM d, yyyy") : "";
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>
+            {dateStr} · {currency ?? ""} breakdown
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-6">
+          {/* Totals */}
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="text-sm text-slate-600">Totals for the day</div>
+            <div className="mt-1 font-semibold">
+              SSP {nf0.format(sumSSP)} <span className="mx-2 text-slate-300">•</span>
+              USD {nf0.format(sumUSD)}
+            </div>
+          </div>
+
+          {/* Dept roll-up */}
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="font-medium mb-2">By Department</div>
+            <div className="space-y-1">
+              {deptList.length === 0 && (
+                <div className="text-sm text-slate-500">No income for this day.</div>
+              )}
+              {deptList.map((d) => (
+                <div key={d.dept} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700">{d.dept}</span>
+                  <span className="font-mono">
+                    SSP {nf0.format(d.ssp)}{" "}
+                    <span className="mx-2 text-slate-300">•</span>
+                    USD {nf0.format(d.usd)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Transactions table */}
+          <div className="rounded-lg border border-slate-200">
+            <div className="px-3 py-2 border-b border-slate-200 font-medium">Transactions</div>
+            <div className="divide-y divide-slate-200">
+              {isLoading && (
+                <div className="p-3 text-sm text-slate-500">Loading…</div>
+              )}
+              {!isLoading && rows.length === 0 && (
+                <div className="p-3 text-sm text-slate-500">No income recorded.</div>
+              )}
+              {rows.map((r) => (
+                <div key={r.id} className="px-3 py-2 text-sm flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-slate-800 truncate">{r.department}</div>
+                    {r.description && (
+                      <div className="text-slate-500 truncate">{r.description}</div>
+                    )}
+                  </div>
+                  <div className="font-mono text-right whitespace-nowrap">
+                    <div>SSP {nf0.format(r.ssp || 0)}</div>
+                    <div className="text-slate-500">USD {nf2.format(r.usd || 0)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -222,120 +365,147 @@ export default function RevenueAnalyticsDaily({
     <RevenueTooltip {...p} year={year} month={month} currency="USD" />
   );
 
+  // NEW: click-to-drill state
+  const [open, setOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+
+  const openDay = (day: number, cur: Currency) => {
+    setSelectedDay(day);
+    setSelectedCurrency(cur);
+    setOpen(true);
+  };
+
   return (
-    <Card className="border-0 shadow-md bg-white">
-      <CardHeader className="pb-0">
-        <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
-          Revenue Analytics
-        </CardTitle>
-        <div className="mt-1 text-sm text-slate-600">
-          {monthLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
-        </div>
-      </CardHeader>
+    <>
+      <Card className="border-0 shadow-md bg-white">
+        <CardHeader className="pb-0">
+          <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
+            Revenue Analytics
+          </CardTitle>
+          <div className="mt-1 text-sm text-slate-600">
+            {monthLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+          </div>
+        </CardHeader>
 
-      <CardContent className="pt-4 space-y-8">
-        {/* SSP Daily */}
-        <section aria-label="SSP daily">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-slate-700">SSP (Daily)</p>
-            <span className="text-xs text-slate-500">
-              Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
-              <span className="mx-2">•</span>
-              Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
-            </span>
-          </div>
-          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={ssp}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="28%"
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  interval={xInterval}            // fewer labels on mobile
-                  minTickGap={isMobile ? 2 : 0}   // let recharts drop a few if tight
-                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                  tickMargin={xTickMargin}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, yMaxSSP]}
-                  ticks={ticksSSP}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v)}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={renderSSPTooltip} />
-                <Bar
-                  dataKey="value"
-                  name="SSP"
-                  fill="#14b8a6"
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={sspBarSize}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        <CardContent className="pt-4 space-y-8">
+          {/* SSP Daily */}
+          <section aria-label="SSP daily">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-slate-700">SSP (Daily)</p>
+              <span className="text-xs text-slate-500">
+                Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
+                <span className="mx-2">•</span>
+                Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
+              </span>
+            </div>
+            <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={ssp}
+                  margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                  barCategoryGap="28%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    interval={xInterval}
+                    minTickGap={isMobile ? 2 : 0}
+                    tick={{ fontSize: xTickFont, fill: "#64748b" }}
+                    tickMargin={xTickMargin}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, yMaxSSP]}
+                    ticks={ticksSSP}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickFormatter={(v) => compact.format(v)}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={renderSSPTooltip} />
+                  <Bar
+                    dataKey="value"
+                    name="SSP"
+                    fill="#14b8a6"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={sspBarSize}
+                    cursor="pointer"
+                    onClick={(_, index) => openDay(ssp[index].day, "SSP")}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
 
-        {/* USD Daily */}
-        <section aria-label="USD daily">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-slate-700">USD (Daily)</p>
-            <span className="text-xs text-slate-500">
-              Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
-              <span className="mx-2">•</span>
-              Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
-            </span>
-          </div>
-          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={usd}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="28%"
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  interval={xInterval}
-                  minTickGap={isMobile ? 2 : 0}
-                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                  tickMargin={xTickMargin}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, yMaxUSD]}
-                  ticks={ticksUSD}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v)}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={renderUSDTooltip} />
-                <Bar
-                  dataKey="value"
-                  name="USD"
-                  fill="#0ea5e9"
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={usdBarSize}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+          {/* USD Daily */}
+          <section aria-label="USD daily">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-slate-700">USD (Daily)</p>
+              <span className="text-xs text-slate-500">
+                Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
+                <span className="mx-2">•</span>
+                Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
+              </span>
+            </div>
+            <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={usd}
+                  margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                  barCategoryGap="28%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    interval={xInterval}
+                    minTickGap={isMobile ? 2 : 0}
+                    tick={{ fontSize: xTickFont, fill: "#64748b" }}
+                    tickMargin={xTickMargin}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, yMaxUSD]}
+                    ticks={ticksUSD}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickFormatter={(v) => compact.format(v)}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={renderUSDTooltip} />
+                  <Bar
+                    dataKey="value"
+                    name="USD"
+                    fill="#0ea5e9"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={usdBarSize}
+                    cursor="pointer"
+                    onClick={(_, index) => openDay(usd[index].day, "USD")}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
 
-        {isLoading && (
-          <div className="text-center text-slate-500 text-sm">
-            Loading daily revenue…
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {isLoading && (
+            <div className="text-center text-slate-500 text-sm">
+              Loading daily revenue…
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Drill-down Sheet */}
+      <DayDetail
+        open={open}
+        onOpenChange={setOpen}
+        year={year}
+        month={month}
+        day={selectedDay}
+        currency={selectedCurrency}
+      />
+    </>
   );
 }
