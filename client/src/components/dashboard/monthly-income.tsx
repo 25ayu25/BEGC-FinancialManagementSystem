@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import {
   Tooltip,
   Line,
   ReferenceLine,
+  LabelList, // ⬅️ add
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
@@ -214,6 +215,28 @@ function MonthTooltip({
   );
 }
 
+/* --------------------------- Value labels (new) -------------------------- */
+
+function ValueLabel(props: any) {
+  const { x, y, width, value } = props;
+  const v = Number(value || 0);
+  if (v <= 0 || typeof x !== "number" || typeof y !== "number") return null;
+  const cx = x + width / 2;
+  const cy = y - 6; // above bar
+  return (
+    <text
+      x={cx}
+      y={cy}
+      textAnchor="middle"
+      fontSize={10}
+      fill="#475569"
+      className="pointer-events-none select-none"
+    >
+      {compact.format(v)}
+    </text>
+  );
+}
+
 /* ------------------------------- Component ------------------------------ */
 
 export default function MonthlyIncome({
@@ -365,7 +388,6 @@ export default function MonthlyIncome({
         <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
           Monthly Income
         </CardTitle>
-        {/* Subheader removed per your request */}
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
@@ -384,7 +406,7 @@ export default function MonthlyIncome({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={sspSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                margin={{ top: 24, right: 12, left: 12, bottom: 18 }} // extra top for labels
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -437,7 +459,10 @@ export default function MonthlyIncome({
                   radius={[3, 3, 0, 0]}
                   maxBarSize={28}
                   onClick={(_, i) => handleBarClick(i, "SSP")}
-                />
+                >
+                  {/* ⬇️ compact amount label above each bar */}
+                  <LabelList content={(p) => <ValueLabel {...p} />} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -458,7 +483,7 @@ export default function MonthlyIncome({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usdSeries}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                margin={{ top: 24, right: 12, left: 12, bottom: 18 }} // extra top for labels
                 barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -488,7 +513,10 @@ export default function MonthlyIncome({
                   radius={[3, 3, 0, 0]}
                   maxBarSize={28}
                   onClick={(_, i) => handleBarClick(i, "USD")}
-                />
+                >
+                  {/* ⬇️ compact amount label above each bar */}
+                  <LabelList content={(p) => <ValueLabel {...p} />} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
