@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -15,9 +15,8 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
 
-/* ------------------------------------------------------------------ */
-/* Types                                                              */
-/* ------------------------------------------------------------------ */
+/* ----------------------------- Types ----------------------------- */
+
 type TimeRange =
   | "current-month"
   | "last-month"
@@ -28,44 +27,50 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // 4-digit year
+  selectedYear: number;   // e.g. 2025
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
 
-/* ------------------------------------------------------------------ */
-/* Intl formatters                                                    */
-/* ------------------------------------------------------------------ */
+/* ------------------------ Number Formatters ---------------------- */
+
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
+/* ----------------------------- Utils ----------------------------- */
+
 function daysInMonth(year: number, month: number) {
-  // month: 1..12
-  return new Date(year, month, 0).getDate();
+  return new Date(year, month, 0).getDate(); // month is 1..12
 }
 
-function monthBounds(year: number, month: number) {
-  // month: 1..12
-  const start = new Date(year, month - 1, 1);
-  // inclusive end (set to last day 23:59:59 to avoid server-exclusive filters)
-  const end = new Date(year, month, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
+function normalizedRange(range: TimeRange) {
+  return range === "month-select" ? "current-month" : range;
 }
 
-function ymd(d: Date) {
-  // yyyy-MM-dd
-  return format(d, "yyyy-MM-dd");
+async function fetchIncomeTrendsDaily(
+  year: number,
+  month: number,
+  range: TimeRange,
+  start?: Date,
+  end?: Date
+) {
+  let url = `/api/income-trends/${year}/${month}?range=${normalizedRange(range)}`;
+  if (range === "custom" && start && end) {
+    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
+      end,
+      "yyyy-MM-dd"
+    )}`;
+  }
+  const { data } = await api.get(url);
+  return Array.isArray(data) ? data : [];
 }
 
-/** Return a "nice" step (1, 2, **2.5**, 5, 10 × 10^n) for a given rough step. */
+/* --------------------- Nice ticks for Y-axis --------------------- */
+/** Return a "nice" step (1, 2, 2.5, 5, 10 × 10^n) for a given rough step. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -73,7 +78,7 @@ function niceStep(roughStep: number) {
   const frac = roughStep / base;
   let niceFrac: number;
 
-  // include 2.5 for 250/2.5k/25k style ticks
+  // include 2.5 to get 250/2.5k/etc when needed
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
@@ -83,7 +88,7 @@ function niceStep(roughStep: number) {
   return niceFrac * base;
 }
 
-/** Build 5 ticks (0..max) with a nice step so labels are round and spacing feels right. */
+/** Build 5 ticks (0..max) with a nice step so spacing/labels look right. */
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
@@ -92,124 +97,23 @@ function buildNiceTicks(dataMax: number) {
   return { max, ticks };
 }
 
-/* ------------------------------------------------------------------ */
-/* Normalization helpers                                              */
-/* ------------------------------------------------------------------ */
-type RawItem =
-  | { day?: number; incomeSSP?: number; incomeUSD?: number; income?: number; amount?: number; currency?: string; date?: string; dateISO?: string }
-  | any;
+/* ------------------------ Mobile helper hook --------------------- */
 
-/** Turn heterogeneous API rows into {day, ssp, usd}. */
-function normalizeDailyRows(items: RawItem[], daysInTarget: number) {
-  const out = Array.from({ length: daysInTarget }, (_, i) => ({
-    day: i + 1,
-    ssp: 0,
-    usd: 0,
-  }));
-
-  for (const r of items) {
-    let d: number | undefined = (r as any).day;
-
-    const rawDate = (r as any).dateISO ?? (r as any).date;
-    if (!d && rawDate) {
-      const dt = new Date(rawDate);
-      if (!isNaN(dt.getTime())) d = dt.getDate();
-    }
-
-    // If still no day but we can guess from a transaction-like row, skip (we need a day)
-    if (typeof d !== "number" || d < 1 || d > daysInTarget) continue;
-
-    // Pull SSP & USD in a permissive way
-    const sspCandidate =
-      (r as any).incomeSSP ??
-      (r as any).income ??
-      ((r as any).currency === "SSP" ? (r as any).amount : undefined) ??
-      0;
-
-    const usdCandidate =
-      (r as any).incomeUSD ??
-      ((r as any).currency === "USD" ? (r as any).amount : undefined) ??
-      0;
-
-    out[d - 1].ssp += Number(sspCandidate || 0);
-    out[d - 1].usd += Number(usdCandidate || 0);
-  }
-
-  return out;
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, [breakpoint]);
+  return isMobile;
 }
 
-/* ------------------------------------------------------------------ */
-/* API fetch with robust fallbacks                                    */
-/* ------------------------------------------------------------------ */
-async function fetchIncomeTrendsDailyRobust(
-  year: number,
-  month: number,
-  range: TimeRange,
-  start?: Date,
-  end?: Date
-) {
-  let s: Date;
-  let e: Date;
+/* ------------------------- Tooltip component --------------------- */
 
-  if (range === "month-select") {
-    const mb = monthBounds(year, month);
-    s = mb.start;
-    e = mb.end;
-  } else if (range === "custom" && start && end) {
-    s = start;
-    e = end;
-  } else {
-    // default to selected month to be safe
-    const mb = monthBounds(year, month);
-    s = mb.start;
-    e = mb.end;
-  }
-
-  const qsCustom = `range=custom&startDate=${ymd(s)}&endDate=${ymd(e)}`;
-
-  // Try several URL shapes your backend may accept
-  const candidates = [
-    // explicit month path + custom dates
-    `/api/income-trends/${year}/${month}?${qsCustom}`,
-    // generic query
-    `/api/income-trends?year=${year}&month=${month}&${qsCustom}`,
-    // explicit month path + current-month (some servers expect this)
-    `/api/income-trends/${year}/${month}?range=current-month`,
-    // last resort: pull transactions and aggregate client-side
-    // (we'll detect this one by checking the path and aggregating below)
-    `/api/transactions?type=income&${qsCustom}`,
-  ];
-
-  for (const url of candidates) {
-    try {
-      const { data } = await api.get(url);
-
-      // If this is the transactions fallback, aggregate it client-side
-      if (url.startsWith("/api/transactions")) {
-        if (Array.isArray(data) && data.length) {
-          const normalized = normalizeDailyRows(data, daysInMonth(year, month));
-          return normalized;
-        }
-        continue;
-      }
-
-      if (Array.isArray(data) && data.length) {
-        const normalized = normalizeDailyRows(data, daysInMonth(year, month));
-        return normalized;
-      }
-    } catch (err) {
-      // swallow and try next
-      // console.debug("fetch candidate failed", url, err);
-    }
-  }
-
-  // Nothing worked
-  return normalizeDailyRows([], daysInMonth(year, month));
-}
-
-/* ------------------------------------------------------------------ */
-/* Tooltip                                                            */
-/* ------------------------------------------------------------------ */
 type RTProps = {
   active?: boolean;
   payload?: any[];
@@ -237,9 +141,8 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
+/* ------------------------------- Main ---------------------------- */
+
 export default function RevenueAnalyticsDaily({
   timeRange,
   selectedYear,
@@ -249,35 +152,50 @@ export default function RevenueAnalyticsDaily({
 }: Props) {
   const year = selectedYear;
   const month = selectedMonth;
-
   const days = daysInMonth(year, month);
+  const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
+
+  // X-axis label density for mobile vs desktop
+  const desiredXTicks = isMobile ? 12 : days; // ~12 labels on mobile, all on desktop
+  const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
+  const xTickFont = isMobile ? 10 : 11;
+  const xTickMargin = isMobile ? 4 : 8;
+  const chartHeightClass = isMobile ? "h-52" : "h-56";
+  const sspBarSize = isMobile ? 14 : 18;
+  const usdBarSize = isMobile ? 14 : 18;
+
   const baseDays = useMemo(
     () => Array.from({ length: days }, (_, i) => i + 1),
     [days]
   );
 
-  const { data: daily = [], isLoading } = useQuery({
+  const { data: raw = [], isLoading } = useQuery({
     queryKey: [
-      "exec-daily-income-v2",
+      "exec-daily-income",
       year,
       month,
-      timeRange,
+      normalizedRange(timeRange),
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
     queryFn: () =>
-      fetchIncomeTrendsDailyRobust(year, month, timeRange, customStartDate, customEndDate),
+      fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Build continuous series (SSP & USD)
+  // Continuous series with zeros for missing days (SSP & USD)
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
 
-  for (const r of daily as any[]) {
-    const d = Number(r.day);
-    if (d >= 1 && d <= days) {
-      ssp[d - 1].value += Number(r.ssp || 0);
-      usd[d - 1].value += Number(r.usd || 0);
+  for (const r of raw as any[]) {
+    let d: number | undefined = (r as any).day;
+    if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
+    if (!d && (r as any).date) d = new Date((r as any).date).getDate();
+
+    if (typeof d === "number" && d >= 1 && d <= days) {
+      ssp[d - 1].value += Number(
+        (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
+      );
+      usd[d - 1].value += Number((r as any).incomeUSD ?? 0);
     }
   }
 
@@ -326,7 +244,7 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
             </span>
           </div>
-          <div className="h-56 rounded-lg border border-slate-200">
+          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={ssp}
@@ -336,9 +254,10 @@ export default function RevenueAnalyticsDaily({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="day"
-                  interval={0}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickMargin={8}
+                  interval={xInterval}            // fewer labels on mobile
+                  minTickGap={isMobile ? 2 : 0}   // let recharts drop a few if tight
+                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
+                  tickMargin={xTickMargin}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -356,7 +275,7 @@ export default function RevenueAnalyticsDaily({
                   name="SSP"
                   fill="#14b8a6"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={18}
+                  maxBarSize={sspBarSize}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -373,7 +292,7 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
             </span>
           </div>
-          <div className="h-56 rounded-lg border border-slate-200">
+          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usd}
@@ -383,9 +302,10 @@ export default function RevenueAnalyticsDaily({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="day"
-                  interval={0}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickMargin={8}
+                  interval={xInterval}
+                  minTickGap={isMobile ? 2 : 0}
+                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
+                  tickMargin={xTickMargin}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -403,7 +323,7 @@ export default function RevenueAnalyticsDaily({
                   name="USD"
                   fill="#0ea5e9"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={18}
+                  maxBarSize={usdBarSize}
                 />
               </BarChart>
             </ResponsiveContainer>
