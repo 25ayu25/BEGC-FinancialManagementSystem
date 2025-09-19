@@ -1,135 +1,204 @@
-'use client';
+import * as React from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
-import * as React from 'react';
-import { useMemo, useEffect } from 'react';
-import { cn } from '@/lib/utils';
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
-import { useDateFilter } from '@/context/date-filter-context';
+// IMPORTANT: adjust the relative import if your folder layout differs
+import { useDateFilter } from "../../context/date-filter-context";
 
-/** Build a small list of recent years (current year going back 7). */
-function buildYearOptions(span = 8) {
-  const thisYear = new Date().getFullYear();
-  return Array.from({ length: span }, (_, i) => String(thisYear - i));
-}
-
-const MONTHS = [
-  { label: 'January', value: '1' },
-  { label: 'February', value: '2' },
-  { label: 'March', value: '3' },
-  { label: 'April', value: '4' },
-  { label: 'May', value: '5' },
-  { label: 'June', value: '6' },
-  { label: 'July', value: '7' },
-  { label: 'August', value: '8' },
-  { label: 'September', value: '9' },
-  { label: 'October', value: '10' },
-  { label: 'November', value: '11' },
-  { label: 'December', value: '12' },
-];
-
-export default function StickyPageHeader({ className }: { className?: string }) {
+/**
+ * Right-side date range control with direct month selection.
+ * Uses the shared date filter context.
+ *
+ * Mobile-safe: on small screens we render this control on its own row
+ * so it never collides with the title/back content.
+ */
+function DateRangeControl() {
   const {
-    timeRange,            // 'year' | 'month-select' | 'last-month' | 'last-3-months' | 'current-month' | 'custom'
+    timeRange,
     setTimeRange,
     selectedYear,
-    setSelectedYear,
     selectedMonth,
-    setSelectedMonth,
+    setSpecificMonth,
+    periodLabel,
   } = useDateFilter();
 
-  const yearOptions = useMemo(() => buildYearOptions(8), []);
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const years = React.useMemo(() => [thisYear, thisYear - 1], [thisYear]);
 
-  // Ensure defaults when switching modes
-  useEffect(() => {
-    const now = new Date();
-    if (timeRange === 'year') {
-      if (!selectedYear) setSelectedYear(now.getFullYear());
-    } else if (timeRange === 'month-select') {
-      if (!selectedYear) setSelectedYear(now.getFullYear());
-      if (!selectedMonth) setSelectedMonth(now.getMonth() + 1);
-    }
-  }, [timeRange, selectedYear, selectedMonth, setSelectedYear, setSelectedMonth]);
+  const months = [
+    { label: "January", value: 1 },
+    { label: "February", value: 2 },
+    { label: "March", value: 3 },
+    { label: "April", value: 4 },
+    { label: "May", value: 5 },
+    { label: "June", value: 6 },
+    { label: "July", value: 7 },
+    { label: "August", value: 8 },
+    { label: "September", value: 9 },
+    { label: "October", value: 10 },
+    { label: "November", value: 11 },
+    { label: "December", value: 12 },
+  ];
 
-  const showYear = timeRange === 'year' || timeRange === 'month-select';
-  const showMonth = timeRange === 'month-select';
+  const onQuickChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = e.target.value as
+      | "current-month"
+      | "last-month"
+      | "last-3-months"
+      | "year"
+      | "month-select"
+      | "custom";
+    setTimeRange(v);
+  };
+
+  const onYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const y = Number(e.target.value);
+    if (!Number.isNaN(y)) setSpecificMonth(y, selectedMonth || 1);
+  };
+
+  const onMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const m = Number(e.target.value);
+    if (!Number.isNaN(m)) setSpecificMonth(selectedYear || thisYear, m);
+  };
 
   return (
-    <div
-      className={cn(
-        'sticky top-0 z-30 w-full bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/50',
-        'border-b border-slate-200',
-        className
-      )}
-    >
-      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-3">
-        {/* IMPORTANT: flex-wrap + gaps; the min-widths keep controls visible */}
-        <div className="flex flex-wrap items-center gap-3">
+    <div className="flex items-center gap-3">
+      {/* Quick range */}
+      <div className="flex items-center gap-2 min-w-0">
+        <label className="text-sm text-slate-600 shrink-0">Range</label>
+        <select
+          value={timeRange}
+          onChange={onQuickChange}
+          aria-label="Select date range"
+          className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+        >
+          <option value="current-month">Current Month</option>
+          <option value="last-month">Last Month</option>
+          <option value="last-3-months">Last 3 Months</option>
+          <option value="year">This Year</option>
+          <option value="month-select">Select Month…</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
 
-          {/* Range selector */}
-          <Select
-            value={timeRange}
-            onValueChange={(v) => {
-              setTimeRange(v as any);
-            }}
+      {/* Month selection (only when "Select Month…" is active) */}
+      {timeRange === "month-select" && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-slate-600">Month</label>
+          <select
+            value={selectedYear}
+            onChange={onYearChange}
+            aria-label="Select year"
+            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
-            <SelectTrigger className="w-[180px] min-w-[180px]" data-testid="df-range">
-              <SelectValue placeholder="Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="year">This Year</SelectItem>
-              <SelectItem value="month-select">Select Month…</SelectItem>
-              <SelectItem value="current-month">Current Month</SelectItem>
-              <SelectItem value="last-month">Last Month</SelectItem>
-              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
 
-          {/* YEAR — show for This Year OR Select Month… */}
-          {showYear && (
-            <Select
-              value={String(selectedYear ?? '')}
-              onValueChange={(v) => setSelectedYear(Number(v))}
-            >
-              <SelectTrigger className="w-[128px] min-w-[128px]" data-testid="df-year">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* MONTH — only for Select Month… */}
-          {showMonth && (
-            <Select
-              value={String(selectedMonth ?? '')}
-              onValueChange={(v) => setSelectedMonth(Number(v))}
-            >
-              <SelectTrigger className="w-[140px] min-w-[140px]" data-testid="df-month">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <select
+            value={selectedMonth}
+            onChange={onMonthChange}
+            aria-label="Select month"
+            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+          >
+            {months.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
         </div>
+      )}
+
+      {/* Current period label (hide on very small screens) */}
+      <div className="hidden sm:block text-sm text-slate-500 pl-1">
+        {periodLabel}
       </div>
     </div>
+  );
+}
+
+type Props = {
+  children: React.ReactNode;
+  className?: string;
+  /**
+   * Show or hide the right-side date filter control.
+   * Defaults to true for convenience.
+   */
+  showDateFilter?: boolean;
+};
+
+/**
+ * Sticky page header with auto-height spacer. Mobile-first layout:
+ * - md+: children (left) + date filter (right) in a single row
+ * - <md: children on first row; date filter rendered on a second row
+ */
+export default function StickyPageHeader({
+  children,
+  className = "",
+  showDateFilter = true,
+}: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(64);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => setH(el.offsetHeight || 64);
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return (
+    <>
+      {/* spacer to offset fixed header height */}
+      <div style={{ height: h }} aria-hidden="true" />
+      <div
+        ref={ref}
+        className={
+          "fixed inset-x-0 top-0 z-30 border-b border-slate-200 " +
+          "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 " +
+          className
+        }
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
+          {/* Desktop row: left + right */}
+          <div className="hidden md:flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">{children}</div>
+            {showDateFilter && (
+              <div className="relative z-50">
+                <DateRangeControl />
+              </div>
+            )}
+          </div>
+
+          {/* Mobile stack: children first, filter below */}
+          <div className="md:hidden">
+            <div className="min-w-0">{children}</div>
+            {showDateFilter && (
+              <div className="mt-3 relative z-50 overflow-visible">
+                {/* wrap to avoid clipping and allow horizontal scrolling if needed */}
+                <div className="overflow-x-auto no-scrollbar">
+                  <div className="inline-flex">
+                    <DateRangeControl />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
