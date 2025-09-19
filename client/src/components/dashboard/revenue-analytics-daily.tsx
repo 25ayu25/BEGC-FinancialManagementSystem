@@ -1,8 +1,8 @@
 'use client';
 
-import {useMemo, useState, useCallback} from 'react';
-import {useQuery} from '@tanstack/react-query';
-import {format} from 'date-fns';
+import { useMemo, useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import {
   ResponsiveContainer,
   BarChart,
@@ -12,7 +12,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
-import {Card, CardHeader, CardTitle, CardContent} from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -20,11 +20,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {api} from '@/lib/queryClient';
+import { api } from '@/lib/queryClient';
 
-/* ------------------------------------------------------------------ */
-/* Types                                                              */
-/* ------------------------------------------------------------------ */
+/* ----------------------------- Types ----------------------------- */
 
 type TimeRange =
   | 'current-month'
@@ -36,7 +34,7 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // four-digit year
+  selectedYear: number;   // four-digit
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
@@ -65,11 +63,9 @@ type TxRow = {
   departmentName?: string;
 };
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
+/* --------------------------- Formatting -------------------------- */
 
-const nf0 = new Intl.NumberFormat('en-US', {maximumFractionDigits: 0});
+const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
@@ -82,7 +78,7 @@ function normalizedRange(range: TimeRange) {
   return range === 'month-select' ? 'current-month' : range;
 }
 
-/** “Nice” ticks so the y-axis looks even. */
+/** Make y-axis spacing feel even and round. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -103,43 +99,73 @@ function buildNiceTicks(maxVal: number) {
   return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
 
-/* ------------------------------------------------------------------ */
-/* Data fetchers                                                      */
-/* ------------------------------------------------------------------ */
+/* --------------------------- Data fetchers ----------------------- */
 
+/** Robust fetcher with fallbacks so we always get data even if the API ignores the range param. */
 async function fetchIncomeTrendsDaily(
   year: number,
   month: number,
   range: TimeRange,
   start?: Date,
   end?: Date
-) {
+): Promise<TrendRow[]> {
   const rng = normalizedRange(range);
-  const url = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
-  url.searchParams.set('range', rng);
+
+  // Try #1: /api/income-trends/{y}/{m}?range=...
+  const try1 = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+  try1.searchParams.set('range', rng);
   if (range === 'custom' && start && end) {
-    url.searchParams.set('startDate', format(start, 'yyyy-MM-dd'));
-    url.searchParams.set('endDate', format(end, 'yyyy-MM-dd'));
+    try1.searchParams.set('startDate', format(start, 'yyyy-MM-dd'));
+    try1.searchParams.set('endDate', format(end, 'yyyy-MM-dd'));
   }
-  const { data } = await api.get(url.toString());
-  return Array.isArray(data) ? (data as TrendRow[]) : [];
+  try {
+    const r1 = await api.get(try1.toString());
+    if (Array.isArray(r1.data) && r1.data.length) return r1.data as TrendRow[];
+  } catch {}
+
+  // Try #2: ?period=...
+  const try2 = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+  try2.searchParams.set('period', rng);
+  try {
+    const r2 = await api.get(try2.toString());
+    if (Array.isArray(r2.data) && r2.data.length) return r2.data as TrendRow[];
+  } catch {}
+
+  // Try #3: no period param
+  const try3 = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+  try {
+    const r3 = await api.get(try3.toString());
+    if (Array.isArray(r3.data) && r3.data.length) return r3.data as TrendRow[];
+  } catch {}
+
+  // Try #4: flat style: /api/income-trends?year=&month=
+  const try4 = new URL('/api/income-trends', window.location.origin);
+  try4.searchParams.set('year', String(year));
+  try4.searchParams.set('month', String(month));
+  try {
+    const r4 = await api.get(try4.toString());
+    if (Array.isArray(r4.data) && r4.data.length) return r4.data as TrendRow[];
+  } catch {}
+
+  // No luck — return empty array
+  return [];
 }
 
-/** FETCH TRANSACTIONS FOR EXACT DAY (FULL ISO DATE) */
+/** Fetch the list of income transactions for a specific ISO date. */
 async function fetchTransactionsForDay(isoDate: string) {
-  // We send both styles so either backend shape works:
   const url = new URL('/api/transactions', window.location.origin);
   url.searchParams.set('type', 'income');
-  url.searchParams.set('date', isoDate);       // if server expects ?date=yyyy-MM-dd
-  url.searchParams.set('start', isoDate);      // if server expects range
+  // Support both single-date and range styles
+  url.searchParams.set('date', isoDate);
+  url.searchParams.set('start', isoDate);
   url.searchParams.set('end', isoDate);
+
   const { data } = await api.get(url.toString());
   return Array.isArray(data) ? (data as TxRow[]) : [];
 }
 
-/* ------------------------------------------------------------------ */
-/* Tooltip                                                            */
-/* ------------------------------------------------------------------ */
+/* ------------------------------ Tooltip -------------------------- */
+
 function RevenueTooltip({
   active,
   payload,
@@ -156,9 +182,10 @@ function RevenueTooltip({
   if (!active || !payload || !payload.length) return null;
   const d = payload[0]?.payload?.day as number | undefined;
   const value = Number(payload[0]?.payload?.value ?? 0);
-  const dateStr = typeof d === 'number'
-    ? format(new Date(year, month - 1, d), 'MMM d, yyyy')
-    : '';
+  const dateStr =
+    typeof d === 'number'
+      ? format(new Date(year, month - 1, d), 'MMM d, yyyy')
+      : '';
 
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
@@ -170,9 +197,7 @@ function RevenueTooltip({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
+/* ------------------------------ Component ------------------------ */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -182,7 +207,7 @@ export default function RevenueAnalyticsDaily({
   customEndDate,
 }: Props) {
   const year = selectedYear;
-  const month = selectedMonth; // 1..12
+  const month = selectedMonth;
 
   const days = daysInMonth(year, month);
   const baseDays = useMemo(() => Array.from({ length: days }, (_, i) => i + 1), [days]);
@@ -200,7 +225,7 @@ export default function RevenueAnalyticsDaily({
       fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Continuous series for both currencies
+  // Build continuous series
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
 
@@ -216,13 +241,14 @@ export default function RevenueAnalyticsDaily({
 
   const totalSSP = ssp.reduce((s, r) => s + r.value, 0);
   const totalUSD = usd.reduce((s, r) => s + r.value, 0);
+
   const activeDaysSSP = ssp.filter((d) => d.value > 0).length || 0;
   const activeDaysUSD = usd.filter((d) => d.value > 0).length || 0;
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(Math.max(...ssp.map(d => d.value), 0));
-  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(Math.max(...usd.map(d => d.value), 0));
+  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(Math.max(0, ...ssp.map((d) => d.value)));
+  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(Math.max(0, ...usd.map((d) => d.value)));
 
   const [open, setOpen] = useState(false);
   const [clickedDay, setClickedDay] = useState<number | null>(null);
@@ -236,27 +262,20 @@ export default function RevenueAnalyticsDaily({
     queryFn: () => fetchTransactionsForDay(isoForDay as string),
   });
 
-  // Group by department
   const byDept = useMemo(() => {
-    const map = new Map<
-      string,
-      { ssp: number; usd: number; rows: TxRow[] }
-    >();
+    const map = new Map<string, { ssp: number; usd: number; rows: TxRow[] }>();
     for (const t of dayTx) {
-      const dept =
-        t.department?.name ||
-        t.departmentName ||
-        'Unspecified';
+      const dept = t.department?.name || t.departmentName || 'Unspecified';
       const entry = map.get(dept) || { ssp: 0, usd: 0, rows: [] };
       const cur = String(t.currency || '').toUpperCase();
-      const val =
+      const value =
         typeof t.amount === 'number'
           ? t.amount
           : cur === 'USD'
           ? Number(t.amountUSD ?? 0)
           : Number(t.amountSSP ?? 0);
-      if (cur === 'USD') entry.usd += val;
-      else entry.ssp += val;
+      if (cur === 'USD') entry.usd += value;
+      else entry.ssp += value;
       entry.rows.push(t);
       map.set(dept, entry);
     }
@@ -301,8 +320,7 @@ export default function RevenueAnalyticsDaily({
               <span className="text-xs text-slate-500">
                 Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
                 <span className="mx-2">•</span>
-                Avg/day:{' '}
-                <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
+                Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
               </span>
             </div>
 
@@ -351,8 +369,7 @@ export default function RevenueAnalyticsDaily({
               <span className="text-xs text-slate-500">
                 Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
                 <span className="mx-2">•</span>
-                Avg/day:{' '}
-                <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
+                Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
               </span>
             </div>
 
@@ -402,7 +419,7 @@ export default function RevenueAnalyticsDaily({
         </CardContent>
       </Card>
 
-      {/* Details sheet/dialog */}
+      {/* Day details */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
@@ -411,14 +428,12 @@ export default function RevenueAnalyticsDaily({
                 ? `${format(new Date(year, month - 1, clickedDay), 'MMM d, yyyy')} • SSP & USD breakdown`
                 : 'Day breakdown'}
             </DialogTitle>
-            {/* Silence the shadcn warning while keeping a11y happy */}
             <DialogDescription className="sr-only">
               Detailed income for the selected day grouped by department
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-1">
-            {/* Totals row */}
             <div className="flex items-center justify-between text-sm">
               <div className="text-slate-600">Totals for the day</div>
               <div className="font-medium text-slate-900">
@@ -428,7 +443,6 @@ export default function RevenueAnalyticsDaily({
               </div>
             </div>
 
-            {/* Departments */}
             <div>
               <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">
                 By Department
