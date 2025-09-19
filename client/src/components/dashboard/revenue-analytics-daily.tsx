@@ -28,8 +28,8 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // e.g. 2025
-  selectedMonth: number;  // 1..12
+  selectedYear: number;
+  selectedMonth: number; // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
@@ -38,12 +38,12 @@ type Currency = "SSP" | "USD";
 
 type Txn = {
   id?: string | number;
-  date?: string;           // ISO
+  date?: string;
   department?: string;
   description?: string;
   incomeSSP?: number;
   incomeUSD?: number;
-  amount?: number;         // fallback
+  amount?: number;
 };
 
 /* ------------------------ Number Formatters ---------------------- */
@@ -58,7 +58,7 @@ const compact = new Intl.NumberFormat("en-US", {
 /* ----------------------------- Utils ----------------------------- */
 
 function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate(); // month is 1..12
+  return new Date(year, month, 0).getDate();
 }
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
@@ -83,16 +83,40 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
-/** Day drill-down: list income transactions for a single date */
+/** Try multiple day endpoints; return first non-empty response */
 async function fetchIncomesForDay(year: number, month: number, day: number) {
-  const d = format(new Date(year, month - 1, day), "yyyy-MM-dd");
-  // If your API differs, update this one line:
-  const { data } = await api.get(
-    `/api/transactions?type=income&from=${d}&to=${d}`
-  );
-  // accept either {items: [...] } or [...] directly
-  const list: Txn[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-  return list;
+  const localDate = new Date(year, month - 1, day);
+  const d = format(localDate, "yyyy-MM-dd");
+  const startUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
+  const endUTC   = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
+
+  const candidates = [
+    // 1) from/to (date-only)
+    `/api/transactions?type=income&from=${d}&to=${d}`,
+    // 2) startDate/endDate (full UTC day)
+    `/api/transactions?type=income&startDate=${encodeURIComponent(
+      startUTC
+    )}&endDate=${encodeURIComponent(endUTC)}`,
+    // 3) single date
+    `/api/transactions?type=income&date=${d}`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const { data } = await api.get(url);
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray((data as any)?.items)
+        ? (data as any).items
+        : [];
+
+      if (items.length) return items as Txn[];
+    } catch {
+      // try next
+    }
+  }
+
+  return [] as Txn[];
 }
 
 /* --------------------- Nice ticks for Y-axis --------------------- */
@@ -140,7 +164,7 @@ type RTProps = {
   active?: boolean;
   payload?: any[];
   year: number;
-  month: number; // 1..12
+  month: number;
   currency: Currency;
 };
 
@@ -172,6 +196,8 @@ function DayDetail({
   month,
   day,
   currency,
+  fallbackSSP,
+  fallbackUSD,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -179,6 +205,8 @@ function DayDetail({
   month: number;
   day: number | null;
   currency: Currency | null;
+  fallbackSSP: number;
+  fallbackUSD: number;
 }) {
   const enabled = !!day;
   const { data = [], isLoading } = useQuery({
@@ -195,10 +223,14 @@ function DayDetail({
     usd: Number(t.incomeUSD ?? 0),
   }));
 
-  const sumSSP = rows.reduce((s, r) => s + (r.ssp || 0), 0);
-  const sumUSD = rows.reduce((s, r) => s + (r.usd || 0), 0);
+  const apiSumSSP = rows.reduce((s, r) => s + (r.ssp || 0), 0);
+  const apiSumUSD = rows.reduce((s, r) => s + (r.usd || 0), 0);
 
-  // department roll-up (by selected currency)
+  const useFallback = rows.length === 0 && (fallbackSSP > 0 || fallbackUSD > 0);
+  const sumSSP = useFallback ? fallbackSSP : apiSumSSP;
+  const sumUSD = useFallback ? fallbackUSD : apiSumUSD;
+
+  // roll-up
   const byDept = rows.reduce<Record<string, { ssp: number; usd: number }>>((acc, r) => {
     acc[r.department] ??= { ssp: 0, usd: 0 };
     acc[r.department].ssp += r.ssp || 0;
@@ -223,21 +255,24 @@ function DayDetail({
         </SheetHeader>
 
         <div className="mt-4 space-y-6">
-          {/* Totals */}
           <div className="rounded-lg border border-slate-200 p-3">
             <div className="text-sm text-slate-600">Totals for the day</div>
             <div className="mt-1 font-semibold">
               SSP {nf0.format(sumSSP)} <span className="mx-2 text-slate-300">•</span>
               USD {nf0.format(sumUSD)}
             </div>
+            {useFallback && (
+              <div className="mt-1 text-xs text-amber-600">
+                Showing aggregated totals from the chart (API returned no line items for this day).
+              </div>
+            )}
           </div>
 
-          {/* Dept roll-up */}
           <div className="rounded-lg border border-slate-200 p-3">
             <div className="font-medium mb-2">By Department</div>
             <div className="space-y-1">
               {deptList.length === 0 && (
-                <div className="text-sm text-slate-500">No income for this day.</div>
+                <div className="text-sm text-slate-500">No per-transaction data available.</div>
               )}
               {deptList.map((d) => (
                 <div key={d.dept} className="flex items-center justify-between text-sm">
@@ -252,14 +287,11 @@ function DayDetail({
             </div>
           </div>
 
-          {/* Transactions table */}
           <div className="rounded-lg border border-slate-200">
             <div className="px-3 py-2 border-b border-slate-200 font-medium">Transactions</div>
             <div className="divide-y divide-slate-200">
-              {isLoading && (
-                <div className="p-3 text-sm text-slate-500">Loading…</div>
-              )}
-              {!isLoading && rows.length === 0 && (
+              {isLoading && <div className="p-3 text-sm text-slate-500">Loading…</div>}
+              {!isLoading && rows.length === 0 && !useFallback && (
                 <div className="p-3 text-sm text-slate-500">No income recorded.</div>
               )}
               {rows.map((r) => (
@@ -296,10 +328,9 @@ export default function RevenueAnalyticsDaily({
   const year = selectedYear;
   const month = selectedMonth;
   const days = daysInMonth(year, month);
-  const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
+  const isMobile = useIsMobile(768);
 
-  // X-axis label density for mobile vs desktop
-  const desiredXTicks = isMobile ? 12 : days; // ~12 labels on mobile, all on desktop
+  const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
   const xTickFont = isMobile ? 10 : 11;
   const xTickMargin = isMobile ? 4 : 8;
@@ -325,9 +356,11 @@ export default function RevenueAnalyticsDaily({
       fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Continuous series with zeros for missing days (SSP & USD)
+  // Build series + lookup for fallback totals per day
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
+  const fallbackByDay = new Map<number, { ssp: number; usd: number }>();
+  baseDays.forEach((d) => fallbackByDay.set(d, { ssp: 0, usd: 0 }));
 
   for (const r of raw as any[]) {
     let d: number | undefined = (r as any).day;
@@ -335,23 +368,28 @@ export default function RevenueAnalyticsDaily({
     if (!d && (r as any).date) d = new Date((r as any).date).getDate();
 
     if (typeof d === "number" && d >= 1 && d <= days) {
-      ssp[d - 1].value += Number(
+      const sspVal = Number(
         (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
       );
-      usd[d - 1].value += Number((r as any).incomeUSD ?? 0);
+      const usdVal = Number((r as any).incomeUSD ?? 0);
+
+      ssp[d - 1].value += sspVal;
+      usd[d - 1].value += usdVal;
+
+      const agg = fallbackByDay.get(d)!;
+      agg.ssp += sspVal;
+      agg.usd += usdVal;
     }
   }
 
   const totalSSP = ssp.reduce((s, r) => s + r.value, 0);
   const totalUSD = usd.reduce((s, r) => s + r.value, 0);
 
-  // "active-day" averages (ignores zero days)
   const activeDaysSSP = ssp.filter((d) => d.value > 0).length || 0;
   const activeDaysUSD = usd.filter((d) => d.value > 0).length || 0;
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  // Nice ticks for even spacing & rounded labels
   const dataMaxSSP = Math.max(0, ...ssp.map((d) => d.value));
   const dataMaxUSD = Math.max(0, ...usd.map((d) => d.value));
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(dataMaxSSP);
@@ -375,6 +413,10 @@ export default function RevenueAnalyticsDaily({
     setSelectedCurrency(cur);
     setOpen(true);
   };
+
+  const fallbackTotalsForSelected = selectedDay
+    ? fallbackByDay.get(selectedDay) ?? { ssp: 0, usd: 0 }
+    : { ssp: 0, usd: 0 };
 
   return (
     <>
@@ -411,8 +453,8 @@ export default function RevenueAnalyticsDaily({
                     dataKey="day"
                     interval={xInterval}
                     minTickGap={isMobile ? 2 : 0}
-                    tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                    tickMargin={xTickMargin}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: "#64748b" }}
+                    tickMargin={isMobile ? 4 : 8}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -430,7 +472,7 @@ export default function RevenueAnalyticsDaily({
                     name="SSP"
                     fill="#14b8a6"
                     radius={[3, 3, 0, 0]}
-                    maxBarSize={sspBarSize}
+                    maxBarSize={isMobile ? 14 : 18}
                     cursor="pointer"
                     onClick={(_, index) => openDay(ssp[index].day, "SSP")}
                   />
@@ -461,8 +503,8 @@ export default function RevenueAnalyticsDaily({
                     dataKey="day"
                     interval={xInterval}
                     minTickGap={isMobile ? 2 : 0}
-                    tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                    tickMargin={xTickMargin}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: "#64748b" }}
+                    tickMargin={isMobile ? 4 : 8}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -480,7 +522,7 @@ export default function RevenueAnalyticsDaily({
                     name="USD"
                     fill="#0ea5e9"
                     radius={[3, 3, 0, 0]}
-                    maxBarSize={usdBarSize}
+                    maxBarSize={isMobile ? 14 : 18}
                     cursor="pointer"
                     onClick={(_, index) => openDay(usd[index].day, "USD")}
                   />
@@ -505,6 +547,8 @@ export default function RevenueAnalyticsDaily({
         month={month}
         day={selectedDay}
         currency={selectedCurrency}
+        fallbackSSP={fallbackTotalsForSelected.ssp}
+        fallbackUSD={fallbackTotalsForSelected.usd}
       />
     </>
   );
