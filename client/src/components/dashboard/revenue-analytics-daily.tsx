@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/queryClient';
 
-/* ----------------------------- Types ----------------------------- */
+/* =============================== Types =============================== */
 
 type TimeRange =
   | 'current-month'
@@ -34,7 +34,7 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // four-digit
+  selectedYear: number;   // YYYY
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
@@ -54,7 +54,7 @@ type TxRow = {
   id?: string | number;
   date?: string;
   createdAt?: string;
-  currency?: 'SSP' | 'USD' | string;
+  currency?: string;
   amount?: number;
   amountSSP?: number;
   amountUSD?: number;
@@ -63,7 +63,7 @@ type TxRow = {
   departmentName?: string;
 };
 
-/* --------------------------- Formatting -------------------------- */
+/* ========================== Formatting helpers ========================= */
 
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat('en-US', {
@@ -71,26 +71,31 @@ const compact = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 1,
 });
 
-function daysInMonth(year: number, month1to12: number) {
-  return new Date(year, month1to12, 0).getDate();
-}
-function normalizedRange(range: TimeRange) {
-  return range === 'month-select' ? 'current-month' : range;
+const normalizedRange = (r: TimeRange) => (r === 'month-select' ? 'current-month' : r);
+
+const daysInMonth = (y: number, m1: number) => new Date(y, m1, 0).getDate(); // m1 is 1..12
+
+function monthStartEnd(y: number, m1: number) {
+  const start = new Date(y, m1 - 1, 1);
+  const end = new Date(y, m1, 0);
+  return {
+    startISO: format(start, 'yyyy-MM-dd'),
+    endISO: format(end, 'yyyy-MM-dd'),
+  };
 }
 
-/** Make y-axis spacing feel even and round. */
-function niceStep(roughStep: number) {
-  if (roughStep <= 0) return 1;
-  const exp = Math.floor(Math.log10(roughStep));
+/** Even, rounded y-axis ticks. */
+function niceStep(rough: number) {
+  if (rough <= 0) return 1;
+  const exp = Math.floor(Math.log10(rough));
   const base = Math.pow(10, exp);
-  const frac = roughStep / base;
-  let niceFrac: number;
-  if (frac <= 1) niceFrac = 1;
-  else if (frac <= 2) niceFrac = 2;
-  else if (frac <= 2.5) niceFrac = 2.5;
-  else if (frac <= 5) niceFrac = 5;
-  else niceFrac = 10;
-  return niceFrac * base;
+  const frac = rough / base;
+  let f = 10;
+  if (frac <= 1) f = 1;
+  else if (frac <= 2) f = 2;
+  else if (frac <= 2.5) f = 2.5;
+  else if (frac <= 5) f = 5;
+  return f * base;
 }
 function buildNiceTicks(maxVal: number) {
   if (maxVal <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
@@ -99,10 +104,16 @@ function buildNiceTicks(maxVal: number) {
   return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
 
-/* --------------------------- Data fetchers ----------------------- */
+/* ============================== Fetchers ============================== */
 
-/** Robust fetcher with fallbacks so we always get data even if the API ignores the range param. */
-async function fetchIncomeTrendsDaily(
+/** Add cache-buster param so the server won’t 304 us with an empty body. */
+const withTs = (u: URL) => {
+  u.searchParams.set('ts', String(Date.now()));
+  return u.toString();
+};
+
+/** Try the trends endpoint in a few shapes. Return [] when not usable. */
+async function tryTrends(
   year: number,
   month: number,
   range: TimeRange,
@@ -111,60 +122,106 @@ async function fetchIncomeTrendsDaily(
 ): Promise<TrendRow[]> {
   const rng = normalizedRange(range);
 
-  // Try #1: /api/income-trends/{y}/{m}?range=...
-  const try1 = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
-  try1.searchParams.set('range', rng);
-  if (range === 'custom' && start && end) {
-    try1.searchParams.set('startDate', format(start, 'yyyy-MM-dd'));
-    try1.searchParams.set('endDate', format(end, 'yyyy-MM-dd'));
-  }
+  // 1) /api/income-trends/{y}/{m}?range=
   try {
-    const r1 = await api.get(try1.toString());
-    if (Array.isArray(r1.data) && r1.data.length) return r1.data as TrendRow[];
+    const u = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+    u.searchParams.set('range', rng);
+    if (range === 'custom' && start && end) {
+      u.searchParams.set('startDate', format(start, 'yyyy-MM-dd'));
+      u.searchParams.set('endDate', format(end, 'yyyy-MM-dd'));
+    }
+    const r = await api.get(withTs(u));
+    if (Array.isArray(r.data) && r.data.length) return r.data as TrendRow[];
   } catch {}
 
-  // Try #2: ?period=...
-  const try2 = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
-  try2.searchParams.set('period', rng);
+  // 2) ?period=
   try {
-    const r2 = await api.get(try2.toString());
-    if (Array.isArray(r2.data) && r2.data.length) return r2.data as TrendRow[];
+    const u = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+    u.searchParams.set('period', rng);
+    const r = await api.get(withTs(u));
+    if (Array.isArray(r.data) && r.data.length) return r.data as TrendRow[];
   } catch {}
 
-  // Try #3: no period param
-  const try3 = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+  // 3) no param
   try {
-    const r3 = await api.get(try3.toString());
-    if (Array.isArray(r3.data) && r3.data.length) return r3.data as TrendRow[];
+    const u = new URL(`/api/income-trends/${year}/${month}`, window.location.origin);
+    const r = await api.get(withTs(u));
+    if (Array.isArray(r.data) && r.data.length) return r.data as TrendRow[];
   } catch {}
 
-  // Try #4: flat style: /api/income-trends?year=&month=
-  const try4 = new URL('/api/income-trends', window.location.origin);
-  try4.searchParams.set('year', String(year));
-  try4.searchParams.set('month', String(month));
+  // 4) flat style
   try {
-    const r4 = await api.get(try4.toString());
-    if (Array.isArray(r4.data) && r4.data.length) return r4.data as TrendRow[];
+    const u = new URL('/api/income-trends', window.location.origin);
+    u.searchParams.set('year', String(year));
+    u.searchParams.set('month', String(month));
+    const r = await api.get(withTs(u));
+    if (Array.isArray(r.data) && r.data.length) return r.data as TrendRow[];
   } catch {}
 
-  // No luck — return empty array
   return [];
 }
 
-/** Fetch the list of income transactions for a specific ISO date. */
-async function fetchTransactionsForDay(isoDate: string) {
-  const url = new URL('/api/transactions', window.location.origin);
-  url.searchParams.set('type', 'income');
-  // Support both single-date and range styles
-  url.searchParams.set('date', isoDate);
-  url.searchParams.set('start', isoDate);
-  url.searchParams.set('end', isoDate);
+/** Fallback: aggregate daily income directly from /api/transactions. */
+async function trendsFromTransactions(year: number, month: number): Promise<TrendRow[]> {
+  const { startISO, endISO } = monthStartEnd(year, month);
+  const u = new URL('/api/transactions', window.location.origin);
+  u.searchParams.set('type', 'income');
+  u.searchParams.set('start', startISO);
+  u.searchParams.set('end', endISO);
 
-  const { data } = await api.get(url.toString());
+  const { data } = await api.get(withTs(u));
+  const rows: TxRow[] = Array.isArray(data) ? data : [];
+
+  // group per day
+  const map = new Map<number, { ssp: number; usd: number }>();
+  for (const t of rows) {
+    const iso = (t.date || t.createdAt || '').slice(0, 10);
+    if (!iso) continue;
+    const d = new Date(iso).getDate();
+    const cur = String(t.currency || '').toUpperCase();
+    let value = 0;
+    if (typeof t.amount === 'number') value = t.amount;
+    else if (cur === 'USD') value = Number(t.amountUSD ?? 0);
+    else value = Number(t.amountSSP ?? 0);
+
+    const entry = map.get(d) || { ssp: 0, usd: 0 };
+    if (cur === 'USD') entry.usd += value;
+    else entry.ssp += value;
+    map.set(d, entry);
+  }
+
+  // convert to TrendRow[]
+  return Array.from(map.entries())
+    .map(([day, v]) => ({ day, incomeSSP: v.ssp, incomeUSD: v.usd }))
+    .sort((a, b) => a.day! - b.day!);
+}
+
+/** Unified fetcher: try trends → else derive from transactions. */
+async function fetchIncomeDaily(
+  year: number,
+  month: number,
+  range: TimeRange,
+  start?: Date,
+  end?: Date
+): Promise<TrendRow[]> {
+  const fromTrends = await tryTrends(year, month, range, start, end);
+  if (fromTrends.length) return fromTrends;
+  return trendsFromTransactions(year, month);
+}
+
+/** Fetch transactions for a day (for the right-side dialog). */
+async function fetchTransactionsForDay(isoDate: string): Promise<TxRow[]> {
+  const u = new URL('/api/transactions', window.location.origin);
+  u.searchParams.set('type', 'income');
+  u.searchParams.set('start', isoDate);
+  u.searchParams.set('end', isoDate);
+  // also support servers that use single ?date=
+  u.searchParams.set('date', isoDate);
+  const { data } = await api.get(withTs(u));
   return Array.isArray(data) ? (data as TxRow[]) : [];
 }
 
-/* ------------------------------ Tooltip -------------------------- */
+/* ============================== Tooltip ============================== */
 
 function RevenueTooltip({
   active,
@@ -176,7 +233,7 @@ function RevenueTooltip({
   active?: boolean;
   payload?: any[];
   year: number;
-  month: number;
+  month: number; // 1..12
   currency: 'SSP' | 'USD';
 }) {
   if (!active || !payload || !payload.length) return null;
@@ -197,7 +254,7 @@ function RevenueTooltip({
   );
 }
 
-/* ------------------------------ Component ------------------------ */
+/* ============================= Component ============================= */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -221,11 +278,10 @@ export default function RevenueAnalyticsDaily({
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
-    queryFn: () =>
-      fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
+    queryFn: () => fetchIncomeDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // Build continuous series
+  // Build continuous series (fill missing days with 0)
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
 
@@ -250,6 +306,7 @@ export default function RevenueAnalyticsDaily({
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(Math.max(0, ...ssp.map((d) => d.value)));
   const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(Math.max(0, ...usd.map((d) => d.value)));
 
+  // Day-details dialog
   const [open, setOpen] = useState(false);
   const [clickedDay, setClickedDay] = useState<number | null>(null);
   const isoForDay = clickedDay
@@ -437,9 +494,9 @@ export default function RevenueAnalyticsDaily({
             <div className="flex items-center justify-between text-sm">
               <div className="text-slate-600">Totals for the day</div>
               <div className="font-medium text-slate-900">
-                SSP {nf0.format(byDept.reduce((s, d) => s + d.ssp, 0))}
+                SSP {nf0.format((byDept || []).reduce((s, d) => s + d.ssp, 0))}
                 <span className="mx-2">•</span>
-                USD {nf0.format(byDept.reduce((s, d) => s + d.usd, 0))}
+                USD {nf0.format((byDept || []).reduce((s, d) => s + d.usd, 0))}
               </div>
             </div>
 
@@ -450,7 +507,7 @@ export default function RevenueAnalyticsDaily({
 
               {loadingDay ? (
                 <div className="text-sm text-slate-500">Loading…</div>
-              ) : byDept.length === 0 ? (
+              ) : (byDept || []).length === 0 ? (
                 <div className="text-sm text-slate-500">
                   No income recorded for this day.
                 </div>
