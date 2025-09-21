@@ -30,15 +30,11 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // 4-digit year
-  selectedMonth: number;  // 1..12
+  selectedYear: number;
+  selectedMonth: number;
   customStartDate?: Date;
   customEndDate?: Date;
-
-  /** Optional: draw a goal/reference line on the SSP chart (per-month target). */
   monthlySSPTarget?: number;
-
-  /** Optional drill-down when a bar is clicked. */
   onBarClick?: (year: number, month: number, currency: "SSP" | "USD") => void;
 };
 
@@ -236,8 +232,6 @@ function ValueLabel(props: any) {
     </text>
   );
 }
-
-/** FULL number label for USD bars */
 function ValueLabelFull(props: any) {
   const { x, y, width, value } = props;
   const v = Number(value || 0);
@@ -281,7 +275,6 @@ export default function MonthlyIncome({
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
-  // span for API pull
   const spanStart = useMemo(() => {
     const first = months[0];
     return new Date(first.y, first.m - 1, 1);
@@ -308,7 +301,7 @@ export default function MonthlyIncome({
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
-      "monthly-income-v6",
+      "monthly-income-v7",
       timeRange,
       selectedYear,
       selectedMonth,
@@ -319,10 +312,9 @@ export default function MonthlyIncome({
       const map = new Map<string, { label: string; ssp: number; usd: number }>();
       months.forEach(({ y, m }) => {
         const key = `${y}-${String(m).padStart(2, "0")}`;
-        map.set(key, { label: MONTH_SHORT[m - 1], ssp: 0, usd: 0 }); // month only
+        map.set(key, { label: MONTH_SHORT[m - 1], ssp: 0, usd: 0 });
       });
 
-      // Pull all transactions in one span
       const txStart = isSingleMonth ? monthStart : spanStart;
       const txEnd = isSingleMonth ? monthEnd : spanEnd;
       const rows = await fetchTransactions(
@@ -347,7 +339,6 @@ export default function MonthlyIncome({
         else map.get(key)!.ssp += amount;
       }
 
-      // Add insurance USD
       const insMap = await fetchInsuranceMonthlyUSD(
         timeRange,
         selectedYear,
@@ -361,9 +352,12 @@ export default function MonthlyIncome({
 
       return Array.from(map.values());
     },
+    // Small stability/perf wins:
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
   });
-
-  /* ----------------------------- Aggregations ---------------------------- */
 
   const sspSeries = data.map(({ label, ssp }) => ({ label, value: Number(ssp) || 0 }));
   const usdSeries = data.map(({ label, usd }) => ({ label, value: Number(usd) || 0 }));
@@ -371,13 +365,11 @@ export default function MonthlyIncome({
   const totalSSP = sspSeries.reduce((s, r) => s + r.value, 0);
   const totalUSD = usdSeries.reduce((s, r) => s + r.value, 0);
 
-  // Average over active months (ignore months with zero value)
   const activeMonthsSSP = sspSeries.filter(d => d.value > 0).length || 0;
   const activeMonthsUSD = usdSeries.filter(d => d.value > 0).length || 0;
   const avgMoSSP = activeMonthsSSP ? Math.round(totalSSP / activeMonthsSSP) : 0;
   const avgMoUSD = activeMonthsUSD ? Math.round(totalUSD / activeMonthsUSD) : 0;
 
-  // Rolling avg (3-mo) for SSP
   const sspRolling = sspSeries.map((d, i, arr) => {
     const start = Math.max(0, i - 2);
     const slice = arr.slice(start, i + 1);
@@ -385,7 +377,6 @@ export default function MonthlyIncome({
     return { label: d.label, avg: slice.length ? sum / slice.length : 0 };
   });
 
-  // Nice ticks to keep spacing even and labels round
   const maxSSP = Math.max(0, ...sspSeries.map(d => d.value));
   const maxUSD = Math.max(0, ...usdSeries.map(d => d.value));
   const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(maxSSP);
@@ -423,8 +414,9 @@ export default function MonthlyIncome({
             </span>
           </div>
 
-          <div className="h-64 rounded-lg border border-slate-200">
-            <ResponsiveContainer width="100%" height="100%">
+          {/* min-w-0 prevents flex overflow → resize loops */}
+          <div className="h-64 rounded-lg border border-slate-200 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" debounce={250}>
               <BarChart
                 data={sspSeries}
                 margin={{ top: 24, right: 12, left: 12, bottom: 18 }}
@@ -444,6 +436,7 @@ export default function MonthlyIncome({
                 <YAxis
                   domain={[0, yMaxSSP]}
                   ticks={ticksSSP}
+                  allowDecimals={false}
                   tick={{ fontSize: 11, fill: "#64748b" }}
                   tickFormatter={(v) => compact.format(v as number)}
                   axisLine={false}
@@ -458,6 +451,7 @@ export default function MonthlyIncome({
                   strokeWidth={2}
                   dot={false}
                   name="3-mo avg"
+                  isAnimationActive={false}
                 />
                 {typeof monthlySSPTarget === "number" && monthlySSPTarget > 0 && (
                   <ReferenceLine
@@ -479,6 +473,7 @@ export default function MonthlyIncome({
                   fill="#14b8a6"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={28}
+                  isAnimationActive={false}
                   onClick={(_, i) => handleBarClick(i, "SSP")}
                 >
                   <LabelList content={(p) => <ValueLabel {...p} />} />
@@ -499,8 +494,8 @@ export default function MonthlyIncome({
             </span>
           </div>
 
-          <div className="h-64 rounded-lg border border-slate-200">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 rounded-lg border border-slate-200 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" debounce={250}>
               <BarChart
                 data={usdSeries}
                 margin={{ top: 24, right: 12, left: 12, bottom: 18 }}
@@ -520,8 +515,9 @@ export default function MonthlyIncome({
                 <YAxis
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
+                  allowDecimals={false}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => nf0.format(v as number)}  // FULL numbers
+                  tickFormatter={(v) => nf0.format(v as number)}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -532,9 +528,9 @@ export default function MonthlyIncome({
                   fill="#0ea5e9"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={28}
+                  isAnimationActive={false}
                   onClick={(_, i) => handleBarClick(i, "USD")}
                 >
-                  {/* FULL numbers on labels */}
                   <LabelList content={(p) => <ValueLabelFull {...p} />} />
                 </Bar>
               </BarChart>
