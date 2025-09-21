@@ -46,11 +46,9 @@ const compact = new Intl.NumberFormat("en-US", {
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate(); // month is 1..12
 }
-
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
-
 async function fetchIncomeTrendsDaily(
   year: number,
   month: number,
@@ -70,25 +68,19 @@ async function fetchIncomeTrendsDaily(
 }
 
 /* --------------------- Nice ticks for Y-axis --------------------- */
-/** Return a "nice" step (1, 2, 2.5, 5, 10 × 10^n) for a given rough step. */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
   let niceFrac: number;
-
-  // include 2.5 to get 250/2.5k/etc when needed
   if (frac <= 1)        niceFrac = 1;
   else if (frac <= 2)   niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
   else if (frac <= 5)   niceFrac = 5;
   else                  niceFrac = 10;
-
   return niceFrac * base;
 }
-
-/** Build 5 ticks (0..max) with a nice step so spacing/labels look right. */
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
@@ -155,14 +147,17 @@ export default function RevenueAnalyticsDaily({
   const days = daysInMonth(year, month);
   const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
 
-  // X-axis label density for mobile vs desktop
-  const desiredXTicks = isMobile ? 12 : days; // ~12 labels on mobile, all on desktop
+  // Bigger chart feel
+  const chartHeight = isMobile ? 260 : 340;        // ⬅️ taller charts
+  const sspBarSize = isMobile ? 16 : 24;           // ⬅️ wider bars
+  const usdBarSize = isMobile ? 16 : 24;
+
+  // Label density + typography
+  const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
-  const xTickFont = isMobile ? 10 : 11;
+  const xTickFont = isMobile ? 11 : 12;            // ⬅️ slightly larger
+  const yTickFont = isMobile ? 11 : 12;
   const xTickMargin = isMobile ? 4 : 8;
-  const chartHeightClass = isMobile ? "h-52" : "h-56";
-  const sspBarSize = isMobile ? 14 : 18;
-  const usdBarSize = isMobile ? 14 : 18;
 
   const baseDays = useMemo(
     () => Array.from({ length: days }, (_, i) => i + 1),
@@ -244,18 +239,21 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
             </span>
           </div>
-          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
+          <div
+            className="rounded-lg border border-slate-200"
+            style={{ height: chartHeight }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={ssp}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="28%"
+                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
+                barCategoryGap="26%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="day"
-                  interval={xInterval}            // fewer labels on mobile
-                  minTickGap={isMobile ? 2 : 0}   // let recharts drop a few if tight
+                  interval={xInterval}
+                  minTickGap={isMobile ? 2 : 0}
                   tick={{ fontSize: xTickFont, fill: "#64748b" }}
                   tickMargin={xTickMargin}
                   axisLine={false}
@@ -264,7 +262,7 @@ export default function RevenueAnalyticsDaily({
                 <YAxis
                   domain={[0, yMaxSSP]}
                   ticks={ticksSSP}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tick={{ fontSize: yTickFont, fill: "#64748b" }}
                   tickFormatter={(v) => compact.format(v)}
                   axisLine={false}
                   tickLine={false}
@@ -274,7 +272,7 @@ export default function RevenueAnalyticsDaily({
                   dataKey="value"
                   name="SSP"
                   fill="#14b8a6"
-                  radius={[3, 3, 0, 0]}
+                  radius={[4, 4, 0, 0]}
                   maxBarSize={sspBarSize}
                 />
               </BarChart>
@@ -292,12 +290,15 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
             </span>
           </div>
-          <div className={`${chartHeightClass} rounded-lg border border-slate-200`}>
+          <div
+            className="rounded-lg border border-slate-200"
+            style={{ height: chartHeight }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usd}
-                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="28%"
+                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
+                barCategoryGap="26%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
@@ -312,7 +313,7 @@ export default function RevenueAnalyticsDaily({
                 <YAxis
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tick={{ fontSize: yTickFont, fill: "#64748b" }}
                   tickFormatter={(v) => compact.format(v)}
                   axisLine={false}
                   tickLine={false}
@@ -322,7 +323,7 @@ export default function RevenueAnalyticsDaily({
                   dataKey="value"
                   name="USD"
                   fill="#0ea5e9"
-                  radius={[3, 3, 0, 0]}
+                  radius={[4, 4, 0, 0]}
                   maxBarSize={usdBarSize}
                 />
               </BarChart>
