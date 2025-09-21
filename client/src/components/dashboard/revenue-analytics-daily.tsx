@@ -49,6 +49,7 @@ function daysInMonth(year: number, month: number) {
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
+
 async function fetchIncomeTrendsDaily(
   year: number,
   month: number,
@@ -88,6 +89,17 @@ function buildNiceTicks(dataMax: number) {
   const ticks = [0, step, step * 2, step * 3, max];
   return { max, ticks };
 }
+/** Lock to a preferred max if data is below it; otherwise expand nicely. */
+function buildTicksPreferred(dataMax: number, preferredMax: number) {
+  if (dataMax <= preferredMax) {
+    const step = preferredMax / 4;
+    return {
+      max: preferredMax,
+      ticks: [0, step, step * 2, step * 3, preferredMax],
+    };
+  }
+  return buildNiceTicks(dataMax);
+}
 
 /* ------------------------ Mobile helper hook --------------------- */
 
@@ -123,11 +135,14 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
       ? format(new Date(year, month - 1, d), "MMM d, yyyy")
       : "";
 
+  const formatValue =
+    currency === "USD" ? nf0.format(Math.round(value)) : compact.format(Math.round(value));
+
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
       <div className="font-semibold text-slate-900 mb-1">{dateStr}</div>
       <div className="text-sm text-slate-700 font-mono">
-        {currency} {compact.format(Math.round(value))}
+        {currency} {formatValue}
       </div>
     </div>
   );
@@ -148,14 +163,14 @@ export default function RevenueAnalyticsDaily({
   const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
 
   // Bigger chart feel
-  const chartHeight = isMobile ? 260 : 340;        // ⬅️ taller charts
-  const sspBarSize = isMobile ? 16 : 24;           // ⬅️ wider bars
+  const chartHeight = isMobile ? 260 : 340;
+  const sspBarSize = isMobile ? 16 : 24;
   const usdBarSize = isMobile ? 16 : 24;
 
   // Label density + typography
   const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
-  const xTickFont = isMobile ? 11 : 12;            // ⬅️ slightly larger
+  const xTickFont = isMobile ? 11 : 12;
   const yTickFont = isMobile ? 11 : 12;
   const xTickMargin = isMobile ? 4 : 8;
 
@@ -203,11 +218,13 @@ export default function RevenueAnalyticsDaily({
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  // Nice ticks for even spacing & rounded labels
+  // Axis: prefer 6M for SSP and 1.5k for USD; expand automatically if exceeded
   const dataMaxSSP = Math.max(0, ...ssp.map((d) => d.value));
   const dataMaxUSD = Math.max(0, ...usd.map((d) => d.value));
-  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(dataMaxSSP);
-  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(dataMaxUSD);
+  const preferredSSPMax = 6_000_000; // 6M default ceiling
+  const preferredUSDMax = 1_500;     // 1.5k default ceiling
+  const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
+  const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMM yyyy");
   const renderSSPTooltip = (p: any) => (
@@ -263,7 +280,7 @@ export default function RevenueAnalyticsDaily({
                   domain={[0, yMaxSSP]}
                   ticks={ticksSSP}
                   tick={{ fontSize: yTickFont, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v)}
+                  tickFormatter={(v) => compact.format(v as number)}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -314,7 +331,7 @@ export default function RevenueAnalyticsDaily({
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
                   tick={{ fontSize: yTickFont, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v)}
+                  tickFormatter={(v) => nf0.format(v as number)}  // full values for USD
                   axisLine={false}
                   tickLine={false}
                 />
