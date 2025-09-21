@@ -93,27 +93,69 @@ function computeWindow(
   return out;
 }
 
-/** Fetch income transactions within a span (handles pagination). */
+/* --------------------- Loop-proof pagination --------------------- */
+
+const MAX_PAGES = 60; // hard safety cap
+type TxRow = {
+  id?: string | number;
+  amount?: number;
+  currency?: string;
+  dateISO?: string;
+  date?: string;
+  createdAt?: string;
+  created_at?: string;
+  timestamp?: string;
+};
+
 async function fetchTransactions(startISO: string, endISO: string) {
   const pageSize = 1000;
   let page = 1;
   let hasMore = true;
-  const all: any[] = [];
+  const all: TxRow[] = [];
+  let lastFirstId: string | number | undefined;
+  let lastLastId: string | number | undefined;
 
-  while (hasMore) {
+  while (hasMore && page <= MAX_PAGES) {
     const { data } = await api.get(
       `/api/transactions?type=income&startDate=${startISO}&endDate=${endISO}&page=${page}&limit=${pageSize}`
     );
-    const rows = data?.transactions || [];
+    const rows: TxRow[] = data?.transactions || [];
+
+    // empty page => break no matter what hasMore says
+    if (!rows.length) break;
+
+    // loop detection: same first/last id as previous page
+    const firstId = rows[0]?.id;
+    const lastId = rows[rows.length - 1]?.id;
+    if (firstId && lastId && firstId === lastFirstId && lastId === lastLastId) break;
+    lastFirstId = firstId;
+    lastLastId = lastId;
+
     all.push(...rows);
     hasMore = Boolean(data?.hasMore);
     page += 1;
-    if (!rows.length) break;
   }
+
   return all;
 }
 
-/** Fetch insurance USD totals per month for current window. */
+/* --------- Optional fast path for “year” using a summary API ---------- */
+/* If your backend doesn’t have this endpoint, we just fall back to pagination. */
+async function tryFetchMonthlySummary(startISO: string, endISO: string) {
+  try {
+    const { data } = await api.get(
+      `/api/income-trends/summary?granularity=month&startDate=${startISO}&endDate=${endISO}`
+    );
+    // Expect: [{ year: 2025, month: 1, ssp: number, usd: number }, ...]
+    if (Array.isArray(data)) return data as Array<{ year:number; month:number; ssp:number; usd:number }>;
+    if (Array.isArray(data?.data)) return data.data as Array<{ year:number; month:number; ssp:number; usd:number }>;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Insurance USD totals per month */
 async function fetchInsuranceMonthlyUSD(
   timeRange: TimeRange,
   selectedYear: number,
@@ -163,7 +205,7 @@ async function fetchInsuranceMonthlyUSD(
   }
 }
 
-/* --------------------------- Nice tick helpers -------------------------- */
+/* --------------------------- Nice ticks helpers -------------------------- */
 
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
@@ -200,7 +242,6 @@ function MonthTooltip({
   const p = payload[0]?.payload;
   const label: string = p?.label ?? "";
   const value = Number(p?.value ?? 0);
-
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[160px]">
       <div className="font-semibold text-slate-900 mb-1">{label}</div>
@@ -211,8 +252,6 @@ function MonthTooltip({
   );
 }
 
-/* --------------------------- Value labels ------------------------------- */
-
 function ValueLabel(props: any) {
   const { x, y, width, value } = props;
   const v = Number(value || 0);
@@ -220,14 +259,7 @@ function ValueLabel(props: any) {
   const cx = x + width / 2;
   const cy = y - 6;
   return (
-    <text
-      x={cx}
-      y={cy}
-      textAnchor="middle"
-      fontSize={10}
-      fill="#475569"
-      className="pointer-events-none select-none"
-    >
+    <text x={cx} y={cy} textAnchor="middle" fontSize={10} fill="#475569" className="pointer-events-none select-none">
       {compact.format(v)}
     </text>
   );
@@ -239,14 +271,7 @@ function ValueLabelFull(props: any) {
   const cx = x + width / 2;
   const cy = y - 6;
   return (
-    <text
-      x={cx}
-      y={cy}
-      textAnchor="middle"
-      fontSize={10}
-      fill="#475569"
-      className="pointer-events-none select-none"
-    >
+    <text x={cx} y={cy} textAnchor="middle" fontSize={10} fill="#475569" className="pointer-events-none select-none">
       {nf0.format(v)}
     </text>
   );
@@ -264,14 +289,7 @@ export default function MonthlyIncome({
   onBarClick,
 }: Props) {
   const months = useMemo(
-    () =>
-      computeWindow(
-        timeRange,
-        selectedYear,
-        selectedMonth,
-        customStartDate,
-        customEndDate
-      ),
+    () => computeWindow(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate),
     [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
@@ -301,7 +319,7 @@ export default function MonthlyIncome({
 
   const { data = [], isLoading } = useQuery({
     queryKey: [
-      "monthly-income-v7",
+      "monthly-income-v8",
       timeRange,
       selectedYear,
       selectedMonth,
@@ -315,30 +333,59 @@ export default function MonthlyIncome({
         map.set(key, { label: MONTH_SHORT[m - 1], ssp: 0, usd: 0 });
       });
 
+      // Choose the span once
       const txStart = isSingleMonth ? monthStart : spanStart;
       const txEnd = isSingleMonth ? monthEnd : spanEnd;
-      const rows = await fetchTransactions(
-        format(txStart, "yyyy-MM-dd"),
-        format(txEnd, "yyyy-MM-dd")
-      );
+      const startISO = format(txStart, "yyyy-MM-dd");
+      const endISO = format(txEnd, "yyyy-MM-dd");
 
-      for (const t of rows as any[]) {
-        const rawDate =
-          t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
-        const d = rawDate ? new Date(rawDate) : null;
-        if (!d || Number.isNaN(d.getTime())) continue;
-
-        const y = d.getFullYear();
-        const m = d.getMonth() + 1;
-        const key = `${y}-${String(m).padStart(2, "0")}`;
-        if (!map.has(key)) continue;
-
-        const amount = Number(t.amount ?? 0);
-        const cur = normCurrency(t.currency);
-        if (cur === "USD") map.get(key)!.usd += amount;
-        else map.get(key)!.ssp += amount;
+      // FAST PATH for "year": try monthly summary (if backend supports it)
+      if (timeRange === "year") {
+        const summary = await tryFetchMonthlySummary(startISO, endISO);
+        if (summary) {
+          for (const r of summary) {
+            const key = `${r.year}-${String(r.month).padStart(2, "0")}`;
+            if (map.has(key)) {
+              map.get(key)!.ssp += Number(r.ssp || 0);
+              map.get(key)!.usd += Number(r.usd || 0);
+            }
+          }
+        } else {
+          // fallback to pagination
+          const rows = await fetchTransactions(startISO, endISO);
+          for (const t of rows) {
+            const rawDate = t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
+            const d = rawDate ? new Date(rawDate) : null;
+            if (!d || Number.isNaN(d.getTime())) continue;
+            const y = d.getFullYear();
+            const m = d.getMonth() + 1;
+            const key = `${y}-${String(m).padStart(2, "0")}`;
+            if (!map.has(key)) continue;
+            const amount = Number(t.amount ?? 0);
+            const cur = normCurrency(t.currency);
+            if (cur === "USD") map.get(key)!.usd += amount;
+            else map.get(key)!.ssp += amount;
+          }
+        }
+      } else {
+        // non-year ranges: normal pagination
+        const rows = await fetchTransactions(startISO, endISO);
+        for (const t of rows) {
+          const rawDate = t.dateISO || t.date || t.createdAt || t.created_at || t.timestamp;
+          const d = rawDate ? new Date(rawDate) : null;
+          if (!d || Number.isNaN(d.getTime())) continue;
+          const y = d.getFullYear();
+          const m = d.getMonth() + 1;
+          const key = `${y}-${String(m).padStart(2, "0")}`;
+          if (!map.has(key)) continue;
+          const amount = Number(t.amount ?? 0);
+          const cur = normCurrency(t.currency);
+          if (cur === "USD") map.get(key)!.usd += amount;
+          else map.get(key)!.ssp += amount;
+        }
       }
 
+      // Insurance add-on
       const insMap = await fetchInsuranceMonthlyUSD(
         timeRange,
         selectedYear,
@@ -352,12 +399,16 @@ export default function MonthlyIncome({
 
       return Array.from(map.values());
     },
-    // Small stability/perf wins:
+    // Defensive query settings
     staleTime: 30_000,
     gcTime: 5 * 60_000,
+    retry: 1,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     keepPreviousData: true,
   });
+
+  /* ----------------------------- Aggregations ---------------------------- */
 
   const sspSeries = data.map(({ label, ssp }) => ({ label, value: Number(ssp) || 0 }));
   const usdSeries = data.map(({ label, usd }) => ({ label, value: Number(usd) || 0 }));
@@ -384,13 +435,7 @@ export default function MonthlyIncome({
 
   const handleBarClick = (index: number, currency: "SSP" | "USD") => {
     if (!onBarClick) return;
-    const bucket = computeWindow(
-      timeRange,
-      selectedYear,
-      selectedMonth,
-      customStartDate,
-      customEndDate
-    )[index];
+    const bucket = computeWindow(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate)[index];
     if (bucket) onBarClick(bucket.y, bucket.m, currency);
   };
 
@@ -414,7 +459,6 @@ export default function MonthlyIncome({
             </span>
           </div>
 
-          {/* min-w-0 prevents flex overflow → resize loops */}
           <div className="h-64 rounded-lg border border-slate-200 min-w-0">
             <ResponsiveContainer width="100%" height="100%" debounce={250}>
               <BarChart
