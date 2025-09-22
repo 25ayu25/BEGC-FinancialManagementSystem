@@ -24,16 +24,16 @@ import {
   TrendingDown,
   DollarSign,
   Users,
-  CalendarIcon,
+  Calendar as CalendarIcon,
   Shield,
   RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 import { useDateFilter } from "@/context/date-filter-context";
 
-// Feature components kept separate so the page stays clean:
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
+import ExecutiveStyleKpis from "@/components/dashboard/executive-style-kpis";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 
 /* ------------------------------ formatters ------------------------------ */
@@ -44,8 +44,21 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
+/* -------------------------------- helpers ------------------------------- */
+type TimeRange =
+  | "current-month"
+  | "last-month"
+  | "month-select"
+  | "last-3-months"
+  | "year"
+  | "custom";
+
+function normalizedRange(range: TimeRange) {
+  return range === "month-select" ? "current-month" : range;
+}
+
 /* --------------------------------- page --------------------------------- */
-export default function AdvancedDashboard() {
+export default function AdvancedExecutiveDashboard() {
   const {
     timeRange,
     selectedYear,
@@ -59,11 +72,9 @@ export default function AdvancedDashboard() {
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
+  const rangeParam = normalizedRange(timeRange);
 
-  // Keep backend compatibility when user uses the “month-select” UI
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
-
-  /* ------------------------- quick range + month UI ------------------------- */
+  /* ------------------------------ options UI ----------------------------- */
   const now = new Date();
   const thisYear = now.getFullYear();
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
@@ -82,73 +93,92 @@ export default function AdvancedDashboard() {
     { label: "December", value: 12 },
   ];
 
-  /* -------------------------------- queries ------------------------------- */
+  const startISO = customStartDate ? format(customStartDate, "yyyy-MM-dd") : undefined;
+  const endISO = customEndDate ? format(customEndDate, "yyyy-MM-dd") : undefined;
+
+  /* --------------------------- dashboard summary ------------------------- */
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
       selectedYear,
       selectedMonth,
-      normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      rangeParam,
+      startISO,
+      endISO,
     ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(
-          customEndDate,
-          "yyyy-MM-dd"
-        )}`;
+      const base = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${rangeParam}`;
+      const url =
+        rangeParam === "custom" && startISO && endISO
+          ? `${base}&startDate=${startISO}&endDate=${endISO}`
+          : base;
+      try {
+        const { data } = await api.get(url);
+        return data ?? {};
+      } catch {
+        return {};
       }
-      const { data } = await api.get(url);
-      return data ?? {};
     },
+    staleTime: 60_000,
   });
 
+  /* ------------------------------- departments --------------------------- */
   const { data: departments = [] } = useQuery({
-    queryKey: ["/api/departments"],
+    queryKey: ["/api/departments", selectedYear, selectedMonth, rangeParam, startISO, endISO],
     queryFn: async () => {
-      const { data } = await api.get("/api/departments");
-      return Array.isArray(data) ? data : [];
+      const base = `/api/departments?year=${selectedYear}&month=${selectedMonth}&range=${rangeParam}`;
+      const url =
+        rangeParam === "custom" && startISO && endISO
+          ? `${base}&startDate=${startISO}&endDate=${endISO}`
+          : base;
+      try {
+        const { data } = await api.get(url);
+        if (Array.isArray(data)) return data;
+        if (Array.isArray((data as any)?.data)) return (data as any).data;
+        return [];
+      } catch {
+        return [];
+      }
     },
+    staleTime: 60_000,
   });
 
-  // For SSP/USD monthly totals (used in the KPI cards) we reuse the daily feed
+  /* ------------------------------ daily series --------------------------- */
   const { data: rawIncome = [] } = useQuery({
     queryKey: [
       "/api/income-trends",
       selectedYear,
       selectedMonth,
-      normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      rangeParam,
+      startISO,
+      endISO,
     ],
     queryFn: async () => {
-      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(
-          customEndDate,
-          "yyyy-MM-dd"
-        )}`;
+      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${rangeParam}`;
+      if (rangeParam === "custom" && startISO && endISO) {
+        url += `&startDate=${startISO}&endDate=${endISO}`;
       }
       const { data } = await api.get(url);
       return Array.isArray(data) ? data : [];
     },
+    staleTime: 60_000,
   });
 
-  /* ------------------------ compute monthly SSP/USD ------------------------ */
+  /* ----------------------------- SSP/USD totals -------------------------- */
   const { totalSSP, totalUSD } = useMemo(() => {
-    // Build a month-contiguous array and sum
     const y = selectedYear;
     const m = selectedMonth;
     const days = new Date(y, m, 0).getDate();
     const ssp = new Array(days).fill(0);
     const usd = new Array(days).fill(0);
 
-    for (const r of rawIncome as any[]) {
-      let d: number | undefined = (r as any).day;
-      if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
-      if (!d && (r as any).date) d = new Date((r as any).date).getDate();
+    const rows = Array.isArray(rawIncome) ? rawIncome : [];
+    for (const r of rows) {
+      const d =
+        (r as any)?.day ??
+        (r as any)?.dateISO ? new Date((r as any).dateISO).getDate() :
+        (r as any)?.date ? new Date((r as any).date).getDate() :
+        undefined;
       if (typeof d === "number" && d >= 1 && d <= days) {
         ssp[d - 1] += Number((r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0);
         usd[d - 1] += Number((r as any).incomeUSD ?? 0);
@@ -160,10 +190,10 @@ export default function AdvancedDashboard() {
     };
   }, [rawIncome, selectedYear, selectedMonth]);
 
-  /* ---------------------------- loading overlay --------------------------- */
+  /* ------------------------------- loading UI ---------------------------- */
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex items-center space-x-2">
           <RefreshCw className="h-6 w-6 animate-spin text-primary" />
           <span className="text-lg">Loading dashboard…</span>
@@ -172,15 +202,14 @@ export default function AdvancedDashboard() {
     );
   }
 
-  /* ------------------------------- summaries ------------------------------ */
-  const sspIncomeFromAPI = Number(dashboardData?.totalIncomeSSP || 0);
-  const usdIncomeFromAPI = Number(dashboardData?.totalIncomeUSD || 0);
-  const totalExpenses = Number(dashboardData?.totalExpenses || 0);
-
-  const sspRevenue = totalSSP || sspIncomeFromAPI;
+  /* ------------------------------- summaries ----------------------------- */
+  const sspRevenue =
+    Number(dashboardData?.totals?.ssp ?? dashboardData?.totalIncomeSSP ?? 0) || totalSSP;
+  const totalExpenses = Number(dashboardData?.totals?.expenses ?? dashboardData?.totalExpenses ?? 0);
   const netIncomeSSP = sspRevenue - totalExpenses;
+  const usdIncome = Number(dashboardData?.totals?.insuranceUSD ?? dashboardData?.totalIncomeUSD ?? 0) || totalUSD;
 
-  /* -------------------------- helper for navigation ------------------------ */
+  /* ------------------------- patient-volume link -------------------------- */
   const getPatientVolumeNavigation = () => {
     const d = new Date();
     switch (timeRange) {
@@ -218,15 +247,13 @@ export default function AdvancedDashboard() {
               Executive Dashboard
             </h1>
             <div className="mt-1 flex items-center gap-4">
-              <p className="text-sm text-muted-foreground">
-                Key financials · {periodLabel}
-              </p>
+              <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
             </div>
           </div>
 
           {/* RIGHT controls */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as any)}>
+            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
               <SelectTrigger className="h-9 w-[160px]">
                 <SelectValue />
               </SelectTrigger>
@@ -240,7 +267,7 @@ export default function AdvancedDashboard() {
               </SelectContent>
             </Select>
 
-            {/* month-select helpers */}
+            {/* month-select */}
             {timeRange === "month-select" && (
               <>
                 <Select
@@ -277,7 +304,7 @@ export default function AdvancedDashboard() {
               </>
             )}
 
-            {/* custom range pickers */}
+            {/* custom range */}
             {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
@@ -293,12 +320,7 @@ export default function AdvancedDashboard() {
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                  >
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
                     <DatePicker
                       mode="single"
                       numberOfMonths={1}
@@ -325,12 +347,7 @@ export default function AdvancedDashboard() {
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                  >
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
                     <DatePicker
                       mode="single"
                       numberOfMonths={1}
@@ -347,7 +364,14 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* KPI Cards */}
+      {/* KPI bar */}
+      <ExecutiveStyleKpis
+        timeRange={timeRange as TimeRange}
+        selectedYear={selectedYear}
+        selectedMonth={selectedMonth}
+      />
+
+      {/* KPI cards (top) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
         {/* Total Revenue (SSP) */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
@@ -429,7 +453,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Net Income (SSP) */}
+        {/* Net Income */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
@@ -464,12 +488,9 @@ export default function AdvancedDashboard() {
 
         {/* Insurance (USD) */}
         <Link
-          href={`/insurance-providers?range=${normalizedRange}${
-            timeRange === "custom" && customStartDate && customEndDate
-              ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(
-                  customEndDate,
-                  "yyyy-MM-dd"
-                )}`
+          href={`/insurance-providers?range=${rangeParam}${
+            rangeParam === "custom" && startISO && endISO
+              ? `&startDate=${startISO}&endDate=${endISO}`
               : `&year=${selectedYear}&month=${selectedMonth}`
           }`}
         >
@@ -479,7 +500,7 @@ export default function AdvancedDashboard() {
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD {fmtUSD(Math.round(usdIncomeFromAPI || totalUSD))}
+                    USD {fmtUSD(Math.round(usdIncome))}
                   </p>
                   <div className="flex items-center mt-1">
                     {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
@@ -497,9 +518,7 @@ export default function AdvancedDashboard() {
                       </span>
                     ) : (
                       <span className="text-xs font-medium text-purple-600">
-                        {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
-                          ? "1 provider"
-                          : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                        Insurance details
                       </span>
                     )}
                   </div>
@@ -514,9 +533,7 @@ export default function AdvancedDashboard() {
 
         {/* Patient Volume */}
         <Link
-          href={`/patient-volume?view=monthly&year=${
-            getPatientVolumeNavigation().year
-          }&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}
+          href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${rangeParam}`}
         >
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
@@ -524,7 +541,7 @@ export default function AdvancedDashboard() {
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Total Patients</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    {(dashboardData?.totalPatients || 0).toLocaleString()}
+                    {(dashboardData?.totals?.patients ?? dashboardData?.totalPatients ?? 0).toLocaleString()}
                   </p>
                   <div className="flex items-center mt-1">
                     <span className="text-xs font-medium text-teal-600">Current period</span>
@@ -539,12 +556,12 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main grid: keep Departments perfectly aligned with Revenue Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
-        {/* left: Revenue Analytics (spans 2) */}
-        <div className="lg:col-span-2">
+      {/* ===== Middle row: Revenue analytics + Departments (same grid row) ===== */}
+      <div className="grid grid-cols-12 gap-6 mt-6 items-start">
+        {/* Revenue Analytics (left) */}
+        <div className="col-span-12 lg:col-span-8 self-start">
           <RevenueAnalyticsDaily
-            timeRange={timeRange}
+            timeRange={timeRange as TimeRange}
             selectedYear={selectedYear}
             selectedMonth={selectedMonth}
             customStartDate={customStartDate ?? undefined}
@@ -552,15 +569,26 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* right: Departments (spans 1) */}
-        <div className="lg:col-span-1">
+        {/* Departments (right) */}
+        <div className="col-span-12 lg:col-span-4 self-start">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
-            totalSSP={sspRevenue}
+            totalSSP={
+              Number(dashboardData?.totals?.ssp ?? 0) ||
+              (Array.isArray(departments)
+                ? (departments as any[]).reduce(
+                    (s, d) => s + Number((d as any)?.total ?? (d as any)?.value ?? 0),
+                    0
+                  )
+                : 0)
+            }
           />
         </div>
+      </div>
 
+      {/* Row under the middle grid: Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         {/* Quick Actions — under chart (spans 2) */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
@@ -638,10 +666,7 @@ export default function AdvancedDashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Last Sync</span>
                 <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
-                  {new Date().toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
