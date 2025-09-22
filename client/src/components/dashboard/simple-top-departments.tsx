@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   FlaskConical,
   Microscope,
@@ -10,19 +9,20 @@ import {
 } from "lucide-react";
 
 interface SimpleTopDepartmentsProps {
+  /** Map of departmentId -> total SSP for the selected period */
   data?: Record<string, string>;
+  /** Department metadata (id, name, code) */
   departments?: Array<{ id: string; name: string; code: string }>;
 }
 
+/* Small helper to choose a clean, recognizable icon per department */
 function DeptIcon({ name, code }: { name: string; code: string }) {
   const key = (code || name || "").toLowerCase();
-
   if (key.includes("lab")) return <FlaskConical className="w-4 h-4 text-emerald-600" />;
-  if (key.includes("ultra")) return <Microscope className="w-4 h-4 text-blue-600" />; // closest medical vibe
+  if (key.includes("ultra")) return <Microscope className="w-4 h-4 text-blue-600" />;
   if (key.includes("x") && key.includes("ray")) return <Radiation className="w-4 h-4 text-orange-600" />;
   if (key.includes("pharm")) return <Pill className="w-4 h-4 text-purple-600" />;
   if (key.includes("consult")) return <Stethoscope className="w-4 h-4 text-rose-600" />;
-
   return <Building2 className="w-4 h-4 text-slate-500" />;
 }
 
@@ -30,16 +30,11 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
   if (!departments?.length) {
     return (
       <Card className="border border-slate-200 shadow-sm">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Departments
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
-              View full breakdown
-            </Button>
-          </div>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-blue-600" />
+            Departments
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -67,20 +62,17 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 5);
 
-  const colors = ["bg-teal-500", "bg-blue-500", "bg-purple-500", "bg-orange-500", "bg-red-500"];
+  const barColors = ["bg-teal-500", "bg-blue-500", "bg-purple-500", "bg-orange-500", "bg-red-500"];
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 
   return (
     <Card className="border border-slate-200 shadow-sm">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            Departments
-          </CardTitle>
-          <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs">
-            View full breakdown
-          </Button>
-        </div>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-blue-600" />
+          Departments
+        </CardTitle>
       </CardHeader>
 
       <CardContent>
@@ -90,34 +82,32 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <DeptIcon name={department.name} code={department.code} />
-                  <span className="text-sm font-medium text-slate-700">
-                    {department.name}
-                  </span>
+                  <span className="text-sm font-medium text-slate-700">{department.name}</span>
                 </div>
 
+                {/* Right column: totals aligned with tabular-nums */}
                 <div className="text-right">
                   <div className="text-sm font-bold tabular-nums text-slate-900">
                     SSP {Math.round(department.amount).toLocaleString()}
                   </div>
                   <div className="text-xs tabular-nums text-slate-500">
                     {department.percentage.toFixed(1)}% • Avg/day: SSP{" "}
-                    {Math.round(
-                      department.amount / new Date().getDate()
-                    ).toLocaleString()}
+                    {Math.round(department.amount / Math.max(1, Math.min(today.getDate(), daysInMonth))).toLocaleString()}
                   </div>
                 </div>
               </div>
 
-              <div className="w-full bg-slate-200 rounded-full h-2">
+              {/* Progress bar – full width, crisp alignment */}
+              <div className="w-full bg-slate-200/80 rounded-full h-2">
                 <div
-                  className={`${colors[idx]} h-2 rounded-full transition-all duration-500`}
+                  className={`${barColors[idx]} h-2 rounded-full transition-all duration-500`}
                   style={{ width: `${department.percentage}%` }}
                 />
               </div>
             </div>
           ))}
 
-          {/* Total summary */}
+          {/* Total summary (clean + aligned) */}
           <div className="pt-4 border-t border-slate-200">
             <div className="relative p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-xl shadow-sm overflow-hidden">
               <div className="absolute inset-0 opacity-5">
@@ -141,8 +131,7 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
                     </span>
                   </div>
                   <span className="text-xs font-medium tabular-nums text-slate-600 bg-white/60 px-2 py-1 rounded-full">
-                    Day {new Date().getDate()} of{" "}
-                    {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}
+                    Day {today.getDate()} of {daysInMonth}
                   </span>
                 </div>
               </div>
