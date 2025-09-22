@@ -1,6 +1,3 @@
-// client/src/pages/dashboard.tsx
-'use client';
-
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -15,14 +12,12 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon, Users } from "lucide-react";
 import { api } from "@/lib/queryClient";
-
 import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
-import MonthlyIncome from "@/components/dashboard/monthly-income";
+import MonthlyIncome from "@/components/dashboard/monthly-income"; // <-- ensure this file exists
 import { Link } from "wouter";
 
-// Keep this in sync with the rest of the app
 type TimeRange =
   | "current-month"
   | "last-month"
@@ -54,31 +49,21 @@ export default function Dashboard() {
     const now = new Date();
     switch (range) {
       case "current-month":
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(now.getMonth() + 1);
-        break;
+        setSelectedYear(now.getFullYear()); setSelectedMonth(now.getMonth() + 1); break;
       case "last-month": {
         const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        setSelectedYear(last.getFullYear());
-        setSelectedMonth(last.getMonth() + 1);
-        break;
+        setSelectedYear(last.getFullYear()); setSelectedMonth(last.getMonth() + 1); break;
       }
       case "last-3-months":
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(now.getMonth() + 1);
-        break;
+        setSelectedYear(now.getFullYear()); setSelectedMonth(now.getMonth() + 1); break;
       case "year":
-        setSelectedYear(now.getFullYear());
-        setSelectedMonth(1);
-        break;
+        setSelectedYear(now.getFullYear()); setSelectedMonth(1); break;
       case "month-select":
       case "custom":
-        // leave selections as-is for user control
         break;
     }
   };
 
-  // API expects "current-month" for both current-month and month-select
   const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
 
   const getPatientVolumeNavigation = () => {
@@ -104,15 +89,10 @@ export default function Dashboard() {
     }
   };
 
-  // DASHBOARD SUMMARY
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: [
-      "/api/dashboard",
-      selectedYear,
-      selectedMonth,
-      normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      "/api/dashboard", selectedYear, selectedMonth, normalizedRange,
+      customStartDate?.toISOString(), customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
@@ -124,18 +104,12 @@ export default function Dashboard() {
     },
   });
 
-  // DEPARTMENTS (names/icons map)
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
-  // PATIENT CHIP (period total)
   const { data: periodPatientVolume = [] } = useQuery({
     queryKey: [
-      "/api/patient-volume/period",
-      selectedYear,
-      selectedMonth,
-      normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      "/api/patient-volume/period", selectedYear, selectedMonth, normalizedRange,
+      customStartDate?.toISOString(), customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/patient-volume/period/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
@@ -160,16 +134,12 @@ export default function Dashboard() {
           <p className="text-slate-600">Daily operations at a glance</p>
         </div>
         <main className="flex-1 overflow-y-auto p-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center text-red-600">
-                <p className="text-lg font-semibold">Error Loading Dashboard</p>
-                <p className="text-sm mt-2">
-                  Unable to fetch dashboard data. Please check your connection and try again.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="pt-6">
+            <div className="text-center text-red-600">
+              <p className="text-lg font-semibold">Error Loading Dashboard</p>
+              <p className="text-sm mt-2">Unable to fetch dashboard data. Please check your connection and try again.</p>
+            </div>
+          </CardContent></Card>
         </main>
       </div>
     );
@@ -193,18 +163,12 @@ export default function Dashboard() {
         <main className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <Card key={i} className="p-6">
-                <Skeleton className="h-20 w-full" />
-              </Card>
+              <Card key={i} className="p-6"><Skeleton className="h-20 w-full" /></Card>
             ))}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <Skeleton className="h-64 w-full" />
-            </Card>
-            <Card className="p-6">
-              <Skeleton className="h-64 w-full" />
-            </Card>
+            <Card className="p-6"><Skeleton className="h-64 w-full" /></Card>
+            <Card className="p-6"><Skeleton className="h-64 w-full" /></Card>
           </div>
         </main>
       </div>
@@ -223,15 +187,13 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50">
-      {/* HEADER */}
+      {/* Header with Time Controls */}
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900">Overview</h1>
             <div className="mt-1 flex items-center gap-4">
               <p className="text-sm text-muted-foreground">Key financials · {headerLabel}</p>
-
-              {/* Patient volume chip linking to the PV page with matching range */}
               <Link
                 href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}
                 className="inline-block"
@@ -247,12 +209,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* RANGE + PICKERS */}
+          {/* RIGHT: range + optional pickers */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             <Select value={timeRange} onValueChange={(v: TimeRange) => handleTimeRangeChange(v)}>
-              <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="current-month">Current Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
@@ -266,25 +226,13 @@ export default function Dashboard() {
             {timeRange === "month-select" && (
               <>
                 <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
-                  <SelectTrigger className="h-9 w-[120px]">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
+                  <SelectContent>{years.map((y) => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}</SelectContent>
                 </Select>
 
                 <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
-                  <SelectTrigger className="h-9 w-[140px]">
-                    <SelectValue placeholder="Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Month" /></SelectTrigger>
+                  <SelectContent>{months.map((m) => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}</SelectContent>
                 </Select>
               </>
             )}
@@ -293,32 +241,13 @@ export default function Dashboard() {
               <>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
-                    >
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000 }}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      initialFocus
-                    />
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000 }}>
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customStartDate} onSelect={setCustomStartDate} initialFocus />
                   </PopoverContent>
                 </Popover>
 
@@ -326,32 +255,13 @@ export default function Dashboard() {
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
-                    >
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000 }}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      initialFocus
-                    />
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000 }}>
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customEndDate} onSelect={setCustomEndDate} initialFocus />
                   </PopoverContent>
                 </Popover>
               </>
@@ -360,11 +270,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MAIN */}
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
         <ExecutiveStyleKPIs data={dashboardData || {}} />
 
-        {/* Monthly Income (SSP + USD) */}
+        {/* NEW: Monthly Income (inserted under KPI band) */}
         <MonthlyIncome
           timeRange={timeRange}
           selectedYear={selectedYear}
