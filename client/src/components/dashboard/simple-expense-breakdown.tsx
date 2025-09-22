@@ -9,12 +9,27 @@ import {
   CartesianGrid,
   Tooltip,
   Cell,
+  LabelList,
 } from "recharts";
 
 type BreakdownMap = Record<string, number | string>;
 
-function formatSSP(n: number) {
-  return `SSP ${Math.round(n).toLocaleString()}`;
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+function compactSSP(n: number) {
+  const v = Math.abs(n);
+  if (v >= 1_000_000_000) return `SSP ${(n / 1_000_000_000).toFixed(v < 10_000_000_000 ? 1 : 0)}B`;
+  if (v >= 1_000_000) return `SSP ${(n / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
+  if (v >= 1_000) return `SSP ${nf0.format(Math.round(n / 1_000))}k`;
+  return `SSP ${nf0.format(Math.round(n))}`;
+}
+
+function axisCompact(n: number) {
+  const v = Math.abs(n);
+  if (v >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return `${nf0.format(Math.round(n))}`;
 }
 
 export interface SimpleExpenseBreakdownProps {
@@ -50,7 +65,10 @@ export default function SimpleExpenseBreakdown({
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
 
-  const height = Math.max(220, 56 * rows.length + 80);
+  // Give bars room and keep category labels aligned by fixing Y-axis width
+  const height = Math.max(240, 56 * rows.length + 90);
+  const yLabelWidth = 180;
+
   const palette = ["#0ea5e9", "#22c55e", "#f97316", "#e11d48", "#8b5cf6", "#14b8a6", "#64748b"];
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -60,7 +78,7 @@ export default function SimpleExpenseBreakdown({
     return (
       <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow">
         <div className="text-sm font-semibold text-slate-900">{category}</div>
-        <div className="text-sm font-mono tabular-nums">{formatSSP(amount)}</div>
+        <div className="text-sm font-mono tabular-nums">{compactSSP(amount)}</div>
         <div className="text-xs text-slate-500">{pct.toFixed(1)}% of total</div>
       </div>
     );
@@ -71,18 +89,12 @@ export default function SimpleExpenseBreakdown({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              {title}
-            </CardTitle>
-            {periodLabel ? (
-              <p className="text-xs text-slate-500">{periodLabel}</p>
-            ) : null}
+            <CardTitle className="text-lg font-semibold text-slate-900">{title}</CardTitle>
+            {periodLabel ? <p className="text-xs text-slate-500">{periodLabel}</p> : null}
           </div>
-
-          {/* Total - right aligned, compact, prominent */}
           <div className="rounded-md bg-slate-50 px-3 py-1.5 text-sm border border-slate-200">
             <span className="text-slate-600 mr-2">Total</span>
-            <span className="font-semibold">{formatSSP(finalTotal)}</span>
+            <span className="font-semibold">{compactSSP(finalTotal)}</span>
           </div>
         </div>
       </CardHeader>
@@ -94,7 +106,7 @@ export default function SimpleExpenseBreakdown({
               <BarChart
                 data={rows}
                 layout="vertical"
-                margin={{ top: 8, right: 16, bottom: 8, left: 16 }}
+                margin={{ top: 8, right: 24, bottom: 8, left: 16 }}
                 barCategoryGap={10}
               >
                 <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" horizontal={false} />
@@ -103,18 +115,26 @@ export default function SimpleExpenseBreakdown({
                   tickLine={false}
                   axisLine={false}
                   tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)}
+                  tickFormatter={axisCompact}
                 />
                 <YAxis
                   dataKey="category"
                   type="category"
-                  width={160}
+                  width={yLabelWidth}
                   tick={{ fontSize: 12, fill: "#334155" }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="amount" radius={[4, 4, 4, 4]}>
+                  {/* Value labels at the end of each bar */}
+                  <LabelList
+                    dataKey="amount"
+                    position="right"
+                    className="fill-slate-700"
+                    formatter={(v: number) => compactSSP(v).replace("SSP ", "")}
+                    style={{ fontSize: 11 }}
+                  />
                   {rows.map((_, i) => (
                     <Cell key={`c-${i}`} fill={palette[i % palette.length]} />
                   ))}
