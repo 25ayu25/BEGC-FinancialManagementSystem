@@ -82,11 +82,12 @@ function niceStep(roughStep: number) {
   else                  niceFrac = 10;
   return niceFrac * base;
 }
-function buildNiceTicks(max: number) {
-  if (max <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
-  const step = niceStep(max / 4);
-  const niceMax = step * 4;
-  return { max: niceMax, ticks: [0, step, step * 2, step * 3, niceMax] };
+function buildNiceTicks(dataMax: number) {
+  if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
+  const step = niceStep(dataMax / 4);
+  const max = step * 4;
+  const ticks = [0, step, step * 2, step * 3, max];
+  return { max, ticks };
 }
 /** Lock to a preferred max if data is below it; otherwise expand nicely. */
 function buildTicksPreferred(dataMax: number, preferredMax: number) {
@@ -134,16 +135,14 @@ function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
       ? format(new Date(year, month - 1, d), "MMM d, yyyy")
       : "";
 
-  const fmt =
-    currency === "USD"
-      ? nf0.format(Math.round(value))  // full numbers for USD
-      : compact.format(Math.round(value)); // compact for SSP
+  const formatValue =
+    currency === "USD" ? nf0.format(Math.round(value)) : compact.format(Math.round(value));
 
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
       <div className="font-semibold text-slate-900 mb-1">{dateStr}</div>
       <div className="text-sm text-slate-700 font-mono">
-        {currency} {fmt}
+        {currency} {formatValue}
       </div>
     </div>
   );
@@ -163,10 +162,10 @@ export default function RevenueAnalyticsDaily({
   const days = daysInMonth(year, month);
   const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
 
-  // Tighter chart feel so the card aligns with the Departments panel
-  const chartHeight = isMobile ? 240 : 300;   // previously 260/340
-  const sspBarSize = isMobile ? 14 : 20;      // previously 16/24
-  const usdBarSize = isMobile ? 14 : 20;
+  // Bigger chart feel
+  const chartHeight = isMobile ? 260 : 340;
+  const sspBarSize = isMobile ? 16 : 24;
+  const usdBarSize = isMobile ? 16 : 24;
 
   // Label density + typography
   const desiredXTicks = isMobile ? 12 : days;
@@ -180,10 +179,7 @@ export default function RevenueAnalyticsDaily({
     [days]
   );
 
-  const {
-    data: fetched,
-    isLoading,
-  } = useQuery({
+  const { data: raw = [], isLoading } = useQuery({
     queryKey: [
       "exec-daily-income",
       year,
@@ -196,21 +192,20 @@ export default function RevenueAnalyticsDaily({
       fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
-  // 🚧 HARDEN: always coerce to array so we never crash iterating
-  const raw: any[] = Array.isArray(fetched) ? fetched : [];
-
   // Continuous series with zeros for missing days (SSP & USD)
   const ssp = baseDays.map((day) => ({ day, value: 0 }));
   const usd = baseDays.map((day) => ({ day, value: 0 }));
 
-  for (const r of raw) {
-    let d: number | undefined = r?.day;
-    if (!d && r?.dateISO) d = new Date(r.dateISO).getDate();
-    if (!d && r?.date) d = new Date(r.date).getDate();
+  for (const r of raw as any[]) {
+    let d: number | undefined = (r as any).day;
+    if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
+    if (!d && (r as any).date) d = new Date((r as any).date).getDate();
 
     if (typeof d === "number" && d >= 1 && d <= days) {
-      ssp[d - 1].value += Number(r?.incomeSSP ?? r?.income ?? r?.amount ?? 0);
-      usd[d - 1].value += Number(r?.incomeUSD ?? 0);
+      ssp[d - 1].value += Number(
+        (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
+      );
+      usd[d - 1].value += Number((r as any).incomeUSD ?? 0);
     }
   }
 
@@ -250,8 +245,7 @@ export default function RevenueAnalyticsDaily({
         </div>
       </CardHeader>
 
-      {/* tighter top padding + smaller gap between charts */}
-      <CardContent className="pt-3 space-y-6">
+      <CardContent className="pt-4 space-y-8">
         {/* SSP Daily */}
         <section aria-label="SSP daily">
           <div className="flex items-center justify-between mb-2">
@@ -262,7 +256,10 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
             </span>
           </div>
-          <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
+          <div
+            className="rounded-lg border border-slate-200"
+            style={{ height: chartHeight }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={ssp}
@@ -310,7 +307,10 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
             </span>
           </div>
-          <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
+          <div
+            className="rounded-lg border border-slate-200"
+            style={{ height: chartHeight }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usd}
@@ -331,7 +331,7 @@ export default function RevenueAnalyticsDaily({
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
                   tick={{ fontSize: yTickFont, fill: "#64748b" }}
-                  tickFormatter={(v) => nf0.format(v as number)} // full values for USD
+                  tickFormatter={(v) => nf0.format(v as number)}  // full values for USD
                   axisLine={false}
                   tickLine={false}
                 />
