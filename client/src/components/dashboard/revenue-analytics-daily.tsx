@@ -82,12 +82,11 @@ function niceStep(roughStep: number) {
   else                  niceFrac = 10;
   return niceFrac * base;
 }
-function buildNiceTicks(dataMax: number) {
-  if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
-  const step = niceStep(dataMax / 4);
-  const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
+function buildNiceTicks(max: number) {
+  if (max <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
+  const step = niceStep(max / 4);
+  const niceMax = step * 4;
+  return { max: niceMax, ticks: [0, step, step * 2, step * 3, niceMax] };
 }
 /** Lock to a preferred max if data is below it; otherwise expand nicely. */
 function buildTicksPreferred(dataMax: number, preferredMax: number) {
@@ -162,10 +161,10 @@ export default function RevenueAnalyticsDaily({
   const days = daysInMonth(year, month);
   const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
 
-  // Bigger chart feel
-  const chartHeight = isMobile ? 260 : 340;
-  const sspBarSize = isMobile ? 16 : 24;
-  const usdBarSize = isMobile ? 16 : 24;
+  // Tighter chart feel so the card aligns with the Departments panel
+  const chartHeight = isMobile ? 240 : 300;   // was 260/340
+  const sspBarSize = isMobile ? 14 : 20;      // was 16/24
+  const usdBarSize = isMobile ? 14 : 20;
 
   // Label density + typography
   const desiredXTicks = isMobile ? 12 : days;
@@ -245,7 +244,8 @@ export default function RevenueAnalyticsDaily({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4 space-y-8">
+      {/* tighter top padding + smaller gap between charts */}
+      <CardContent className="pt-3 space-y-6">
         {/* SSP Daily */}
         <section aria-label="SSP daily">
           <div className="flex items-center justify-between mb-2">
@@ -256,10 +256,7 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
             </span>
           </div>
-          <div
-            className="rounded-lg border border-slate-200"
-            style={{ height: chartHeight }}
-          >
+          <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={ssp}
@@ -307,10 +304,7 @@ export default function RevenueAnalyticsDaily({
               Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
             </span>
           </div>
-          <div
-            className="rounded-lg border border-slate-200"
-            style={{ height: chartHeight }}
-          >
+          <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={usd}
@@ -331,7 +325,7 @@ export default function RevenueAnalyticsDaily({
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
                   tick={{ fontSize: yTickFont, fill: "#64748b" }}
-                  tickFormatter={(v) => nf0.format(v as number)}  // full values for USD
+                  tickFormatter={(v) => nf0.format(v as number)} // full values for USD
                   axisLine={false}
                   tickLine={false}
                 />
