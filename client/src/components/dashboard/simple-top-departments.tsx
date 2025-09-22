@@ -1,116 +1,143 @@
-'use client';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  FlaskConical,
+  Microscope,
+  Radiation,
+  Pill,
+  Stethoscope,
+  Building2,
+} from "lucide-react";
 
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { api } from '@/lib/queryClient';
+interface SimpleTopDepartmentsProps {
+  /** Map of departmentId -> total SSP for the selected period */
+  data?: Record<string, string>;
+  /** Department metadata (id, name, code) */
+  departments?: Array<{ id: string; name: string; code: string }>;
+}
 
-const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+/* Small helper to choose a clean, recognizable icon per department */
+function DeptIcon({ name, code }: { name: string; code: string }) {
+  const key = (code || name || "").toLowerCase();
+  if (key.includes("lab")) return <FlaskConical className="w-4 h-4 text-emerald-600" />;
+  if (key.includes("ultra")) return <Microscope className="w-4 h-4 text-blue-600" />;
+  if (key.includes("x") && key.includes("ray")) return <Radiation className="w-4 h-4 text-orange-600" />;
+  if (key.includes("pharm")) return <Pill className="w-4 h-4 text-purple-600" />;
+  if (key.includes("consult")) return <Stethoscope className="w-4 h-4 text-rose-600" />;
+  return <Building2 className="w-4 h-4 text-slate-500" />;
+}
 
-type DeptRow = {
-  name: string;
-  total: number;
-  percent: number; // 0..1
-  avgPerDay?: number;
-  color?: string;
-};
+export default function SimpleTopDepartments({ data, departments }: SimpleTopDepartmentsProps) {
+  if (!departments?.length) {
+    return (
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-blue-600" />
+            Departments
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-8 h-8 bg-slate-300 rounded animate-pulse"></div>
+            </div>
+            <p className="text-slate-500 font-medium">No department data available</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-export default function SimpleTopDepartments() {
-  const { data = [], isLoading } = useQuery({
-    queryKey: ['top-departments', 'overview'],
-    queryFn: async () => {
-      const res = await api.get('/api/departments/top?range=current-month');
-      // Expecting array of rows; fall back safely
-      const rows: DeptRow[] = Array.isArray(res?.data) ? res.data : [];
-      return rows
-        .map((r) => ({
-          name: String(r?.name ?? '—'),
-          total: Number(r?.total ?? 0),
-          percent: Number(r?.percent ?? 0),
-          avgPerDay: Number(r?.avgPerDay ?? 0),
-          color: r?.color || undefined,
-        }))
-        .slice(0, 6);
-    },
-  });
+  const total = departments.reduce(
+    (sum, dept) => sum + parseFloat(data?.[dept.id] || "0"),
+    0
+  );
+
+  const sorted = departments
+    .map((dept) => ({
+      ...dept,
+      amount: parseFloat(data?.[dept.id] || "0"),
+      percentage: total > 0 ? (parseFloat(data?.[dept.id] || "0") / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  const barColors = ["bg-teal-500", "bg-blue-500", "bg-purple-500", "bg-orange-500", "bg-red-500"];
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 
   return (
-    <Card className="border-0 shadow-md bg-white h-full self-start">
-      {/* Align with Revenue Analytics (no extra top padding) */}
-      <CardHeader className="px-4 pt-2 pb-0">
-        <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-blue-600" />
           Departments
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="px-4 pt-3">
-        <div className="space-y-4">
-          {isLoading && (
-            <div className="text-sm text-slate-500">Loading departments…</div>
-          )}
+      <CardContent>
+        <div className="space-y-6">
+          {sorted.map((department, idx) => (
+            <div key={department.id} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <DeptIcon name={department.name} code={department.code} />
+                  <span className="text-sm font-medium text-slate-700">{department.name}</span>
+                </div>
 
-          {!isLoading &&
-            (data.length ? (
-              data.map((row, i) => {
-                const pct = Math.max(0, Math.min(1, row.percent || 0));
-                return (
-                  <div key={i} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="inline-block h-2 w-2 rounded-full"
-                          style={{
-                            background:
-                              row.color ||
-                              ['#10b981', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#94a3b8'][i % 6],
-                          }}
-                        />
-                        <span className="text-slate-700">{row.name}</span>
-                      </div>
-                      <div className="font-medium tabular-nums">
-                        SSP {nf0.format(row.total)}
-                      </div>
-                    </div>
-                    <div className="relative h-2 rounded-full bg-slate-100">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full"
-                        style={{
-                          width: `${pct * 100}%`,
-                          background:
-                            row.color ||
-                            ['#10b981', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#94a3b8'][i % 6],
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>{(pct * 100).toFixed(1)}% of revenue</span>
-                      {row.avgPerDay ? (
-                        <span>Avg/day: SSP {nf0.format(row.avgPerDay)}</span>
-                      ) : (
-                        <span>&nbsp;</span>
-                      )}
-                    </div>
+                {/* Right column: totals aligned with tabular-nums */}
+                <div className="text-right">
+                  <div className="text-sm font-bold tabular-nums text-slate-900">
+                    SSP {Math.round(department.amount).toLocaleString()}
                   </div>
-                );
-              })
-            ) : (
-              <div className="text-sm text-slate-500">No department data for this period.</div>
-            ))}
-        </div>
+                  <div className="text-xs tabular-nums text-slate-500">
+                    {department.percentage.toFixed(1)}% • Avg/day: SSP{" "}
+                    {Math.round(department.amount / Math.max(1, Math.min(today.getDate(), daysInMonth))).toLocaleString()}
+                  </div>
+                </div>
+              </div>
 
-        {/* Total badge */}
-        {!isLoading && data.length > 0 && (
-          <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 p-4 border border-emerald-100">
-            <div className="flex items-center justify-between text-sm">
-              <div className="text-emerald-700 font-medium">Total Revenue</div>
-              <div className="text-emerald-700 font-semibold tabular-nums">
-                SSP {nf0.format(data.reduce((s, r) => s + (r.total || 0), 0))}
+              {/* Progress bar – full width, crisp alignment */}
+              <div className="w-full bg-slate-200/80 rounded-full h-2">
+                <div
+                  className={`${barColors[idx]} h-2 rounded-full transition-all duration-500`}
+                  style={{ width: `${department.percentage}%` }}
+                />
               </div>
             </div>
-            <div className="mt-1 text-[11px] text-emerald-700/70">
-              {data.length} active departments
+          ))}
+
+          {/* Total summary (clean + aligned) */}
+          <div className="pt-4 border-t border-slate-200">
+            <div className="relative p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-xl shadow-sm overflow-hidden">
+              <div className="absolute inset-0 opacity-5">
+                <div className="w-full h-full bg-gradient-to-br from-teal-200 via-transparent to-emerald-200" />
+              </div>
+              <div className="relative z-10 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-teal-500 rounded-full" />
+                    <span className="text-sm font-semibold text-teal-700">Total Revenue</span>
+                  </div>
+                  <span className="text-xl font-bold tabular-nums text-teal-900">
+                    SSP {Math.round(total).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                    <span className="text-xs font-medium text-emerald-600">
+                      {sorted.filter((d) => d.amount > 0).length} active departments
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium tabular-nums text-slate-600 bg-white/60 px-2 py-1 rounded-full">
+                    Day {today.getDate()} of {daysInMonth}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
