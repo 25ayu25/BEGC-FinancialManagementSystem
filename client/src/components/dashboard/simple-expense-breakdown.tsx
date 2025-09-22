@@ -1,6 +1,5 @@
-'use client';
-
-import { useMemo } from 'react';
+import * as React from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   ResponsiveContainer,
   BarChart,
@@ -9,165 +8,145 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Cell,
   LabelList,
-} from 'recharts';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+} from "recharts";
 
-type Row = { name: string; value: number };
+type BreakdownMap = Record<string, number | string>;
 
-type Props = {
-  /** Can be Row[], { rows: Row[] }, null, or undefined (we'll normalize). */
-  rows?: Row[] | { rows: Row[] } | null;
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+function compactSSP(n: number) {
+  const v = Math.abs(n);
+  if (v >= 1_000_000_000) return `SSP ${(n / 1_000_000_000).toFixed(v < 10_000_000_000 ? 1 : 0)}B`;
+  if (v >= 1_000_000) return `SSP ${(n / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
+  if (v >= 1_000) return `SSP ${nf0.format(Math.round(n / 1_000))}k`;
+  return `SSP ${nf0.format(Math.round(n))}`;
+}
+
+function axisCompact(n: number) {
+  const v = Math.abs(n);
+  if (v >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return `${nf0.format(Math.round(n))}`;
+}
+
+export interface SimpleExpenseBreakdownProps {
+  breakdown?: BreakdownMap | null;
+  total?: number | null;
   title?: string;
-  periodLabel?: string; // e.g. 'This year' / 'Current month'
-  total?: number;
-  isLoading?: boolean;
-};
-
-/* -------- smart number formatting: 58.4M / 840K / 98,500 -------- */
-const fmtMillions1 = new Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-const fmtK0 = new Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  maximumFractionDigits: 0,
-});
-const fmt0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-
-function formatCompactSmart(n: number) {
-  if (!Number.isFinite(n)) return '0';
-  if (n >= 1_000_000) return fmtMillions1.format(n);
-  if (n >= 100_000) return fmtK0.format(n);
-  return fmt0.format(n);
-}
-
-/* ---------------- normalization (safe even if rows is undefined) --------- */
-function normalizeRows(maybeRows: Props['rows']): Row[] {
-  const arr =
-    (Array.isArray(maybeRows)
-      ? maybeRows
-      : (maybeRows && typeof maybeRows === 'object' && Array.isArray((maybeRows as any).rows))
-      ? (maybeRows as any).rows
-      : []) as unknown[];
-
-  return arr
-    .filter(Boolean)
-    .map((r: any) => ({ name: String(r?.name ?? ''), value: Number(r?.value ?? 0) }))
-    .filter((r) => r.name.length > 0 && Number.isFinite(r.value));
-}
-
-function TooltipContent({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: any[];
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const v = Number(payload[0]?.value ?? 0);
-  return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-md">
-      <div className="text-[13px] font-medium text-slate-900">{label}</div>
-      <div className="text-[12px] text-slate-600 font-mono">{formatCompactSmart(v)}</div>
-    </div>
-  );
+  periodLabel?: string;
+  maxBars?: number;
 }
 
 export default function SimpleExpenseBreakdown({
-  rows,
-  title = 'Expenses Breakdown',
-  periodLabel = '',
+  breakdown,
   total,
-  isLoading = false,
-}: Props) {
-  const data = useMemo(() => {
-    const safe = normalizeRows(rows);
-    safe.sort((a, b) => b.value - a.value);
-    return safe;
-  }, [rows]);
+  title = "Expenses Breakdown",
+  periodLabel,
+  maxBars = 6,
+}: SimpleExpenseBreakdownProps) {
+  const rows = React.useMemo(() => {
+    const entries = Object.entries(breakdown || {}).map(([k, v]) => ({
+      category: k,
+      amount: Number(v) || 0,
+    }));
+    entries.sort((a, b) => b.amount - a.amount);
 
-  const safeTotal =
-    typeof total === 'number'
-      ? total
-      : data.reduce((sum, r) => (Number.isFinite(r.value) ? sum + r.value : sum), 0);
+    if (entries.length <= maxBars) return entries;
 
-  const totalLabel = formatCompactSmart(safeTotal);
-  const hasData = data.length > 0;
+    const top = entries.slice(0, maxBars);
+    const othersSum = entries.slice(maxBars).reduce((s, r) => s + r.amount, 0);
+    if (othersSum > 0) top.push({ category: "Others", amount: othersSum });
+    return top;
+  }, [breakdown, maxBars]);
+
+  const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
+  const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
+
+  // Give bars room and keep category labels aligned by fixing Y-axis width
+  const height = Math.max(240, 56 * rows.length + 90);
+  const yLabelWidth = 180;
+
+  const palette = ["#0ea5e9", "#22c55e", "#f97316", "#e11d48", "#8b5cf6", "#14b8a6", "#64748b"];
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const { category, amount } = payload[0].payload;
+    const pct = finalTotal > 0 ? (amount / finalTotal) * 100 : 0;
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow">
+        <div className="text-sm font-semibold text-slate-900">{category}</div>
+        <div className="text-sm font-mono tabular-nums">{compactSSP(amount)}</div>
+        <div className="text-xs text-slate-500">{pct.toFixed(1)}% of total</div>
+      </div>
+    );
+  };
 
   return (
-    <Card className="border-0 shadow-md bg-white">
-      <CardHeader className="pb-0">
-        <div className="flex items-center justify-between">
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
-              {title}
-            </CardTitle>
-            {periodLabel && (
-              <div className="mt-1 text-xs text-slate-500">{periodLabel}</div>
-            )}
+            <CardTitle className="text-lg font-semibold text-slate-900">{title}</CardTitle>
+            {periodLabel ? <p className="text-xs text-slate-500">{periodLabel}</p> : null}
           </div>
-          <div className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-700 border border-slate-200">
-            <span className="mr-1 text-slate-500">Total</span>
-            <span className="font-semibold">{totalLabel}</span>
+          <div className="rounded-md bg-slate-50 px-3 py-1.5 text-sm border border-slate-200">
+            <span className="text-slate-600 mr-2">Total</span>
+            <span className="font-semibold">{compactSSP(finalTotal)}</span>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4">
-        <div className="h-[360px] md:h-[420px] rounded-lg border border-slate-200">
-          {isLoading ? (
-            /* simple skeleton */
-            <div className="h-full animate-pulse grid grid-rows-6 gap-3 p-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-6 bg-slate-100 rounded" />
-              ))}
-            </div>
-          ) : hasData ? (
-            <ResponsiveContainer width="100%" height="100%">
+      <CardContent>
+        {rows.length > 0 ? (
+          <div style={{ width: "100%", height }}>
+            <ResponsiveContainer>
               <BarChart
-                data={data}
+                data={rows}
                 layout="vertical"
-                margin={{ top: 4, right: 24, left: 24, bottom: 4 }}
-                barCategoryGap="18%"
+                margin={{ top: 8, right: 24, bottom: 8, left: 16 }}
+                barCategoryGap={10}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
+                <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" horizontal={false} />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => formatCompactSmart(Number(v))}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickFormatter={axisCompact}
                 />
                 <YAxis
-                  dataKey="name"
+                  dataKey="category"
                   type="category"
-                  width={180}
-                  tick={{ fontSize: 12, fill: '#334155' }}
-                  axisLine={false}
+                  width={yLabelWidth}
+                  tick={{ fontSize: 12, fill: "#334155" }}
                   tickLine={false}
+                  axisLine={false}
                 />
-                <Tooltip content={<TooltipContent />} />
-                <Bar dataKey="value" radius={[6, 6, 6, 6]} fill="#3b82f6" maxBarSize={26}>
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="amount" radius={[4, 4, 4, 4]}>
+                  {/* Value labels at the end of each bar */}
                   <LabelList
-                    dataKey="value"
+                    dataKey="amount"
                     position="right"
-                    formatter={(v: number) => formatCompactSmart(Number(v))}
-                    style={{ fontSize: 11, fill: '#475569' }}
+                    className="fill-slate-700"
+                    formatter={(v: number) => compactSSP(v).replace("SSP ", "")}
+                    style={{ fontSize: 11 }}
                   />
+                  {rows.map((_, i) => (
+                    <Cell key={`c-${i}`} fill={palette[i % palette.length]} />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            /* graceful empty state */
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-              No expense data for the selected period.
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="h-40 flex items-center justify-center text-slate-500 text-sm">
+            No expense data for this period.
+          </div>
+        )}
       </CardContent>
     </Card>
   );
