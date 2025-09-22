@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, addDays, differenceInCalendarDays, startOfMonth, endOfMonth } from "date-fns";
 import {
   ResponsiveContainer,
   BarChart,
@@ -15,7 +15,9 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
 
-/* ----------------------------- Types ----------------------------- */
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
 
 type TimeRange =
   | "current-month"
@@ -27,48 +29,25 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // e.g. 2025
+  selectedYear: number;   // 4-digit year
   selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
 
-/* ------------------------ Number Formatters ---------------------- */
+/* ------------------------------------------------------------------ */
+/* Number formatters                                                   */
+/* ------------------------------------------------------------------ */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const compact = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
-/* ----------------------------- Utils ----------------------------- */
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
 
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate(); // month is 1..12
-}
-function normalizedRange(range: TimeRange) {
-  return range === "month-select" ? "current-month" : range;
-}
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-async function fetchIncomeTrendsDaily(
-  year: number,
-  month: number,
-  range: TimeRange,
-  start?: Date,
-  end?: Date
-) {
-  let url = `/api/income-trends/${year}/${month}?range=${normalizedRange(range)}`;
-  if (range === "custom" && start && end) {
-    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
-      end,
-      "yyyy-MM-dd"
-    )}`;
-  }
-  const { data } = await api.get(url);
-  return Array.isArray(data) ? data : [];
-}
-
-/* --------------------- Nice ticks for Y-axis --------------------- */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -82,73 +61,222 @@ function niceStep(roughStep: number) {
   else                  niceFrac = 10;
   return niceFrac * base;
 }
-function buildNiceTicks(dataMax: number) {
-  if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
-  const step = niceStep(dataMax / 4);
-  const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
+function buildNiceTicks(max: number) {
+  if (max <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
+  const step = niceStep(max / 4);
+  const niceMax = step * 4;
+  return { max: niceMax, ticks: [0, step, step * 2, step * 3, niceMax] };
 }
-/** Lock to a preferred max if data is below it; otherwise expand nicely. */
-function buildTicksPreferred(dataMax: number, preferredMax: number) {
-  if (dataMax <= preferredMax) {
-    const step = preferredMax / 4;
-    return {
-      max: preferredMax,
-      ticks: [0, step, step * 2, step * 3, preferredMax],
-    };
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/** Decide bucket size based on total length in days. */
+function decideBucket(days: number): "daily" | "weekly" | "monthly" {
+  if (days <= 45) return "daily";
+  if (days <= 120) return "weekly";
+  return "monthly";
+}
+
+/** Compute start/end date for the selected time range. */
+function computeRange(
+  timeRange: TimeRange,
+  year: number,
+  month: number,
+  customStart?: Date,
+  customEnd?: Date
+): { start: Date; end: Date; label: string } {
+  const mIdx = clamp(month - 1, 0, 11);
+
+  if (timeRange === "current-month") {
+    const start = startOfMonth(new Date(year, mIdx, 1));
+    const end = endOfMonth(new Date(year, mIdx, 1));
+    return { start, end, label: `${MONTH_SHORT[mIdx]} ${year}` };
   }
-  return buildNiceTicks(dataMax);
+  if (timeRange === "last-month") {
+    const d = new Date(year, mIdx, 1);
+    const last = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const start = startOfMonth(last);
+    const end = endOfMonth(last);
+    return { start, end, label: `${MONTH_SHORT[last.getMonth()]} ${last.getFullYear()}` };
+  }
+  if (timeRange === "month-select") {
+    const start = startOfMonth(new Date(year, mIdx, 1));
+    const end = endOfMonth(new Date(year, mIdx, 1));
+    return { start, end, label: `${MONTH_SHORT[mIdx]} ${year}` };
+  }
+  if (timeRange === "last-3-months") {
+    const end = endOfMonth(new Date(year, mIdx, 1));
+    const start = startOfMonth(new Date(end.getFullYear(), end.getMonth() - 2, 1));
+    return { start, end, label: "Last 3 months" };
+  }
+  if (timeRange === "year") {
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31);
+    return { start, end, label: `${year}` };
+  }
+  // custom
+  const start = customStart ? new Date(customStart) : startOfMonth(new Date(year, mIdx, 1));
+  const end   = customEnd   ? new Date(customEnd)   : endOfMonth(new Date(year, mIdx, 1));
+  return { start, end, label: `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}` };
 }
 
-/* ------------------------ Mobile helper hook --------------------- */
+/** Read all income transactions in a span (SSP + USD). */
+async function fetchTransactions(start: Date, end: Date) {
+  // Pull in pages to be safe with larger ranges.
+  const pageSize = 1000;
+  let page = 1;
+  let hasMore = true;
+  const all: any[] = [];
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener?.("change", update);
-    return () => mq.removeEventListener?.("change", update);
-  }, [breakpoint]);
-  return isMobile;
+  while (hasMore) {
+    const { data } = await api.get(
+      `/api/transactions?type=income&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
+        end,
+        "yyyy-MM-dd"
+      )}&page=${page}&limit=${pageSize}`
+    );
+    const rows: any[] = data?.transactions || [];
+    all.push(...rows);
+    hasMore = Boolean(data?.hasMore);
+    page += 1;
+    if (!rows.length) break;
+  }
+  return all;
 }
 
-/* ------------------------- Tooltip component --------------------- */
+/** For single-month windows we can keep using the existing daily endpoint */
+async function fetchDailyMonth(year: number, month: number) {
+  const { data } = await api.get(`/api/income-trends/${year}/${month}?range=current-month`);
+  return Array.isArray(data) ? data : [];
+}
 
-type RTProps = {
+/* ------------------------------------------------------------------ */
+/* Bucketing                                                          */
+/* ------------------------------------------------------------------ */
+
+type BucketRow = { label: string; ssp: number; usd: number };
+
+function bucketize(
+  rows: any[],
+  start: Date,
+  end: Date,
+  bucket: "daily" | "weekly" | "monthly"
+): BucketRow[] {
+  const map = new Map<string, BucketRow>();
+
+  if (bucket === "daily") {
+    // Build every day so gaps show as zeros
+    const totalDays = differenceInCalendarDays(end, start) + 1;
+    for (let i = 0; i < totalDays; i++) {
+      const d = addDays(start, i);
+      const key = format(d, "yyyy-MM-dd");
+      map.set(key, { label: format(d, "d"), ssp: 0, usd: 0 });
+    }
+    for (const t of rows) {
+      const raw = t.dateISO || t.date || t.createdAt || t.created_at;
+      const d = raw ? new Date(raw) : null;
+      if (!d) continue;
+      const key = format(d, "yyyy-MM-dd");
+      if (!map.has(key)) continue; // outside
+      const cur = map.get(key)!;
+      cur.ssp += Number(t.incomeSSP ?? t.income ?? t.amount ?? 0);
+      cur.usd += Number(t.incomeUSD ?? 0);
+    }
+    return Array.from(map.values());
+  }
+
+  if (bucket === "weekly") {
+    // 7-day rolling buckets aligned to the start date
+    let cursor = new Date(start);
+    while (cursor <= end) {
+      const next = addDays(cursor, 6);
+      const key = `${format(cursor, "yyyy-MM-dd")}__${format(next, "yyyy-MM-dd")}`;
+      map.set(key, {
+        label: `${format(cursor, "MMM d")}–${format(next, "d")}`,
+        ssp: 0,
+        usd: 0,
+      });
+      cursor = addDays(next, 1);
+    }
+    for (const t of rows) {
+      const raw = t.dateISO || t.date || t.createdAt || t.created_at;
+      const d = raw ? new Date(raw) : null;
+      if (!d || d < start || d > end) continue;
+      // find bucket
+      const daysFromStart = differenceInCalendarDays(d, start);
+      const bucketStartIdx = Math.floor(daysFromStart / 7) * 7;
+      const bStart = addDays(start, bucketStartIdx);
+      const bEnd = addDays(bStart, 6);
+      const k = `${format(bStart, "yyyy-MM-dd")}__${format(bEnd, "yyyy-MM-dd")}`;
+      const cur = map.get(k);
+      if (!cur) continue;
+      cur.ssp += Number(t.incomeSSP ?? t.income ?? t.amount ?? 0);
+      cur.usd += Number(t.incomeUSD ?? 0);
+    }
+    return Array.from(map.values());
+  }
+
+  // monthly
+  {
+    // Seed months
+    const first = new Date(start.getFullYear(), start.getMonth(), 1);
+    let cursor = new Date(first);
+    while (cursor <= end) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+      map.set(key, { label: `${MONTH_SHORT[cursor.getMonth()]}`, ssp: 0, usd: 0 });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+    for (const t of rows) {
+      const raw = t.dateISO || t.date || t.createdAt || t.created_at;
+      const d = raw ? new Date(raw) : null;
+      if (!d || d < start || d > end) continue;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const cur = map.get(key);
+      if (!cur) continue;
+      cur.ssp += Number(t.incomeSSP ?? t.income ?? t.amount ?? 0);
+      cur.usd += Number(t.incomeUSD ?? 0);
+    }
+    return Array.from(map.values());
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Tooltip                                                            */
+/* ------------------------------------------------------------------ */
+
+function BucketTooltip({
+  active,
+  payload,
+  titlePrefix,
+  currency,
+}: {
   active?: boolean;
   payload?: any[];
-  year: number;
-  month: number; // 1..12
+  titlePrefix: string;
   currency: "SSP" | "USD";
-};
-
-function RevenueTooltip({ active, payload, year, month, currency }: RTProps) {
-  if (!active || !payload || !payload.length) return null;
-  const d = payload[0]?.payload?.day as number | undefined;
-  const value = Number(payload[0]?.payload?.value ?? 0);
-  const dateStr =
-    typeof d === "number"
-      ? format(new Date(year, month - 1, d), "MMM d, yyyy")
-      : "";
-
-  const formatValue =
-    currency === "USD" ? nf0.format(Math.round(value)) : compact.format(Math.round(value));
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0]?.payload;
+  const label: string = p?.label ?? "";
+  const value: number = Number(payload[0]?.value ?? 0);
 
   return (
-    <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
-      <div className="font-semibold text-slate-900 mb-1">{dateStr}</div>
+    <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[160px]">
+      <div className="font-semibold text-slate-900 mb-1">
+        {titlePrefix} {label}
+      </div>
       <div className="text-sm text-slate-700 font-mono">
-        {currency} {formatValue}
+        {currency} {nf0.format(Math.round(value))}
       </div>
     </div>
   );
 }
 
-/* ------------------------------- Main ---------------------------- */
+/* ------------------------------------------------------------------ */
+/* Component                                                          */
+/* ------------------------------------------------------------------ */
 
 export default function RevenueAnalyticsDaily({
   timeRange,
@@ -157,83 +285,64 @@ export default function RevenueAnalyticsDaily({
   customStartDate,
   customEndDate,
 }: Props) {
-  const year = selectedYear;
-  const month = selectedMonth;
-  const days = daysInMonth(year, month);
-  const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
-
-  // Bigger chart feel
-  const chartHeight = isMobile ? 260 : 340;
-  const sspBarSize = isMobile ? 16 : 24;
-  const usdBarSize = isMobile ? 16 : 24;
-
-  // Label density + typography
-  const desiredXTicks = isMobile ? 12 : days;
-  const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
-  const xTickFont = isMobile ? 11 : 12;
-  const yTickFont = isMobile ? 11 : 12;
-  const xTickMargin = isMobile ? 4 : 8;
-
-  const baseDays = useMemo(
-    () => Array.from({ length: days }, (_, i) => i + 1),
-    [days]
+  const { start, end, label: rangeLabel } = useMemo(
+    () => computeRange(timeRange, selectedYear, selectedMonth, customStartDate, customEndDate),
+    [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate]
   );
 
-  const { data: raw = [], isLoading } = useQuery({
-    queryKey: [
-      "exec-daily-income",
-      year,
-      month,
-      normalizedRange(timeRange),
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
-    ],
-    queryFn: () =>
-      fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
+  const spanDays = differenceInCalendarDays(end, start) + 1;
+  const bucket = decideBucket(spanDays);
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["exec-revenue", timeRange, selectedYear, selectedMonth, start.toISOString(), end.toISOString()],
+    queryFn: async () => {
+      // Optimization: for "single month" daily mode, use existing daily endpoint
+      const isSingleMonth =
+        bucket === "daily" &&
+        start.getFullYear() === end.getFullYear() &&
+        start.getMonth() === end.getMonth() &&
+        start.getDate() === 1 &&
+        end.getDate() >= 28;
+
+      if (isSingleMonth) {
+        const daily = await fetchDailyMonth(start.getFullYear(), start.getMonth() + 1);
+        // shape to {label, ssp, usd}
+        const rows = daily.map((r: any) => ({
+          label: String(r.day ?? r.date ?? r.dateISO ? new Date(r.dateISO).getDate() : ""),
+          ssp: Number(r.incomeSSP ?? r.income ?? r.amount ?? 0),
+          usd: Number(r.incomeUSD ?? 0),
+        }));
+        return rows as BucketRow[];
+      }
+
+      // otherwise, get raw transactions in the big window and bucket
+      const tx = await fetchTransactions(start, end);
+      return bucketize(tx, start, end, bucket);
+    },
   });
 
-  // Continuous series with zeros for missing days (SSP & USD)
-  const ssp = baseDays.map((day) => ({ day, value: 0 }));
-  const usd = baseDays.map((day) => ({ day, value: 0 }));
+  /* Aggregations */
+  const sspSeries = data.map((d: BucketRow) => ({ label: d.label, value: d.ssp }));
+  const usdSeries = data.map((d: BucketRow) => ({ label: d.label, value: d.usd }));
 
-  for (const r of raw as any[]) {
-    let d: number | undefined = (r as any).day;
-    if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
-    if (!d && (r as any).date) d = new Date((r as any).date).getDate();
+  const totalSSP = sspSeries.reduce((s, r) => s + r.value, 0);
+  const totalUSD = usdSeries.reduce((s, r) => s + r.value, 0);
 
-    if (typeof d === "number" && d >= 1 && d <= days) {
-      ssp[d - 1].value += Number(
-        (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
-      );
-      usd[d - 1].value += Number((r as any).incomeUSD ?? 0);
-    }
-  }
+  const activeSSP = sspSeries.filter(d => d.value > 0).length || 0;
+  const activeUSD = usdSeries.filter(d => d.value > 0).length || 0;
 
-  const totalSSP = ssp.reduce((s, r) => s + r.value, 0);
-  const totalUSD = usd.reduce((s, r) => s + r.value, 0);
+  const avgSSP = activeSSP ? Math.round(totalSSP / activeSSP) : 0;
+  const avgUSD = activeUSD ? Math.round(totalUSD / activeUSD) : 0;
 
-  // "active-day" averages (ignores zero days)
-  const activeDaysSSP = ssp.filter((d) => d.value > 0).length || 0;
-  const activeDaysUSD = usd.filter((d) => d.value > 0).length || 0;
-  const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
-  const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
+  // Nice Y ticks
+  const maxSSP = Math.max(0, ...sspSeries.map(d => d.value));
+  const maxUSD = Math.max(0, ...usdSeries.map(d => d.value));
+  const { max: yMaxSSP, ticks: ticksSSP } = buildNiceTicks(maxSSP);
+  const { max: yMaxUSD, ticks: ticksUSD } = buildNiceTicks(maxUSD);
 
-  // Axis: prefer 6M for SSP and 1.5k for USD; expand automatically if exceeded
-  const dataMaxSSP = Math.max(0, ...ssp.map((d) => d.value));
-  const dataMaxUSD = Math.max(0, ...usd.map((d) => d.value));
-  const preferredSSPMax = 6_000_000; // 6M default ceiling
-  const preferredUSDMax = 1_500;     // 1.5k default ceiling
-  const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
-  const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
+  const bucketTitle = bucket === "daily" ? "day" : bucket === "weekly" ? "week of" : "month";
 
-  const monthLabel = format(new Date(year, month - 1, 1), "MMM yyyy");
-  const renderSSPTooltip = (p: any) => (
-    <RevenueTooltip {...p} year={year} month={month} currency="SSP" />
-  );
-  const renderUSDTooltip = (p: any) => (
-    <RevenueTooltip {...p} year={year} month={month} currency="USD" />
-  );
-
+  /* UI */
   return (
     <Card className="border-0 shadow-md bg-white">
       <CardHeader className="pb-0">
@@ -241,117 +350,102 @@ export default function RevenueAnalyticsDaily({
           Revenue Analytics
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          {monthLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+          {rangeLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)} ·
+          <span className="ml-1">({bucket.toUpperCase()})</span>
         </div>
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
-        {/* SSP Daily */}
-        <section aria-label="SSP daily">
+        {/* SSP */}
+        <section aria-label="SSP">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-slate-700">SSP (Daily)</p>
+            <p className="text-sm font-medium text-slate-700">SSP ({bucket === "daily" ? "Daily" : bucket === "weekly" ? "Weekly" : "Monthly"})</p>
             <span className="text-xs text-slate-500">
               Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
               <span className="mx-2">•</span>
-              Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
+              Avg/{bucket === "daily" ? "day" : bucket === "weekly" ? "week" : "month"}:{" "}
+              <span className="font-semibold">SSP {nf0.format(avgSSP)}</span>
             </span>
           </div>
-          <div
-            className="rounded-lg border border-slate-200"
-            style={{ height: chartHeight }}
-          >
+          <div className="h-64 rounded-lg border border-slate-200">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={ssp}
-                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="26%"
+                data={sspSeries}
+                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
-                  dataKey="day"
-                  interval={xInterval}
-                  minTickGap={isMobile ? 2 : 0}
-                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                  tickMargin={xTickMargin}
+                  dataKey="label"
+                  interval={bucket === "daily" ? 0 : 0}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickMargin={8}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   domain={[0, yMaxSSP]}
                   ticks={ticksSSP}
-                  tick={{ fontSize: yTickFont, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v as number)}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickFormatter={(v) => compact.format(v)}
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip content={renderSSPTooltip} />
-                <Bar
-                  dataKey="value"
-                  name="SSP"
-                  fill="#14b8a6"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={sspBarSize}
+                <Tooltip
+                  content={<BucketTooltip titlePrefix={bucketTitle} currency="SSP" />}
                 />
+                <Bar dataKey="value" name="SSP" fill="#14b8a6" radius={[3, 3, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </section>
 
-        {/* USD Daily */}
-        <section aria-label="USD daily">
+        {/* USD */}
+        <section aria-label="USD">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-slate-700">USD (Daily)</p>
+            <p className="text-sm font-medium text-slate-700">USD ({bucket === "daily" ? "Daily" : bucket === "weekly" ? "Weekly" : "Monthly"})</p>
             <span className="text-xs text-slate-500">
               Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
               <span className="mx-2">•</span>
-              Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
+              Avg/{bucket === "daily" ? "day" : bucket === "weekly" ? "week" : "month"}:{" "}
+              <span className="font-semibold">USD {nf0.format(avgUSD)}</span>
             </span>
           </div>
-          <div
-            className="rounded-lg border border-slate-200"
-            style={{ height: chartHeight }}
-          >
+          <div className="h-64 rounded-lg border border-slate-200">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={usd}
-                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="26%"
+                data={usdSeries}
+                margin={{ top: 10, right: 12, left: 12, bottom: 18 }}
+                barCategoryGap="28%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
-                  dataKey="day"
-                  interval={xInterval}
-                  minTickGap={isMobile ? 2 : 0}
-                  tick={{ fontSize: xTickFont, fill: "#64748b" }}
-                  tickMargin={xTickMargin}
+                  dataKey="label"
+                  interval={bucket === "daily" ? 0 : 0}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickMargin={8}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   domain={[0, yMaxUSD]}
                   ticks={ticksUSD}
-                  tick={{ fontSize: yTickFont, fill: "#64748b" }}
-                  tickFormatter={(v) => nf0.format(v as number)}  // full values for USD
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickFormatter={(v) => compact.format(v)}
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip content={renderUSDTooltip} />
-                <Bar
-                  dataKey="value"
-                  name="USD"
-                  fill="#0ea5e9"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={usdBarSize}
+                <Tooltip
+                  content={<BucketTooltip titlePrefix={bucketTitle} currency="USD" />}
                 />
+                <Bar dataKey="value" name="USD" fill="#0ea5e9" radius={[3, 3, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </section>
 
         {isLoading && (
-          <div className="text-center text-slate-500 text-sm">
-            Loading daily revenue…
-          </div>
+          <div className="text-center text-slate-500 text-sm">Loading revenue…</div>
         )}
       </CardContent>
     </Card>
