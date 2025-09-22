@@ -1,83 +1,74 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Users,
-  Calendar as CalendarIcon,
-  Shield,
-  RefreshCw,
+  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
+
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ReferenceLine, Legend,
+} from "recharts";
+
 import { useDateFilter } from "@/context/date-filter-context";
-
-import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
-import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
-import ExecutiveStyleKpis from "@/components/dashboard/executive-style-kpis";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
+import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 
-/* ------------------------------ formatters ------------------------------ */
+// NEW: daily analytics (split SSP & USD) for the Exec view
+import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
+
+// ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
 const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* -------------------------------- helpers ------------------------------- */
-type TimeRange =
-  | "current-month"
-  | "last-month"
-  | "month-select"
-  | "last-3-months"
-  | "year"
-  | "custom";
-
-function normalizedRange(range: TimeRange) {
-  return range === "month-select" ? "current-month" : range;
-}
-
-/* --------------------------------- page --------------------------------- */
-export default function AdvancedExecutiveDashboard() {
+export default function AdvancedDashboard() {
   const {
-    timeRange,
-    selectedYear,
-    selectedMonth,
-    customStartDate,
-    customEndDate,
-    setTimeRange,
-    setCustomRange,
-    setSpecificMonth,
-    periodLabel,
+    timeRange, selectedYear, selectedMonth,
+    customStartDate, customEndDate,
+    setTimeRange, setCustomRange, setSpecificMonth, periodLabel,
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
-  const rangeParam = normalizedRange(timeRange);
 
-  /* ------------------------------ options UI ----------------------------- */
+  // ---- NEW: “normalizedRange” keeps backend compatibility
+  const normalizedRange =
+    timeRange === "month-select" ? "current-month" : timeRange;
+
+  // ---------- dropdown handlers ----------
+  const handleTimeRangeChange = (
+    range:
+      | "current-month"
+      | "last-month"
+      | "last-3-months"
+      | "year"
+      | "month-select"
+      | "custom"
+  ) => setTimeRange(range);
+
+  // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
   const months = [
     { label: "January", value: 1 },
     { label: "February", value: 2 },
@@ -93,157 +84,178 @@ export default function AdvancedExecutiveDashboard() {
     { label: "December", value: 12 },
   ];
 
-  const startISO = customStartDate ? format(customStartDate, "yyyy-MM-dd") : undefined;
-  const endISO = customEndDate ? format(customEndDate, "yyyy-MM-dd") : undefined;
-
-  /* --------------------------- dashboard summary ------------------------- */
+  // ---------- queries ----------
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
       selectedYear,
       selectedMonth,
-      rangeParam,
-      startISO,
-      endISO,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      const base = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${rangeParam}`;
-      const url =
-        rangeParam === "custom" && startISO && endISO
-          ? `${base}&startDate=${startISO}&endDate=${endISO}`
-          : base;
-      try {
-        const { data } = await api.get(url);
-        return data ?? {};
-      } catch {
-        return {};
+      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
+      const { data } = await api.get(url);
+      return data;
     },
-    staleTime: 60_000,
   });
 
-  /* ------------------------------- departments --------------------------- */
-  const { data: departments = [] } = useQuery({
-    queryKey: ["/api/departments", selectedYear, selectedMonth, rangeParam, startISO, endISO],
-    queryFn: async () => {
-      const base = `/api/departments?year=${selectedYear}&month=${selectedMonth}&range=${rangeParam}`;
-      const url =
-        rangeParam === "custom" && startISO && endISO
-          ? `${base}&startDate=${startISO}&endDate=${endISO}`
-          : base;
-      try {
-        const { data } = await api.get(url);
-        if (Array.isArray(data)) return data;
-        if (Array.isArray((data as any)?.data)) return (data as any).data;
-        return [];
-      } catch {
-        return [];
-      }
-    },
-    staleTime: 60_000,
-  });
+  const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
-  /* ------------------------------ daily series --------------------------- */
-  const { data: rawIncome = [] } = useQuery({
+  const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
       selectedYear,
       selectedMonth,
-      rangeParam,
-      startISO,
-      endISO,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${rangeParam}`;
-      if (rangeParam === "custom" && startISO && endISO) {
-        url += `&startDate=${startISO}&endDate=${endISO}`;
+      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const { data } = await api.get(url);
-      return Array.isArray(data) ? data : [];
+      return data;
     },
-    staleTime: 60_000,
   });
 
-  /* ----------------------------- SSP/USD totals -------------------------- */
-  const { totalSSP, totalUSD } = useMemo(() => {
+  // ---------- build income series ----------
+  let incomeSeries: Array<{
+    day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
+  }> = [];
+  if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
+    incomeSeries = rawIncome.map((r: any, i: number) => ({
+      day: i + 1,
+      amount: Number(r.income ?? r.amount ?? 0),
+      amountUSD: Number(r.incomeUSD ?? 0),
+      amountSSP: Number(r.incomeSSP ?? (r.income ?? r.amount ?? 0)),
+      label: r.date,
+      fullDate: r.date,
+    }));
+  } else {
     const y = selectedYear;
     const m = selectedMonth;
-    const days = new Date(y, m, 0).getDate();
-    const ssp = new Array(days).fill(0);
-    const usd = new Array(days).fill(0);
-
-    const rows = Array.isArray(rawIncome) ? rawIncome : [];
-    for (const r of rows) {
-      const d =
-        (r as any)?.day ??
-        (r as any)?.dateISO ? new Date((r as any).dateISO).getDate() :
-        (r as any)?.date ? new Date((r as any).date).getDate() :
-        undefined;
-      if (typeof d === "number" && d >= 1 && d <= days) {
-        ssp[d - 1] += Number((r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0);
-        usd[d - 1] += Number((r as any).incomeUSD ?? 0);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
+      day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
+      label: `${i + 1}`,
+      fullDate: new Date(y, m - 1, i + 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    }));
+    if (Array.isArray(rawIncome)) {
+      for (const r of rawIncome as any[]) {
+        let d = (r as any).day;
+        if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
+        if (!d && (r as any).date) d = new Date((r as any).date).getDate();
+        if (d >= 1 && d <= daysInMonth) {
+          incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
+          incomeSeries[d - 1].amountSSP += Number((r as any).incomeSSP ?? 0);
+          incomeSeries[d - 1].amount += Number((r as any).income ?? (r as any).amount ?? 0);
+        }
       }
     }
-    return {
-      totalSSP: ssp.reduce((a, b) => a + b, 0),
-      totalUSD: usd.reduce((a, b) => a + b, 0),
-    };
-  }, [rawIncome, selectedYear, selectedMonth]);
+  }
 
-  /* ------------------------------- loading UI ---------------------------- */
+  // ---------- totals & metrics ----------
+  const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
+  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
+  const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
+  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
+  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
+  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
+  const showAvgLine = daysWithSSP >= 2;
+  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
+
+  // hide zero bars: null skips drawing
+  const chartData = useMemo(
+    () => incomeSeries.map(d => ({
+      ...d,
+      amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
+      amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
+    })),
+    [incomeSeries]
+  );
+
+  // X ticks: 1,5,10,15,20,25,last
+  const xTicks = useMemo(() => {
+    const n = incomeSeries.length;
+    if (!n) return [];
+    const base = Array.from({ length: n }, (_, i) => i + 1).filter(v => v === 1 || v === n || v % 5 === 0);
+    if (!base.includes(n)) base.push(n);
+    return base;
+  }, [incomeSeries.length]);
+
+  const formatYAxisSSP = kfmt;
+  const formatYAxisUSD = kfmt;
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const p = payload[0].payload;
+    const hasSSP = p.amountSSP > 0;
+    const hasUSD = p.amountUSD > 0;
+    return (
+      <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
+        <p className="font-semibold text-slate-900 mb-2">{p.fullDate}</p>
+        {hasSSP && <p className="text-sm text-slate-700 font-mono">SSP {nf0.format(p.amountSSP)}</p>}
+        {hasUSD && <p className="text-sm text-slate-700 font-mono">USD {fmtUSD(p.amountUSD)}</p>}
+        {!hasSSP && !hasUSD && <p className="text-sm text-slate-500">No transactions</p>}
+      </div>
+    );
+  };
+
+  // loading
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="flex items-center space-x-2">
           <RefreshCw className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-lg">Loading dashboard…</span>
+          <span className="text-lg">Loading dashboard...</span>
         </div>
       </div>
     );
   }
 
-  /* ------------------------------- summaries ----------------------------- */
-  const sspRevenue =
-    Number(dashboardData?.totals?.ssp ?? dashboardData?.totalIncomeSSP ?? 0) || totalSSP;
-  const totalExpenses = Number(dashboardData?.totals?.expenses ?? dashboardData?.totalExpenses ?? 0);
-  const netIncomeSSP = sspRevenue - totalExpenses;
-  const usdIncome = Number(dashboardData?.totals?.insuranceUSD ?? dashboardData?.totalIncomeUSD ?? 0) || totalUSD;
+  // summary numbers
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
+  const sspRevenue = monthTotalSSP || sspIncome;
+  const sspNetIncome = sspRevenue - totalExpenses;
 
-  /* ------------------------- patient-volume link -------------------------- */
   const getPatientVolumeNavigation = () => {
-    const d = new Date();
+    const currentDate = new Date();
     switch (timeRange) {
-      case "current-month":
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      case "current-month": return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
       case "last-month": {
-        const x = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-        return { year: x.getFullYear(), month: x.getMonth() + 1 };
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
       }
       case "last-3-months": {
-        const x = new Date(d.getFullYear(), d.getMonth() - 2, 1);
-        return { year: x.getFullYear(), month: x.getMonth() + 1 };
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
       }
-      case "year":
-        return { year: d.getFullYear(), month: 1 };
-      case "month-select":
-        return { year: selectedYear, month: selectedMonth };
+      case "year": return { year: currentDate.getFullYear(), month: 1 };
+      case "month-select": return { year: selectedYear, month: selectedMonth };
       case "custom":
         return customStartDate
           ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
-          : { year: d.getFullYear(), month: d.getMonth() + 1 };
-      default:
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+          : { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
+      default: return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
     }
   };
 
-  /* --------------------------------- render -------------------------------- */
   return (
-    <div className="bg-white p-6 dashboard-content">
+    <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
       {/* Header + date filters */}
       <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900">
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
               Executive Dashboard
             </h1>
             <div className="mt-1 flex items-center gap-4">
@@ -251,9 +263,13 @@ export default function AdvancedExecutiveDashboard() {
             </div>
           </div>
 
-          {/* RIGHT controls */}
+          {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+            {/* Quick range selector including new “Select Month…” */}
+            <Select
+              value={timeRange}
+              onValueChange={handleTimeRangeChange}
+            >
               <SelectTrigger className="h-9 w-[160px]">
                 <SelectValue />
               </SelectTrigger>
@@ -267,7 +283,7 @@ export default function AdvancedExecutiveDashboard() {
               </SelectContent>
             </Select>
 
-            {/* month-select */}
+            {/* If month-select: show Year + Month dropdowns */}
             {timeRange === "month-select" && (
               <>
                 <Select
@@ -279,9 +295,7 @@ export default function AdvancedExecutiveDashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>
-                        {y}
-                      </SelectItem>
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -295,32 +309,35 @@ export default function AdvancedExecutiveDashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     {months.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>
-                        {m.label}
-                      </SelectItem>
+                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </>
             )}
 
-            {/* custom range */}
+            {/* If custom: show start/end date pickers */}
             {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
+                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
                     <DatePicker
                       mode="single"
                       numberOfMonths={1}
@@ -338,16 +355,21 @@ export default function AdvancedExecutiveDashboard() {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "h-9 justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
+                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl">
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
                     <DatePicker
                       mode="single"
                       numberOfMonths={1}
@@ -364,35 +386,23 @@ export default function AdvancedExecutiveDashboard() {
         </div>
       </header>
 
-      {/* KPI bar */}
-      <ExecutiveStyleKpis
-        timeRange={timeRange as TimeRange}
-        selectedYear={selectedYear}
-        selectedMonth={selectedMonth}
-      />
-
-      {/* KPI cards (top) */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
-        {/* Total Revenue (SSP) */}
+        {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(sspRevenue))}
+                  SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
                 </p>
                 <div className="flex items-center mt-1">
                   {dashboardData?.changes?.incomeChangeSSP !== undefined && (
-                    <span
-                      className={`text-xs font-medium ${
-                        dashboardData.changes.incomeChangeSSP > 0
-                          ? "text-emerald-600"
-                          : dashboardData.changes.incomeChangeSSP < 0
-                          ? "text-red-600"
-                          : "text-slate-500"
-                      }`}
-                    >
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
                       {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
                       {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
                     </span>
@@ -403,38 +413,28 @@ export default function AdvancedExecutiveDashboard() {
                 {dashboardData?.changes?.incomeChangeSSP !== undefined &&
                 dashboardData.changes.incomeChangeSSP < 0 ? (
                   <TrendingDown className="h-4 w-4 text-red-600" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
-                )}
+                ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Total Expenses */}
-        <Card
-          className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => setOpenExpenses(true)}
-          title="Click to view expense breakdown"
-        >
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(totalExpenses))}
+                  SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
                 </p>
                 <div className="flex items-center mt-1">
                   {dashboardData?.changes?.expenseChangeSSP !== undefined && (
-                    <span
-                      className={`text-xs font-medium ${
-                        dashboardData.changes.expenseChangeSSP > 0
-                          ? "text-red-600"
-                          : dashboardData.changes.expenseChangeSSP < 0
-                          ? "text-emerald-600"
-                          : "text-slate-500"
-                      }`}
-                    >
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
+                      dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                    }`}>
                       {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
                       {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
                     </span>
@@ -445,9 +445,7 @@ export default function AdvancedExecutiveDashboard() {
                 {dashboardData?.changes?.expenseChangeSSP !== undefined &&
                 dashboardData.changes.expenseChangeSSP < 0 ? (
                   <TrendingDown className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 text-red-600" />
-                )}
+                ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
               </div>
             </div>
           </CardContent>
@@ -460,19 +458,14 @@ export default function AdvancedExecutiveDashboard() {
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  SSP {nf0.format(Math.round(netIncomeSSP))}
+                  SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
                 </p>
                 <div className="flex items-center mt-1">
                   {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
-                    <span
-                      className={`text-xs font-medium ${
-                        dashboardData.changes.netIncomeChangeSSP > 0
-                          ? "text-emerald-600"
-                          : dashboardData.changes.netIncomeChangeSSP < 0
-                          ? "text-red-600"
-                          : "text-slate-500"
-                      }`}
-                    >
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
                       {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
                       {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
                     </span>
@@ -487,81 +480,69 @@ export default function AdvancedExecutiveDashboard() {
         </Card>
 
         {/* Insurance (USD) */}
-        <Link
-          href={`/insurance-providers?range=${rangeParam}${
-            rangeParam === "custom" && startISO && endISO
-              ? `&startDate=${startISO}&endDate=${endISO}`
-              : `&year=${selectedYear}&month=${selectedMonth}`
-          }`}
-        >
+        <Link href={`/insurance-providers?range=${normalizedRange}${
+          timeRange === "custom" && customStartDate && customEndDate
+            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+            : `&year=${selectedYear}&month=${selectedMonth}`
+        }`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD {fmtUSD(Math.round(usdIncome))}
+                    USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
                   </p>
                   <div className="flex items-center mt-1">
                     {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
-                      <span
-                        className={`text-xs font-medium ${
-                          dashboardData.changes.incomeChangeUSD > 0
-                            ? "text-emerald-600"
-                            : dashboardData.changes.incomeChangeUSD < 0
-                            ? "text-red-600"
-                            : "text-slate-500"
-                        }`}
-                      >
+                      <span className={`text-xs font-medium ${
+                        dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
+                        dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                      }`}>
                         {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
                         {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
                       </span>
                     ) : (
                       <span className="text-xs font-medium text-purple-600">
-                        Insurance details
+                        {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
+                          ? "1 provider" : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="bg-purple-50 p-1.5 rounded-lg">
-                  <Shield className="h-4 w-4 text-purple-600" />
-                </div>
+                <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
               </div>
             </CardContent>
           </Card>
         </Link>
 
         {/* Patient Volume */}
-        <Link
-          href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${rangeParam}`}
-        >
+        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Total Patients</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    {(dashboardData?.totals?.patients ?? dashboardData?.totalPatients ?? 0).toLocaleString()}
+                    {(dashboardData?.totalPatients || 0).toLocaleString()}
                   </p>
                   <div className="flex items-center mt-1">
                     <span className="text-xs font-medium text-teal-600">Current period</span>
                   </div>
                 </div>
-                <div className="bg-teal-50 p-1.5 rounded-lg">
-                  <Users className="h-4 w-4 text-teal-600" />
-                </div>
+                <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
               </div>
             </CardContent>
           </Card>
         </Link>
       </div>
 
-      {/* ===== Middle row: Revenue analytics + Departments (same grid row) ===== */}
-      <div className="grid grid-cols-12 gap-6 mt-6 items-start">
-        {/* Revenue Analytics (left) */}
-        <div className="col-span-12 lg:col-span-8 self-start">
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
+        {/* Revenue Analytics (REPLACED with the new daily split charts) */}
+        <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
-            timeRange={timeRange as TimeRange}
+            timeRange={timeRange}
             selectedYear={selectedYear}
             selectedMonth={selectedMonth}
             customStartDate={customStartDate ?? undefined}
@@ -569,41 +550,26 @@ export default function AdvancedExecutiveDashboard() {
           />
         </div>
 
-        {/* Departments (right) */}
-        <div className="col-span-12 lg:col-span-4 self-start">
+        {/* Departments Panel */}
+        <div className="lg:col-span-1">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
-            totalSSP={
-              Number(dashboardData?.totals?.ssp ?? 0) ||
-              (Array.isArray(departments)
-                ? (departments as any[]).reduce(
-                    (s, d) => s + Number((d as any)?.total ?? (d as any)?.value ?? 0),
-                    0
-                  )
-                : 0)
-            }
+            totalSSP={sspRevenue}
           />
         </div>
-      </div>
 
-      {/* Row under the middle grid: Quick Actions + System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Quick Actions — under chart (spans 2) */}
+        {/* Quick Actions — sits below chart (spans 2) */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 bg-green-500 rounded-full" />
-              Quick Actions
+              <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <a href="/transactions" className="block">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
-                >
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-slate-900">Add Transaction</span>
                     <span className="text-xs text-slate-500">Record new income or expense</span>
@@ -611,10 +577,7 @@ export default function AdvancedExecutiveDashboard() {
                 </Button>
               </a>
               <a href="/patient-volume" className="block">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
-                >
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-slate-900">Patient Volume</span>
                     <span className="text-xs text-slate-500">Update patient count</span>
@@ -622,10 +585,7 @@ export default function AdvancedExecutiveDashboard() {
                 </Button>
               </a>
               <a href="/reports" className="block">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
-                >
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-slate-900">Monthly Reports</span>
                     <span className="text-xs text-slate-500">View generated reports</span>
@@ -633,10 +593,7 @@ export default function AdvancedExecutiveDashboard() {
                 </Button>
               </a>
               <a href="/users" className="block">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
-                >
+                <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-slate-900">User Management</span>
                     <span className="text-xs text-slate-500">Manage user accounts</span>
@@ -647,21 +604,18 @@ export default function AdvancedExecutiveDashboard() {
           </CardContent>
         </Card>
 
-        {/* System Status — under Departments (spans 1) */}
+        {/* System Status — sits under Departments */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 bg-blue-500 rounded-full" />
-              System Status
+              <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Database</span>
-                <Badge className="bg-green-100 text-green-700 border-green-200 rounded-full">
-                  Connected
-                </Badge>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Last Sync</span>
@@ -671,25 +625,21 @@ export default function AdvancedExecutiveDashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Active Users</span>
-                <Badge className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">
-                  1 online
-                </Badge>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Expense drawer (click Total Expenses card to open) */}
+      {/* Expenses drawer */}
       <ExpensesDrawer
         open={openExpenses}
         onOpenChange={setOpenExpenses}
         periodLabel={periodLabel}
         expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
         totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
-        onViewFullReport={() => {
-          window.location.href = "/reports";
-        }}
+        onViewFullReport={() => { window.location.href = "/reports"; }}
       />
     </div>
   );
