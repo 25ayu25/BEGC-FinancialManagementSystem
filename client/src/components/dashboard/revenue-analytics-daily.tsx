@@ -27,8 +27,8 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;   // e.g. 2025
-  selectedMonth: number;  // 1..12
+  selectedYear: number;
+  selectedMonth: number;
   customStartDate?: Date;
   customEndDate?: Date;
 };
@@ -44,13 +44,11 @@ const compact = new Intl.NumberFormat("en-US", {
 /* ----------------------------- Utils ----------------------------- */
 
 function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate(); // month is 1..12
+  return new Date(year, month, 0).getDate();
 }
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
-
-// compute a concrete date window so we can infer years when API returns "Sep 4"
 function computeWindow(
   range: TimeRange,
   year: number,
@@ -66,42 +64,28 @@ function computeWindow(
   }
   if (range === "last-3-months") {
     const end = endOfMonth(year, month);
-    const start = new Date(year, month - 3, 1); // two months back + current => 3 months
+    const start = new Date(year, month - 3, 1);
     return { start, end };
   }
-  if (range === "year") {
-    return {
-      start: new Date(year, 0, 1),
-      end: new Date(year, 11, 31),
-    };
-  }
+  if (range === "year") return { start: new Date(year, 0, 1), end: new Date(year, 11, 31) };
   if (range === "last-month") {
     const d = new Date(year, month - 1, 1);
-    const last = new Date(d.getFullYear(), d.getMonth(), 0); // last day of prev month
-    return {
-      start: new Date(last.getFullYear(), last.getMonth(), 1),
-      end: last,
-    };
+    const last = new Date(d.getFullYear(), d.getMonth(), 0);
+    return { start: new Date(last.getFullYear(), last.getMonth(), 1), end: last };
   }
-  // current-month or month-select
-  return {
-    start: startOfMonth(year, month),
-    end: endOfMonth(year, month),
-  };
+  return { start: startOfMonth(year, month), end: endOfMonth(year, month) };
 }
 
 function isWideRange(range: TimeRange, start?: Date, end?: Date) {
   if (range === "last-3-months" || range === "year") return true;
   if (range === "custom" && start && end) {
-    const ms = end.getTime() - start.getTime();
-    const days = ms / (1000 * 60 * 60 * 24);
-    return days > 45; // threshold ~1.5 months
+    const days = (end.getTime() - start.getTime()) / 86_400_000;
+    return days > 45;
   }
   return false;
 }
 
 function inferISOFromLabel(label: string, start: Date, end: Date): string | undefined {
-  // Try: "Sep 4", "Oct 12"
   const m = label?.match?.(/^([A-Za-z]{3,})\s+(\d{1,2})$/);
   if (!m) return undefined;
   const mon = m[1].toLowerCase();
@@ -109,14 +93,11 @@ function inferISOFromLabel(label: string, start: Date, end: Date): string | unde
   const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
   const mi = months.indexOf(mon.slice(0,3));
   if (mi < 0) return undefined;
-
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cursor <= end) {
     if (cursor.getMonth() === mi) {
       const candidate = new Date(cursor.getFullYear(), mi, day);
-      if (candidate >= start && candidate <= end) {
-        return format(candidate, "yyyy-MM-dd");
-      }
+      if (candidate >= start && candidate <= end) return format(candidate, "yyyy-MM-dd");
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -132,23 +113,18 @@ async function fetchIncomeTrendsDaily(
 ) {
   let url = `/api/income-trends/${year}/${month}?range=${normalizedRange(range)}`;
   if (range === "custom" && start && end) {
-    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
-      end,
-      "yyyy-MM-dd"
-    )}`;
+    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`;
   }
   const { data } = await api.get(url);
   return Array.isArray(data) ? data : [];
 }
 
-/* -------- amounts parsing (prevents SSP leaking into USD) -------- */
+/* -------- amounts parsing (avoid mixing SSP into USD) -------- */
 
 function parseAmounts(row: any) {
   const N = (v: any) => (v == null ? 0 : Number(v));
   let ssp = 0;
   let usd = 0;
-
-  // explicit fields
   if ("incomeSSP" in row || "incomeUSD" in row) {
     ssp += N(row.incomeSSP);
     usd += N(row.incomeUSD);
@@ -156,46 +132,34 @@ function parseAmounts(row: any) {
     ssp += N(row.ssp);
     usd += N(row.usd);
   } else {
-    // generic shape with a currency
     const amount = N(row.amount ?? row.income ?? row.value);
     const ccy = String(row.currency ?? row.curr ?? row.ccy ?? "").toUpperCase();
     if (amount) {
       if (ccy === "USD" || ccy === "US$" || ccy === "$") usd += amount;
-      else ssp += amount; // default all non-USD → SSP
+      else ssp += amount;
     }
   }
-
   return { ssp, usd };
 }
 
-/* --------- Axis ticks (nice-looking dynamic Y scale values) ------ */
+/* --------- Axis ticks helpers --------- */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
-  let niceFrac: number;
-  if (frac <= 1)        niceFrac = 1;
-  else if (frac <= 2)   niceFrac = 2;
-  else if (frac <= 2.5) niceFrac = 2.5;
-  else if (frac <= 5)   niceFrac = 5;
-  else                  niceFrac = 10;
-  return niceFrac * base;
+  return (frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 2.5 ? 2.5 : frac <= 5 ? 5 : 10) * base;
 }
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
   const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
+  return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
 function buildTicksPreferred(dataMax: number, preferredMax: number) {
   if (dataMax <= preferredMax) {
     const step = preferredMax / 4;
-    return {
-      max: preferredMax,
-      ticks: [0, step, step * 2, step * 3, preferredMax],
-    };
+    return { max: preferredMax, ticks: [0, step, step * 2, step * 3, preferredMax] };
   }
   return buildNiceTicks(dataMax);
 }
@@ -221,7 +185,7 @@ type RTProps = {
   active?: boolean;
   payload?: any[];
   year?: number;
-  month?: number; // for daily
+  month?: number;
   currency: "SSP" | "USD";
   mode: "daily" | "monthly";
 };
@@ -230,7 +194,6 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
   if (!active || !payload || !payload.length) return null;
   const p = payload[0]?.payload ?? {};
   let title = "";
-
   if (mode === "daily") {
     const d = p.day as number | undefined;
     title =
@@ -238,20 +201,14 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
         ? format(new Date(year, month - 1, d), "MMM d, yyyy")
         : p.dateISO ?? "";
   } else {
-    // monthly
-    const key = p.label as string | undefined; // "YYYY-MM"
+    const key = p.label as string | undefined;
     if (key && /^\d{4}-\d{2}$/.test(key)) {
       const [y, m] = key.split("-").map((x: string) => parseInt(x, 10));
       title = format(new Date(y, m - 1, 1), "MMM yyyy");
-    } else {
-      title = String(p.label ?? "");
-    }
+    } else title = String(p.label ?? "");
   }
-
   const value = Number(p.value ?? 0);
-  const formatValue =
-    currency === "USD" ? nf0.format(Math.round(value)) : compact.format(Math.round(value));
-
+  const formatValue = currency === "USD" ? nf0.format(Math.round(value)) : compact.format(Math.round(value));
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
       <div className="font-semibold text-slate-900 mb-1">{title}</div>
@@ -281,10 +238,7 @@ function Modal({
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-          <button
-            className="text-slate-500 hover:text-slate-700 text-sm"
-            onClick={onClose}
-          >
+          <button className="text-slate-500 hover:text-slate-700 text-sm" onClick={onClose}>
             Close
           </button>
         </div>
@@ -296,22 +250,19 @@ function Modal({
 
 /* ----------------------- Drilldown helpers ----------------------- */
 
-// Normalize any date-ish value to "YYYY-MM-DD"
 function normalizeISODate(v: any): string | undefined {
   if (!v) return undefined;
   if (typeof v === "string") {
-    const m = v.match(/^(\d{4}-\d{2}-\d{2})/); // "2025-09-22" or "2025-09-22T..."
+    const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
     if (m) return m[1];
   }
   const d = new Date(v);
   if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
   return undefined;
 }
-
-// Inclusive UTC window for a given date range
 function asUTCWindow(fromISO: string, toISO: string) {
   const startDateTime = `${fromISO}T00:00:00.000Z`;
-  const endDateTime   = `${toISO}T23:59:59.999Z`;
+  const endDateTime = `${toISO}T23:59:59.999Z`;
   return { startDateTime, endDateTime };
 }
 
@@ -336,10 +287,7 @@ export default function RevenueAnalyticsDaily({
   const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
 
-  const baseDays = useMemo(
-    () => Array.from({ length: days }, (_, i) => i + 1),
-    [days]
-  );
+  const baseDays = useMemo(() => Array.from({ length: days }, (_, i) => i + 1), [days]);
 
   const { data: raw = [], isLoading } = useQuery({
     queryKey: [
@@ -350,22 +298,20 @@ export default function RevenueAnalyticsDaily({
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
-    queryFn: () =>
-      fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
+    queryFn: () => fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
   /* ------------------- Shape data for charts ------------------- */
 
   const sspDaily = baseDays.map((day) => ({ day, value: 0 }));
   const usdDaily = baseDays.map((day) => ({ day, value: 0 }));
-  const sspMonthlyMap = new Map<string, number>(); // key: "YYYY-MM"
+
+  const sspMonthlyMap = new Map<string, number>();
   const usdMonthlyMap = new Map<string, number>();
 
   for (const r of raw as any[]) {
-    // strict parsing (prevents mixing)
     const { ssp: incomeSSP, usd: incomeUSD } = parseAmounts(r);
 
-    // Prefer explicit ISO if provided, otherwise infer within [start..end]
     let iso = (r as any).dateISO as string | undefined;
     if (!iso && typeof r.date === "string" && start && end) {
       iso = inferISOFromLabel(r.date, start, end);
@@ -377,7 +323,7 @@ export default function RevenueAnalyticsDaily({
         const dt = new Date(iso + "T00:00:00");
         const y = dt.getFullYear();
         const m = dt.getMonth() + 1;
-        if (y !== year || m !== month) continue; // keep only selected month
+        if (y !== year || m !== month) continue;
         d = dt.getDate();
       } else if ((r as any).day) {
         d = Number((r as any).day);
@@ -385,7 +331,6 @@ export default function RevenueAnalyticsDaily({
         const mm = r.date.match(/^\D+\s+(\d{1,2})$/);
         if (mm) d = parseInt(mm[1], 10);
       }
-
       if (typeof d === "number" && d >= 1 && d <= days) {
         sspDaily[d - 1].value += incomeSSP;
         usdDaily[d - 1].value += incomeUSD;
@@ -398,40 +343,31 @@ export default function RevenueAnalyticsDaily({
         if (ii) key = ii.slice(0, 7);
       }
       if (!key) continue;
-
       sspMonthlyMap.set(key, (sspMonthlyMap.get(key) ?? 0) + incomeSSP);
       usdMonthlyMap.set(key, (usdMonthlyMap.get(key) ?? 0) + incomeUSD);
     }
   }
 
   const monthlyKeys = Array.from(new Set([...sspMonthlyMap.keys(), ...usdMonthlyMap.keys()])).sort();
-  const sspMonthly = monthlyKeys.map(k => ({ label: k, value: sspMonthlyMap.get(k) ?? 0 }));
-  const usdMonthly = monthlyKeys.map(k => ({ label: k, value: usdMonthlyMap.get(k) ?? 0 }));
+  const sspMonthly = monthlyKeys.map((k) => ({ label: k, value: sspMonthlyMap.get(k) ?? 0 }));
+  const usdMonthly = monthlyKeys.map((k) => ({ label: k, value: usdMonthlyMap.get(k) ?? 0 }));
 
   /* ------------------- Totals & Averages ------------------- */
 
-  const totalSSP = (!wide
-    ? sspDaily.reduce((s, r) => s + r.value, 0)
-    : sspMonthly.reduce((s, r) => s + (r.value || 0), 0)
-  );
-
-  const totalUSD = (!wide
-    ? usdDaily.reduce((s, r) => s + r.value, 0)
-    : usdMonthly.reduce((s, r) => s + (r.value || 0), 0)
-  );
+  const totalSSP = (!wide ? sspDaily : sspMonthly).reduce((s, r) => s + (r.value || 0), 0);
+  const totalUSD = (!wide ? usdDaily : usdMonthly).reduce((s, r) => s + (r.value || 0), 0);
 
   const activeDaysSSP = !wide ? sspDaily.filter((d) => d.value > 0).length || 0 : 0;
   const activeDaysUSD = !wide ? usdDaily.filter((d) => d.value > 0).length || 0 : 0;
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  /* ------------------- Axis scaling ------------------- */
+  /* ------------------- Axis scaling & header (single declaration) ------------------- */
 
   const dataMaxSSP = Math.max(0, ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value)));
   const dataMaxUSD = Math.max(0, ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value)));
-
-  const preferredSSPMax = 6_000_000; // 6M default ceiling
-  const preferredUSDMax = 1_500;     // 1.5k default ceiling
+  const preferredSSPMax = 6_000_000;
+  const preferredUSDMax = 1_500;
   const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
   const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
 
@@ -445,7 +381,6 @@ export default function RevenueAnalyticsDaily({
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detail, setDetail] = useState<{ from?: string; to?: string; items: any[] }>({ items: [] });
 
-  // Fetch departments only when modal opens (for id→name fallback)
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
@@ -479,35 +414,28 @@ export default function RevenueAnalyticsDaily({
     );
   }
 
-  // Robust fetch that tries common param names; then client-filters + de-dupes
   async function loadTransactionsByRange(fromISO: string, toISO: string) {
     setOpen(true);
     setLoadingDetail(true);
     try {
       const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
-
       const attempts: Array<Record<string, string | number>> = [
-        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO }, // most likely
-        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },   // alt names
-        { page: 1, pageSize: 200, start: fromISO, end: toISO },         // alt names
-        { page: 1, pageSize: 200, startDateTime, endDateTime },         // full UTC window
-        { page: 1, pageSize: 200, date: fromISO },                      // single date
+        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO },
+        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },
+        { page: 1, pageSize: 200, start: fromISO, end: toISO },
+        { page: 1, pageSize: 200, startDateTime, endDateTime },
+        { page: 1, pageSize: 200, date: fromISO },
       ];
-
       for (const params of attempts) {
         const res = await api.get("/api/transactions", { params });
         const raw =
           res.data?.transactions ??
           res.data?.items ??
           (Array.isArray(res.data) ? res.data : []);
-
-        // Filter safely to the requested inclusive window
         const filtered = raw.filter((t: any) => {
           const d = normalizeISODate(t.date);
           return d ? d >= fromISO && d <= toISO : false;
         });
-
-        // De-duplicate by (id|date|amount|deptId) to protect against API double-includes
         const uniq = new Map<string, any>();
         for (const t of filtered) {
           const key = [
@@ -519,13 +447,11 @@ export default function RevenueAnalyticsDaily({
           if (!uniq.has(key)) uniq.set(key, t);
         }
         const result = Array.from(uniq.values());
-
         if (result.length > 0) {
           setDetail({ from: fromISO, to: toISO, items: result });
           return;
         }
       }
-
       setDetail({ from: fromISO, to: toISO, items: [] });
     } finally {
       setLoadingDetail(false);
@@ -538,9 +464,8 @@ export default function RevenueAnalyticsDaily({
     const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
     loadTransactionsByRange(iso, iso);
   };
-
   const onClickMonthly = (payload: any) => {
-    const key = payload?.label as string | undefined; // YYYY-MM
+    const key = payload?.label as string | undefined;
     if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
     const [y, m] = key.split("-").map((n: string) => parseInt(n, 10));
     const first = format(new Date(y, m - 1, 1), "yyyy-MM-dd");
@@ -550,17 +475,6 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------------------- UI ---------------------------- */
 
-  const dataMaxSSP = Math.max(0, ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value)));
-  const dataMaxUSD = Math.max(0, ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value)));
-  const preferredSSPMax = 6_000_000;
-  const preferredUSDMax = 1_500;
-  const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
-  const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
-
-  const headerLabel = !wide
-    ? format(new Date(year, month - 1, 1), "MMM yyyy")
-    : `${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`;
-
   return (
     <Card className="border-0 shadow-md bg-white">
       <CardHeader className="pb-0">
@@ -568,11 +482,7 @@ export default function RevenueAnalyticsDaily({
           Revenue Analytics
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          {headerLabel} · SSP {nf0.format(
-            (!wide ? sspDaily : sspMonthly).reduce((s, r) => s + (r.value || 0), 0)
-          )} · USD {nf0.format(
-            (!wide ? usdDaily : usdMonthly).reduce((s, r) => s + (r.value || 0), 0)
-          )}
+          {headerLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
         </div>
       </CardHeader>
 
@@ -589,7 +499,11 @@ export default function RevenueAnalyticsDaily({
           </div>
           <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={wide ? sspMonthly : sspDaily} margin={{ top: 8, right: 12, left: 12, bottom: 18 }} barCategoryGap="26%">
+              <BarChart
+                data={wide ? sspMonthly : sspDaily}
+                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
+                barCategoryGap="26%"
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 {!wide ? (
                   <XAxis dataKey="day" interval={xInterval} minTickGap={2} tick={{ fontSize: 12, fill: "#64748b" }} tickMargin={8} axisLine={false} tickLine={false} />
@@ -625,7 +539,11 @@ export default function RevenueAnalyticsDaily({
           </div>
           <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={wide ? usdMonthly : usdDaily} margin={{ top: 8, right: 12, left: 12, bottom: 18 }} barCategoryGap="26%">
+              <BarChart
+                data={wide ? usdMonthly : usdDaily}
+                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
+                barCategoryGap="26%"
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 {!wide ? (
                   <XAxis dataKey="day" interval={xInterval} minTickGap={2} tick={{ fontSize: 12, fill: "#64748b" }} tickMargin={8} axisLine={false} tickLine={false} />
