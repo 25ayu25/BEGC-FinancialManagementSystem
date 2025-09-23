@@ -87,7 +87,49 @@ function isWideRange(range: TimeRange, start?: Date, end?: Date) {
   return false;
 }
 
+/* ---- Robust date extraction: accepts many shapes & returns yyyy-mm-dd ---- */
+
+function normalizeISODate(v: any): string | undefined {
+  if (!v && v !== 0) return undefined;
+
+  // String cases
+  if (typeof v === "string") {
+    // 1) yyyy-mm-dd
+    let m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+
+    // 2) dd/mm/yyyy or dd-mm-yyyy -> convert to yyyy-mm-dd (best effort)
+    m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (m) {
+      const dd = m[1].padStart(2, "0");
+      const mm = m[2].padStart(2, "0");
+      const yy = m[3];
+      return `${yy}-${mm}-${dd}`;
+    }
+
+    // 3) Any parsable date string
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+    return undefined;
+  }
+
+  // Number timestamp
+  if (typeof v === "number") {
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+    return undefined;
+  }
+
+  // Date object
+  if (v instanceof Date && !isNaN(v.getTime?.())) {
+    return format(v, "yyyy-MM-dd");
+  }
+
+  return undefined;
+}
+
 function inferISOFromLabel(label: string, start: Date, end: Date): string | undefined {
+  // Try: "Sep 4", "Oct 12"
   const m = label?.match?.(/^([A-Za-z]{3,})\s+(\d{1,2})$/);
   if (!m) return undefined;
   const mon = m[1].toLowerCase();
@@ -258,24 +300,6 @@ function Modal({
   );
 }
 
-/* ----------------------- Drilldown helpers ----------------------- */
-
-function normalizeISODate(v: any): string | undefined {
-  if (!v) return undefined;
-  if (typeof v === "string") {
-    const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (m) return m[1];
-  }
-  const d = new Date(v);
-  if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
-  return undefined;
-}
-function asUTCWindow(fromISO: string, toISO: string) {
-  const startDateTime = `${fromISO}T00:00:00.000Z`;
-  const endDateTime   = `${toISO}T23:59:59.999Z`;
-  return { startDateTime, endDateTime };
-}
-
 /* ------------------------------- Main ---------------------------- */
 
 export default function RevenueAnalyticsDaily({
@@ -322,7 +346,13 @@ export default function RevenueAnalyticsDaily({
   for (const r of raw as any[]) {
     const { ssp: incomeSSP, usd: incomeUSD } = parseAmountsStrict(r);
 
-    let iso = (r as any).dateISO as string | undefined;
+    // date detection: dateISO -> ISO like 'YYYY-MM-DD...' -> Date-like -> label inference
+    let iso: string | undefined =
+      (r as any).dateISO ||
+      normalizeISODate((r as any).date) ||
+      normalizeISODate((r as any).createdAt) ||
+      normalizeISODate((r as any).updatedAt);
+
     if (!iso && typeof r.date === "string" && start && end) {
       iso = inferISOFromLabel(r.date, start, end);
     }
@@ -441,19 +471,17 @@ export default function RevenueAnalyticsDaily({
     return name.includes("insurance");
   }
 
-  // ✅ Fixed: only return when we actually find rows; otherwise try all param variants.
   async function loadTransactionsByRange(fromISO: string, toISO: string, currency: DrillCurrency) {
     setOpen(true);
     setLoadingDetail(true);
     try {
-      const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
       const attempts: Array<Record<string, string | number>> = [
         { page: 1, pageSize: 1000, startDate: fromISO, endDate: toISO },
         { page: 1, pageSize: 1000, fromDate: fromISO, toDate: toISO },
         { page: 1, pageSize: 1000, start: fromISO, end: toISO },
-        { page: 1, pageSize: 1000, startDateTime, endDateTime },
+        { page: 1, pageSize: 1000, startDateTime: `${fromISO}T00:00:00.000Z`, endDateTime: `${toISO}T23:59:59.999Z` },
         { page: 1, pageSize: 1000, date: fromISO },
-        { page: 1, pageSize: 1000 }, // last resort: fetch page and filter client-side
+        { page: 1, pageSize: 1000 },
       ];
 
       for (const params of attempts) {
@@ -493,11 +521,10 @@ export default function RevenueAnalyticsDaily({
 
         if (result.length > 0) {
           setDetail({ from: fromISO, to: toISO, currency, items: result });
-          return; // <-- only exit when we have data
+          return;
         }
       }
 
-      // If nothing matched any attempt:
       setDetail({ from: fromISO, to: toISO, currency, items: [] });
     } finally {
       setLoadingDetail(false);
@@ -655,7 +682,6 @@ export default function RevenueAnalyticsDaily({
                 <th className="py-2">Currency</th>
                 <th className="py-2">Amount</th>
                 <th className="py-2">Type</th>
-                <th className="py-2">Note</th>
               </tr>
             </thead>
             <tbody>
@@ -664,9 +690,8 @@ export default function RevenueAnalyticsDaily({
                   <td className="py-2">{normalizeISODate(t.date) ?? "-"}</td>
                   <td className="py-2">{displayDept(t)}</td>
                   <td className="py-2">{String(t.currency || "SSP").toUpperCase().includes("USD") ? "USD" : "SSP"}</td>
-                  <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
+                  <td className="py-2">{nf0.format(Math.round(Number(t.amount ?? 0)))}</td>
                   <td className="py-2">{String(t.type || "income")}</td>
-                  <td className="py-2">{t.description || "-"}</td>
                 </tr>
               ))}
             </tbody>
