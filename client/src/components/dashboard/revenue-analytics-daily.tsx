@@ -27,8 +27,8 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number;
-  selectedMonth: number;
+  selectedYear: number;   // e.g. 2025
+  selectedMonth: number;  // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
 };
@@ -93,11 +93,14 @@ function inferISOFromLabel(label: string, start: Date, end: Date): string | unde
   const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
   const mi = months.indexOf(mon.slice(0,3));
   if (mi < 0) return undefined;
+
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cursor <= end) {
     if (cursor.getMonth() === mi) {
       const candidate = new Date(cursor.getFullYear(), mi, day);
-      if (candidate >= start && candidate <= end) return format(candidate, "yyyy-MM-dd");
+      if (candidate >= start && candidate <= end) {
+        return format(candidate, "yyyy-MM-dd");
+      }
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -119,27 +122,28 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
-/* -------- amounts parsing (avoid mixing SSP into USD) -------- */
+/* -------- amounts parsing (STRICT: never mix SSP into USD) ------- */
 
-function parseAmounts(row: any) {
+function parseAmountsStrict(row: any) {
   const N = (v: any) => (v == null ? 0 : Number(v));
-  let ssp = 0;
-  let usd = 0;
-  if ("incomeSSP" in row || "incomeUSD" in row) {
-    ssp += N(row.incomeSSP);
-    usd += N(row.incomeUSD);
-  } else if ("ssp" in row || "usd" in row) {
-    ssp += N(row.ssp);
-    usd += N(row.usd);
-  } else {
+
+  // If the row declares a currency, trust it and only use the declared amount.
+  if (row.currency != null && String(row.currency).trim() !== "") {
+    const c = String(row.currency).trim().toUpperCase();
     const amount = N(row.amount ?? row.income ?? row.value);
-    const ccy = String(row.currency ?? row.curr ?? row.ccy ?? "").toUpperCase();
-    if (amount) {
-      if (ccy === "USD" || ccy === "US$" || ccy === "$") usd += amount;
-      else ssp += amount;
-    }
+    if (!amount) return { ssp: 0, usd: 0 };
+    return c.includes("USD") ? { ssp: 0, usd: amount } : { ssp: amount, usd: 0 };
   }
-  return { ssp, usd };
+
+  // No currency on the row: use explicit fields only.
+  const usd = N(row.incomeUSD ?? row.usd ?? 0);
+  const ssp = N(row.incomeSSP ?? row.ssp ?? 0);
+
+  // As a last resort (trends rows sometimes have "amount" without currency),
+  // only take it if neither usd nor ssp were supplied explicitly.
+  const fallback = usd === 0 && ssp === 0 ? N(row.amount ?? row.income ?? row.value) : 0;
+
+  return { ssp: ssp || fallback, usd };
 }
 
 /* --------- Axis ticks helpers --------- */
@@ -185,7 +189,7 @@ type RTProps = {
   active?: boolean;
   payload?: any[];
   year?: number;
-  month?: number;
+  month?: number; // for daily
   currency: "SSP" | "USD";
   mode: "daily" | "monthly";
 };
@@ -194,6 +198,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
   if (!active || !payload || !payload.length) return null;
   const p = payload[0]?.payload ?? {};
   let title = "";
+
   if (mode === "daily") {
     const d = p.day as number | undefined;
     title =
@@ -262,7 +267,7 @@ function normalizeISODate(v: any): string | undefined {
 }
 function asUTCWindow(fromISO: string, toISO: string) {
   const startDateTime = `${fromISO}T00:00:00.000Z`;
-  const endDateTime = `${toISO}T23:59:59.999Z`;
+  const endDateTime   = `${toISO}T23:59:59.999Z`;
   return { startDateTime, endDateTime };
 }
 
@@ -310,7 +315,7 @@ export default function RevenueAnalyticsDaily({
   const usdMonthlyMap = new Map<string, number>();
 
   for (const r of raw as any[]) {
-    const { ssp: incomeSSP, usd: incomeUSD } = parseAmounts(r);
+    const { ssp: incomeSSP, usd: incomeUSD } = parseAmountsStrict(r);
 
     let iso = (r as any).dateISO as string | undefined;
     if (!iso && typeof r.date === "string" && start && end) {
@@ -362,7 +367,7 @@ export default function RevenueAnalyticsDaily({
   const avgDaySSP = activeDaysSSP ? Math.round(totalSSP / activeDaysSSP) : 0;
   const avgDayUSD = activeDaysUSD ? Math.round(totalUSD / activeDaysUSD) : 0;
 
-  /* ------------------- Axis scaling & header (single declaration) ------------------- */
+  /* ------------------- Axis scaling & header -------------------- */
 
   const dataMaxSSP = Math.max(0, ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value)));
   const dataMaxUSD = Math.max(0, ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value)));
@@ -380,7 +385,9 @@ export default function RevenueAnalyticsDaily({
   const [open, setOpen] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detail, setDetail] = useState<{ from?: string; to?: string; items: any[] }>({ items: [] });
+  const [drillMode, setDrillMode] = useState<"grouped" | "raw">("grouped");
 
+  // Departments for name fallback
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
@@ -389,7 +396,6 @@ export default function RevenueAnalyticsDaily({
     },
     enabled: open,
   });
-
   const deptMap = useMemo(() => {
     const m = new Map<string | number, string>();
     (departments ?? []).forEach((d: any) => {
@@ -414,17 +420,19 @@ export default function RevenueAnalyticsDaily({
     );
   }
 
+  // fetch day/month and client-filter + de-dupe
   async function loadTransactionsByRange(fromISO: string, toISO: string) {
     setOpen(true);
     setLoadingDetail(true);
+    setDrillMode("grouped");
     try {
       const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
       const attempts: Array<Record<string, string | number>> = [
-        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO },
-        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },
-        { page: 1, pageSize: 200, start: fromISO, end: toISO },
-        { page: 1, pageSize: 200, startDateTime, endDateTime },
-        { page: 1, pageSize: 200, date: fromISO },
+        { page: 1, pageSize: 500, startDate: fromISO, endDate: toISO },
+        { page: 1, pageSize: 500, fromDate: fromISO, toDate: toISO },
+        { page: 1, pageSize: 500, start: fromISO, end: toISO },
+        { page: 1, pageSize: 500, startDateTime, endDateTime },
+        { page: 1, pageSize: 500, date: fromISO },
       ];
       for (const params of attempts) {
         const res = await api.get("/api/transactions", { params });
@@ -442,9 +450,9 @@ export default function RevenueAnalyticsDaily({
             t.id ?? "",
             normalizeISODate(t.date) ?? "",
             String(t.amount ?? ""),
-            t.departmentId ?? t.department?.id ?? ""
+            t.departmentId ?? t.department?.id ?? displayDept(t) ?? ""
           ].join("|");
-          if (!uniq.has(key)) uniq.set(key, t);
+        if (!uniq.has(key)) uniq.set(key, t);
         }
         const result = Array.from(uniq.values());
         if (result.length > 0) {
@@ -473,6 +481,29 @@ export default function RevenueAnalyticsDaily({
     loadTransactionsByRange(first, last);
   };
 
+  /* --------------------- Grouped view (Dept×Currency×Type) ------- */
+
+  const groupedRows = useMemo(() => {
+    const map = new Map<string, { dept: string; currency: string; type: string; amount: number; count: number }>();
+    for (const t of detail.items) {
+      const dept = displayDept(t);
+      const currency = String(t.currency || "SSP").toUpperCase().includes("USD") ? "USD" : "SSP";
+      const type = (String(t.type || "income").toLowerCase() === "expense") ? "expense" : "income";
+      const amount = Number(t.amount ?? 0);
+      const key = `${dept}|${currency}|${type}`;
+      const cur = map.get(key);
+      if (cur) {
+        cur.amount += amount;
+        cur.count += 1;
+      } else {
+        map.set(key, { dept, currency, type, amount, count: 1 });
+      }
+    }
+    return Array.from(map.values()).sort((a,b) =>
+      a.dept.localeCompare(b.dept) || a.currency.localeCompare(b.currency) || a.type.localeCompare(b.type)
+    );
+  }, [detail.items, deptMap]);
+
   /* ------------------------------- UI ---------------------------- */
 
   return (
@@ -482,7 +513,10 @@ export default function RevenueAnalyticsDaily({
           Revenue Analytics
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          {headerLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+          {(!wide ? format(new Date(year, month - 1, 1), "MMM yyyy")
+                  : `${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`)}
+          {" · "}SSP {nf0.format((!wide ? sspDaily : sspMonthly).reduce((s, r) => s + (r.value || 0), 0))}
+          {" · "}USD {nf0.format((!wide ? usdDaily : usdMonthly).reduce((s, r) => s + (r.value || 0), 0))}
         </div>
       </CardHeader>
 
@@ -491,19 +525,11 @@ export default function RevenueAnalyticsDaily({
         <section aria-label={`SSP ${wide ? "monthly" : "daily"}`}>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-slate-700">SSP ({wide ? "Monthly" : "Daily"})</p>
-            {!wide ? (
-              <span className="text-xs text-slate-500">
-                Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
-              </span>
-            ) : null}
+            {!wide && <span className="text-xs text-slate-500">Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span></span>}
           </div>
           <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={wide ? sspMonthly : sspDaily}
-                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="26%"
-              >
+              <BarChart data={wide ? sspMonthly : sspDaily} margin={{ top: 8, right: 12, left: 12, bottom: 18 }} barCategoryGap="26%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 {!wide ? (
                   <XAxis dataKey="day" interval={xInterval} minTickGap={2} tick={{ fontSize: 12, fill: "#64748b" }} tickMargin={8} axisLine={false} tickLine={false} />
@@ -519,7 +545,14 @@ export default function RevenueAnalyticsDaily({
                     interval="preserveStartEnd" minTickGap={8} tickMargin={8} axisLine={false} tickLine={false}
                   />
                 )}
-                <YAxis domain={[0, yMaxSSP]} ticks={ticksSSP} tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={(v) => compact.format(v as number)} axisLine={false} tickLine={false} />
+                <YAxis
+                  domain={[0, buildTicksPreferred(Math.max(0, ...(!wide ? sspDaily.map(d=>d.value) : sspMonthly.map(d=>d.value))), 6_000_000).max]}
+                  ticks={buildTicksPreferred(Math.max(0, ...(!wide ? sspDaily.map(d=>d.value) : sspMonthly.map(d=>d.value))), 6_000_000).ticks}
+                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  tickFormatter={(v) => compact.format(v as number)}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <Tooltip content={(p: any) => <RevenueTooltip {...p} year={!wide ? year : undefined} month={!wide ? month : undefined} currency="SSP" mode={wide ? "monthly" : "daily"} />} />
                 <Bar dataKey="value" name="SSP" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={24} onClick={(p: any) => (wide ? onClickMonthly(p?.payload) : onClickDaily(p?.payload))} style={{ cursor: "pointer" }} />
               </BarChart>
@@ -531,19 +564,11 @@ export default function RevenueAnalyticsDaily({
         <section aria-label={`USD ${wide ? "monthly" : "daily"}`}>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-slate-700">USD ({wide ? "Monthly" : "Daily"})</p>
-            {!wide ? (
-              <span className="text-xs text-slate-500">
-                Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
-              </span>
-            ) : null}
+            {!wide && <span className="text-xs text-slate-500">Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span></span>}
           </div>
           <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={wide ? usdMonthly : usdDaily}
-                margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
-                barCategoryGap="26%"
-              >
+              <BarChart data={wide ? usdMonthly : usdDaily} margin={{ top: 8, right: 12, left: 12, bottom: 18 }} barCategoryGap="26%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 {!wide ? (
                   <XAxis dataKey="day" interval={xInterval} minTickGap={2} tick={{ fontSize: 12, fill: "#64748b" }} tickMargin={8} axisLine={false} tickLine={false} />
@@ -559,7 +584,14 @@ export default function RevenueAnalyticsDaily({
                     interval="preserveStartEnd" minTickGap={8} tickMargin={8} axisLine={false} tickLine={false}
                   />
                 )}
-                <YAxis domain={[0, yMaxUSD]} ticks={ticksUSD} tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={(v) => nf0.format(v as number)} axisLine={false} tickLine={false} />
+                <YAxis
+                  domain={[0, buildTicksPreferred(Math.max(0, ...(!wide ? usdDaily.map(d=>d.value) : usdMonthly.map(d=>d.value))), 1_500).max]}
+                  ticks={buildTicksPreferred(Math.max(0, ...(!wide ? usdDaily.map(d=>d.value) : usdMonthly.map(d=>d.value))), 1_500).ticks}
+                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  tickFormatter={(v) => nf0.format(v as number)}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <Tooltip content={(p: any) => <RevenueTooltip {...p} year={!wide ? year : undefined} month={!wide ? month : undefined} currency="USD" mode={wide ? "monthly" : "daily"} />} />
                 <Bar dataKey="value" name="USD" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={24} onClick={(p: any) => (wide ? onClickMonthly(p?.payload) : onClickDaily(p?.payload))} style={{ cursor: "pointer" }} />
               </BarChart>
@@ -582,36 +614,81 @@ export default function RevenueAnalyticsDaily({
             : "Transactions"
         }
       >
+        {/* Small mode toggle */}
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            className={`px-2 py-1 rounded border text-xs ${drillMode === "grouped" ? "bg-slate-900 text-white border-slate-900" : "border-slate-300 text-slate-600"}`}
+            onClick={() => setDrillMode("grouped")}
+          >
+            Grouped
+          </button>
+          <button
+            className={`px-2 py-1 rounded border text-xs ${drillMode === "raw" ? "bg-slate-900 text-white border-slate-900" : "border-slate-300 text-slate-600"}`}
+            onClick={() => setDrillMode("raw")}
+          >
+            Raw
+          </button>
+        </div>
+
         {loadingDetail ? (
           <div className="text-sm text-slate-600">Loading…</div>
-        ) : detail.items.length === 0 ? (
-          <div className="text-sm text-slate-600">No transactions found.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500">
-                <th className="py-2">Date</th>
-                <th className="py-2">Dept</th>
-                <th className="py-2">Currency</th>
-                <th className="py-2">Amount</th>
-                <th className="py-2">Type</th>
-                <th className="py-2">Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.items.map((t: any) => (
-                <tr key={(t.id ?? "") + "|" + (normalizeISODate(t.date) ?? "") + "|" + (t.amount ?? "")} className="border-t border-slate-100">
-                  <td className="py-2">{normalizeISODate(t.date) ?? "-"}</td>
-                  <td className="py-2">{displayDept(t)}</td>
-                  <td className="py-2">{t.currency}</td>
-                  <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
-                  <td className="py-2">{t.type}</td>
-                  <td className="py-2">{t.description || "-"}</td>
+        ) : (drillMode === "grouped" ? (
+          groupedRows.length === 0 ? (
+            <div className="text-sm text-slate-600">No transactions found.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500">
+                  <th className="py-2">Dept</th>
+                  <th className="py-2">Currency</th>
+                  <th className="py-2">Type</th>
+                  <th className="py-2">Count</th>
+                  <th className="py-2">Total Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {groupedRows.map((g, i) => (
+                  <tr key={`${g.dept}|${g.currency}|${g.type}`} className={i ? "border-t border-slate-100" : ""}>
+                    <td className="py-2">{g.dept}</td>
+                    <td className="py-2">{g.currency}</td>
+                    <td className="py-2 capitalize">{g.type}</td>
+                    <td className="py-2">{g.count}</td>
+                    <td className="py-2">{g.amount.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        ) : (
+          detail.items.length === 0 ? (
+            <div className="text-sm text-slate-600">No transactions found.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500">
+                  <th className="py-2">Date</th>
+                  <th className="py-2">Dept</th>
+                  <th className="py-2">Currency</th>
+                  <th className="py-2">Amount</th>
+                  <th className="py-2">Type</th>
+                  <th className="py-2">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.items.map((t: any) => (
+                  <tr key={(t.id ?? "") + "|" + (normalizeISODate(t.date) ?? "") + "|" + (t.amount ?? "")} className="border-t border-slate-100">
+                    <td className="py-2">{normalizeISODate(t.date) ?? "-"}</td>
+                    <td className="py-2">{displayDept(t)}</td>
+                    <td className="py-2">{String(t.currency || "SSP").toUpperCase().includes("USD") ? "USD" : "SSP"}</td>
+                    <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
+                    <td className="py-2">{t.type}</td>
+                    <td className="py-2">{t.description || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        ))}
       </Modal>
     </Card>
   );
