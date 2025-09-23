@@ -267,6 +267,15 @@ function Modal({
   );
 }
 
+/* ----------------------- Drilldown helpers ----------------------- */
+
+// Inclusive UTC window for a given date range
+function asUTCWindow(fromISO: string, toISO: string) {
+  const startDateTime = `${fromISO}T00:00:00.000Z`;
+  const endDateTime   = `${toISO}T23:59:59.999Z`;
+  return { startDateTime, endDateTime };
+}
+
 /* ------------------------------- Main ---------------------------- */
 
 export default function RevenueAnalyticsDaily({
@@ -424,14 +433,59 @@ export default function RevenueAnalyticsDaily({
     items: [],
   });
 
+  // UPDATED: robust fetch that tries common param shapes + UTC window
   async function loadTransactionsByRange(fromISO: string, toISO: string) {
     setOpen(true);
     setLoadingDetail(true);
     try {
-      const res = await api.get("/api/transactions", {
-        params: { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO },
-      });
-      setDetail({ from: fromISO, to: toISO, items: res.data?.transactions ?? [] });
+      const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
+
+      const attempts: Array<Record<string, string | number>> = [
+        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO },          // most likely
+        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },            // alt names
+        { page: 1, pageSize: 200, start: fromISO, end: toISO },                  // alt names
+        { page: 1, pageSize: 200, startDateTime, endDateTime },                  // full UTC day
+        { page: 1, pageSize: 200, date: fromISO },                               // single date
+      ];
+
+      for (const params of attempts) {
+        const res = await api.get("/api/transactions", { params });
+        const txns =
+          res.data?.transactions ??
+          res.data?.items ??
+          (Array.isArray(res.data) ? res.data : []);
+
+        const count =
+          res.data?.total ??
+          res.data?.count ??
+          txns.length;
+
+        if (count > 0 && txns.length > 0) {
+          setDetail({ from: fromISO, to: toISO, items: txns });
+          return;
+        }
+      }
+
+      // Fallback: same-month helper endpoint if you have it
+      if (fromISO.slice(0, 7) === toISO.slice(0, 7)) {
+        const y = parseInt(fromISO.slice(0, 4), 10);
+        const m = parseInt(fromISO.slice(5, 7), 10);
+        try {
+          const res = await api.get(`/api/detailed-transactions/${y}/${m}`, {
+            params: { day: fromISO },
+          });
+          const txns =
+            res.data?.transactions ??
+            res.data?.items ??
+            (Array.isArray(res.data) ? res.data : []);
+          if (txns.length > 0) {
+            setDetail({ from: fromISO, to: toISO, items: txns });
+            return;
+          }
+        } catch { /* ignore */ }
+      }
+
+      setDetail({ from: fromISO, to: toISO, items: [] });
     } finally {
       setLoadingDetail(false);
     }
@@ -671,7 +725,14 @@ export default function RevenueAnalyticsDaily({
             <tbody>
               {detail.items.map((t: any) => (
                 <tr key={t.id} className="border-t border-slate-100">
-                  <td className="py-2">{t.date}</td>
+                  <td className="py-2">
+                    {(() => {
+                      const v = t.date;
+                      if (!v) return "-";
+                      // normalize "2025-09-22T00:00:00.000Z" → "2025-09-22"
+                      return String(v).slice(0, 10);
+                    })()}
+                  </td>
                   <td className="py-2">{t.departmentName || "-"}</td>
                   <td className="py-2">{t.currency}</td>
                   <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
