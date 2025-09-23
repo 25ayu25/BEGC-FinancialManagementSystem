@@ -141,7 +141,7 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
-/* --------------------- Nice ticks for Y-axis --------------------- */
+/* --------- Axis ticks (nice-looking dynamic Y scale values) ------ */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
@@ -269,6 +269,18 @@ function Modal({
 
 /* ----------------------- Drilldown helpers ----------------------- */
 
+// Normalize any date-ish value to "YYYY-MM-DD"
+function normalizeISODate(v: any): string | undefined {
+  if (!v) return undefined;
+  if (typeof v === "string") {
+    const m = v.match(/^(\d{4}-\d{2}-\d{2})/); // "2025-09-22" or "2025-09-22T..."
+    if (m) return m[1];
+  }
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+  return undefined;
+}
+
 // Inclusive UTC window for a given date range
 function asUTCWindow(fromISO: string, toISO: string) {
   const startDateTime = `${fromISO}T00:00:00.000Z`;
@@ -296,15 +308,10 @@ export default function RevenueAnalyticsDaily({
 
   // Bigger chart feel
   const chartHeight = isMobile ? 260 : 340;
-  const sspBarSize = isMobile ? 16 : 24;
-  const usdBarSize = isMobile ? 16 : 24;
 
-  // Label density + typography for daily mode
+  // Label density for daily mode
   const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
-  const xTickFont = isMobile ? 11 : 12;
-  const yTickFont = isMobile ? 11 : 12;
-  const xTickMargin = isMobile ? 4 : 8;
 
   const baseDays = useMemo(
     () => Array.from({ length: days }, (_, i) => i + 1),
@@ -433,7 +440,37 @@ export default function RevenueAnalyticsDaily({
     items: [],
   });
 
-  // UPDATED: robust fetch that tries common param shapes + UTC window
+  // Fetch departments only when modal opens (for id→name fallback)
+  const { data: departments } = useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const res = await api.get("/api/departments", { params: { page: 1, pageSize: 1000 } });
+      return res.data?.departments ?? res.data ?? [];
+    },
+    enabled: open,
+  });
+
+  const deptMap = useMemo(() => {
+    const m = new Map<string | number, string>();
+    (departments ?? []).forEach((d: any) => {
+      m.set(d.id, d.name);
+      m.set(String(d.id), d.name);
+    });
+    return m;
+  }, [departments]);
+
+  function displayDept(t: any) {
+    return (
+      t.departmentName ??
+      t.department_name ??
+      t.department?.name ??
+      deptMap.get(t.departmentId) ??
+      deptMap.get(t.department_id) ??
+      "-"
+    );
+  }
+
+  // Robust fetch that tries common param names; then client-filters to [from..to]
   async function loadTransactionsByRange(fromISO: string, toISO: string) {
     setOpen(true);
     setLoadingDetail(true);
@@ -441,32 +478,33 @@ export default function RevenueAnalyticsDaily({
       const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
 
       const attempts: Array<Record<string, string | number>> = [
-        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO },          // most likely
-        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },            // alt names
-        { page: 1, pageSize: 200, start: fromISO, end: toISO },                  // alt names
-        { page: 1, pageSize: 200, startDateTime, endDateTime },                  // full UTC day
-        { page: 1, pageSize: 200, date: fromISO },                               // single date
+        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO }, // most likely
+        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },   // alt names
+        { page: 1, pageSize: 200, start: fromISO, end: toISO },         // alt names
+        { page: 1, pageSize: 200, startDateTime, endDateTime },         // full UTC window
+        { page: 1, pageSize: 200, date: fromISO },                      // single date
       ];
 
       for (const params of attempts) {
         const res = await api.get("/api/transactions", { params });
-        const txns =
+        const raw =
           res.data?.transactions ??
           res.data?.items ??
           (Array.isArray(res.data) ? res.data : []);
 
-        const count =
-          res.data?.total ??
-          res.data?.count ??
-          txns.length;
+        // Filter safely to the requested inclusive window
+        const filtered = raw.filter((t: any) => {
+          const d = normalizeISODate(t.date);
+          return d ? d >= fromISO && d <= toISO : false;
+        });
 
-        if (count > 0 && txns.length > 0) {
-          setDetail({ from: fromISO, to: toISO, items: txns });
+        if (filtered.length > 0) {
+          setDetail({ from: fromISO, to: toISO, items: filtered });
           return;
         }
       }
 
-      // Fallback: same-month helper endpoint if you have it
+      // Optional fallback: same-month helper if present
       if (fromISO.slice(0, 7) === toISO.slice(0, 7)) {
         const y = parseInt(fromISO.slice(0, 4), 10);
         const m = parseInt(fromISO.slice(5, 7), 10);
@@ -474,15 +512,19 @@ export default function RevenueAnalyticsDaily({
           const res = await api.get(`/api/detailed-transactions/${y}/${m}`, {
             params: { day: fromISO },
           });
-          const txns =
+          const raw =
             res.data?.transactions ??
             res.data?.items ??
             (Array.isArray(res.data) ? res.data : []);
-          if (txns.length > 0) {
-            setDetail({ from: fromISO, to: toISO, items: txns });
+          const filtered = raw.filter((t: any) => {
+            const d = normalizeISODate(t.date);
+            return d ? d >= fromISO && d <= toISO : false;
+          });
+          if (filtered.length > 0) {
+            setDetail({ from: fromISO, to: toISO, items: filtered });
             return;
           }
-        } catch { /* ignore */ }
+        } catch {}
       }
 
       setDetail({ from: fromISO, to: toISO, items: [] });
@@ -549,9 +591,9 @@ export default function RevenueAnalyticsDaily({
                   <XAxis
                     dataKey="day"
                     interval={xInterval}
-                    minTickGap={isMobile ? 2 : 0}
+                    minTickGap={2}
                     tick={{ fontSize: 12, fill: "#64748b" }}
-                    tickMargin={isMobile ? 4 : 8}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -595,7 +637,7 @@ export default function RevenueAnalyticsDaily({
                   name="SSP"
                   fill="#14b8a6"
                   radius={[4, 4, 0, 0]}
-                  maxBarSize={isMobile ? 16 : 24}
+                  maxBarSize={24}
                   onClick={(p: any) => (wide ? onClickMonthly(p?.payload) : onClickDaily(p?.payload))}
                   style={{ cursor: "pointer" }}
                 />
@@ -632,9 +674,9 @@ export default function RevenueAnalyticsDaily({
                   <XAxis
                     dataKey="day"
                     interval={xInterval}
-                    minTickGap={isMobile ? 2 : 0}
+                    minTickGap={2}
                     tick={{ fontSize: 12, fill: "#64748b" }}
-                    tickMargin={isMobile ? 4 : 8}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -678,7 +720,7 @@ export default function RevenueAnalyticsDaily({
                   name="USD"
                   fill="#0ea5e9"
                   radius={[4, 4, 0, 0]}
-                  maxBarSize={isMobile ? 16 : 24}
+                  maxBarSize={24}
                   onClick={(p: any) => (wide ? onClickMonthly(p?.payload) : onClickDaily(p?.payload))}
                   style={{ cursor: "pointer" }}
                 />
@@ -733,7 +775,7 @@ export default function RevenueAnalyticsDaily({
                       return String(v).slice(0, 10);
                     })()}
                   </td>
-                  <td className="py-2">{t.departmentName || "-"}</td>
+                  <td className="py-2">{displayDept(t)}</td>
                   <td className="py-2">{t.currency}</td>
                   <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
                   <td className="py-2">{t.type}</td>
