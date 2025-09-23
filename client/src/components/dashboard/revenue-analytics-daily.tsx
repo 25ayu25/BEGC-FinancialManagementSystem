@@ -51,7 +51,6 @@ function daysInMonth(year: number, month: number) {
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
-
 function computeWindow(
   range: TimeRange,
   year: number,
@@ -78,7 +77,6 @@ function computeWindow(
     const last = new Date(d.getFullYear(), d.getMonth(), 0);
     return { start: new Date(last.getFullYear(), last.getMonth(), 1), end: last };
   }
-  // current-month or month-select
   return { start: startOfMonth(year, month), end: endOfMonth(year, month) };
 }
 
@@ -91,46 +89,22 @@ function isWideRange(range: TimeRange, start?: Date, end?: Date) {
   return false;
 }
 
-/* ---- Robust date extraction: accepts many shapes & returns yyyy-mm-dd ---- */
+/* ---- Date parsing helpers: make sure every row finds a day/month ---- */
+
+const ISO_RE = /^(\d{4}-\d{2}-\d{2})/;
 
 function normalizeISODate(v: any): string | undefined {
-  if (!v && v !== 0) return undefined;
-
+  if (!v) return undefined;
   if (typeof v === "string") {
-    // 1) yyyy-mm-dd or yyyy-mm-ddThh:mm:ss...
-    const m1 = v.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (m1) return m1[1];
-
-    // 2) dd/mm/yyyy or dd-mm-yyyy
-    const m2 = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if (m2) {
-      const dd = m2[1].padStart(2, "0");
-      const mm = m2[2].padStart(2, "0");
-      const yy = m2[3];
-      return `${yy}-${mm}-${dd}`;
-    }
-
-    // 3) any other parsable string
-    const d = new Date(v);
-    if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
-    return undefined;
+    const m = v.match(ISO_RE);
+    if (m) return m[1];
   }
-
-  if (typeof v === "number") {
-    const d = new Date(v);
-    if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
-    return undefined;
-  }
-
-  if (v instanceof Date && !isNaN(v.getTime?.())) {
-    return format(v, "yyyy-MM-dd");
-  }
-
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
   return undefined;
 }
 
 function inferISOFromLabel(label: string, start: Date, end: Date): string | undefined {
-  // Try: "Sep 4", "Oct 12"
   const m = label?.match?.(/^([A-Za-z]{3,})\s+(\d{1,2})$/);
   if (!m) return undefined;
   const mon = m[1].toLowerCase();
@@ -152,6 +126,38 @@ function inferISOFromLabel(label: string, start: Date, end: Date): string | unde
   return undefined;
 }
 
+/** Try very hard to produce a 'YYYY-MM-DD' for a trends row */
+function extractISO(
+  row: any,
+  start: Date,
+  end: Date,
+  selectedYear: number,
+  selectedMonth: number,
+  forDailyView: boolean
+): string | undefined {
+  // 1) explicit dateISO or ISO-like strings
+  const d1 = normalizeISODate(row.dateISO) || normalizeISODate(row.date) || normalizeISODate(row.transactionDate);
+  if (d1) return d1;
+
+  // 2) label like "Sep 22"
+  if (typeof row.date === "string") {
+    const inferred = inferISOFromLabel(row.date, start, end);
+    if (inferred) return inferred;
+  }
+
+  // 3) explicit day number (use the selected month/year for daily view)
+  if (forDailyView && (row.day != null)) {
+    const day = Number(row.day);
+    if (Number.isFinite(day) && day >= 1 && day <= 31) {
+      return format(new Date(selectedYear, selectedMonth - 1, day), "yyyy-MM-dd");
+    }
+  }
+
+  return undefined;
+}
+
+/* --------------------- API --------------------- */
+
 async function fetchIncomeTrendsDaily(
   year: number,
   month: number,
@@ -167,101 +173,51 @@ async function fetchIncomeTrendsDaily(
   return Array.isArray(data) ? data : [];
 }
 
-/* -------- STRICT amounts parsing (income only) — robust to many field names -------- */
+/* -------- STRICT amounts parsing (income only) -------- */
+
 function parseAmountsStrict(row: any) {
-  // Charts & drilldown are income-only
-  const t = String(row.type ?? "").trim().toLowerCase();
-  if (t === "expense") return { ssp: 0, usd: 0 };
+  // charts & drilldown are income-only
+  if (String(row.type ?? "").trim().toLowerCase() === "expense") {
+    return { ssp: 0, usd: 0 };
+  }
+  const N = (v: any) => (v == null ? 0 : Number(v));
 
-  // number helper: accept numbers or "750,000.00" strings
-  const N = (v: any) => {
-    if (v == null || v === "") return 0;
-    if (typeof v === "string") return Number(v.replace(/,/g, ""));
-    return Number(v);
-  };
-
-  const pick = (o: any, keys: string[]) => {
-    for (const k of keys) {
-      const v = o?.[k];
-      if (v !== undefined && v !== null && v !== "") return N(v);
-    }
-    return 0;
-  };
-
-  // read declared currency if present
-  const declaredCurrency = String(
-    row.currency ?? row.curr ?? row.ccy ?? ""
-  )
-    .trim()
-    .toUpperCase();
-
-  // explicit USD & SSP fields (common variants)
-  const usdExplicit = pick(row, [
-    "incomeUSD",
-    "usd",
-    "amountUSD",
-    "totalUSD",
-    "insuranceUSD",
-    "revenueUSD",
-  ]);
-
-  const sspExplicit = pick(row, [
-    "incomeSSP",
-    "ssp",
-    "amountSSP",
-    "totalSSP",
-    "local",
-    "incomeLocal",
-    "revenueLocal",
-    "income",        // aggregated local/SSP total (your endpoint)
-  ]);
-
-  // If currency is declared on the row, trust it for the generic amount fields
-  if (declaredCurrency) {
-    const generic = pick(row, ["amount", "total", "value", "revenue", "income"]);
-    if (declaredCurrency.includes("USD")) {
-      return { ssp: sspExplicit, usd: usdExplicit || generic };
-    }
-    // treat any non-USD as SSP/local currency
-    return { ssp: sspExplicit || generic, usd: usdExplicit };
+  // If row declares a currency, use it exclusively
+  if (row.currency != null && String(row.currency).trim() !== "") {
+    const c = String(row.currency).trim().toUpperCase();
+    const amount = N(row.amount ?? row.income ?? row.value);
+    if (!amount) return { ssp: 0, usd: 0 };
+    return c.includes("USD") ? { ssp: 0, usd: amount } : { ssp: amount, usd: 0 };
   }
 
-  // No declared currency: use explicit per-currency fields.
-  // If neither explicit field exists, treat lone amount-like field as SSP (local) fallback.
-  if (usdExplicit || sspExplicit) return { ssp: sspExplicit, usd: usdExplicit };
+  // No currency: rely on explicit fields
+  const usd = N(row.incomeUSD ?? row.usd ?? 0);
+  const ssp = N(row.incomeSSP ?? row.ssp ?? 0);
 
-  const fallbackLocal = pick(row, ["amount", "total", "value", "revenue", "income"]);
-  return { ssp: fallbackLocal, usd: 0 };
+  // Fallback single number → treat as SSP only if neither explicit field present
+  const fallbackSSP = usd === 0 && ssp === 0 ? N(row.amount ?? row.income ?? row.value) : 0;
+
+  return { ssp: ssp || fallbackSSP, usd };
 }
 
-/* --------------------- Nice ticks for Y-axis --------------------- */
+/* --------- Axis ticks helpers --------- */
 function niceStep(roughStep: number) {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
-  let niceFrac: number;
-  if (frac <= 1)        niceFrac = 1;
-  else if (frac <= 2)   niceFrac = 2;
-  else if (frac <= 2.5) niceFrac = 2.5;
-  else if (frac <= 5)   niceFrac = 5;
-  else                  niceFrac = 10;
-  return niceFrac * base;
+  return (frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 2.5 ? 2.5 : frac <= 5 ? 5 : 10) * base;
 }
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
   const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
+  return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
 function buildTicksPreferred(dataMax: number, preferredMax: number) {
   if (dataMax <= preferredMax) {
     const step = preferredMax / 4;
-    return {
-      max: preferredMax,
-      ticks: [0, step, step * 2, step * 3, preferredMax],
-    };
+    return { max: preferredMax, ticks: [0, step, step * 2, step * 3, preferredMax] };
   }
   return buildNiceTicks(dataMax);
 }
@@ -304,7 +260,6 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
         ? format(new Date(year, month - 1, d), "MMM d, yyyy")
         : p.dateISO ?? "";
   } else {
-    // monthly
     const key = p.label as string | undefined; // "YYYY-MM"
     if (key && /^\d{4}-\d{2}$/.test(key)) {
       const [y, m] = key.split("-").map((x: string) => parseInt(x, 10));
@@ -347,10 +302,7 @@ function Modal({
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-          <button
-            className="text-slate-500 hover:text-slate-700 text-sm"
-            onClick={onClose}
-          >
+          <button className="text-slate-500 hover:text-slate-700 text-sm" onClick={onClose}>
             Close
           </button>
         </div>
@@ -358,14 +310,6 @@ function Modal({
       </div>
     </div>
   );
-}
-
-/* ----------------------- Drilldown helpers ----------------------- */
-
-function asUTCWindow(fromISO: string, toISO: string) {
-  const startDateTime = `${fromISO}T00:00:00.000Z`;
-  const endDateTime   = `${toISO}T23:59:59.999Z`;
-  return { startDateTime, endDateTime };
 }
 
 /* ------------------------------- Main ---------------------------- */
@@ -385,8 +329,7 @@ export default function RevenueAnalyticsDaily({
 
   const days = daysInMonth(year, month);
   const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
-
-  // Label density for daily mode
+  const chartHeight = isMobile ? 260 : 340;
   const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
 
@@ -410,63 +353,34 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------- Shape data for charts ------------------- */
 
-  // Daily arrays (one month)
   const sspDaily = baseDays.map((day) => ({ day, value: 0 }));
   const usdDaily = baseDays.map((day) => ({ day, value: 0 }));
 
-  // Monthly arrays (for wide ranges)
   const sspMonthlyMap = new Map<string, number>(); // key: "YYYY-MM"
   const usdMonthlyMap = new Map<string, number>();
 
   for (const r of raw as any[]) {
     const { ssp: incomeSSP, usd: incomeUSD } = parseAmountsStrict(r);
 
-    // Prefer explicit ISO if API provides it, otherwise infer from label within [start..end]
-    let iso: string | undefined =
-      (r as any).dateISO ||
-      normalizeISODate((r as any).date) ||
-      normalizeISODate((r as any).createdAt) ||
-      normalizeISODate((r as any).updatedAt);
-
-    if (!iso && typeof r.date === "string" && start && end) {
-      iso = inferISOFromLabel(r.date, start, end);
-    }
+    // Get the date for this row as ISO (very robust)
+    const iso = extractISO(r, start, end, year, month, !wide);
 
     if (!wide) {
-      // daily mode: only the current (selected) month should be plotted
-      if (String(r.type ?? "").toLowerCase() === "expense") continue; // guard
+      // daily mode: only the current (selected) month should be charted
+      if (!iso) continue;
+      const dt = new Date(iso + "T00:00:00");
+      const y = dt.getFullYear();
+      const m = dt.getMonth() + 1;
+      if (y !== year || m !== month) continue;
+      const d = dt.getDate();
 
-      let d: number | undefined;
-      if (iso) {
-        const dt = new Date(iso + "T00:00:00");
-        const y = dt.getFullYear();
-        const m = dt.getMonth() + 1;
-        if (y !== year || m !== month) continue; // skip other months
-        d = dt.getDate();
-      } else if ((r as any).day) {
-        d = Number((r as any).day);
-      } else if (typeof r.date === "string") {
-        const mm = r.date.match(/^\D+\s+(\d{1,2})$/);
-        if (mm) d = parseInt(mm[1], 10);
-      }
-
-      if (typeof d === "number" && d >= 1 && d <= days) {
-        sspDaily[d - 1].value += incomeSSP; // SSP income only
-        usdDaily[d - 1].value += incomeUSD; // USD income only
-      }
+      // add income only
+      if (incomeSSP) sspDaily[d - 1].value += incomeSSP;
+      if (incomeUSD) usdDaily[d - 1].value += incomeUSD;
     } else {
-      // monthly mode: group everything in [start..end] by YYYY-MM
-      if (String(r.type ?? "").toLowerCase() === "expense") continue;
-
-      let key: string | undefined;
-      if (iso) {
-        key = iso.slice(0, 7); // YYYY-MM
-      } else if (typeof r.date === "string" && start && end) {
-        const ii = inferISOFromLabel(r.date, start, end);
-        if (ii) key = ii.slice(0, 7);
-      }
-      if (!key) continue;
-
+      // monthly mode: group everything in [start..end] by YYYY-MM (income only)
+      if (!iso) continue;
+      const key = iso.slice(0, 7); // YYYY-MM
       sspMonthlyMap.set(key, (sspMonthlyMap.get(key) ?? 0) + incomeSSP);
       usdMonthlyMap.set(key, (usdMonthlyMap.get(key) ?? 0) + incomeUSD);
     }
@@ -498,17 +412,10 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------- Axis scaling & header -------------------- */
 
-  const dataMaxSSP = Math.max(
-    0,
-    ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value))
-  );
-  const dataMaxUSD = Math.max(
-    0,
-    ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value))
-  );
-
-  const preferredSSPMax = 6_000_000; // default ceiling
-  const preferredUSDMax = 1_500;     // default ceiling
+  const dataMaxSSP = Math.max(0, ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value)));
+  const dataMaxUSD = Math.max(0, ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value)));
+  const preferredSSPMax = 6_000_000;
+  const preferredUSDMax = 1_500;
   const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
   const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
 
@@ -524,6 +431,7 @@ export default function RevenueAnalyticsDaily({
     items: [],
   });
 
+  // Department name fallback map for transactions
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
@@ -532,7 +440,6 @@ export default function RevenueAnalyticsDaily({
     },
     enabled: open,
   });
-
   const deptMap = useMemo(() => {
     const m = new Map<string | number, string>();
     (departments ?? []).forEach((d: any) => {
@@ -568,12 +475,13 @@ export default function RevenueAnalyticsDaily({
     return name.includes("insurance");
   }
 
-  // Robust fetch + filter to the specific drill currency and INCOME only
+  // fetch & filter to the specific drill currency (income only). For USD we keep Insurance only.
   async function loadTransactionsByRange(fromISO: string, toISO: string, currency: DrillCurrency) {
     setOpen(true);
     setLoadingDetail(true);
     try {
-      const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
+      const startDateTime = `${fromISO}T00:00:00.000Z`;
+      const endDateTime   = `${toISO}T23:59:59.999Z`;
 
       const attempts: Array<Record<string, string | number>> = [
         { page: 1, pageSize: 1000, startDate: fromISO, endDate: toISO },
@@ -581,9 +489,10 @@ export default function RevenueAnalyticsDaily({
         { page: 1, pageSize: 1000, start: fromISO, end: toISO },
         { page: 1, pageSize: 1000, startDateTime, endDateTime },
         { page: 1, pageSize: 1000, date: fromISO },
-        { page: 1, pageSize: 1000 }, // last resort: fetch page and filter client-side
+        { page: 1, pageSize: 1000 },
       ];
 
+      let best: any[] = [];
       for (const params of attempts) {
         const res = await api.get("/api/transactions", { params });
         const raw =
@@ -591,41 +500,37 @@ export default function RevenueAnalyticsDaily({
           res.data?.items ??
           (Array.isArray(res.data) ? res.data : []);
 
-        // date-window filter (inclusive)
-        const inWindow = raw.filter((t: any) => {
+        // date window (inclusive)
+        let items = raw.filter((t: any) => {
           const d = normalizeISODate(t.date);
           return d ? d >= fromISO && d <= toISO : false;
         });
 
-        // income-only, currency-specific
-        let filtered = inWindow.filter((t: any) => isIncome(t) && (currency === "USD" ? isUSD(t) : !isUSD(t)));
+        // income-only & currency specific
+        items = items.filter((t: any) => isIncome(t) && (currency === "USD" ? isUSD(t) : !isUSD(t)));
 
-        // If USD: prefer just Insurance rows when they exist
+        // USD strictly Insurance
         if (currency === "USD") {
-          const insuranceOnly = filtered.filter(isInsurance);
-          if (insuranceOnly.length > 0) filtered = insuranceOnly;
+          items = items.filter(isInsurance);
         }
 
-        // (Optional) de-dupe by id|date|amount|deptId
-        const uniq = new Map<string, any>();
-        for (const t of filtered) {
-          const key = [
-            t.id ?? "",
-            normalizeISODate(t.date) ?? "",
-            String(t.amount ?? ""),
-            t.departmentId ?? t.department?.id ?? displayDept(t) ?? ""
-          ].join("|");
-          if (!uniq.has(key)) uniq.set(key, t);
-        }
-        const result = Array.from(uniq.values());
-
-        if (result.length > 0) {
-          setDetail({ from: fromISO, to: toISO, currency, items: result });
-          return; // only exit when we actually found rows
-        }
+        // keep the first param shape that yields results
+        if (items.length > 0) { best = items; break; }
       }
 
-      setDetail({ from: fromISO, to: toISO, currency, items: [] });
+      // de-dupe
+      const uniq = new Map<string, any>();
+      for (const t of best) {
+        const key = [
+          t.id ?? "",
+          normalizeISODate(t.date) ?? "",
+          String(t.amount ?? ""),
+          t.departmentId ?? t.department?.id ?? displayDept(t) ?? ""
+        ].join("|");
+        if (!uniq.has(key)) uniq.set(key, t);
+      }
+
+      setDetail({ from: fromISO, to: toISO, currency, items: Array.from(uniq.values()) });
     } finally {
       setLoadingDetail(false);
     }
@@ -638,14 +543,12 @@ export default function RevenueAnalyticsDaily({
     const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
     loadTransactionsByRange(iso, iso, "SSP");
   };
-
   const onClickDailyUSD = (payload: any) => {
     const d = payload?.day as number | undefined;
     if (!d) return;
     const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
     loadTransactionsByRange(iso, iso, "USD");
   };
-
   const onClickMonthlySSP = (payload: any) => {
     const key = payload?.label as string | undefined; // YYYY-MM
     if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
@@ -654,7 +557,6 @@ export default function RevenueAnalyticsDaily({
     const last = format(new Date(y, m, 0), "yyyy-MM-dd");
     loadTransactionsByRange(first, last, "SSP");
   };
-
   const onClickMonthlyUSD = (payload: any) => {
     const key = payload?.label as string | undefined; // YYYY-MM
     if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
@@ -673,11 +575,8 @@ export default function RevenueAnalyticsDaily({
           Revenue Analytics
         </CardTitle>
         <div className="mt-1 text-sm text-slate-600">
-          {headerLabel} · SSP {nf0.format(
-            (!wide ? sspDaily : sspMonthly).reduce((s, r) => s + (r.value || 0), 0)
-          )} · USD {nf0.format(
-            (!wide ? usdDaily : usdMonthly).reduce((s, r) => s + (r.value || 0), 0)
-          )}
+          {headerLabel} · SSP {nf0.format((!wide ? sspDaily : sspMonthly).reduce((s, r) => s + (r.value || 0), 0))}
+          {" · "}USD {nf0.format((!wide ? usdDaily : usdMonthly).reduce((s, r) => s + (r.value || 0), 0))}
         </div>
       </CardHeader>
 
@@ -692,7 +591,7 @@ export default function RevenueAnalyticsDaily({
               </span>
             ) : null}
           </div>
-          <div className="rounded-lg border border-slate-200" style={{ height: isMobile ? 260 : 340 }}>
+          <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={wide ? sspMonthly : sspDaily}
@@ -769,7 +668,7 @@ export default function RevenueAnalyticsDaily({
               </span>
             ) : null}
           </div>
-          <div className="rounded-lg border border-slate-200" style={{ height: isMobile ? 260 : 340 }}>
+          <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={wide ? usdMonthly : usdDaily}
