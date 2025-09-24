@@ -538,9 +538,10 @@ export default function AdvancedDashboard() {
       </div>
 
       {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
+      {/* NOTE: stretch items + auto rows = equal height first row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 lg:items-stretch lg:[grid-auto-rows:1fr]">
         {/* Revenue Analytics (REPLACED with the new daily split charts) */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 h-full [&>*]:h-full">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
             selectedYear={selectedYear}
@@ -550,8 +551,8 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Departments Panel */}
-        <div className="lg:col-span-1">
+        {/* Departments Panel (sticky on desktop) */}
+        <div className="lg:col-span-1 h-full lg:sticky lg:top-24 [&>*]:h-full">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
