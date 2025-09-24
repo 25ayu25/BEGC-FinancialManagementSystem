@@ -35,7 +35,7 @@ type Props = {
 
 /* ------------------------ Number Formatters ---------------------- */
 
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }); // "750,000"
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -222,8 +222,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
   }
 
   const value = Number(p.value ?? 0);
-  const formatValue =
-    currency === "USD" ? nf0.format(Math.round(value)) : compact.format(Math.round(value));
+  const formatValue = nf0.format(Math.round(value));
 
   return (
     <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[180px]">
@@ -333,7 +332,7 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------- Shape data for charts ------------------- */
 
-  // Daily arrays (one month)
+  // Daily arrays (one month) — ensure there is a record for **every day**
   const sspDaily = baseDays.map((day) => ({ day, value: 0 }));
   const usdDaily = baseDays.map((day) => ({ day, value: 0 }));
 
@@ -342,7 +341,8 @@ export default function RevenueAnalyticsDaily({
   const usdMonthlyMap = new Map<string, number>();
 
   for (const r of raw as any[]) {
-    const incomeSSP = Number(r.incomeSSP ?? r.income ?? r.amount ?? 0);
+    // IMPORTANT: only consider **income**, separated by currency
+    const incomeSSP = Number(r.incomeSSP ?? 0);
     const incomeUSD = Number(r.incomeUSD ?? 0);
 
     // Prefer explicit ISO if API provides it, otherwise infer from label within [start..end]
@@ -363,12 +363,12 @@ export default function RevenueAnalyticsDaily({
       } else if ((r as any).day) {
         d = Number((r as any).day);
       } else if (typeof r.date === "string") {
-        // fallback: parse "Sep 4" to a day number (still month-ambiguous, but filtered above)
         const mm = r.date.match(/^\D+\s+(\d{1,2})$/);
         if (mm) d = parseInt(mm[1], 10);
       }
 
       if (typeof d === "number" && d >= 1 && d <= days) {
+        // Only accumulate **income**; SSP goes to SSP chart, USD goes to USD chart
         sspDaily[d - 1].value += incomeSSP;
         usdDaily[d - 1].value += incomeUSD;
       }
@@ -436,11 +436,11 @@ export default function RevenueAnalyticsDaily({
 
   const [open, setOpen] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detail, setDetail] = useState<{ from?: string; to?: string; items: any[] }>({
+  const [detail, setDetail] = useState<{ from?: string; to?: string; items: any[]; currency?: "SSP"|"USD" }>({
     items: [],
   });
 
-  // Fetch departments only when modal opens (for id→name fallback)
+  // When modal opens, fetch departments once (fallback for id→name)
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
@@ -470,19 +470,19 @@ export default function RevenueAnalyticsDaily({
     );
   }
 
-  // Robust fetch that tries common param names; then client-filters to [from..to]
-  async function loadTransactionsByRange(fromISO: string, toISO: string) {
+  // Robust fetch: request + client-filter to the exact day/month AND to desired currency + income only
+  async function loadTransactionsByRange(fromISO: string, toISO: string, currency: "SSP" | "USD") {
     setOpen(true);
     setLoadingDetail(true);
     try {
       const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
 
       const attempts: Array<Record<string, string | number>> = [
-        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO }, // most likely
-        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO },   // alt names
-        { page: 1, pageSize: 200, start: fromISO, end: toISO },         // alt names
-        { page: 1, pageSize: 200, startDateTime, endDateTime },         // full UTC window
-        { page: 1, pageSize: 200, date: fromISO },                      // single date
+        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO, currency, type: "income" },
+        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO, currency, type: "income" },
+        { page: 1, pageSize: 200, start: fromISO, end: toISO, currency, type: "income" },
+        { page: 1, pageSize: 200, startDateTime, endDateTime, currency, type: "income" },
+        { page: 1, pageSize: 200, date: fromISO, currency, type: "income" },
       ];
 
       for (const params of attempts) {
@@ -492,25 +492,26 @@ export default function RevenueAnalyticsDaily({
           res.data?.items ??
           (Array.isArray(res.data) ? res.data : []);
 
-        // Filter safely to the requested inclusive window
         const filtered = raw.filter((t: any) => {
           const d = normalizeISODate(t.date);
-          return d ? d >= fromISO && d <= toISO : false;
+          const c = (t.currency || "").toUpperCase();
+          const ty = (t.type || "").toLowerCase();
+          return d ? d >= fromISO && d <= toISO && c === currency && ty === "income" : false;
         });
 
         if (filtered.length > 0) {
-          setDetail({ from: fromISO, to: toISO, items: filtered });
+          setDetail({ from: fromISO, to: toISO, items: filtered, currency });
           return;
         }
       }
 
-      // Optional fallback: same-month helper if present
+      // Optional fallback endpoint if you have it:
       if (fromISO.slice(0, 7) === toISO.slice(0, 7)) {
         const y = parseInt(fromISO.slice(0, 4), 10);
         const m = parseInt(fromISO.slice(5, 7), 10);
         try {
           const res = await api.get(`/api/detailed-transactions/${y}/${m}`, {
-            params: { day: fromISO },
+            params: { day: fromISO, currency, type: "income" },
           });
           const raw =
             res.data?.transactions ??
@@ -518,35 +519,53 @@ export default function RevenueAnalyticsDaily({
             (Array.isArray(res.data) ? res.data : []);
           const filtered = raw.filter((t: any) => {
             const d = normalizeISODate(t.date);
-            return d ? d >= fromISO && d <= toISO : false;
+            const c = (t.currency || "").toUpperCase();
+            const ty = (t.type || "").toLowerCase();
+            return d ? d >= fromISO && d <= toISO && c === currency && ty === "income" : false;
           });
           if (filtered.length > 0) {
-            setDetail({ from: fromISO, to: toISO, items: filtered });
+            setDetail({ from: fromISO, to: toISO, items: filtered, currency });
             return;
           }
         } catch {}
       }
 
-      setDetail({ from: fromISO, to: toISO, items: [] });
+      setDetail({ from: fromISO, to: toISO, items: [], currency });
     } finally {
       setLoadingDetail(false);
     }
   }
 
-  const onClickDaily = (payload: any) => {
+  const onClickDailySSP = (payload: any) => {
     const d = payload?.day as number | undefined;
     if (!d) return;
     const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
-    loadTransactionsByRange(iso, iso);
+    loadTransactionsByRange(iso, iso, "SSP");
   };
 
-  const onClickMonthly = (payload: any) => {
+  const onClickDailyUSD = (payload: any) => {
+    const d = payload?.day as number | undefined;
+    if (!d) return;
+    const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
+    loadTransactionsByRange(iso, iso, "USD");
+  };
+
+  const onClickMonthlySSP = (payload: any) => {
     const key = payload?.label as string | undefined; // YYYY-MM
     if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
     const [y, m] = key.split("-").map((n: string) => parseInt(n, 10));
     const first = format(new Date(y, m - 1, 1), "yyyy-MM-dd");
     const last = format(new Date(y, m, 0), "yyyy-MM-dd");
-    loadTransactionsByRange(first, last);
+    loadTransactionsByRange(first, last, "SSP");
+  };
+
+  const onClickMonthlyUSD = (payload: any) => {
+    const key = payload?.label as string | undefined; // YYYY-MM
+    if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
+    const [y, m] = key.split("-").map((n: string) => parseInt(n, 10));
+    const first = format(new Date(y, m - 1, 1), "yyyy-MM-dd");
+    const last = format(new Date(y, m, 0), "yyyy-MM-dd");
+    loadTransactionsByRange(first, last, "USD");
   };
 
   /* ------------------------------- UI ---------------------------- */
@@ -617,7 +636,7 @@ export default function RevenueAnalyticsDaily({
                   domain={[0, yMaxSSP]}
                   ticks={ticksSSP}
                   tick={{ fontSize: 12, fill: "#64748b" }}
-                  tickFormatter={(v) => compact.format(v as number)}
+                  tickFormatter={(v) => nf0.format(v as number)}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -638,7 +657,7 @@ export default function RevenueAnalyticsDaily({
                   fill="#14b8a6"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={24}
-                  onClick={(p: any) => (wide ? onClickMonthly(p?.payload) : onClickDaily(p?.payload))}
+                  onClick={(p: any) => (wide ? onClickMonthlySSP(p?.payload) : onClickDailySSP(p?.payload))}
                   style={{ cursor: "pointer" }}
                 />
               </BarChart>
@@ -721,7 +740,7 @@ export default function RevenueAnalyticsDaily({
                   fill="#0ea5e9"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={24}
-                  onClick={(p: any) => (wide ? onClickMonthly(p?.payload) : onClickDaily(p?.payload))}
+                  onClick={(p: any) => (wide ? onClickMonthlyUSD(p?.payload) : onClickDailyUSD(p?.payload))}
                   style={{ cursor: "pointer" }}
                 />
               </BarChart>
@@ -743,8 +762,8 @@ export default function RevenueAnalyticsDaily({
         title={
           detail.from && detail.to
             ? detail.from === detail.to
-              ? `Transactions · ${detail.from}`
-              : `Transactions · ${detail.from} → ${detail.to}`
+              ? `Transactions · ${detail.from} · ${detail.currency ?? ""}`
+              : `Transactions · ${detail.from} → ${detail.to} · ${detail.currency ?? ""}`
             : "Transactions"
         }
       >
@@ -761,7 +780,7 @@ export default function RevenueAnalyticsDaily({
                 <th className="py-2">Currency</th>
                 <th className="py-2">Amount</th>
                 <th className="py-2">Type</th>
-                <th className="py-2">Note</th>
+                {/* Note column removed */}
               </tr>
             </thead>
             <tbody>
@@ -771,15 +790,13 @@ export default function RevenueAnalyticsDaily({
                     {(() => {
                       const v = t.date;
                       if (!v) return "-";
-                      // normalize "2025-09-22T00:00:00.000Z" → "2025-09-22"
-                      return String(v).slice(0, 10);
+                      return String(v).slice(0, 10); // "YYYY-MM-DD"
                     })()}
                   </td>
                   <td className="py-2">{displayDept(t)}</td>
                   <td className="py-2">{t.currency}</td>
-                  <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
+                  <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
                   <td className="py-2">{t.type}</td>
-                  <td className="py-2">{t.description || "-"}</td>
                 </tr>
               ))}
             </tbody>
