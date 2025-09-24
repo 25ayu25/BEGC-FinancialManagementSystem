@@ -6,6 +6,39 @@ import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 
 // Extend Express Request type to include user
+
+// ---- helpers for date & aggregation (PATCH) ----
+function ymd(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+function denseDays(start: Date, end: Date): string[] {
+  const out: string[] = [];
+  const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+  while (d <= last) {
+    out.push(ymd(d));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+function coerceYMD(x?: any): string | null {
+  if (x == null || String(x) === "undefined") return null;
+  const s = String(x);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+  const dt = new Date(s);
+  return isNaN(dt.getTime()) ? null : ymd(dt);
+}
+function pickTxDate(t: any): string | undefined {
+  const v = (t as any)?.date ?? (t as any)?.transactionDate ?? (t as any)?.txnDate ?? (t as any)?.createdAt ?? (t as any)?.postedAt;
+  if (!v) return undefined;
+  if (typeof v === "string") {
+    const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : ymd(d);
+}
 declare global {
   namespace Express {
     interface Request {
@@ -511,44 +544,56 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Transactions
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
-      // Parse pagination parameters
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50; // Default 50 per page
-      const offset = (page - 1) * limit;
+      
+// --- replace inside GET /api/transactions (PATCH) ---
+const page = parseInt((req.query.page as string) || "1", 10);
+const limit =
+  parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10);
+const offset = (page - 1) * limit;
 
-      // Parse date range (only filter if dates are explicitly provided)
-      let startDate = null;
-      let endDate = null;
-      
-      // Use provided dates if they exist
-      if (req.query.startDate && req.query.startDate !== 'undefined') {
-        startDate = new Date(req.query.startDate as string);
-      }
-      if (req.query.endDate && req.query.endDate !== 'undefined') {
-        endDate = new Date(req.query.endDate as string);
-      }
-      
-      if (startDate && endDate) {
-        console.log('Date filtering - Start:', startDate.toISOString().split('T')[0], 'End:', endDate.toISOString().split('T')[0]);
-      } else {
-        console.log('No date filtering applied - showing all transactions');
-      }
+// Normalize date params (support many names)
+const s = coerceYMD(req.query.startDate || req.query.fromDate || req.query.start || req.query.start_date || req.query.dateFrom || req.query.date);
+const e = coerceYMD(req.query.endDate   || req.query.toDate   || req.query.end   || req.query.end_date   || req.query.dateTo   || req.query.date);
 
-      const filters: any = {
-        limit,
-        offset
-      };
-      
-      // Only add date filters if they're explicitly provided
-      if (startDate) filters.startDate = startDate;
-      if (endDate) filters.endDate = endDate;
-      
-      if (req.query.departmentId) filters.departmentId = req.query.departmentId as string;
-      if (req.query.type) filters.type = req.query.type as string;
-      if (req.query.insuranceProviderId) filters.insuranceProviderId = req.query.insuranceProviderId as string;
-      if (req.query.searchQuery) filters.searchQuery = req.query.searchQuery as string;
+let startDate: Date | null = null;
+let endDate: Date | null = null;
+if (s) startDate = new Date(s + "T00:00:00.000Z");        // inclusive start
+if (e) endDate   = new Date(e + "T23:59:59.999Z");        // inclusive end
 
-      const result = await storage.getTransactionsPaginated(filters);
+const filters: any = { limit, offset };
+if (startDate) filters.startDate = startDate;
+if (endDate)   filters.endDate   = endDate;
+
+if (req.query.departmentId)       filters.departmentId       = String(req.query.departmentId);
+if (req.query.insuranceProviderId)filters.insuranceProviderId= String(req.query.insuranceProviderId);
+if (req.query.searchQuery)        filters.searchQuery        = String(req.query.searchQuery);
+
+// NOTE: your storage layer may ignore currency/type; we still pass them AND post-filter later
+const wantCurrency = (req.query.currency ? String(req.query.currency).toUpperCase() : "");
+const wantType     = (req.query.type ? String(req.query.type).toLowerCase() : "");
+
+// fetch
+const result = await storage.getTransactionsPaginated(filters);
+
+// post-filter if client asked for currency/type
+const rows =
+  (result?.transactions ?? result?.items ?? (Array.isArray(result) ? result : []))
+  .filter((t: any) => {
+    const okCcy  = !wantCurrency || String(t.currency || "").toUpperCase() === wantCurrency;
+    const ty     = String(t.type || "").toLowerCase();
+    const okType = !wantType || ty === wantType || (wantType === "income" && (ty === "credit" || ty === "revenue"));
+    // keep only the requested date window if we set one
+    if (startDate || endDate) {
+      const d = pickTxDate(t);
+      if (!d) return false;
+      if (s && d < s) return false;
+      if (e && d > e) return false;
+    }
+    return okCcy && okType;
+  });
+
+res.json({ total: rows.length, transactions: rows });
+
       res.json(result);
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -637,45 +682,90 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/dashboard", requireAuth, async (req, res) => {
     try {
       const year  = Number(req.query.year)  || new Date().getUTCFullYear();
-      const month = Number(req.query.month) || (new Date().getUTCMonth() + 1);
-      const range = (req.query.range as string) || "current-month";
-      // When range === "custom", these will be passed to storage.getDashboardData
-      const startDate = req.query.startDate as string | undefined;
-      const endDate   = req.query.endDate as string | undefined;
+      const mont
+// Income trends rebuilt from raw transactions: INCOME-ONLY, split by SSP/USD, dense days (PATCH)
+app.get("/api/income-trends/:year/:month", requireAuth, async (req, res) => {
+  try {
+    const year = parseInt(req.params.year, 10);
+    const month = parseInt(req.params.month, 10);
+    const range = String(req.query.range || "current-month");
 
-      const data = await storage.getDashboardData({ year, month, range, startDate, endDate });
-      // absolutely no caching for dashboard responses
-      res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-      res.json(data);
-    } catch (err) {
-      console.error("[dashboard-error]", err);
-      res.status(500).json({ error: "Failed to load dashboard" });
+    // resolve concrete window
+    let start = new Date(Date.UTC(year, month - 1, 1));
+    let end   = new Date(Date.UTC(year, month, 0));
+
+    if (range === "last-3-months") {
+      end   = new Date(Date.UTC(year, month, 0));
+      start = new Date(Date.UTC(year, month - 3, 1));
+    } else if (range === "year") {
+      start = new Date(Date.UTC(year, 0, 1));
+      end   = new Date(Date.UTC(year, 11, 31));
+    } else if (range === "custom") {
+      const s = coerceYMD(req.query.startDate);
+      const e = coerceYMD(req.query.endDate);
+      if (s && e) {
+        start = new Date(s + "T00:00:00.000Z");
+        end   = new Date(e + "T23:59:59.999Z");
+      }
     }
-  });
 
-  // Income trends data
-  app.get("/api/income-trends", requireAuth, async (req, res) => {
-    try {
-      const days = parseInt(req.query.days as string) || 7;
-      const data = await storage.getIncomeTrends(days);
-      res.json(data);
-    } catch (error) {
-      console.error("Error fetching income trends:", error);
-      res.status(500).json({ error: "Failed to fetch income trends" });
+    // fetch month chunks via your existing storage API
+    const txs: any[] = [];
+    const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+    while (cursor <= end) {
+      const y = cursor.getUTCFullYear();
+      const m = cursor.getUTCMonth() + 1;
+      const monthData = await storage.getDetailedTransactionsForMonth(y, m);
+      const arr = Array.isArray(monthData?.transactions) ? monthData.transactions
+                : Array.isArray(monthData?.items)       ? monthData.items
+                : Array.isArray(monthData)              ? monthData
+                : [];
+      txs.push(...arr);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     }
-  });
 
-  app.get("/api/income-trends/:year/:month", requireAuth, async (req, res) => {
-    try {
-      const year = parseInt(req.params.year);
-      const month = parseInt(req.params.month);
-      const range = req.query.range as string;
-      const startDateStr = req.query.startDate as string;
-      const endDateStr = req.query.endDate as string;
+    // filter txs to window + type=income
+    const startISO = ymd(start);
+    const endISO   = ymd(end);
+    const filtered = txs.filter((t) => {
+      const d = pickTxDate(t);
+      const ty = String((t as any)?.type || "").toLowerCase();
+      const isIncome = ty === "income" || ty === "credit" || ty === "revenue";
+      return d ? (d >= startISO && d <= endISO && isIncome) : false;
+    });
 
-      let data;
-      
-      if (range === 'custom' && startDateStr && endDateStr) {
+    // aggregate per day and currency
+    const days = denseDays(start, end);
+    const map = new Map<string, { ssp: number; usd: number }>();
+    days.forEach((d) => map.set(d, { ssp: 0, usd: 0 }));
+
+    for (const t of filtered) {
+      const d = pickTxDate(t);
+      if (!d) continue;
+      const bucket = map.get(d);
+      if (!bucket) continue;
+      const amt = Number((t as any).amount || 0);
+      const ccy = String((t as any).currency || "").toUpperCase();
+      if (ccy === "SSP") bucket.ssp += amt;
+      if (ccy === "USD") bucket.usd += amt;
+    }
+
+    // response: dense series the client expects
+    const out = days.map((d) => ({
+      dateISO: d,
+      incomeSSP: map.get(d)!.ssp,
+      incomeUSD: map.get(d)!.usd,
+    }));
+
+    // never cache; this feeds the dashboard
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.json(out);
+  } catch (error) {
+    console.error("Error building income trends:", error);
+    res.status(500).json({ error: "Failed to fetch income trends" });
+  }
+});
+ endDateStr) {
         const startDate = new Date(startDateStr);
         const endDate = new Date(endDateStr);
         data = await storage.getIncomeTrendsForDateRange(startDate, endDate);
