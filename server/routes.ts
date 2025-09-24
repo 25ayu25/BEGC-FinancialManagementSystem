@@ -594,7 +594,7 @@ const rows =
 
 res.json({ total: rows.length, transactions: rows });
 
-      res.json(result);
+      
     } catch (error) {
       console.error("Error fetching transactions:", error);
       res.status(500).json({ error: "Failed to fetch transactions" });
