@@ -35,7 +35,7 @@ type Props = {
 
 /* ------------------------ Number Formatters ---------------------- */
 
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }); // "750,000"
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -242,7 +242,6 @@ function Modal({
 
 /* ----------------------- Drilldown helpers ----------------------- */
 
-// pull the date from any common field and normalize to "YYYY-MM-DD"
 function normalizeTxDate(t: any): string | undefined {
   const src =
     t?.date ??
@@ -255,7 +254,7 @@ function normalizeTxDate(t: any): string | undefined {
   if (typeof src === "string") {
     const iso = src.match(/^(\d{4}-\d{2}-\d{2})/);
     if (iso) return iso[1];
-    const md = src.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); // "9/10/2025"
+    const md = src.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (md) {
       const y = parseInt(md[3], 10);
       const m = parseInt(md[1], 10) - 1;
@@ -310,9 +309,51 @@ export default function RevenueAnalyticsDaily({
     queryFn: () => fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
+  /* ------------------------ reference data ----------------------- */
+
+  // Departments (for SSP rows)
+  const { data: departments } = useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const res = await api.get("/api/departments", { params: { page: 1, pageSize: 1000 } });
+      return res.data?.departments ?? res.data ?? [];
+    },
+    enabled: true,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const deptMap = useMemo(() => {
+    const m = new Map<string | number, string>();
+    (departments ?? []).forEach((d: any) => {
+      m.set(d.id, d.name);
+      m.set(String(d.id), d.name);
+    });
+    return m;
+  }, [departments]);
+
+  // Insurance providers (for USD rows)
+  const { data: providers } = useQuery({
+    queryKey: ["insurance-providers"],
+    queryFn: async () => {
+      const res = await api.get("/api/insurance-providers");
+      return res.data?.providers ?? res.data ?? [];
+    },
+    enabled: true,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const providerMap = useMemo(() => {
+    const m = new Map<string | number, string>();
+    (providers ?? []).forEach((p: any) => {
+      m.set(p.id, p.name);
+      m.set(String(p.id), p.name);
+    });
+    return m;
+  }, [providers]);
+
   /* ------------------- Shape data for charts ------------------- */
 
-  // daily arrays: have an entry for **every** day
+  // daily arrays: ensure an entry for **every** day
   const sspDaily = baseDays.map((day) => ({ day, value: 0 }));
   const usdDaily = baseDays.map((day) => ({ day, value: 0 }));
 
@@ -395,36 +436,30 @@ export default function RevenueAnalyticsDaily({
     items: [],
   });
 
-  const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: async () => {
-      const res = await api.get("/api/departments", { params: { page: 1, pageSize: 1000 } });
-      return res.data?.departments ?? res.data ?? [];
-    },
-    enabled: open,
-  });
+  // Prefer department for SSP, provider for USD; fallbacks included.
+  function displaySource(t: any) {
+    const currency = String(t.currency || "").toUpperCase();
 
-  const deptMap = useMemo(() => {
-    const m = new Map<string | number, string>();
-    (departments ?? []).forEach((d: any) => {
-      m.set(d.id, d.name);
-      m.set(String(d.id), d.name);
-    });
-    return m;
-  }, [departments]);
-
-  function displayDept(t: any) {
-    return (
+    const dept =
       t.departmentName ??
       t.department_name ??
       t.department?.name ??
       deptMap.get(t.departmentId) ??
-      deptMap.get(t.department_id) ??
-      "-"
-    );
+      deptMap.get(t.department_id);
+
+    const provider =
+      t.insuranceProviderName ??                 // from API join
+      t.insurance_provider_name ??               // alt snake_case
+      t.insuranceProvider?.name ??               // nested shape
+      providerMap.get(t.insuranceProviderId) ??  // fallback by id
+      providerMap.get(t.insurance_provider_id) ?? // alt id key
+      undefined;
+
+    // USD = insurance revenue ⇒ show provider; SSP ⇒ show department.
+    if (currency === "USD") return provider ?? "-";
+    return dept ?? provider ?? "-";
   }
 
-  // request by date only; enforce currency+type locally so "most days" always work
   async function loadTransactionsByRange(fromISO: string, toISO: string, currency: "SSP" | "USD") {
     setOpen(true);
     setLoadingDetail(true);
@@ -453,7 +488,6 @@ export default function RevenueAnalyticsDaily({
           const d = normalizeTxDate(t);
           const c = (t.currency || "").toUpperCase();
           const ty = (t.type || "").toLowerCase();
-          // allow common synonyms for income
           const isIncome = ty === "income" || ty === "credit" || ty === "revenue";
           return d ? d >= fromISO && d <= toISO && c === currency && isIncome : false;
         });
@@ -707,7 +741,7 @@ export default function RevenueAnalyticsDaily({
             <thead>
               <tr className="text-left text-slate-500">
                 <th className="py-2">Date</th>
-                <th className="py-2">Dept</th>
+                <th className="py-2">Dept / Provider</th>
                 <th className="py-2">Currency</th>
                 <th className="py-2">Amount</th>
                 <th className="py-2">Type</th>
@@ -716,8 +750,10 @@ export default function RevenueAnalyticsDaily({
             <tbody>
               {detail.items.map((t: any) => (
                 <tr key={t.id} className="border-t border-slate-100">
-                  <td className="py-2">{String((t.date ?? t.transactionDate ?? t.createdAt ?? t.postedAt) ?? "").slice(0, 10)}</td>
-                  <td className="py-2">{displayDept(t)}</td>
+                  <td className="py-2">
+                    {String((t.date ?? t.transactionDate ?? t.createdAt ?? t.postedAt) ?? "").slice(0, 10)}
+                  </td>
+                  <td className="py-2">{displaySource(t)}</td>
                   <td className="py-2">{t.currency}</td>
                   <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
                   <td className="py-2">{t.type}</td>
