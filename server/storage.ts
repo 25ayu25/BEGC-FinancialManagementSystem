@@ -116,7 +116,9 @@ export interface IStorage {
       limit?: number;
       offset?: number;
     }
-  ): Promise<Transaction[]>;
+  ): Promise<
+    (Transaction & { departmentName: string | null; insuranceProviderName: string | null })[]
+  >;
 
   getTransactionById(id: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -362,7 +364,9 @@ export class DatabaseStorage implements IStorage {
       limit?: number;
       offset?: number;
     }
-  ): Promise<Transaction[]> {
+  ): Promise<
+    (Transaction & { departmentName: string | null; insuranceProviderName: string | null })[]
+  > {
     const conds: any[] = [
       gte(transactions.date, startInclusive),
       lt(transactions.date, endExclusive),
@@ -376,9 +380,30 @@ export class DatabaseStorage implements IStorage {
     const limit = opts?.limit ?? 1000;
     const offset = opts?.offset ?? 0;
 
+    // JOIN to include names for drill-down modal (USD -> insurance name)
     return await db
-      .select()
+      .select({
+        id: transactions.id,
+        type: transactions.type,
+        departmentId: transactions.departmentId,
+        amount: transactions.amount,
+        currency: transactions.currency,
+        description: transactions.description,
+        date: transactions.date,
+        receiptPath: transactions.receiptPath,
+        insuranceProviderId: transactions.insuranceProviderId,
+        expenseCategory: transactions.expenseCategory,
+        staffType: transactions.staffType,
+        createdBy: transactions.createdBy,
+        syncStatus: transactions.syncStatus,
+        createdAt: transactions.createdAt,
+        updatedAt: transactions.updatedAt,
+        departmentName: departments.name,
+        insuranceProviderName: insuranceProviders.name,
+      })
       .from(transactions)
+      .leftJoin(departments, eq(transactions.departmentId, departments.id))
+      .leftJoin(insuranceProviders, eq(transactions.insuranceProviderId, insuranceProviders.id))
       .where(and(...conds))
       .orderBy(desc(transactions.date))
       .limit(limit)
