@@ -365,7 +365,7 @@ export default function AdvancedDashboard() {
                     side="bottom"
                     align="start"
                     sideOffset={12}
-                    className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
                     avoidCollisions
                     collisionPadding={15}
@@ -538,8 +538,8 @@ export default function AdvancedDashboard() {
       </div>
 
       {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
-      {/* NOTE: stretch items + auto rows = equal height first row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 lg:items-stretch lg:[grid-auto-rows:1fr]">
+      {/* Equal-height first row, no sticky to avoid overlap */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start lg:[grid-auto-rows:minmax(0,1fr)]">
         {/* Revenue Analytics (REPLACED with the new daily split charts) */}
         <div className="lg:col-span-2 h-full [&>*]:h-full">
           <RevenueAnalyticsDaily
@@ -551,8 +551,8 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Departments Panel (sticky on desktop) */}
-        <div className="lg:col-span-1 h-full lg:sticky lg:top-24 [&>*]:h-full">
+        {/* Departments Panel (aligned, no sticky; fills row height) */}
+        <div className="lg:col-span-1 h-full [&>*]:h-full">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
