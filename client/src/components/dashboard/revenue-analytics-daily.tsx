@@ -50,7 +50,6 @@ function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
 }
 
-// compute a concrete date window so we can infer years when API returns "Sep 4"
 function computeWindow(
   range: TimeRange,
   year: number,
@@ -66,42 +65,30 @@ function computeWindow(
   }
   if (range === "last-3-months") {
     const end = endOfMonth(year, month);
-    const start = new Date(year, month - 3, 1); // two months back + current => 3 months
+    const start = new Date(year, month - 3, 1);
     return { start, end };
   }
   if (range === "year") {
-    return {
-      start: new Date(year, 0, 1),
-      end: new Date(year, 11, 31),
-    };
+    return { start: new Date(year, 0, 1), end: new Date(year, 11, 31) };
   }
   if (range === "last-month") {
     const d = new Date(year, month - 1, 1);
-    const last = new Date(d.getFullYear(), d.getMonth(), 0); // last day of prev month
-    return {
-      start: new Date(last.getFullYear(), last.getMonth(), 1),
-      end: last,
-    };
+    const last = new Date(d.getFullYear(), d.getMonth(), 0);
+    return { start: new Date(last.getFullYear(), last.getMonth(), 1), end: last };
   }
-  // current-month or month-select
-  return {
-    start: startOfMonth(year, month),
-    end: endOfMonth(year, month),
-  };
+  return { start: startOfMonth(year, month), end: endOfMonth(year, month) };
 }
 
 function isWideRange(range: TimeRange, start?: Date, end?: Date) {
   if (range === "last-3-months" || range === "year") return true;
   if (range === "custom" && start && end) {
     const ms = end.getTime() - start.getTime();
-    const days = ms / (1000 * 60 * 60 * 24);
-    return days > 45; // threshold ~1.5 months
+    return ms / 86400000 > 45;
   }
   return false;
 }
 
 function inferISOFromLabel(label: string, start: Date, end: Date): string | undefined {
-  // Try: "Sep 4", "Oct 12"
   const m = label?.match?.(/^([A-Za-z]{3,})\s+(\d{1,2})$/);
   if (!m) return undefined;
   const mon = m[1].toLowerCase();
@@ -114,9 +101,7 @@ function inferISOFromLabel(label: string, start: Date, end: Date): string | unde
   while (cursor <= end) {
     if (cursor.getMonth() === mi) {
       const candidate = new Date(cursor.getFullYear(), mi, day);
-      if (candidate >= start && candidate <= end) {
-        return format(candidate, "yyyy-MM-dd");
-      }
+      if (candidate >= start && candidate <= end) return format(candidate, "yyyy-MM-dd");
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -132,10 +117,7 @@ async function fetchIncomeTrendsDaily(
 ) {
   let url = `/api/income-trends/${year}/${month}?range=${normalizedRange(range)}`;
   if (range === "custom" && start && end) {
-    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(
-      end,
-      "yyyy-MM-dd"
-    )}`;
+    url += `&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`;
   }
   const { data } = await api.get(url);
   return Array.isArray(data) ? data : [];
@@ -148,27 +130,23 @@ function niceStep(roughStep: number) {
   const base = Math.pow(10, exp);
   const frac = roughStep / base;
   let niceFrac: number;
-  if (frac <= 1)        niceFrac = 1;
-  else if (frac <= 2)   niceFrac = 2;
+  if (frac <= 1) niceFrac = 1;
+  else if (frac <= 2) niceFrac = 2;
   else if (frac <= 2.5) niceFrac = 2.5;
-  else if (frac <= 5)   niceFrac = 5;
-  else                  niceFrac = 10;
+  else if (frac <= 5) niceFrac = 5;
+  else niceFrac = 10;
   return niceFrac * base;
 }
 function buildNiceTicks(dataMax: number) {
   if (dataMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4] };
   const step = niceStep(dataMax / 4);
   const max = step * 4;
-  const ticks = [0, step, step * 2, step * 3, max];
-  return { max, ticks };
+  return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
 function buildTicksPreferred(dataMax: number, preferredMax: number) {
   if (dataMax <= preferredMax) {
     const step = preferredMax / 4;
-    return {
-      max: preferredMax,
-      ticks: [0, step, step * 2, step * 3, preferredMax],
-    };
+    return { max: preferredMax, ticks: [0, step, step * 2, step * 3, preferredMax] };
   }
   return buildNiceTicks(dataMax);
 }
@@ -211,7 +189,6 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
         ? format(new Date(year, month - 1, d), "MMM d, yyyy")
         : p.dateISO ?? "";
   } else {
-    // monthly
     const key = p.label as string | undefined; // "YYYY-MM"
     if (key && /^\d{4}-\d{2}$/.test(key)) {
       const [y, m] = key.split("-").map((x: string) => parseInt(x, 10));
@@ -253,10 +230,7 @@ function Modal({
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-          <button
-            className="text-slate-500 hover:text-slate-700 text-sm"
-            onClick={onClose}
-          >
+          <button className="text-slate-500 hover:text-slate-700 text-sm" onClick={onClose}>
             Close
           </button>
         </div>
@@ -268,22 +242,34 @@ function Modal({
 
 /* ----------------------- Drilldown helpers ----------------------- */
 
-// Normalize any date-ish value to "YYYY-MM-DD"
-function normalizeISODate(v: any): string | undefined {
-  if (!v) return undefined;
-  if (typeof v === "string") {
-    const m = v.match(/^(\d{4}-\d{2}-\d{2})/); // "2025-09-22" or "2025-09-22T..."
-    if (m) return m[1];
+// pull the date from any common field and normalize to "YYYY-MM-DD"
+function normalizeTxDate(t: any): string | undefined {
+  const src =
+    t?.date ??
+    t?.transactionDate ??
+    t?.txnDate ??
+    t?.createdAt ??
+    t?.postedAt;
+  if (!src) return undefined;
+
+  if (typeof src === "string") {
+    const iso = src.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const md = src.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); // "9/10/2025"
+    if (md) {
+      const y = parseInt(md[3], 10);
+      const m = parseInt(md[1], 10) - 1;
+      const d = parseInt(md[2], 10);
+      return format(new Date(Date.UTC(y, m, d)), "yyyy-MM-dd");
+    }
   }
-  const d = new Date(v);
-  if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
-  return undefined;
+  const d = new Date(src);
+  return isNaN(d.getTime()) ? undefined : format(d, "yyyy-MM-dd");
 }
 
-// Inclusive UTC window for a given date range
 function asUTCWindow(fromISO: string, toISO: string) {
   const startDateTime = `${fromISO}T00:00:00.000Z`;
-  const endDateTime   = `${toISO}T23:59:59.999Z`;
+  const endDateTime = `${toISO}T23:59:59.999Z`;
   return { startDateTime, endDateTime };
 }
 
@@ -303,19 +289,14 @@ export default function RevenueAnalyticsDaily({
   const wide = isWideRange(timeRange, start, end);
 
   const days = daysInMonth(year, month);
-  const isMobile = useIsMobile(768); // treat <= 768px as mobile/tablet
+  const isMobile = useIsMobile(768);
 
-  // Bigger chart feel
   const chartHeight = isMobile ? 260 : 340;
 
-  // Label density for daily mode
   const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
 
-  const baseDays = useMemo(
-    () => Array.from({ length: days }, (_, i) => i + 1),
-    [days]
-  );
+  const baseDays = useMemo(() => Array.from({ length: days }, (_, i) => i + 1), [days]);
 
   const { data: raw = [], isLoading } = useQuery({
     queryKey: [
@@ -326,39 +307,34 @@ export default function RevenueAnalyticsDaily({
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
-    queryFn: () =>
-      fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
+    queryFn: () => fetchIncomeTrendsDaily(year, month, timeRange, customStartDate, customEndDate),
   });
 
   /* ------------------- Shape data for charts ------------------- */
 
-  // Daily arrays (one month) — ensure there is a record for **every day**
+  // daily arrays: have an entry for **every** day
   const sspDaily = baseDays.map((day) => ({ day, value: 0 }));
   const usdDaily = baseDays.map((day) => ({ day, value: 0 }));
 
-  // Monthly arrays (for wide ranges)
-  const sspMonthlyMap = new Map<string, number>(); // key: "YYYY-MM"
+  const sspMonthlyMap = new Map<string, number>();
   const usdMonthlyMap = new Map<string, number>();
 
   for (const r of raw as any[]) {
-    // IMPORTANT: only consider **income**, separated by currency
     const incomeSSP = Number(r.incomeSSP ?? 0);
     const incomeUSD = Number(r.incomeUSD ?? 0);
 
-    // Prefer explicit ISO if API provides it, otherwise infer from label within [start..end]
     let iso = (r as any).dateISO as string | undefined;
     if (!iso && typeof r.date === "string" && start && end) {
       iso = inferISOFromLabel(r.date, start, end);
     }
 
     if (!wide) {
-      // daily mode: only the current (selected) month should be plotted
       let d: number | undefined;
       if (iso) {
         const dt = new Date(iso + "T00:00:00");
         const y = dt.getFullYear();
         const m = dt.getMonth() + 1;
-        if (y !== year || m !== month) continue; // skip other months
+        if (y !== year || m !== month) continue;
         d = dt.getDate();
       } else if ((r as any).day) {
         d = Number((r as any).day);
@@ -368,44 +344,30 @@ export default function RevenueAnalyticsDaily({
       }
 
       if (typeof d === "number" && d >= 1 && d <= days) {
-        // Only accumulate **income**; SSP goes to SSP chart, USD goes to USD chart
         sspDaily[d - 1].value += incomeSSP;
         usdDaily[d - 1].value += incomeUSD;
       }
     } else {
-      // monthly mode: group everything in [start..end] by YYYY-MM
       let key: string | undefined;
-      if (iso) {
-        key = iso.slice(0, 7); // YYYY-MM
-      } else if (typeof r.date === "string" && start && end) {
+      if (iso) key = iso.slice(0, 7);
+      else if (typeof r.date === "string" && start && end) {
         const ii = inferISOFromLabel(r.date, start, end);
         if (ii) key = ii.slice(0, 7);
       }
       if (!key) continue;
-
       sspMonthlyMap.set(key, (sspMonthlyMap.get(key) ?? 0) + incomeSSP);
       usdMonthlyMap.set(key, (usdMonthlyMap.get(key) ?? 0) + incomeUSD);
     }
   }
 
-  const monthlyKeys = Array.from(
-    new Set([ ...sspMonthlyMap.keys(), ...usdMonthlyMap.keys() ])
-  ).sort();
-
-  const sspMonthly = monthlyKeys.map(k => ({ label: k, value: sspMonthlyMap.get(k) ?? 0 }));
-  const usdMonthly = monthlyKeys.map(k => ({ label: k, value: usdMonthlyMap.get(k) ?? 0 }));
+  const monthlyKeys = Array.from(new Set([...sspMonthlyMap.keys(), ...usdMonthlyMap.keys()])).sort();
+  const sspMonthly = monthlyKeys.map((k) => ({ label: k, value: sspMonthlyMap.get(k) ?? 0 }));
+  const usdMonthly = monthlyKeys.map((k) => ({ label: k, value: usdMonthlyMap.get(k) ?? 0 }));
 
   /* ------------------- Totals & Averages ------------------- */
 
-  const totalSSP = (!wide
-    ? sspDaily.reduce((s, r) => s + r.value, 0)
-    : sspMonthly.reduce((s, r) => s + (r.value || 0), 0)
-  );
-
-  const totalUSD = (!wide
-    ? usdDaily.reduce((s, r) => s + r.value, 0)
-    : usdMonthly.reduce((s, r) => s + (r.value || 0), 0)
-  );
+  const totalSSP = (!wide ? sspDaily : sspMonthly).reduce((s, r: any) => s + (r.value || 0), 0);
+  const totalUSD = (!wide ? usdDaily : usdMonthly).reduce((s, r: any) => s + (r.value || 0), 0);
 
   const activeDaysSSP = !wide ? sspDaily.filter((d) => d.value > 0).length || 0 : 0;
   const activeDaysUSD = !wide ? usdDaily.filter((d) => d.value > 0).length || 0 : 0;
@@ -414,17 +376,10 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------- Axis scaling ------------------- */
 
-  const dataMaxSSP = Math.max(
-    0,
-    ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value))
-  );
-  const dataMaxUSD = Math.max(
-    0,
-    ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value))
-  );
-
-  const preferredSSPMax = 6_000_000; // 6M default ceiling
-  const preferredUSDMax = 1_500;     // 1.5k default ceiling
+  const dataMaxSSP = Math.max(0, ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value)));
+  const dataMaxUSD = Math.max(0, ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value)));
+  const preferredSSPMax = 6_000_000;
+  const preferredUSDMax = 1_500;
   const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
   const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
 
@@ -440,7 +395,6 @@ export default function RevenueAnalyticsDaily({
     items: [],
   });
 
-  // When modal opens, fetch departments once (fallback for id→name)
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
@@ -470,7 +424,7 @@ export default function RevenueAnalyticsDaily({
     );
   }
 
-  // Robust fetch: request + client-filter to the exact day/month AND to desired currency + income only
+  // request by date only; enforce currency+type locally so "most days" always work
   async function loadTransactionsByRange(fromISO: string, toISO: string, currency: "SSP" | "USD") {
     setOpen(true);
     setLoadingDetail(true);
@@ -478,11 +432,14 @@ export default function RevenueAnalyticsDaily({
       const { startDateTime, endDateTime } = asUTCWindow(fromISO, toISO);
 
       const attempts: Array<Record<string, string | number>> = [
-        { page: 1, pageSize: 200, startDate: fromISO, endDate: toISO, currency, type: "income" },
-        { page: 1, pageSize: 200, fromDate: fromISO, toDate: toISO, currency, type: "income" },
-        { page: 1, pageSize: 200, start: fromISO, end: toISO, currency, type: "income" },
-        { page: 1, pageSize: 200, startDateTime, endDateTime, currency, type: "income" },
-        { page: 1, pageSize: 200, date: fromISO, currency, type: "income" },
+        { page: 1, pageSize: 1000, startDate: fromISO, endDate: toISO },
+        { page: 1, pageSize: 1000, fromDate: fromISO, toDate: toISO },
+        { page: 1, pageSize: 1000, start: fromISO, end: toISO },
+        { page: 1, pageSize: 1000, start_date: fromISO, end_date: toISO },
+        { page: 1, pageSize: 1000, dateFrom: fromISO, dateTo: toISO },
+        { page: 1, pageSize: 1000, rangeStart: fromISO, rangeEnd: toISO },
+        { page: 1, pageSize: 1000, startDateTime, endDateTime }, // UTC window
+        { page: 1, pageSize: 1000, date: fromISO },             // single date
       ];
 
       for (const params of attempts) {
@@ -493,41 +450,18 @@ export default function RevenueAnalyticsDaily({
           (Array.isArray(res.data) ? res.data : []);
 
         const filtered = raw.filter((t: any) => {
-          const d = normalizeISODate(t.date);
+          const d = normalizeTxDate(t);
           const c = (t.currency || "").toUpperCase();
           const ty = (t.type || "").toLowerCase();
-          return d ? d >= fromISO && d <= toISO && c === currency && ty === "income" : false;
+          // allow common synonyms for income
+          const isIncome = ty === "income" || ty === "credit" || ty === "revenue";
+          return d ? d >= fromISO && d <= toISO && c === currency && isIncome : false;
         });
 
         if (filtered.length > 0) {
           setDetail({ from: fromISO, to: toISO, items: filtered, currency });
           return;
         }
-      }
-
-      // Optional fallback endpoint if you have it:
-      if (fromISO.slice(0, 7) === toISO.slice(0, 7)) {
-        const y = parseInt(fromISO.slice(0, 4), 10);
-        const m = parseInt(fromISO.slice(5, 7), 10);
-        try {
-          const res = await api.get(`/api/detailed-transactions/${y}/${m}`, {
-            params: { day: fromISO, currency, type: "income" },
-          });
-          const raw =
-            res.data?.transactions ??
-            res.data?.items ??
-            (Array.isArray(res.data) ? res.data : []);
-          const filtered = raw.filter((t: any) => {
-            const d = normalizeISODate(t.date);
-            const c = (t.currency || "").toUpperCase();
-            const ty = (t.type || "").toLowerCase();
-            return d ? d >= fromISO && d <= toISO && c === currency && ty === "income" : false;
-          });
-          if (filtered.length > 0) {
-            setDetail({ from: fromISO, to: toISO, items: filtered, currency });
-            return;
-          }
-        } catch {}
       }
 
       setDetail({ from: fromISO, to: toISO, items: [], currency });
@@ -542,25 +476,22 @@ export default function RevenueAnalyticsDaily({
     const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
     loadTransactionsByRange(iso, iso, "SSP");
   };
-
   const onClickDailyUSD = (payload: any) => {
     const d = payload?.day as number | undefined;
     if (!d) return;
     const iso = format(new Date(year, month - 1, d), "yyyy-MM-dd");
     loadTransactionsByRange(iso, iso, "USD");
   };
-
   const onClickMonthlySSP = (payload: any) => {
-    const key = payload?.label as string | undefined; // YYYY-MM
+    const key = payload?.label as string | undefined;
     if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
     const [y, m] = key.split("-").map((n: string) => parseInt(n, 10));
     const first = format(new Date(y, m - 1, 1), "yyyy-MM-dd");
     const last = format(new Date(y, m, 0), "yyyy-MM-dd");
     loadTransactionsByRange(first, last, "SSP");
   };
-
   const onClickMonthlyUSD = (payload: any) => {
-    const key = payload?.label as string | undefined; // YYYY-MM
+    const key = payload?.label as string | undefined;
     if (!key || !/^\d{4}-\d{2}$/.test(key)) return;
     const [y, m] = key.split("-").map((n: string) => parseInt(n, 10));
     const first = format(new Date(y, m - 1, 1), "yyyy-MM-dd");
@@ -780,19 +711,12 @@ export default function RevenueAnalyticsDaily({
                 <th className="py-2">Currency</th>
                 <th className="py-2">Amount</th>
                 <th className="py-2">Type</th>
-                {/* Note column removed */}
               </tr>
             </thead>
             <tbody>
               {detail.items.map((t: any) => (
                 <tr key={t.id} className="border-t border-slate-100">
-                  <td className="py-2">
-                    {(() => {
-                      const v = t.date;
-                      if (!v) return "-";
-                      return String(v).slice(0, 10); // "YYYY-MM-DD"
-                    })()}
-                  </td>
+                  <td className="py-2">{String((t.date ?? t.transactionDate ?? t.createdAt ?? t.postedAt) ?? "").slice(0, 10)}</td>
                   <td className="py-2">{displayDept(t)}</td>
                   <td className="py-2">{t.currency}</td>
                   <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
