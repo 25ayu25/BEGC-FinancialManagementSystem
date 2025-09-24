@@ -20,9 +20,16 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ReferenceLine, Legend,
+} from "recharts";
+
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
+
+// NEW: daily analytics (split SSP & USD) for the Exec view
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
 // ---------- number formatting helpers ----------
@@ -43,8 +50,9 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // keep backend compatibility
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
+  // ---- NEW: “normalizedRange” keeps backend compatibility
+  const normalizedRange =
+    timeRange === "month-select" ? "current-month" : timeRange;
 
   // ---------- dropdown handlers ----------
   const handleTimeRangeChange = (
@@ -60,7 +68,7 @@ export default function AdvancedDashboard() {
   // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
   const months = [
     { label: "January", value: 1 },
     { label: "February", value: 2 },
@@ -155,8 +163,50 @@ export default function AdvancedDashboard() {
 
   // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
+  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
+  const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
+  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
+  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
+  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
+  const showAvgLine = daysWithSSP >= 2;
+  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
+
+  // hide zero bars: null skips drawing
+  const chartData = useMemo(
+    () => incomeSeries.map(d => ({
+      ...d,
+      amountSSPPlot: d.amountSSP > 0 ? d.amountSSP : null,
+      amountUSDPlot: d.amountUSD > 0 ? d.amountUSD : null,
+    })),
+    [incomeSeries]
+  );
+
+  // X ticks: 1,5,10,15,20,25,last
+  const xTicks = useMemo(() => {
+    const n = incomeSeries.length;
+    if (!n) return [];
+    const base = Array.from({ length: n }, (_, i) => i + 1).filter(v => v === 1 || v === n || v % 5 === 0);
+    if (!base.includes(n)) base.push(n);
+    return base;
+  }, [incomeSeries.length]);
+
+  const formatYAxisSSP = kfmt;
+  const formatYAxisUSD = kfmt;
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const p = payload[0].payload;
+    const hasSSP = p.amountSSP > 0;
+    const hasUSD = p.amountUSD > 0;
+    return (
+      <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
+        <p className="font-semibold text-slate-900 mb-2">{p.fullDate}</p>
+        {hasSSP && <p className="text-sm text-slate-700 font-mono">SSP {nf0.format(p.amountSSP)}</p>}
+        {hasUSD && <p className="text-sm text-slate-700 font-mono">USD {fmtUSD(p.amountUSD)}</p>}
+        {!hasSSP && !hasUSD && <p className="text-sm text-slate-500">No transactions</p>}
+      </div>
+    );
+  };
 
   // loading
   if (isLoading) {
@@ -170,7 +220,12 @@ export default function AdvancedDashboard() {
     );
   }
 
+  // summary numbers
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
+  const sspRevenue = monthTotalSSP || sspIncome;
+  const sspNetIncome = sspRevenue - totalExpenses;
 
   const getPatientVolumeNavigation = () => {
     const currentDate = new Date();
@@ -210,7 +265,11 @@ export default function AdvancedDashboard() {
 
           {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+            {/* Quick range selector including new “Select Month…” */}
+            <Select
+              value={timeRange}
+              onValueChange={handleTimeRangeChange}
+            >
               <SelectTrigger className="h-9 w-[160px]">
                 <SelectValue />
               </SelectTrigger>
@@ -224,6 +283,7 @@ export default function AdvancedDashboard() {
               </SelectContent>
             </Select>
 
+            {/* If month-select: show Year + Month dropdowns */}
             {timeRange === "month-select" && (
               <>
                 <Select
@@ -256,6 +316,7 @@ export default function AdvancedDashboard() {
               </>
             )}
 
+            {/* If custom: show start/end date pickers */}
             {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
@@ -304,7 +365,7 @@ export default function AdvancedDashboard() {
                     side="bottom"
                     align="start"
                     sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
                     avoidCollisions
                     collisionPadding={15}
@@ -359,10 +420,8 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Total Expenses */}
-        <Card
-          className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown"
-        >
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
@@ -478,9 +537,10 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Row 1 (equal height) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 items-start lg:[grid-auto-rows:1fr]">
-        <div className="lg:col-span-2 h-full [&>*]:h-full">
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
+        {/* Revenue Analytics (REPLACED with the new daily split charts) */}
+        <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
             selectedYear={selectedYear}
@@ -490,17 +550,16 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        <div className="lg:col-span-1 h-full [&>*]:h-full overflow-hidden">
+        {/* Departments Panel */}
+        <div className="lg:col-span-1">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
           />
         </div>
-      </div>
 
-      {/* Main Grid: Row 2 (auto height, no empty space) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Quick Actions — sits below chart (spans 2) */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -545,6 +604,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
+        {/* System Status — sits under Departments */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
