@@ -25,6 +25,53 @@ function addDaysUTC(d: Date, days: number) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days, 0, 0, 0, 0));
 }
 
+/* ------------------------------ CORS -------------------------------- */
+
+const RAW_ALLOWED =
+  (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+
+const ALLOWED_EXACT = new Set<string>([
+  // Env-provided
+  ...RAW_ALLOWED,
+  // Local dev
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]);
+
+// Allow common hosters (exact domain still preferred via env var)
+const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
+
+function isAllowedOrigin(origin?: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_EXACT.has(origin)) return true;
+  try {
+    const host = new URL(origin).hostname;
+    return ALLOWED_SUFFIXES.some(sfx => host.endsWith(sfx));
+  } catch {
+    return false;
+  }
+}
+
+function applyCors(req: Request, res: Response) {
+  const origin = req.headers.origin as string | undefined;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  // allow common headers + our session header
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With, X-Session-Token"
+  );
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+}
+
 /* Extend Express Request to include user */
 declare global {
   namespace Express {
@@ -41,6 +88,20 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<void> {
+  // Make secure cookies work behind a proxy (Render/Netlify)
+  app.set("trust proxy", 1);
+
+  // Global CORS + preflight (before any auth middleware)
+  app.use((req, res, next) => {
+    applyCors(req, res);
+    if (req.method === "OPTIONS") {
+      // Preflight: respond quickly, cache briefly
+      res.setHeader("Access-Control-Max-Age", "600");
+      return res.status(204).end();
+    }
+    next();
+  });
+
   /* --------------------------------------------------------------- */
   /* Health                                                          */
   /* --------------------------------------------------------------- */
@@ -782,7 +843,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const month = parseInt(req.params.month, 10);
       const range = (req.query.range as string) || "current-month";
 
-      let volumes: any[] = [];
+    let volumes: any[] = [];
       switch (range) {
         case "current-month":
         case "last-month": {
