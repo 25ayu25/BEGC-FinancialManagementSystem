@@ -1,45 +1,76 @@
 'use client';
 
-import { format } from 'date-fns';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 import { api } from '@/lib/queryClient';
 
-type Stage = {
-  count: number;
-  amountUSD: number;    // total claim value in USD for this stage
+type Stage = 'submitted' | 'in_review' | 'approved' | 'paid' | 'rejected';
+
+type ByState = Partial<
+  Record<
+    Stage,
+    {
+      count: number;
+      amount: number; // USD
+    }
+  >
+>;
+
+type Summary = {
+  period?: string;
+  currency?: string;
+  outstanding: number;     // not yet paid
+  paidPeriod: number;      // paid during this filtered period
+  totalAllStages: number;  // all claims amounts in any state for the period
+  byState: ByState;
 };
 
-type Pipeline = {
-  submitted: Stage;
-  inReview: Stage;
-  approved: Stage;
-  paid: Stage;
-  rejected: Stage;
-};
-
-const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const nf2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-
-function pct(part: number, total: number) {
-  if (!total) return 0;
-  return Math.max(0, Math.min(100, Math.round((part / total) * 100)));
-}
-
-export default function ClaimsPipeline(props: {
-  timeRange: 'current-month' | 'last-month' | 'last-3-months' | 'year' | 'month-select' | 'custom';
-  selectedYear: number;
-  selectedMonth: number;
+type Props = {
+  className?: string;
+  timeRange:
+    | 'current-month'
+    | 'last-month'
+    | 'last-3-months'
+    | 'year'
+    | 'month-select'
+    | 'custom';
+  normalizedRange: string;
+  selectedYear?: number | null;
+  selectedMonth?: number | null;
   customStartDate?: Date;
   customEndDate?: Date;
-  normalizedRange: string;
-}) {
-  const { timeRange, selectedYear, selectedMonth, customStartDate, customEndDate, normalizedRange } =
-    props;
+};
 
-  const { data, isLoading, isError } = useQuery({
+// local formatters
+const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+const fmtUSD = (v: number) => {
+  const one = Number(v.toFixed(1));
+  return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
+};
+
+const defaultSummary: Summary = {
+  outstanding: 0,
+  paidPeriod: 0,
+  totalAllStages: 0,
+  byState: {},
+};
+
+export default function ClaimsPipeline({
+  className,
+  timeRange,
+  normalizedRange,
+  selectedYear,
+  selectedMonth,
+  customStartDate,
+  customEndDate,
+}: Props) {
+  const { data, isLoading } = useQuery({
     queryKey: [
       '/api/claims/summary',
       normalizedRange,
@@ -49,43 +80,55 @@ export default function ClaimsPipeline(props: {
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/claims/summary?range=${normalizedRange}&year=${selectedYear}&month=${selectedMonth}`;
+      let url = `/api/claims/summary?range=${normalizedRange}`;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(
           customEndDate,
           'yyyy-MM-dd'
         )}`;
+      } else {
+        url += `&year=${selectedYear}&month=${selectedMonth}`;
       }
-      const { data } = await api.get(url);
-      return data as { pipeline: Pipeline; periodLabel?: string };
+
+      try {
+        const { data } = await api.get(url);
+        return (data ?? defaultSummary) as Summary;
+      } catch {
+        // backend not live yet / 404—just show the scaffold
+        return defaultSummary;
+      }
     },
-    // If the endpoint isn't live yet, we still render a friendly empty state
-    retry: 1,
   });
 
-  const pipeline: Pipeline =
-    data?.pipeline || {
-      submitted: { count: 0, amountUSD: 0 },
-      inReview: { count: 0, amountUSD: 0 },
-      approved: { count: 0, amountUSD: 0 },
-      paid: { count: 0, amountUSD: 0 },
-      rejected: { count: 0, amountUSD: 0 },
-    };
+  const summary = data ?? defaultSummary;
 
-  const outstandingUSD =
-    pipeline.submitted.amountUSD + pipeline.inReview.amountUSD + pipeline.approved.amountUSD;
-  const totalUSD =
-    outstandingUSD + pipeline.paid.amountUSD + pipeline.rejected.amountUSD;
+  const rows: Array<{ key: Stage; label: string }> = useMemo(
+    () => [
+      { key: 'submitted', label: 'Submitted' },
+      { key: 'in_review', label: 'In review' },
+      { key: 'approved', label: 'Approved' },
+      { key: 'paid', label: 'Paid' },
+      { key: 'rejected', label: 'Rejected' },
+    ],
+    []
+  );
+
+  const totalCount =
+    rows.reduce((s, r) => s + (summary.byState?.[r.key]?.count ?? 0), 0) || 0;
+
+  const visibleRows = rows.filter((r) => (summary.byState?.[r.key]?.count ?? 0) > 0);
 
   return (
-    <Card className="border border-slate-200 shadow-sm">
-      <CardHeader className="pb-3">
+    <Card className={cn('h-full flex flex-col border border-slate-200 shadow-sm', className)}>
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-slate-900">
             Claims Pipeline
           </CardTitle>
           <Badge variant="outline" className="rounded-full">
-            {data?.periodLabel ?? 'Current period'}
+            {timeRange === 'custom' && customStartDate && customEndDate
+              ? `${format(customStartDate, 'MMM d')}–${format(customEndDate, 'MMM d')}`
+              : 'Current period'}
           </Badge>
         </div>
         <p className="text-xs text-slate-500">
@@ -93,67 +136,70 @@ export default function ClaimsPipeline(props: {
         </p>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Summary row */}
-        <div className="grid grid-cols-3 gap-3">
+      <CardContent className="flex-1 pt-0">
+        {/* Top summary tiles */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="rounded-lg border border-slate-200 p-3">
-            <p className="text-xs text-slate-600">Outstanding</p>
-            <p className="font-semibold tabular-nums">USD {nf2.format(outstandingUSD)}</p>
+            <p className="text-[11px] text-slate-500">Outstanding</p>
+            <p className="text-sm font-mono font-semibold">USD {fmtUSD(summary.outstanding || 0)}</p>
           </div>
           <div className="rounded-lg border border-slate-200 p-3">
-            <p className="text-xs text-slate-600">Paid (period)</p>
-            <p className="font-semibold tabular-nums">USD {nf2.format(pipeline.paid.amountUSD)}</p>
+            <p className="text-[11px] text-slate-500">Paid (period)</p>
+            <p className="text-sm font-mono font-semibold">USD {fmtUSD(summary.paidPeriod || 0)}</p>
           </div>
           <div className="rounded-lg border border-slate-200 p-3">
-            <p className="text-xs text-slate-600">Total (all stages)</p>
-            <p className="font-semibold tabular-nums">USD {nf2.format(totalUSD)}</p>
+            <p className="text-[11px] text-slate-500">Total (all stages)</p>
+            <p className="text-sm font-mono font-semibold">USD {fmtUSD(summary.totalAllStages || 0)}</p>
           </div>
         </div>
 
-        {/* Visual pipeline */}
-        <div className="space-y-3">
-          {[
-            ['Submitted', pipeline.submitted, 'bg-slate-300'],
-            ['In review', pipeline.inReview, 'bg-blue-300'],
-            ['Approved', pipeline.approved, 'bg-emerald-400'],
-            ['Paid', pipeline.paid, 'bg-purple-300'],
-            ['Rejected', pipeline.rejected, 'bg-red-300'],
-          ].map(([label, stage, color], idx) => {
-            const s = stage as Stage;
-            const width = pct(s.amountUSD, Math.max(totalUSD, 1));
-            return (
-              <div key={idx} className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-700">{label as string}</span>
-                  <span className="text-xs text-slate-500">
-                    {nf0.format(s.count)} claim{s.count === 1 ? '' : 's'} · USD {nf2.format(s.amountUSD)}
-                  </span>
+        {/* Stage rows */}
+        <div className="space-y-2">
+          {visibleRows.length ? (
+            visibleRows.map((r) => {
+              const c = summary.byState?.[r.key]?.count ?? 0;
+              const amt = summary.byState?.[r.key]?.amount ?? 0;
+              const pct = totalCount ? Math.min(100, Math.round((c / totalCount) * 100)) : 0;
+
+              return (
+                <div key={r.key} className="rounded-md border border-slate-200 p-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-slate-700">{r.label}</div>
+                    <div className="text-xs text-slate-500">
+                      <span className="font-mono">{c}</span> claims · USD{' '}
+                      <span className="font-mono">{fmtUSD(amt)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-1.5 bg-slate-900/80 rounded-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 w-full rounded-full bg-slate-100">
-                  <div className={`h-2 rounded-full ${color as string}`} style={{ width: `${width}%` }} />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="rounded-md border border-slate-200 p-3">
+              <p className="text-xs text-slate-500">
+                No claim data yet for this period (or the endpoint isn’t live). You can still
+                create claims and they’ll show up here.
+              </p>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <Button asChild size="sm" variant="outline">
-            <a href="/claims">View all claims</a>
-          </Button>
-          <Button asChild size="sm">
-            <a href="/claims/new">New claim</a>
-          </Button>
+        {/* Actions */}
+        <div className="mt-4 flex items-center gap-2">
+          <a href="/claims" className="block">
+            <Button variant="outline" size="sm">
+              View all claims
+            </Button>
+          </a>
+          <a href="/claims/new" className="block ml-auto">
+            <Button size="sm">New claim</Button>
+          </a>
         </div>
-
-        {isLoading && (
-          <p className="text-xs text-slate-500">Loading claims…</p>
-        )}
-        {isError && (
-          <p className="text-xs text-slate-500">
-            No claim data yet for this period (or the endpoint isn’t live). You can still create claims and they’ll show up here.
-          </p>
-        )}
       </CardContent>
     </Card>
   );
