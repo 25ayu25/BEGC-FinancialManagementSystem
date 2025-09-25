@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 
@@ -25,7 +25,7 @@ import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-/* ---------- formatting ---------- */
+// ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
@@ -34,91 +34,133 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ---------- Insurance Providers (USD) card ---------- */
-function InsuranceProvidersUSD({
-  breakdown,
-  totalUSD,
-  timeRange,
-  selectedYear,
-  selectedMonth,
-  customStartDate,
-  customEndDate,
-}: {
-  breakdown?: Record<string, number> | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
-  totalUSD: number;
+/* -------------------------------------------------------
+   InsuranceProvidersUSD (fills the “empty rectangle” area)
+   ------------------------------------------------------- */
+type ProvidersProp =
+  | Record<string, number>
+  | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
+
+function InsuranceProvidersUSD(props: {
+  breakdown?: ProvidersProp;
+  totalUSD?: number;
   timeRange: string;
-  selectedYear?: number | null;
-  selectedMonth?: number | null;
+  selectedYear?: number;
+  selectedMonth?: number;
   customStartDate?: Date;
   customEndDate?: Date;
 }) {
+  const {
+    breakdown,
+    totalUSD = 0,
+    timeRange,
+    selectedYear,
+    selectedMonth,
+    customStartDate,
+    customEndDate,
+  } = props;
+
+  // Normalize rows from object or array
   const rows = useMemo(() => {
-    if (!breakdown) return [] as { name: string; amount: number }[];
-    if (Array.isArray(breakdown)) {
-      return breakdown
-        .map((r) => ({ name: String(r.name ?? r.provider ?? "Unknown"), amount: Number(r.amount ?? r.total ?? 0) }))
-        .filter((r) => r.amount > 0);
-    }
-    return Object.entries(breakdown)
-      .map(([name, amount]) => ({ name, amount: Number(amount) }))
-      .filter((r) => r.amount > 0);
+    const arr =
+      Array.isArray(breakdown)
+        ? breakdown.map((r) => ({
+            name: String(r?.name ?? r?.provider ?? "Unknown"),
+            amount: Number(r?.amount ?? r?.total ?? 0),
+          }))
+        : Object.entries(breakdown ?? {}).map(([name, amount]) => ({
+            name,
+            amount: Number(amount),
+          }));
+    // sort desc by amount
+    return arr.sort((a, b) => b.amount - a.amount);
   }, [breakdown]);
 
-  const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
-  const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
-  const sorted = [...rows].sort((a, b) => b.amount - a.amount);
+  // Compute total from the list to avoid mismatches
+  const computedTotal = useMemo(
+    () => rows.reduce((s, r) => s + (Number.isFinite(r.amount) ? r.amount : 0), 0),
+    [rows]
+  );
 
-  const palette = ["#00A3A3", "#4F46E5", "#F59E0B", "#EF4444", "#10B981", "#8B5CF6", "#EA580C", "#06B6D4"];
+  // Distinct colors per provider
+  const palette = [
+    "#0ea5e9", // sky-500
+    "#22c55e", // green-500
+    "#f59e0b", // amber-500
+    "#ef4444", // red-500
+    "#8b5cf6", // violet-500
+    "#06b6d4", // cyan-500
+    "#e11d48", // rose-600
+    "#84cc16", // lime-500
+  ];
 
-  const base = `/insurance-providers?range=${timeRange}`;
+  // Link params for View All
   const viewAllHref =
-    timeRange === "custom" && customStartDate && customEndDate
-      ? `${base}&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-      : `${base}&year=${selectedYear}&month=${selectedMonth}`;
+    `/insurance-providers?range=${timeRange}` +
+    (timeRange === "custom" && customStartDate && customEndDate
+      ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(
+          customEndDate,
+          "yyyy-MM-dd"
+        )}`
+      : `&year=${selectedYear ?? new Date().getFullYear()}&month=${selectedMonth ?? (new Date().getMonth() + 1)}`);
 
   return (
     <Card className="border border-slate-200 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance Providers (USD)
+          <div className="w-2 h-2 bg-violet-500 rounded-full" />
+          Insurance Providers (USD)
         </CardTitle>
-        <Link href={viewAllHref}><Button variant="outline" size="sm">View all</Button></Link>
+        <Link href={viewAllHref}>
+          <Button size="sm" variant="outline">View all</Button>
+        </Link>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="text-xs text-slate-500">
-          Totals in period: <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
-        </div>
 
-        {sorted.length === 0 ? (
-          <div className="text-sm text-slate-500">No insurance receipts for this period.</div>
-        ) : (
-          <div className="space-y-3">
-            {sorted.map((item, idx) => {
-              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
-              const color = palette[idx % palette.length];
-              return (
-                <div key={`${item.name}-${idx}`} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
-                      <span className="text-sm text-slate-700">{item.name}</span>
-                    </div>
-                    <div className="text-xs font-medium text-slate-600">USD {fmtUSD(item.amount)}</div>
+      <CardContent className="pt-0">
+        <p className="text-xs text-slate-500 mb-3">
+          Totals in period: <span className="font-medium text-slate-800">USD {fmtUSD(computedTotal)}</span>
+        </p>
+
+        <div className="space-y-3">
+          {rows.length === 0 && (
+            <div className="text-sm text-slate-500">No insurance transactions for this period.</div>
+          )}
+
+          {rows.map((r, idx) => {
+            const pct = computedTotal > 0 ? (r.amount / computedTotal) * 100 : 0;
+            const color = palette[idx % palette.length];
+            return (
+              <div key={`${r.name}-${idx}`} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="text-sm text-slate-700 truncate">{r.name}</span>
                   </div>
-                  <div className="h-2 rounded bg-slate-100 overflow-hidden">
-                    <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  <div className="text-xs tabular-nums text-slate-600">
+                    USD {fmtUSD(r.amount)}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-2 rounded-full"
+                    style={{ width: `${pct}%`, backgroundColor: color }}
+                  />
+                </div>
+
+                <div className="text-[10px] text-slate-400">{pct.toFixed(1)}% of period total</div>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-/* ---------- Page ---------- */
+/* --------------------------
+   Main AdvancedDashboard
+   -------------------------- */
 export default function AdvancedDashboard() {
   const {
     timeRange, selectedYear, selectedMonth,
@@ -127,10 +169,18 @@ export default function AdvancedDashboard() {
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
+
+  // keep backend compatibility
   const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
 
   const handleTimeRangeChange = (
-    range: "current-month" | "last-month" | "last-3-months" | "year" | "month-select" | "custom"
+    range:
+      | "current-month"
+      | "last-month"
+      | "last-3-months"
+      | "year"
+      | "month-select"
+      | "custom"
   ) => setTimeRange(range);
 
   const now = new Date();
@@ -143,11 +193,15 @@ export default function AdvancedDashboard() {
     { label: "October", value: 10 }, { label: "November", value: 11 }, { label: "December", value: 12 },
   ];
 
-  /* -------- queries -------- */
+  // ---------- queries ----------
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
-      "/api/dashboard", selectedYear, selectedMonth, normalizedRange,
-      customStartDate?.toISOString(), customEndDate?.toISOString(),
+      "/api/dashboard",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
@@ -163,8 +217,12 @@ export default function AdvancedDashboard() {
 
   const { data: rawIncome } = useQuery({
     queryKey: [
-      "/api/income-trends", selectedYear, selectedMonth, normalizedRange,
-      customStartDate?.toISOString(), customEndDate?.toISOString(),
+      "/api/income-trends",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
@@ -176,7 +234,7 @@ export default function AdvancedDashboard() {
     },
   });
 
-  /* -------- build income series (unchanged) -------- */
+  // ---------- build income series ----------
   let incomeSeries: Array<{
     day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
   }> = [];
@@ -190,8 +248,8 @@ export default function AdvancedDashboard() {
       fullDate: r.date,
     }));
   } else {
-    const y = selectedYear!;
-    const m = selectedMonth!;
+    const y = selectedYear;
+    const m = selectedMonth;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
@@ -212,13 +270,17 @@ export default function AdvancedDashboard() {
     }
   }
 
+  // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
+  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
   const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
   const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
   const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
   const showAvgLine = daysWithSSP >= 2;
+  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
 
+  // loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -230,6 +292,7 @@ export default function AdvancedDashboard() {
     );
   }
 
+  // summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
@@ -260,11 +323,13 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
-      {/* Header */}
+      {/* Header + date filters */}
       <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">Executive Dashboard</h1>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+              Executive Dashboard
+            </h1>
             <div className="mt-1 flex items-center gap-4">
               <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
             </div>
@@ -272,7 +337,9 @@ export default function AdvancedDashboard() {
 
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="current-month">Current Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
@@ -285,14 +352,32 @@ export default function AdvancedDashboard() {
 
             {timeRange === "month-select" && (
               <>
-                <Select value={String(selectedYear)} onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}>
-                  <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
-                  <SelectContent>{years.map((y) => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}</SelectContent>
+                <Select
+                  value={String(selectedYear)}
+                  onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
+                >
+                  <SelectTrigger className="h-9 w-[120px]">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
 
-                <Select value={String(selectedMonth)} onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}>
-                  <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Month" /></SelectTrigger>
-                  <SelectContent>{months.map((m) => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}</SelectContent>
+                <Select
+                  value={String(selectedMonth)}
+                  onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
+                >
+                  <SelectTrigger className="h-9 w-[140px]">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </>
             )}
@@ -301,12 +386,31 @@ export default function AdvancedDashboard() {
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />{customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" avoidCollisions collisionPadding={15}>
-                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customStartDate} onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)} initialFocus />
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customStartDate}
+                      onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                      initialFocus
+                    />
                   </PopoverContent>
                 </Popover>
 
@@ -314,12 +418,31 @@ export default function AdvancedDashboard() {
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />{customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" avoidCollisions collisionPadding={15}>
-                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customEndDate} onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)} initialFocus />
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customEndDate}
+                      onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                      initialFocus
+                    />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -328,8 +451,9 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* KPIs */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
+        {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
@@ -351,14 +475,16 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
-                {dashboardData?.changes?.incomeChangeSSP !== undefined && dashboardData.changes.incomeChangeSSP < 0
-                  ? <TrendingDown className="h-4 w-4 text-red-600" />
-                  : <TrendingUp className="h-4 w-4 text-emerald-600" />}
+                {dashboardData?.changes?.incomeChangeSSP !== undefined &&
+                dashboardData.changes.incomeChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Total Expenses */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
           onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
           <CardContent className="p-4 sm:p-3">
@@ -381,14 +507,16 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
               <div className="bg-red-50 p-1.5 rounded-lg">
-                {dashboardData?.changes?.expenseChangeSSP !== undefined && dashboardData.changes.expenseChangeSSP < 0
-                  ? <TrendingDown className="h-4 w-4 text-emerald-600" />
-                  : <TrendingUp className="h-4 w-4 text-red-600" />}
+                {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+                dashboardData.changes.expenseChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-emerald-600" />
+                ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Net Income */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
@@ -409,11 +537,14 @@ export default function AdvancedDashboard() {
                   )}
                 </div>
               </div>
-              <div className="bg-blue-50 p-1.5 rounded-lg"><DollarSign className="h-4 w-4 text-blue-600" /></div>
+              <div className="bg-blue-50 p-1.5 rounded-lg">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Insurance (USD) */}
         <Link href={`/insurance-providers?range=${normalizedRange}${
           timeRange === "custom" && customStartDate && customEndDate
             ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
@@ -450,6 +581,7 @@ export default function AdvancedDashboard() {
           </Card>
         </Link>
 
+        {/* Patient Volume */}
         <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
@@ -470,10 +602,10 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* ====== GRID LAYOUT (no gap): explicit row placements ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
-        {/* Row 1 */}
-        <div className="lg:col-span-2 lg:row-start-1">
+      {/* ===== Main Grid: dense packing, no gaps ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-flow-row-dense gap-6 mb-8 items-start">
+        {/* Revenue (left, spans 2) */}
+        <div className="lg:col-span-2 order-1">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
             selectedYear={selectedYear}
@@ -482,7 +614,9 @@ export default function AdvancedDashboard() {
             customEndDate={customEndDate ?? undefined}
           />
         </div>
-        <div className="lg:col-span-1 lg:row-start-1">
+
+        {/* Departments (right rail) */}
+        <div className="lg:col-span-1 order-2">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
@@ -490,8 +624,8 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Row 2 */}
-        <Card className="border border-slate-200 shadow-sm lg:col-span-2 lg:row-start-2">
+        {/* Quick Actions (left, below revenue) */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-2 order-3">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
@@ -535,7 +669,8 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        <div className="lg:col-span-1 lg:row-start-2">
+        {/* Insurance Providers (right rail, fills the prior empty space) */}
+        <div className="lg:col-span-1 order-4">
           <InsuranceProvidersUSD
             breakdown={dashboardData?.insuranceBreakdown}
             totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
@@ -547,8 +682,8 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Row 3 */}
-        <Card className="border border-slate-200 shadow-sm lg:col-span-1 lg:row-start-3">
+        {/* System Status — grid is row-dense so this fills any remaining hole */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1 order-5">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
