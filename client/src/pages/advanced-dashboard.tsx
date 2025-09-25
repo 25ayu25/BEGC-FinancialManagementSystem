@@ -32,9 +32,6 @@ import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 // NEW: daily analytics (split SSP & USD) for the Exec view
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-// NEW: the widget that fills the empty rectangle on the right
-import ClaimsPipeline from "@/components/dashboard/ClaimsPipeline";
-
 // ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
@@ -224,7 +221,11 @@ export default function AdvancedDashboard() {
   }
 
   // summary numbers
-  const sspRevenue = monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
+  const sspRevenue = monthTotalSSP || sspIncome;
+  const sspNetIncome = sspRevenue - totalExpenses;
 
   const getPatientVolumeNavigation = () => {
     const currentDate = new Date();
@@ -536,10 +537,10 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Revenue + Departments + Quick Actions + Claims + System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start lg:[grid-auto-rows:1fr]">
+      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
         {/* Revenue Analytics (REPLACED with the new daily split charts) */}
-        <div className="lg:col-span-2 h-full [&>*]:h-full">
+        <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
             selectedYear={selectedYear}
@@ -550,7 +551,7 @@ export default function AdvancedDashboard() {
         </div>
 
         {/* Departments Panel */}
-        <div className="lg:col-span-1 h-full [&>*]:h-full">
+        <div className="lg:col-span-1">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
@@ -603,18 +604,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Claims Pipeline — fills the previous empty rectangle */}
-        <ClaimsPipeline
-          className="lg:col-span-1"
-          timeRange={timeRange}
-          normalizedRange={normalizedRange}
-          selectedYear={selectedYear ?? undefined}
-          selectedMonth={selectedMonth ?? undefined}
-          customStartDate={customStartDate ?? undefined}
-          customEndDate={customEndDate ?? undefined}
-        />
-
-        {/* System Status — sits under Claims */}
+        {/* System Status — sits under Departments */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
