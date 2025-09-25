@@ -591,8 +591,8 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Revenue (left) + Right stack (Departments + Providers) + bottom row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
+      {/* Main Grid: Revenue (left) + Right cards (Departments, Providers) + bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 auto-rows-min">
         {/* LEFT: Revenue Analytics (spans 2 cols) */}
         <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
@@ -604,14 +604,17 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* RIGHT: stack Departments + Insurance Providers */}
-        <div className="lg:col-span-1 flex flex-col gap-6 self-start">
+        {/* RIGHT: Departments */}
+        <div className="lg:col-span-1">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
           />
+        </div>
 
+        {/* RIGHT: Insurance Providers (force right column on lg) */}
+        <div className="lg:col-span-1 lg:col-start-3">
           <InsuranceProvidersUSD
             breakdown={dashboardData?.insuranceBreakdown}
             totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
