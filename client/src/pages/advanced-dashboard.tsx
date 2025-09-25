@@ -25,7 +25,7 @@ import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-// ---------- number formatting helpers ----------
+/* ================== number formatting helpers ================== */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
@@ -34,39 +34,8 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-// ---------- palette / hashing for stable provider colors ----------
-const PALETTE = [
-  "#0ea5e9", // sky-500
-  "#a855f7", // purple-500
-  "#10b981", // emerald-500
-  "#f59e0b", // amber-500
-  "#ef4444", // red-500
-  "#06b6d4", // cyan-500
-  "#eab308", // yellow-500
-  "#f97316", // orange-500
-  "#14b8a6", // teal-500
-  "#6366f1", // indigo-500
-  "#22c55e", // green-500
-  "#db2777", // rose-600
-];
-const hashStr = (s: string) => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i);
-  return Math.abs(h);
-};
-const colorFor = (name: string) => PALETTE[hashStr(name) % PALETTE.length];
-
-// ---------- Insurance Providers card ----------
-type ProvidersProps = {
-  breakdown: Record<string, number> | undefined;
-  totalUSD: number;
-  timeRange: string;
-  selectedYear?: number | null;
-  selectedMonth?: number | null;
-  customStartDate?: Date | undefined;
-  customEndDate?: Date | undefined;
-};
-
+/* ================== Insurance Providers Card ================== */
+/** Accepts either an object {provider: amount} or an array [{name, amount}] */
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
@@ -75,84 +44,104 @@ function InsuranceProvidersUSD({
   selectedMonth,
   customStartDate,
   customEndDate,
-}: ProvidersProps) {
-  // normalize & sort
-  const entries = useMemo(() => {
-    const base: Array<{ name: string; amount: number }> = [];
-    if (breakdown) {
-      for (const [k, v] of Object.entries(breakdown)) base.push({ name: k, amount: Number(v || 0) });
+}: {
+  breakdown?: Record<string, number> | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
+  totalUSD: number;
+  timeRange: string;
+  selectedYear?: number | null;
+  selectedMonth?: number | null;
+  customStartDate?: Date;
+  customEndDate?: Date;
+}) {
+  // Normalize breakdown to an array
+  const rows = useMemo(() => {
+    if (!breakdown) return [] as { name: string; amount: number }[];
+    if (Array.isArray(breakdown)) {
+      return breakdown
+        .map((r) => ({
+          name: String(r.name ?? r.provider ?? "Unknown"),
+          amount: Number(r.amount ?? r.total ?? 0),
+        }))
+        .filter((r) => r.amount > 0);
     }
-    base.sort((a, b) => b.amount - a.amount);
-    return base;
+    return Object.entries(breakdown)
+      .map(([name, amount]) => ({ name, amount: Number(amount) }))
+      .filter((r) => r.amount > 0);
   }, [breakdown]);
 
-  // force total to match KPI total; add "Other" if needed
-  const sumProviders = entries.reduce((s, e) => s + e.amount, 0);
-  const other = Math.max(0, Number((totalUSD - sumProviders).toFixed(2)));
-  const rows = other > 0 ? [...entries, { name: "Other", amount: other }] : entries;
+  // Use breakdown sum if it exists (prevents header/section mismatch)
+  const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
+  const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
 
-  // link preserving filters
-  const viewHref =
-    `/insurance-providers?range=${timeRange}` +
-    (timeRange === "custom" && customStartDate && customEndDate
-      ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-      : `&year=${selectedYear}&month=${selectedMonth}`);
+  // Sort by amount desc
+  const sorted = [...rows].sort((a, b) => b.amount - a.amount);
+
+  // Distinct color palette
+  const palette = [
+    "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
+    "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
+  ];
+
+  // Build “View all” link with current filter preserved
+  const base = `/insurance-providers?range=${timeRange}`;
+  const viewAllHref =
+    timeRange === "custom" && customStartDate && customEndDate
+      ? `${base}&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+      : `${base}&year=${selectedYear}&month=${selectedMonth}`;
 
   return (
-    <Card className="border border-slate-200 shadow-sm lg:col-span-1 self-start">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <Shield className="h-4 w-4 text-purple-600" />
-          Insurance Providers (USD)
+          <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance Providers (USD)
         </CardTitle>
-        <Link href={viewHref}>
-          <Button size="sm" variant="outline" className="h-8">View all</Button>
+        <Link href={viewAllHref}>
+          <Button variant="outline" size="sm">View all</Button>
         </Link>
       </CardHeader>
-      <CardContent>
-        <div className="text-xs text-slate-500 mb-3">
-          Totals in period: <span className="font-mono">USD {fmtUSD(totalUSD)}</span>
+      <CardContent className="space-y-3">
+        <div className="text-xs text-slate-500">
+          Totals in period: <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
         </div>
 
-        {/* Clamp height so the card never outgrows Revenue Analytics */}
-        <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1 -mr-1">
-          {rows.length === 0 ? (
-            <div className="text-sm text-slate-500">No insurance payments in this period.</div>
-          ) : rows.map((r) => {
-            const pct = totalUSD > 0 ? (r.amount / totalUSD) * 100 : 0;
-            const color = colorFor(r.name);
-            return (
-              <div key={r.name} className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      aria-hidden
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: color }}
+        {sorted.length === 0 ? (
+          <div className="text-sm text-slate-500">No insurance receipts for this period.</div>
+        ) : (
+          <div className="space-y-3">
+            {sorted.map((item, idx) => {
+              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
+              const color = palette[idx % palette.length];
+              return (
+                <div key={`${item.name}-${idx}`} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-sm"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-sm text-slate-700">{item.name}</span>
+                    </div>
+                    <div className="text-xs font-medium text-slate-600">
+                      USD {fmtUSD(item.amount)}
+                    </div>
+                  </div>
+                  <div className="h-2 rounded bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-2 rounded"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
                     />
-                    <span className="truncate">{r.name}</span>
-                  </div>
-                  <div className="font-mono tabular-nums text-slate-700">
-                    USD {fmtUSD(r.amount)}
                   </div>
                 </div>
-                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-2 rounded-full"
-                    style={{ width: `${Math.min(100, pct)}%`, backgroundColor: color }}
-                    title={`${r.name} · ${pct.toFixed(1)}%`}
-                  />
-                </div>
-                <div className="text-[11px] text-slate-500">{pct.toFixed(1)}% of period total</div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
+/* ================== Page ================== */
 export default function AdvancedDashboard() {
   const {
     timeRange, selectedYear, selectedMonth,
@@ -165,7 +154,6 @@ export default function AdvancedDashboard() {
   // keep backend compatibility
   const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
 
-  // ---------- dropdown handlers ----------
   const handleTimeRangeChange = (
     range:
       | "current-month"
@@ -179,12 +167,20 @@ export default function AdvancedDashboard() {
   // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
   const months = [
-    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
-    { label: "April", value: 4 }, { label: "May", value: 5 }, { label: "June", value: 6 },
-    { label: "July", value: 7 }, { label: "August", value: 8 }, { label: "September", value: 9 },
-    { label: "October", value: 10 }, { label: "November", value: 11 }, { label: "December", value: 12 },
+    { label: "January", value: 1 },
+    { label: "February", value: 2 },
+    { label: "March", value: 3 },
+    { label: "April", value: 4 },
+    { label: "May", value: 5 },
+    { label: "June", value: 6 },
+    { label: "July", value: 7 },
+    { label: "August", value: 8 },
+    { label: "September", value: 9 },
+    { label: "October", value: 10 },
+    { label: "November", value: 11 },
+    { label: "December", value: 12 },
   ];
 
   // ---------- queries ----------
@@ -242,8 +238,8 @@ export default function AdvancedDashboard() {
       fullDate: r.date,
     }));
   } else {
-    const y = selectedYear;
-    const m = selectedMonth;
+    const y = selectedYear!;
+    const m = selectedMonth!;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
@@ -291,6 +287,7 @@ export default function AdvancedDashboard() {
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
+  const sspNetIncome = sspRevenue - totalExpenses;
 
   const getPatientVolumeNavigation = () => {
     const currentDate = new Date();
@@ -331,9 +328,7 @@ export default function AdvancedDashboard() {
           {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="current-month">Current Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
@@ -538,7 +533,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Insurance (USD) KPI */}
+        {/* Insurance (USD) quick nav */}
         <Link href={`/insurance-providers?range=${normalizedRange}${
           timeRange === "custom" && customStartDate && customEndDate
             ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
@@ -596,9 +591,9 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Revenue + Departments + Insurance Providers + Quick Actions + System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
-        {/* Revenue Analytics */}
+      {/* Main Grid: Revenue (left) + Right stack (Departments + Providers) + bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
+        {/* LEFT: Revenue Analytics (spans 2 cols) */}
         <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
@@ -609,27 +604,26 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Departments Panel */}
-        <div className="lg:col-span-1">
+        {/* RIGHT: stack Departments + Insurance Providers */}
+        <div className="lg:col-span-1 flex flex-col gap-6 self-start">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
           />
+
+          <InsuranceProvidersUSD
+            breakdown={dashboardData?.insuranceBreakdown}
+            totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
+            timeRange={normalizedRange}
+            selectedYear={selectedYear ?? undefined}
+            selectedMonth={selectedMonth ?? undefined}
+            customStartDate={customStartDate ?? undefined}
+            customEndDate={customEndDate ?? undefined}
+          />
         </div>
 
-        {/* Insurance Providers (USD) — fills the previous empty rectangle */}
-        <InsuranceProvidersUSD
-          breakdown={dashboardData?.insuranceBreakdown}
-          totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
-          timeRange={normalizedRange}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          customStartDate={customStartDate ?? undefined}
-          customEndDate={customEndDate ?? undefined}
-        />
-
-        {/* Quick Actions */}
+        {/* Bottom row: Quick Actions (2 cols) + System Status (1 col) */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -674,8 +668,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* System Status */}
-        <Card className="border border-slate-200 shadow-sm lg:col-span-1">
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1 self-start">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
