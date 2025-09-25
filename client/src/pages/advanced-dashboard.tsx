@@ -28,9 +28,10 @@ import {
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
-
 // NEW: daily analytics (split SSP & USD) for the Exec view
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
+// NEW: claims pipeline (fills the old empty space)
+import ClaimsPipeline from "@/components/dashboard/ClaimsPipeline";
 
 // ---------- number formatting helpers ----------
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -365,7 +366,7 @@ export default function AdvancedDashboard() {
                     side="bottom"
                     align="start"
                     sideOffset={12}
-                    className="p-2 w=[280px] bg-white border border-gray-200 shadow-2xl"
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
                     style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
                     avoidCollisions
                     collisionPadding={15}
@@ -537,9 +538,9 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
-        {/* Revenue Analytics (REPLACED with the new daily split charts) */}
+      {/* Main Grid: Revenue + Right column stack + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
+        {/* Left: Revenue Analytics */}
         <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
@@ -550,16 +551,53 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Departments Panel */}
-        <div className="lg:col-span-1">
+        {/* RIGHT COLUMN (stacked to avoid empty space) */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
           />
+
+          {/* Claims Pipeline fills the old “hole” */}
+          <ClaimsPipeline
+            timeRange={timeRange}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            customStartDate={customStartDate ?? undefined}
+            customEndDate={customEndDate ?? undefined}
+            normalizedRange={normalizedRange}
+          />
+
+          {/* System Status — moved into the right stack */}
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Database</span>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Last Sync</span>
+                  <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+                    {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Active Users</span>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Quick Actions — sits below chart (spans 2) */}
+        {/* Quick Actions — under the revenue area */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -600,33 +638,6 @@ export default function AdvancedDashboard() {
                   </div>
                 </Button>
               </a>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* System Status — sits under Departments */}
-        <Card className="border border-slate-200 shadow-sm lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Database</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Last Sync</span>
-                <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
-                  {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Active Users</span>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
-              </div>
             </div>
           </CardContent>
         </Card>
