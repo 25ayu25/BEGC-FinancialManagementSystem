@@ -25,7 +25,7 @@ import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-/* ================== number formatting helpers ================== */
+/* ---------- formatting ---------- */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
@@ -34,8 +34,7 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== Insurance Providers Card ================== */
-/** Accepts either an object {provider: amount} or an array [{name, amount}] */
+/* ---------- Insurance Providers (USD) card ---------- */
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
@@ -53,15 +52,11 @@ function InsuranceProvidersUSD({
   customStartDate?: Date;
   customEndDate?: Date;
 }) {
-  // Normalize breakdown to an array
   const rows = useMemo(() => {
     if (!breakdown) return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
       return breakdown
-        .map((r) => ({
-          name: String(r.name ?? r.provider ?? "Unknown"),
-          amount: Number(r.amount ?? r.total ?? 0),
-        }))
+        .map((r) => ({ name: String(r.name ?? r.provider ?? "Unknown"), amount: Number(r.amount ?? r.total ?? 0) }))
         .filter((r) => r.amount > 0);
     }
     return Object.entries(breakdown)
@@ -69,20 +64,12 @@ function InsuranceProvidersUSD({
       .filter((r) => r.amount > 0);
   }, [breakdown]);
 
-  // Use breakdown sum if it exists (prevents header/section mismatch)
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
-
-  // Sort by amount desc
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
 
-  // Distinct color palette
-  const palette = [
-    "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
-    "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
-  ];
+  const palette = ["#00A3A3", "#4F46E5", "#F59E0B", "#EF4444", "#10B981", "#8B5CF6", "#EA580C", "#06B6D4"];
 
-  // Build “View all” link with current filter preserved
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
     timeRange === "custom" && customStartDate && customEndDate
@@ -95,9 +82,7 @@ function InsuranceProvidersUSD({
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
           <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance Providers (USD)
         </CardTitle>
-        <Link href={viewAllHref}>
-          <Button variant="outline" size="sm">View all</Button>
-        </Link>
+        <Link href={viewAllHref}><Button variant="outline" size="sm">View all</Button></Link>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="text-xs text-slate-500">
@@ -115,21 +100,13 @@ function InsuranceProvidersUSD({
                 <div key={`${item.name}-${idx}`} className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm"
-                        style={{ backgroundColor: color }}
-                      />
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
                       <span className="text-sm text-slate-700">{item.name}</span>
                     </div>
-                    <div className="text-xs font-medium text-slate-600">
-                      USD {fmtUSD(item.amount)}
-                    </div>
+                    <div className="text-xs font-medium text-slate-600">USD {fmtUSD(item.amount)}</div>
                   </div>
                   <div className="h-2 rounded bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-2 rounded"
-                      style={{ width: `${pct}%`, backgroundColor: color }}
-                    />
+                    <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
                   </div>
                 </div>
               );
@@ -141,7 +118,7 @@ function InsuranceProvidersUSD({
   );
 }
 
-/* ================== Page ================== */
+/* ---------- Page ---------- */
 export default function AdvancedDashboard() {
   const {
     timeRange, selectedYear, selectedMonth,
@@ -150,48 +127,27 @@ export default function AdvancedDashboard() {
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
-
-  // keep backend compatibility
   const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
 
   const handleTimeRangeChange = (
-    range:
-      | "current-month"
-      | "last-month"
-      | "last-3-months"
-      | "year"
-      | "month-select"
-      | "custom"
+    range: "current-month" | "last-month" | "last-3-months" | "year" | "month-select" | "custom"
   ) => setTimeRange(range);
 
-  // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]); // expand as needed
+  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
   const months = [
-    { label: "January", value: 1 },
-    { label: "February", value: 2 },
-    { label: "March", value: 3 },
-    { label: "April", value: 4 },
-    { label: "May", value: 5 },
-    { label: "June", value: 6 },
-    { label: "July", value: 7 },
-    { label: "August", value: 8 },
-    { label: "September", value: 9 },
-    { label: "October", value: 10 },
-    { label: "November", value: 11 },
-    { label: "December", value: 12 },
+    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
+    { label: "April", value: 4 }, { label: "May", value: 5 }, { label: "June", value: 6 },
+    { label: "July", value: 7 }, { label: "August", value: 8 }, { label: "September", value: 9 },
+    { label: "October", value: 10 }, { label: "November", value: 11 }, { label: "December", value: 12 },
   ];
 
-  // ---------- queries ----------
+  /* -------- queries -------- */
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
-      "/api/dashboard",
-      selectedYear,
-      selectedMonth,
-      normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      "/api/dashboard", selectedYear, selectedMonth, normalizedRange,
+      customStartDate?.toISOString(), customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
@@ -207,12 +163,8 @@ export default function AdvancedDashboard() {
 
   const { data: rawIncome } = useQuery({
     queryKey: [
-      "/api/income-trends",
-      selectedYear,
-      selectedMonth,
-      normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      "/api/income-trends", selectedYear, selectedMonth, normalizedRange,
+      customStartDate?.toISOString(), customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
@@ -224,7 +176,7 @@ export default function AdvancedDashboard() {
     },
   });
 
-  // ---------- build income series ----------
+  /* -------- build income series (unchanged) -------- */
   let incomeSeries: Array<{
     day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
   }> = [];
@@ -260,17 +212,13 @@ export default function AdvancedDashboard() {
     }
   }
 
-  // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
-  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
   const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
   const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
   const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
   const showAvgLine = daysWithSSP >= 2;
-  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
 
-  // loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -282,7 +230,6 @@ export default function AdvancedDashboard() {
     );
   }
 
-  // summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
@@ -313,19 +260,16 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
-      {/* Header + date filters */}
+      {/* Header */}
       <header className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
-              Executive Dashboard
-            </h1>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">Executive Dashboard</h1>
             <div className="mt-1 flex items-center gap-4">
               <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
             </div>
           </div>
 
-          {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
@@ -341,32 +285,14 @@ export default function AdvancedDashboard() {
 
             {timeRange === "month-select" && (
               <>
-                <Select
-                  value={String(selectedYear)}
-                  onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
-                >
-                  <SelectTrigger className="h-9 w-[120px]">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
+                <Select value={String(selectedYear)} onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}>
+                  <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
+                  <SelectContent>{years.map((y) => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}</SelectContent>
                 </Select>
 
-                <Select
-                  value={String(selectedMonth)}
-                  onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
-                >
-                  <SelectTrigger className="h-9 w-[140px]">
-                    <SelectValue placeholder="Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
+                <Select value={String(selectedMonth)} onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}>
+                  <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Month" /></SelectTrigger>
+                  <SelectContent>{months.map((m) => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}</SelectContent>
                 </Select>
               </>
             )}
@@ -375,31 +301,12 @@ export default function AdvancedDashboard() {
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />{customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customStartDate}
-                      onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
-                      initialFocus
-                    />
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" avoidCollisions collisionPadding={15}>
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customStartDate} onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)} initialFocus />
                   </PopoverContent>
                 </Popover>
 
@@ -407,31 +314,12 @@ export default function AdvancedDashboard() {
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />{customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={12}
-                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                    avoidCollisions
-                    collisionPadding={15}
-                  >
-                    <DatePicker
-                      mode="single"
-                      numberOfMonths={1}
-                      showOutsideDays={false}
-                      selected={customEndDate}
-                      onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
-                      initialFocus
-                    />
+                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" avoidCollisions collisionPadding={15}>
+                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customEndDate} onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)} initialFocus />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -440,9 +328,8 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* KPI Cards */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
-        {/* Total Revenue */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
@@ -464,16 +351,14 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
               <div className="bg-emerald-50 p-1.5 rounded-lg">
-                {dashboardData?.changes?.incomeChangeSSP !== undefined &&
-                dashboardData.changes.incomeChangeSSP < 0 ? (
-                  <TrendingDown className="h-4 w-4 text-red-600" />
-                ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
+                {dashboardData?.changes?.incomeChangeSSP !== undefined && dashboardData.changes.incomeChangeSSP < 0
+                  ? <TrendingDown className="h-4 w-4 text-red-600" />
+                  : <TrendingUp className="h-4 w-4 text-emerald-600" />}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Total Expenses */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
           onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
           <CardContent className="p-4 sm:p-3">
@@ -496,16 +381,14 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
               <div className="bg-red-50 p-1.5 rounded-lg">
-                {dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                dashboardData.changes.expenseChangeSSP < 0 ? (
-                  <TrendingDown className="h-4 w-4 text-emerald-600" />
-                ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+                {dashboardData?.changes?.expenseChangeSSP !== undefined && dashboardData.changes.expenseChangeSSP < 0
+                  ? <TrendingDown className="h-4 w-4 text-emerald-600" />
+                  : <TrendingUp className="h-4 w-4 text-red-600" />}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Net Income */}
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
@@ -526,14 +409,11 @@ export default function AdvancedDashboard() {
                   )}
                 </div>
               </div>
-              <div className="bg-blue-50 p-1.5 rounded-lg">
-                <DollarSign className="h-4 w-4 text-blue-600" />
-              </div>
+              <div className="bg-blue-50 p-1.5 rounded-lg"><DollarSign className="h-4 w-4 text-blue-600" /></div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Insurance (USD) quick nav */}
         <Link href={`/insurance-providers?range=${normalizedRange}${
           timeRange === "custom" && customStartDate && customEndDate
             ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
@@ -570,7 +450,6 @@ export default function AdvancedDashboard() {
           </Card>
         </Link>
 
-        {/* Patient Volume */}
         <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
@@ -591,10 +470,10 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Revenue (left) + Right stack (Departments + Providers) + bottom row */}
+      {/* ====== GRID LAYOUT (no gap): explicit row placements ====== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
-        {/* LEFT: Revenue Analytics (spans 2 cols) */}
-        <div className="lg:col-span-2">
+        {/* Row 1 */}
+        <div className="lg:col-span-2 lg:row-start-1">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
             selectedYear={selectedYear}
@@ -603,28 +482,16 @@ export default function AdvancedDashboard() {
             customEndDate={customEndDate ?? undefined}
           />
         </div>
-
-        {/* RIGHT: stack Departments + Insurance Providers */}
-        <div className="lg:col-span-1 flex flex-col gap-6 self-start">
+        <div className="lg:col-span-1 lg:row-start-1">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
           />
-
-          <InsuranceProvidersUSD
-            breakdown={dashboardData?.insuranceBreakdown}
-            totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
-            timeRange={normalizedRange}
-            selectedYear={selectedYear ?? undefined}
-            selectedMonth={selectedMonth ?? undefined}
-            customStartDate={customStartDate ?? undefined}
-            customEndDate={customEndDate ?? undefined}
-          />
         </div>
 
-        {/* Bottom row: Quick Actions (2 cols) + System Status (1 col) */}
-        <Card className="border border-slate-200 shadow-sm lg:col-span-2">
+        {/* Row 2 */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-2 lg:row-start-2">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
@@ -668,7 +535,20 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border border-slate-200 shadow-sm lg:col-span-1 self-start">
+        <div className="lg:col-span-1 lg:row-start-2">
+          <InsuranceProvidersUSD
+            breakdown={dashboardData?.insuranceBreakdown}
+            totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
+            timeRange={normalizedRange}
+            selectedYear={selectedYear ?? undefined}
+            selectedMonth={selectedMonth ?? undefined}
+            customStartDate={customStartDate ?? undefined}
+            customEndDate={customEndDate ?? undefined}
+          />
+        </div>
+
+        {/* Row 3 */}
+        <Card className="border border-slate-200 shadow-sm lg:col-span-1 lg:row-start-3">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
