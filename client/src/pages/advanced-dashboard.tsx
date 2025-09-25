@@ -34,7 +34,7 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== Insurance Providers Card ================== */
+/* ================== Insurance Providers Card (with year clamp) ================== */
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
@@ -52,6 +52,10 @@ function InsuranceProvidersUSD({
   customStartDate?: Date;
   customEndDate?: Date;
 }) {
+  const [clamped, setClamped] = useState(true);
+  const CLAMP_LIMIT = 8;
+
+  // Normalize breakdown to an array
   const rows = useMemo(() => {
     if (!breakdown) return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
@@ -69,13 +73,21 @@ function InsuranceProvidersUSD({
 
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
+
+  // Sort by amount desc
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
 
+  // Clamp list only for "year" to keep the right column tidy
+  const shouldClamp = timeRange === "year" && sorted.length > CLAMP_LIMIT && clamped;
+  const visible = shouldClamp ? sorted.slice(0, CLAMP_LIMIT) : sorted;
+
+  // Distinct color palette
   const palette = [
     "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
     "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
   ];
 
+  // Build “View all” link with current filter preserved
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
     timeRange === "custom" && customStartDate && customEndDate
@@ -97,31 +109,42 @@ function InsuranceProvidersUSD({
           Totals in period: <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
         </div>
 
-        {sorted.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="text-sm text-slate-500">No insurance receipts for this period.</div>
         ) : (
-          <div className="space-y-3">
-            {sorted.map((item, idx) => {
-              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
-              const color = palette[idx % palette.length];
-              return (
-                <div key={`${item.name}-${idx}`} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
-                      <span className="text-sm text-slate-700">{item.name}</span>
+          <>
+            <div className="space-y-3">
+              {visible.map((item, idx) => {
+                const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
+                const color = palette[idx % palette.length];
+                return (
+                  <div key={`${item.name}-${idx}`} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+                        <span className="text-sm text-slate-700">{item.name}</span>
+                      </div>
+                      <div className="text-xs font-medium text-slate-600">
+                        USD {fmtUSD(item.amount)}
+                      </div>
                     </div>
-                    <div className="text-xs font-medium text-slate-600">
-                      USD {fmtUSD(item.amount)}
+                    <div className="h-2 rounded bg-slate-100 overflow-hidden">
+                      <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
                     </div>
                   </div>
-                  <div className="h-2 rounded bg-slate-100 overflow-hidden">
-                    <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Toggle only in year view when clamped/expanded */}
+            {timeRange === "year" && sorted.length > CLAMP_LIMIT && (
+              <div className="flex justify-end pt-1">
+                <Button variant="outline" size="sm" onClick={() => setClamped(!clamped)}>
+                  {clamped ? `Show all (${sorted.length})` : "Show less"}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
