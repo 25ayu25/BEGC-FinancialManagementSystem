@@ -41,6 +41,76 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
+/** NEW: compact list of insurance providers (USD) with share bars */
+function InsuranceProvidersCard({
+  breakdown,
+  totalUSD,
+  href,
+}: {
+  breakdown: Record<string, number>;
+  totalUSD: number;
+  href: string;
+}) {
+  const entries = useMemo(() => {
+    const rows = Object.entries(breakdown || {}).map(([name, v]) => ({
+      name,
+      value: Number(v || 0),
+    }));
+    rows.sort((a, b) => b.value - a.value);
+    return rows;
+  }, [breakdown]);
+
+  const safeTotal = Math.max(totalUSD || 0, 0.000001);
+
+  return (
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Shield className="h-4 w-4 text-purple-600" />
+            Insurance Providers (USD)
+          </CardTitle>
+          <Link href={href}>
+            <Button size="sm" variant="outline">View all</Button>
+          </Link>
+        </div>
+        <p className="text-xs text-slate-500">Total this period: USD {fmtUSD(totalUSD || 0)}</p>
+      </CardHeader>
+
+      <CardContent>
+        {entries.length === 0 ? (
+          <div className="text-sm text-slate-500">No insurance revenue recorded for this period.</div>
+        ) : (
+          <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
+            {entries.map((e) => {
+              const pct = Math.min(100, Math.max(0, (e.value / safeTotal) * 100));
+              return (
+                <div key={e.name} className="grid grid-cols-[1fr_auto] gap-x-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="truncate text-sm text-slate-800">{e.name}</span>
+                      <span className="text-[11px] text-slate-500">{pct.toFixed(0)}%</span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full rounded bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded bg-purple-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-sm font-mono text-slate-900 whitespace-nowrap">
+                    USD {fmtUSD(e.value)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdvancedDashboard() {
   const {
     timeRange, selectedYear, selectedMonth,
@@ -221,11 +291,16 @@ export default function AdvancedDashboard() {
   }
 
   // summary numbers
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
-  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
-  const sspNetIncome = sspRevenue - totalExpenses;
+  const sspRevenue = monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdTotal = monthTotalUSD || parseFloat(dashboardData?.totalIncomeUSD || "0");
+
+  // build the insurance link once so both places stay consistent
+  const insuranceHref =
+    `/insurance-providers?range=${normalizedRange}${
+      timeRange === "custom" && customStartDate && customEndDate
+        ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+        : `&year=${selectedYear}&month=${selectedMonth}`
+    }`;
 
   const getPatientVolumeNavigation = () => {
     const currentDate = new Date();
@@ -265,11 +340,7 @@ export default function AdvancedDashboard() {
 
           {/* RIGHT: range + (optional) month/year or custom dates */}
           <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            {/* Quick range selector including new “Select Month…” */}
-            <Select
-              value={timeRange}
-              onValueChange={handleTimeRangeChange}
-            >
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="h-9 w-[160px]">
                 <SelectValue />
               </SelectTrigger>
@@ -283,7 +354,6 @@ export default function AdvancedDashboard() {
               </SelectContent>
             </Select>
 
-            {/* If month-select: show Year + Month dropdowns */}
             {timeRange === "month-select" && (
               <>
                 <Select
@@ -316,7 +386,6 @@ export default function AdvancedDashboard() {
               </>
             )}
 
-            {/* If custom: show start/end date pickers */}
             {timeRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Popover>
@@ -420,8 +489,10 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Total Expenses */}
-        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
+        <Card
+          className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown"
+        >
           <CardContent className="p-4 sm:p-3">
             <div className="flex items-center justify-between">
               <div>
@@ -480,11 +551,7 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Insurance (USD) */}
-        <Link href={`/insurance-providers?range=${normalizedRange}${
-          timeRange === "custom" && customStartDate && customEndDate
-            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-            : `&year=${selectedYear}&month=${selectedMonth}`
-        }`}>
+        <Link href={insuranceHref}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
@@ -537,9 +604,9 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* Main Grid: Revenue + Departments + Quick Actions + System Status */}
+      {/* Main Grid: Revenue + Departments + Providers + Quick Actions + System Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start auto-rows-min">
-        {/* Revenue Analytics (REPLACED with the new daily split charts) */}
+        {/* Revenue Analytics */}
         <div className="lg:col-span-2">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
@@ -550,12 +617,19 @@ export default function AdvancedDashboard() {
           />
         </div>
 
-        {/* Departments Panel */}
-        <div className="lg:col-span-1">
+        {/* RIGHT COLUMN: stack Departments + Insurance Providers to fill the tall first row */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
             departmentBreakdown={dashboardData?.departmentBreakdown}
             totalSSP={sspRevenue}
+          />
+
+          {/* NEW: Insurance Providers list (USD) */}
+          <InsuranceProvidersCard
+            breakdown={dashboardData?.insuranceBreakdown ?? {}}
+            totalUSD={usdTotal}
+            href={insuranceHref}
           />
         </div>
 
@@ -604,7 +678,7 @@ export default function AdvancedDashboard() {
           </CardContent>
         </Card>
 
-        {/* System Status — sits under Departments */}
+        {/* System Status — sits under right column */}
         <Card className="border border-slate-200 shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
