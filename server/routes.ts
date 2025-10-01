@@ -14,35 +14,40 @@ import { z } from "zod";
 
 function parseYMD(dateStr?: string | null): Date | undefined {
   if (!dateStr) return undefined;
-  // Accept "YYYY-MM-DD" exactly (build UTC midnight)
   const m = /^\d{4}-\d{2}-\d{2}$/.exec(dateStr);
   if (m) {
     const [y, mo, d] = dateStr.split("-").map((n) => parseInt(n, 10));
     return new Date(Date.UTC(y, mo - 1, d, 0, 0, 0, 0));
   }
-  // Fallback: let JS parse (still returns a Date object)
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? undefined : d;
 }
 
 function addDaysUTC(d: Date, days: number) {
-  return new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days, 0, 0, 0, 0)
-  );
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days, 0, 0, 0, 0));
 }
 
 function toNumberLoose(v: unknown): number {
-  // Handle "80,000", " 200.50 ", 200, etc.
+  // Accept "80,000", " 200.50 ", 200, etc.
   const n = Number(String(v ?? "").replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : NaN;
 }
 
+function norm(s?: string | null) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 /* ------------------------------ CORS -------------------------------- */
 
-const RAW_ALLOWED = (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const RAW_ALLOWED =
+  (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const ALLOWED_EXACT = new Set<string>([
   ...RAW_ALLOWED,
@@ -67,17 +72,18 @@ function isAllowedOrigin(origin?: string): boolean {
   }
 }
 
-function applyCors(_req: Request, res: Response) {
-  const origin = _req.headers.origin as string | undefined;
+function applyCors(req: Request, res: Response) {
+  const origin = req.headers.origin as string | undefined;
   if (origin && isAllowedOrigin(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
-  // allow common headers + our session header
+  // Echo requested headers if present (robust to casing / future additions)
+  const requested = (req.headers["access-control-request-headers"] as string | undefined)?.trim();
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, X-Session-Token"
+    requested || "Content-Type, Authorization, X-Requested-With, X-Session-Token"
   );
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
 }
@@ -217,12 +223,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.post("/api/auth/logout", (_req, res) => {
     const isProd = process.env.NODE_ENV === "production";
-    res.clearCookie("user_session", {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "none",
-      path: "/",
-    });
+    res.clearCookie("user_session", { httpOnly: true, secure: isProd, sameSite: "none", path: "/" });
     res.clearCookie("session");
     res.json({ success: true, message: "Logged out successfully" });
   });
@@ -336,8 +337,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const userId = req.params.id;
       const { newPassword } = req.body;
       if (!newPassword) return res.status(400).json({ error: "New password is required" });
-      if (newPassword.length < 8)
-        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      if (newPassword.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
 
       const existing = await storage.getUser(userId);
       if (!existing) return res.status(404).json({ error: "User not found" });
@@ -359,9 +359,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const { username, email, fullName, role, password, permissions } = req.body;
       const location = "clinic";
       if (!username || !email || !fullName || !role) {
-        return res
-          .status(400)
-          .json({ error: "Missing required fields: username, email, fullName, role" });
+        return res.status(400).json({ error: "Missing required fields: username, email, fullName, role" });
       }
 
       const userData = {
@@ -433,15 +431,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
-      // paging: support both ?limit= and ?pageSize=
       const page = parseInt((req.query.page as string) || "1", 10);
-      const limit = parseInt(
-        (req.query.limit as string) || (req.query.pageSize as string) || "50",
-        10
-      );
+      const limit = parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10);
       const offset = (page - 1) * limit;
 
-      // half-open window [start, end)
       const startDate = parseYMD(req.query.startDate as string);
       const endDate = parseYMD(req.query.endDate as string);
 
@@ -450,8 +443,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (endDate) filters.endDate = endDate;
 
       if (req.query.departmentId) filters.departmentId = String(req.query.departmentId);
-      if (req.query.insuranceProviderId)
-        filters.insuranceProviderId = String(req.query.insuranceProviderId);
+      if (req.query.insuranceProviderId) filters.insuranceProviderId = String(req.query.insuranceProviderId);
       if (req.query.currency) filters.currency = String(req.query.currency).toUpperCase();
       if (req.query.type) filters.type = String(req.query.type).toLowerCase();
       if (req.query.searchQuery) filters.searchQuery = String(req.query.searchQuery);
@@ -490,19 +482,24 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* ---------------- NEW: Daily Bulk Income ----------------------- */
-  // Provider-only rows are allowed (departmentId may be omitted).
-  // "no-insurance" → null on the server.
+  // Accept department *or* provider rows; IDs *or* names; sanitize amounts.
   app.post("/api/transactions/bulk-income", requireAuth, async (req, res) => {
     try {
+      // Accept a variety of shapes for robustness
       const RowSchema = z.object({
+        // Either departmentId (uuid) or departmentName (string)
         departmentId: z.string().min(1).optional(),
-        amount: z.any(), // we convert/validate below to allow "80,000" etc.
+        departmentName: z.string().optional(),
+        // Either insuranceProviderId (uuid) or providerName (string)
+        insuranceProviderId: z.string().nullable().optional(),
+        providerName: z.string().optional(),
+        // Free-form amount; we sanitize later
+        amount: z.any(),
         description: z.string().optional(),
-        insuranceProviderId: z.string().nullable().optional(), // may be "no-insurance"
       });
 
       const BulkSchema = z.object({
-        date: z.string().optional(), // YYYY-MM-DD (optional; defaults to today)
+        date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
         defaultInsuranceProviderId: z.string().nullable().optional(),
         notes: z.string().optional(),
@@ -513,6 +510,37 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const dateObj = payload.date ? parseYMD(payload.date) : new Date();
       if (!dateObj) return res.status(400).json({ error: "Invalid date format" });
+
+      // Build lookup maps once per request (id and normalized name → id)
+      const [departments, providers] = await Promise.all([
+        storage.getDepartments(),
+        storage.getInsuranceProviders(),
+      ]);
+
+      const deptMap = new Map<string, string>();
+      for (const d of departments || []) {
+        if (!d?.id) continue;
+        deptMap.set(d.id, d.id);
+        deptMap.set(norm(d.name), d.id);
+      }
+
+      const provMap = new Map<string, string>();
+      for (const p of providers || []) {
+        if (!p?.id) continue;
+        provMap.set(p.id, p.id);
+        provMap.set(norm(p.name), p.id);
+      }
+
+      function resolveDepartment(ref?: string) {
+        const key = norm(ref);
+        return deptMap.get(ref || "") || deptMap.get(key);
+      }
+
+      function resolveProvider(ref?: string | null) {
+        const key = norm(ref || "");
+        if (!ref || key === "" || key === "no-insurance" || key === "cash") return null;
+        return provMap.get(ref) || provMap.get(key) || null;
+      }
 
       const createdBy = req.user!.id;
       const syncStatus = "synced";
@@ -529,19 +557,20 @@ export async function registerRoutes(app: Express): Promise<void> {
           continue;
         }
 
-        // Allow provider-only income rows (no department)
+        // Prefer explicit fields; fall back to name lookups
+        const departmentId = resolveDepartment(r.departmentId || r.departmentName);
+        // Provider precedence: explicit, default, then name resolution
         const chosenProvider =
           r.insuranceProviderId !== undefined
             ? r.insuranceProviderId
-            : payload.defaultInsuranceProviderId ?? null;
+            : payload.defaultInsuranceProviderId ?? r.providerName;
+        const insuranceProviderId = resolveProvider(chosenProvider);
 
-        const insuranceProviderId =
-          chosenProvider === "no-insurance" ? null : chosenProvider ?? null;
-
-        if (!r.departmentId && !insuranceProviderId) {
+        // Require at least one identifier
+        if (!departmentId && insuranceProviderId === null) {
           errors.push({
             index: i,
-            error: "Provide either departmentId or insuranceProviderId",
+            error: "Provide either a valid department or a valid insurance provider",
           });
           continue;
         }
@@ -549,12 +578,12 @@ export async function registerRoutes(app: Express): Promise<void> {
         const txCandidate = {
           type: "income" as const,
           date: dateObj,
-          departmentId: r.departmentId || undefined,
+          departmentId: departmentId || undefined,
           amount: amountNum,
           currency: payload.currency,
           description: r.description || payload.notes || "Daily income",
           createdBy,
-          insuranceProviderId, // null means cash/no-insurance
+          insuranceProviderId, // null = cash/no-insurance
           syncStatus,
         };
 
@@ -563,10 +592,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const tx = await storage.createTransaction(validated);
           created.push(tx);
         } catch (e: any) {
-          errors.push({
-            index: i,
-            error: e?.errors || e?.message || "Validation error",
-          });
+          errors.push({ index: i, error: e?.errors || e?.message || "Validation error" });
         }
       }
 
@@ -636,10 +662,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const tx = await storage.createTransaction(validated);
           created.push(tx);
         } catch (e: any) {
-          errors.push({
-            index: i,
-            error: e?.errors || e?.message || "Validation error",
-          });
+          errors.push({ index: i, error: e?.errors || e?.message || "Validation error" });
         }
       }
 
@@ -720,9 +743,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         start = f;
         endExclusive = t; // [from, to)
       } else {
-        return res
-          .status(400)
-          .json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
+        return res.status(400).json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
       }
 
       const rows = await storage.getTransactionsBetween(start!, endExclusive!, {
@@ -789,7 +810,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         const start = addDaysUTC(new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)), 0);
         data = await storage.getIncomeTrendsForDateRange(start, endEx);
       } else if (range === "year") {
-        // [Jan 1, Jan 1 nextYear)
         const s = new Date(Date.UTC(year, 0, 1));
         const e = new Date(Date.UTC(year + 1, 0, 1));
         data = await storage.getIncomeTrendsForDateRange(s, e);
@@ -822,9 +842,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {
       const { limit } = req.query;
-      const reports = await storage.getMonthlyReports(
-        limit ? parseInt(limit as string, 10) : undefined
-      );
+      const reports = await storage.getMonthlyReports(limit ? parseInt(limit as string, 10) : undefined);
       res.json(reports);
     } catch (error) {
       console.error("Error fetching reports:", error);
@@ -851,11 +869,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const month = parseInt(req.params.month, 10);
       const userId = (req as any).user.id;
 
-      const dashboardData = await storage.getDashboardData({
-        year,
-        month,
-        range: "current-month",
-      });
+      const dashboardData = await storage.getDashboardData({ year, month, range: "current-month" });
       const reportData = {
         year,
         month,
@@ -896,11 +910,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const year = parseInt(pathParts[0], 10);
       const month = parseInt(pathParts[1], 10);
 
-      const dashboardData = await storage.getDashboardData({
-        year,
-        month,
-        range: "current-month",
-      });
+      const dashboardData = await storage.getDashboardData({ year, month, range: "current-month" });
       const report = await storage.getMonthlyReport(year, month);
       if (!report) return res.status(404).json({ error: "Report not found" });
 
@@ -934,9 +944,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Title
       doc.setTextColor(0, 0, 0);
-      const monthName = new Date(year, month - 1).toLocaleDateString("en-US", {
-        month: "long",
-      });
+      const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long" });
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.text(`${monthName} ${year}`, margin, 80);
@@ -970,10 +978,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.post("/api/receipts", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertReceiptSchema.parse({
-        ...req.body,
-        uploadedBy: req.user!.id,
-      });
+      const validatedData = insertReceiptSchema.parse({ ...req.body, uploadedBy: req.user!.id });
       const receipt = await storage.createReceipt(validatedData);
       res.status(201).json(receipt);
     } catch (error) {
@@ -989,9 +994,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/receipts/:receiptPath(*)", async (req, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
-      const objectFile = await objectStorageService.getObjectEntityFile(
-        `/objects/${req.params.receiptPath}`
-      );
+      const objectFile = await objectStorageService.getObjectEntityFile(`/objects/${req.params.receiptPath}`);
       objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
       console.error("Error serving receipt:", error);
@@ -1004,10 +1007,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   app.post("/api/patient-volume", requireAuth, async (req, res) => {
     try {
-      const validated = insertPatientVolumeSchema.parse({
-        ...req.body,
-        recordedBy: req.user?.id,
-      });
+      const validated = insertPatientVolumeSchema.parse({ ...req.body, recordedBy: req.user?.id });
       const volume = await storage.createPatientVolume(validated);
       res.status(201).json(volume);
     } catch (error) {
@@ -1062,10 +1062,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const months: any[] = [];
           for (let i = 0; i < 3; i++) {
             const d = new Date(year, month - 1 - i);
-            const mv = await storage.getPatientVolumeForMonth(
-              d.getFullYear(),
-              d.getMonth() + 1
-            );
+            const mv = await storage.getPatientVolumeForMonth(d.getFullYear(), d.getMonth() + 1);
             months.push(...mv);
           }
           volumes = months;
@@ -1081,12 +1078,8 @@ export async function registerRoutes(app: Express): Promise<void> {
           break;
         }
         case "custom": {
-          const s =
-            parseYMD(req.query.startDate as string) ||
-            new Date(Date.UTC(year, month - 1, 1));
-          const e =
-            parseYMD(req.query.endDate as string) ||
-            new Date(Date.UTC(year, month, 1));
+          const s = parseYMD(req.query.startDate as string) || new Date(Date.UTC(year, month - 1, 1));
+          const e = parseYMD(req.query.endDate as string) || new Date(Date.UTC(year, month, 1));
           volumes = await storage.getPatientVolumeByDateRange(s, e);
           break;
         }
