@@ -67,8 +67,8 @@ function isAllowedOrigin(origin?: string): boolean {
   }
 }
 
-function applyCors(req: Request, res: Response) {
-  const origin = req.headers.origin as string | undefined;
+function applyCors(_req: Request, res: Response) {
+  const origin = _req.headers.origin as string | undefined;
   if (origin && isAllowedOrigin(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -1051,7 +1051,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const month = parseInt(req.params.month, 10);
       const range = (req.query.range as string) || "current-month";
 
-    let volumes: any[] = [];
+      let volumes: any[] = [];
       switch (range) {
         case "current-month":
         case "last-month": {
