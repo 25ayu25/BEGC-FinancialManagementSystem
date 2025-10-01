@@ -10,11 +10,13 @@ import { z } from "zod";
 
 function parseYMD(dateStr?: string | null): Date | undefined {
   if (!dateStr) return undefined;
+  // Accept "YYYY-MM-DD" exactly (build UTC midnight)
   const m = /^\d{4}-\d{2}-\d{2}$/.exec(dateStr);
   if (m) {
     const [y, mo, d] = dateStr.split("-").map((n) => parseInt(n, 10));
     return new Date(Date.UTC(y, mo - 1, d, 0, 0, 0, 0));
   }
+  // Fallback: let JS parse (still returns a Date object)
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? undefined : d;
 }
@@ -32,14 +34,17 @@ const RAW_ALLOWED =
     .filter(Boolean);
 
 const ALLOWED_EXACT = new Set<string>([
+  // Env-provided
   ...RAW_ALLOWED,
+  // Local dev
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
 
-const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
+// Allow common hosters (exact domain still preferred via env var)
+the const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
 
 function isAllowedOrigin(origin?: string): boolean {
   if (!origin) return false;
@@ -59,6 +64,7 @@ function applyCors(req: Request, res: Response) {
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
+  // allow common headers + our session header
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, X-Requested-With, X-Session-Token"
@@ -82,11 +88,14 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<void> {
+  // Make secure cookies work behind a proxy (Render/Netlify)
   app.set("trust proxy", 1);
 
+  // Global CORS + preflight (before any auth middleware)
   app.use((req, res, next) => {
     applyCors(req, res);
     if (req.method === "OPTIONS") {
+      // Preflight: respond quickly, cache briefly
       res.setHeader("Access-Control-Max-Age", "600");
       return res.status(204).end();
     }
@@ -186,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         secure: isProd,
         sameSite: "none",
         path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 30,
+        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
       });
 
       res.json(userSession);
@@ -406,11 +415,13 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
+      // paging: support both ?limit= and ?pageSize=
       const page = parseInt((req.query.page as string) || "1", 10);
       const limit =
         parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10);
       const offset = (page - 1) * limit;
 
+      // half-open window [start, end)
       const startDate = parseYMD(req.query.startDate as string);
       const endDate = parseYMD(req.query.endDate as string);
 
@@ -458,31 +469,21 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  /* ---------------- NEW: Daily Bulk Income ----------------------- */
-  // POST /api/transactions/bulk-income
-  // {
-  //   "date": "2025-09-27",
-  //   "currency": "SSP" | "USD",
-  //   "defaultInsuranceProviderId": "no-insurance" | "<uuid>" | null,
-  //   "notes": "optional",
-  //   "rows": [
-  //     { "departmentId": "<uuid>", "amount": 12345, "description": "optional", "insuranceProviderId": "no-insurance" | "<uuid>" | null },
-  //     ...
-  //   ]
-  // }
+  /* ---------------- NEW: BULK INCOME ------------------------------ */
+  // Accepts mixed rows; each row is validated & created independently.
+  // Returns { created, errors, transactions } where errors indicate row index + reason.
   app.post("/api/transactions/bulk-income", requireAuth, async (req, res) => {
     try {
       const RowSchema = z.object({
-        departmentId: z.string().min(1, "departmentId required"),
-        amount: z.coerce.number().finite().nonnegative(),
+        departmentId: z.string().min(1).optional(),
+        amount: z.coerce.number(),
         description: z.string().optional(),
-        insuranceProviderId: z.string().nullable().optional(),
+        insuranceProviderId: z.string().nullable().optional(), // "no-insurance" handled below
       });
 
       const BulkSchema = z.object({
-        date: z.string().optional(), // YYYY-MM-DD; optional (defaults to today)
+        date: z.string().optional(), // YYYY-MM-DD (optional)
         currency: z.enum(["SSP", "USD"]).default("SSP"),
-        defaultInsuranceProviderId: z.string().nullable().optional(),
         notes: z.string().optional(),
         rows: z.array(RowSchema).min(1, "rows must contain at least one item"),
       });
@@ -492,54 +493,121 @@ export async function registerRoutes(app: Express): Promise<void> {
       const dateObj = payload.date ? parseYMD(payload.date) : new Date();
       if (!dateObj) return res.status(400).json({ error: "Invalid date format" });
 
-      const createdBy = req.user!.id;
-      const syncStatus = "synced";
-
       const created: any[] = [];
-      for (const r of payload.rows) {
-        const amt = Number(r.amount);
-        if (!isFinite(amt) || amt <= 0) continue; // skip empty/non-positive rows
+      const errors: any[] = [];
 
-        const selectedProvider =
-          r.insuranceProviderId !== undefined
-            ? r.insuranceProviderId
-            : payload.defaultInsuranceProviderId ?? null;
+      for (let i = 0; i < payload.rows.length; i++) {
+        const r = payload.rows[i];
+
+        const amt = Number(r.amount);
+        if (!isFinite(amt) || amt <= 0) {
+          errors.push({ index: i, error: "Invalid amount" });
+          continue;
+        }
 
         const insuranceProviderId =
-          selectedProvider === "no-insurance" ? null : selectedProvider ?? null;
+          !r.insuranceProviderId || r.insuranceProviderId === "no-insurance"
+            ? null
+            : String(r.insuranceProviderId);
 
-        // Build one standard income transaction per row
-        const txCandidate = {
-          type: "income",
+        const tx = {
+          type: "income" as const,
           date: dateObj,
-          departmentId: r.departmentId,
-          amount: amt,
           currency: payload.currency,
-          description: r.description || payload.notes || "Daily income",
-          createdBy,
+          amount: amt,
+          departmentId: r.departmentId || undefined, // optional row-wise (schema will enforce if needed)
           insuranceProviderId,
-          syncStatus,
+          description: r.description || payload.notes || "Daily income",
+          createdBy: req.user!.id,
+          syncStatus: "synced" as const,
         };
 
-        const validated = insertTransactionSchema.parse(txCandidate);
-        const tx = await storage.createTransaction(validated);
-        created.push(tx);
+        try {
+          const validated = insertTransactionSchema.parse(tx);
+          const saved = await storage.createTransaction(validated);
+          created.push(saved);
+        } catch (e: any) {
+          errors.push({ index: i, error: e?.errors || e?.message || "Validation error" });
+        }
       }
 
-      if (created.length === 0) {
-        return res.status(400).json({ error: "No valid rows to create" });
+      if (errors.length && !created.length) {
+        return res.status(400).json({ error: "Validation error", details: errors });
       }
-
-      res.status(201).json({ count: created.length, transactions: created });
+      return res.status(201).json({ created: created.length, errors, transactions: created });
     } catch (error) {
-      console.error("Error in bulk-income:", error);
+      console.error("Bulk income error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation error", details: error.errors });
       }
-      res.status(500).json({ error: "Failed to create bulk income transactions" });
+      res.status(500).json({ error: "Failed to save bulk income" });
     }
   });
-  /* --------------------------------------------------------------- */
+
+  /* ---------------- NEW: BULK EXPENSE ----------------------------- */
+  app.post("/api/transactions/bulk-expense", requireAuth, async (req, res) => {
+    try {
+      const RowSchema = z.object({
+        expenseCategory: z.string().min(1, "expenseCategory required"),
+        amount: z.coerce.number(),
+        description: z.string().optional(),
+      });
+
+      const BulkSchema = z.object({
+        date: z.string().optional(), // YYYY-MM-DD
+        currency: z.enum(["SSP", "USD"]).default("SSP"),
+        notes: z.string().optional(),
+        rows: z.array(RowSchema).min(1, "rows must contain at least one item"),
+      });
+
+      const payload = BulkSchema.parse(req.body);
+
+      const dateObj = payload.date ? parseYMD(payload.date) : new Date();
+      if (!dateObj) return res.status(400).json({ error: "Invalid date format" });
+
+      const created: any[] = [];
+      const errors: any[] = [];
+
+      for (let i = 0; i < payload.rows.length; i++) {
+        const r = payload.rows[i];
+        const amt = Number(r.amount);
+        if (!isFinite(amt) || amt <= 0) {
+          errors.push({ index: i, error: "Invalid amount" });
+          continue;
+        }
+
+        const tx = {
+          type: "expense" as const,
+          date: dateObj,
+          currency: payload.currency,
+          amount: amt,
+          expenseCategory: r.expenseCategory,
+          description: r.description || payload.notes || "Daily expense",
+          createdBy: req.user!.id,
+          syncStatus: "synced" as const,
+        };
+
+        try {
+          const validated = insertTransactionSchema.parse(tx);
+          const saved = await storage.createTransaction(validated);
+          created.push(saved);
+        } catch (e: any) {
+          errors.push({ index: i, error: e?.errors || e?.message || "Validation error" });
+        }
+      }
+
+      if (errors.length && !created.length) {
+        return res.status(400).json({ error: "Validation error", details: errors });
+      }
+      return res.status(201).json({ created: created.length, errors, transactions: created });
+    } catch (error) {
+      console.error("Bulk expense error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to save bulk expenses" });
+    }
+  });
 
   app.put("/api/transactions/:id", requireAuth, async (req, res) => {
     try {
@@ -577,6 +645,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* Drill-down endpoint used by chart click */
+  // GET /api/transactions/detailed?date=YYYY-MM-DD&currency=SSP|USD&type=income
+  // or /api/transactions/detailed?from=YYYY-MM-DD&to=YYYY-MM-DD&currency=...&type=...
   app.get("/api/transactions/detailed", requireAuth, async (req, res) => {
     try {
       const { date, from, to } = req.query as any;
@@ -594,13 +664,13 @@ export async function registerRoutes(app: Express): Promise<void> {
         const d = parseYMD(String(date));
         if (!d) return res.status(400).json({ error: "Invalid date" });
         start = d;
-        endExclusive = addDaysUTC(d, 1);
+        endExclusive = addDaysUTC(d, 1); // [date, date+1)
       } else if (from && to) {
         const f = parseYMD(String(from));
         const t = parseYMD(String(to));
         if (!f || !t) return res.status(400).json({ error: "Invalid from/to" });
         start = f;
-        endExclusive = t;
+        endExclusive = t; // [from, to)
       } else {
         return res.status(400).json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
       }
@@ -640,9 +710,9 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.get("/api/income-trends", requireAuth, async (_req, res) => {
+  app.get("/api/income-trends", requireAuth, async (req, res) => {
     try {
-      const days = parseInt((_req.query.days as string) || "7");
+      const days = parseInt(req.query.days as string) || 7;
       const data = await storage.getIncomeTrends(days);
       res.json(data);
     } catch (error) {
@@ -662,13 +732,14 @@ export async function registerRoutes(app: Express): Promise<void> {
       let data;
       if (range === "custom" && startDateStr && endDateStr) {
         const s = parseYMD(startDateStr)!;
-        const e = parseYMD(endDateStr)!;
+        const e = parseYMD(endDateStr)!; // [s, e)
         data = await storage.getIncomeTrendsForDateRange(s, e);
       } else if (range === "last-3-months") {
-        const endEx = new Date();
+        const endEx = new Date(); // now
         const start = addDaysUTC(new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)), 0);
         data = await storage.getIncomeTrendsForDateRange(start, endEx);
       } else if (range === "year") {
+        // [Jan 1, Jan 1 nextYear)
         const s = new Date(Date.UTC(year, 0, 1));
         const e = new Date(Date.UTC(year + 1, 0, 1));
         data = await storage.getIncomeTrendsForDateRange(s, e);
@@ -790,6 +861,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const pageWidth = doc.internal.pageSize.width;
       const margin = 20;
 
+      // Header
       doc.setFillColor(20, 83, 75);
       doc.rect(0, 0, pageWidth, 60, "F");
       doc.setTextColor(255, 255, 255);
@@ -800,6 +872,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       doc.setFont("helvetica", "normal");
       doc.text("Financial Management System", margin, 40);
 
+      // Title
       doc.setTextColor(0, 0, 0);
       const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long" });
       doc.setFontSize(16);
