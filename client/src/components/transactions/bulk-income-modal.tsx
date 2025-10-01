@@ -1,475 +1,346 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
 
-type Dept = { id: string; name: string };
-type Provider = { id: string; name: string };
+/**
+ * Bulk Income (client-side bulk save)
+ * - Cash by department (SSP/USD selectable at top; default SSP)
+ * - Insurance totals by provider (defaults to USD; can change)
+ * - Prefill 5 departments and common providers
+ * - Saves by calling POST /api/transactions per row (same as AddTransaction)
+ */
 
-type DeptRow = {
-  departmentId?: string;
-  amount: string; // keep as text for UX (commas etc.)
-  description?: string;
-};
+type Dept = { id: string; name: string; code?: string };
+type Provider = { id: string; name: string; code?: string };
 
-type ProviderRow = {
-  insuranceProviderId?: string;
-  amount: string;
-  description?: string;
-};
-
-const PREFILL_DEPT_NAMES = [
-  "Consultation",
-  "Laboratory",
-  "Ultrasound",
-  "X-Ray",
-  "Pharmacy",
-];
-
-const PREFILL_PROVIDER_NAMES = ["CIC", "UAP", "CIGNA", "Nile International", "New Sudan"];
-
-function emptyDeptRow(): DeptRow {
-  return { departmentId: undefined, amount: "", description: "" };
-}
-
-function emptyProviderRow(): ProviderRow {
-  return { insuranceProviderId: undefined, amount: "", description: "" };
-}
+type DeptRow = { departmentId?: string; amount: string };
+type ProviderRow = { insuranceProviderId?: string; amount: string };
 
 export default function BulkIncomeModal({
   open,
   onOpenChange,
-  date: initialDate,
-  departments = [],
-  insuranceProviders = [],
+  initialDate,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  date?: string; // YYYY-MM-DD
-  departments: Dept[];
-  insuranceProviders: Provider[];
+  initialDate?: string; // YYYY-MM-DD
 }) {
-  const qc = useQueryClient();
   const { toast } = useToast();
+  const qc = useQueryClient();
 
-  // ------- top-level controls -------
+  // Fetch choices once (same as AddTransaction)
+  const { data: departments = [] as Dept[] } = useQuery({ queryKey: ["/api/departments"] });
+  const { data: insuranceProviders = [] as Provider[] } = useQuery({ queryKey: ["/api/insurance-providers"] });
+
   const [date, setDate] = useState<string>(() => {
     if (initialDate) return initialDate;
     const d = new Date();
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(d.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${dd}`;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
   });
   const [cashCurrency, setCashCurrency] = useState<"SSP" | "USD">("SSP");
   const [providerCurrency, setProviderCurrency] = useState<"SSP" | "USD">("USD");
   const [notes, setNotes] = useState("");
 
-  // ------- rows -------
   const [deptRows, setDeptRows] = useState<DeptRow[]>([
-    emptyDeptRow(),
-    emptyDeptRow(),
-    emptyDeptRow(),
-    emptyDeptRow(),
-    emptyDeptRow(),
+    { departmentId: undefined, amount: "" },
   ]);
-  const [providerRows, setProviderRows] = useState<ProviderRow[]>([emptyProviderRow()]);
+  const [provRows, setProvRows] = useState<ProviderRow[]>([
+    { insuranceProviderId: undefined, amount: "" },
+  ]);
 
   useEffect(() => {
     if (initialDate) setDate(initialDate);
   }, [initialDate]);
 
-  // ------- helpers -------
-  const setDept = (i: number, patch: Partial<DeptRow>) =>
-    setDeptRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const setProv = (i: number, patch: Partial<ProviderRow>) =>
-    setProviderRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const addDeptRow = () => setDeptRows((r) => [...r, { departmentId: undefined, amount: "" }]);
+  const addProvRow = () => setProvRows((r) => [...r, { insuranceProviderId: undefined, amount: "" }]);
 
-  const toNumberLoose = (v: string) => {
-    const n = Number((v ?? "").toString().replace(/,/g, "").trim());
+  const rmDeptRow = (i: number) => setDeptRows((r) => r.filter((_, idx) => idx !== i));
+  const rmProvRow = (i: number) => setProvRows((r) => r.filter((_, idx) => idx !== i));
+
+  const patchDept = (i: number, patch: Partial<DeptRow>) =>
+    setDeptRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+  const patchProv = (i: number, patch: Partial<ProviderRow>) =>
+    setProvRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+
+  // Helpers to find IDs by common names/codes
+  const findDeptId = (needle: string) =>
+    departments.find((d) =>
+      [d.name, d.code].filter(Boolean).some((s) => String(s).toLowerCase().includes(needle.toLowerCase()))
+    )?.id;
+
+  const findProvId = (needle: string) =>
+    insuranceProviders.find((p) =>
+      [p.name, p.code].filter(Boolean).some((s) => String(s).toLowerCase().includes(needle.toLowerCase()))
+    )?.id;
+
+  const prefillDepartments = () => {
+    const list = [
+      findDeptId("consultation"),
+      findDeptId("laboratory"),
+      findDeptId("ultrasound"),
+      findDeptId("x-ray"),
+      findDeptId("pharmacy"),
+    ].filter(Boolean) as string[];
+    if (!list.length) {
+      toast({ title: "No departments found to prefill", variant: "destructive" });
+      return;
+    }
+    setDeptRows(list.map((id) => ({ departmentId: id, amount: "" })));
+  };
+
+  const prefillProviders = () => {
+    const wanted = ["CIC", "UAP", "CIGNA", "Nile", "New Sudan"];
+    const list = wanted
+      .map(findProvId)
+      .filter(Boolean) as string[];
+    if (!list.length) {
+      toast({ title: "No providers found to prefill", variant: "destructive" });
+      return;
+    }
+    setProvRows(list.map((id) => ({ insuranceProviderId: id, amount: "" })));
+    setProviderCurrency("USD");
+  };
+
+  // Parse amounts like "80,000"
+  const toNumber = (v: string) => {
+    const n = Number((v || "").replace(/,/g, "").trim());
     return Number.isFinite(n) ? n : NaN;
   };
 
-  // Pre-fill 5 depts by name lookup
-  const prefFillDepartments = () => {
-    const map = new Map(departments.map((d) => [d.name.toLowerCase(), d.id]));
-    const filled = PREFILL_DEPT_NAMES.map((name) => ({
-      departmentId: map.get(name.toLowerCase()),
-      amount: "",
-      description: "",
-    }));
-    setDeptRows(filled);
-  };
+  const validDeptPayloads = useMemo(() => {
+    return deptRows
+      .map((r) => ({
+        departmentId: r.departmentId,
+        amount: toNumber(r.amount),
+      }))
+      .filter((r) => r.departmentId && r.amount > 0);
+  }, [deptRows]);
 
-  // Pre-fill top providers
-  const prefFillProviders = () => {
-    const map = new Map(insuranceProviders.map((p) => [p.name.toLowerCase(), p.id]));
-    const filled = PREFILL_PROVIDER_NAMES.map((name) => ({
-      insuranceProviderId: map.get(name.toLowerCase()),
-      amount: "",
-      description: "",
-    }));
-    setProviderRows(filled.length ? filled : [emptyProviderRow()]);
-  };
+  const validProvPayloads = useMemo(() => {
+    return provRows
+      .map((r) => ({
+        insuranceProviderId: r.insuranceProviderId,
+        amount: toNumber(r.amount),
+      }))
+      .filter((r) => r.insuranceProviderId && r.amount > 0);
+  }, [provRows]);
 
-  // Valid/converted rows (for preview or debug)
-  const validDeptRows = useMemo(
-    () =>
-      deptRows
-        .map((r) => ({ ...r, amountNum: toNumberLoose(r.amount) }))
-        .filter((r) => r.departmentId && r.amountNum > 0),
-    [deptRows]
-  );
+  const savingDisabled = validDeptPayloads.length === 0 && validProvPayloads.length === 0;
 
-  const validProviderRows = useMemo(
-    () =>
-      providerRows
-        .map((r) => ({ ...r, amountNum: toNumberLoose(r.amount) }))
-        .filter((r) => r.insuranceProviderId && r.amountNum > 0),
-    [providerRows]
-  );
+  const saveAll = async () => {
+    if (savingDisabled) {
+      toast({ title: "Nothing to save", description: "Enter at least one positive amount.", variant: "destructive" });
+      return;
+    }
 
-  // ------- submit (with double-click guard) -------
-  const guardRef = useRef(false);
+    const when = new Date(date).toISOString();
+    const reqs: Promise<any>[] = [];
 
-  const { mutateAsync, isPending } = useMutation({
-    mutationFn: async () => {
-      const created = { dept: 0, provider: 0 };
-
-      // Post 1: cash by department (currency = cashCurrency)
-      if (validDeptRows.length) {
-        const payload = {
-          date,
+    // Cash by department → income rows (no provider)
+    for (const r of validDeptPayloads) {
+      reqs.push(
+        apiRequest("POST", "/api/transactions", {
+          type: "income",
+          date: when,
+          departmentId: r.departmentId,
+          insuranceProviderId: null, // cash
+          amount: String(r.amount),
           currency: cashCurrency,
-          defaultInsuranceProviderId: "no-insurance" as const,
-          notes: notes || undefined,
-          rows: validDeptRows.map((r) => ({
-            departmentId: r.departmentId!,
-            amount: r.amountNum,
-            description: r.description || undefined,
-            insuranceProviderId: "no-insurance" as const, // explicit
-          })),
-        };
-        const res = await apiRequest("POST", "/api/transactions/bulk-income", payload);
-        created.dept = res?.count || res?.created || 0;
-      }
+          description: notes || "Daily income",
+          receiptPath: null,
+          expenseCategory: null,
+          staffType: null,
+        })
+      );
+    }
 
-      // Post 2: insurance totals by provider (currency = providerCurrency)
-      if (validProviderRows.length) {
-        const payload = {
-          date,
-          currency: providerCurrency,
-          defaultInsuranceProviderId: null as const,
-          notes: notes || undefined,
-          rows: validProviderRows.map((r) => ({
-            insuranceProviderId: r.insuranceProviderId!,
-            amount: r.amountNum,
-            description: r.description || "Insurance daily total",
-          })),
-        };
-        const res = await apiRequest("POST", "/api/transactions/bulk-income", payload);
-        created.provider = res?.count || res?.created || 0;
-      }
+    // Insurance totals → income rows with provider (no department)
+    for (const r of validProvPayloads) {
+      reqs.push(
+        apiRequest("POST", "/api/transactions", {
+          type: "income",
+          date: when,
+          departmentId: null,
+          insuranceProviderId: r.insuranceProviderId,
+          amount: String(r.amount),
+          currency: providerCurrency, // usually USD
+          description: notes || "Insurance daily total",
+          receiptPath: null,
+          expenseCategory: null,
+          staffType: null,
+        })
+      );
+    }
 
-      if (!validDeptRows.length && !validProviderRows.length) {
-        throw new Error("Please enter at least one positive amount.");
-      }
+    const results = await Promise.allSettled(reqs);
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const fail = results.length - ok;
 
-      return created;
-    },
-    onSuccess: (res) => {
-      toast({
-        title: "Saved",
-        description: `Added ${res.dept} cash row(s) and ${res.provider} insurance row(s).`,
-      });
+    if (ok) {
+      toast({ title: "Saved", description: `${ok} transaction${ok > 1 ? "s" : ""} created.` });
       qc.invalidateQueries({ queryKey: ["/api/transactions"] });
       qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      onOpenChange(false);
-      // reset for next use
-      setDeptRows([emptyDeptRow(), emptyDeptRow(), emptyDeptRow(), emptyDeptRow(), emptyDeptRow()]);
-      setProviderRows([emptyProviderRow()]);
-      setNotes("");
-      guardRef.current = false;
-    },
-    onError: (e: any) => {
+    }
+    if (fail) {
       toast({
-        title: "Could not save",
-        description: e?.message || "Something went wrong while saving.",
+        title: "Some rows failed",
+        description: `${fail} didn’t save. Please review amounts/choices and try again.`,
         variant: "destructive",
       });
-      guardRef.current = false;
-    },
-  });
+    }
 
-  const onSubmit = async () => {
-    if (isPending || guardRef.current) return; // hard guard against rapid clicks
-    guardRef.current = true;
-    await mutateAsync();
+    if (ok && !fail) {
+      // reset & close for next entry
+      setDeptRows([{ departmentId: undefined, amount: "" }]);
+      setProvRows([{ insuranceProviderId: undefined, amount: "" }]);
+      setNotes("");
+      onOpenChange(false);
+    }
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={(v) => {
-      if (!v) guardRef.current = false;
-      onOpenChange(v);
-    }}>
-      <DialogContent className="max-w-3xl relative">
-        {/* Saving overlay */}
-        <div
-          className={`absolute inset-0 z-10 ${isPending ? "flex" : "hidden"} items-center justify-center bg-white/60 backdrop-blur-[1px]`}
-          aria-hidden={!isPending}
-        >
-          <div className="flex items-center gap-2 text-sm text-slate-700">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Saving…
+    <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true">
+      {/* overlay (no extra opacity classes applied to the card) */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={() => onOpenChange(false)} />
+      <div className="absolute inset-0 flex items-start justify-center p-6">
+        <div className="w-full max-w-3xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto">
+          {/* header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold">Daily Bulk Income</h2>
+            <button onClick={() => onOpenChange(false)} className="px-2 py-1 rounded hover:bg-slate-100 text-gray-500 hover:text-gray-700">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* body */}
+          <div className="p-4 space-y-6">
+            {/* top controls */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <Label className="mb-1 block">Transaction Date</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+              <div>
+                <Label className="mb-1 block">Currency (cash by department)</Label>
+                <Select value={cashCurrency} onValueChange={(v: "SSP" | "USD") => setCashCurrency(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SSP">SSP (South Sudanese Pound)</SelectItem>
+                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-1 block">Notes (optional)</Label>
+                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., ‘Daily totals’" />
+              </div>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 5 departments</Button>
+              <Button type="button" variant="outline" onClick={prefillProviders}>Prefill providers</Button>
+              <div className="ml-auto flex items-center gap-2">
+                <Label className="text-xs text-slate-600">Provider currency</Label>
+                <Select value={providerCurrency} onValueChange={(v: "SSP" | "USD") => setProviderCurrency(v)}>
+                  <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="SSP">SSP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* CASH BY DEPARTMENT */}
+            <div className="border rounded-lg">
+              <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Cash by Department</div>
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
+                <div className="col-span-7">Department</div>
+                <div className="col-span-4 text-right">Amount</div>
+                <div className="col-span-1" />
+              </div>
+              <div className="divide-y">
+                {deptRows.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                    <div className="col-span-7">
+                      <Select value={row.departmentId ?? undefined} onValueChange={(v) => patchDept(idx, { departmentId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-4">
+                      <Input inputMode="numeric" className="text-right" placeholder="0"
+                        value={row.amount} onChange={(e) => patchDept(idx, { amount: e.target.value })} />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => rmDeptRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3">
+                <Button type="button" variant="outline" onClick={addDeptRow}>＋ Add row</Button>
+              </div>
+            </div>
+
+            {/* INSURANCE TOTALS */}
+            <div className="border rounded-lg">
+              <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Insurance Totals (by provider)</div>
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
+                <div className="col-span-7">Insurance Provider</div>
+                <div className="col-span-4 text-right">Amount</div>
+                <div className="col-span-1" />
+              </div>
+              <div className="divide-y">
+                {provRows.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                    <div className="col-span-7">
+                      <Select value={row.insuranceProviderId ?? undefined} onValueChange={(v) => patchProv(idx, { insuranceProviderId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                        <SelectContent>
+                          {insuranceProviders.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-4">
+                      <Input inputMode="numeric" className="text-right" placeholder="0"
+                        value={row.amount} onChange={(e) => patchProv(idx, { amount: e.target.value })} />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => rmProvRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3">
+                <Button type="button" variant="outline" onClick={addProvRow}>＋ Add row</Button>
+              </div>
+            </div>
+          </div>
+
+          {/* footer */}
+          <div className="flex items-center justify-end gap-3 p-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={saveAll} disabled={savingDisabled}>Save Daily Income</Button>
           </div>
         </div>
-
-        <DialogHeader>
-          <DialogTitle>Daily Bulk Income</DialogTitle>
-        </DialogHeader>
-
-        <fieldset disabled={isPending} aria-busy={isPending} className="space-y-4">
-          {/* Top controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <Label className="mb-1 block">Transaction Date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-
-            <div>
-              <Label className="mb-1 block">Currency (cash by department)</Label>
-              <Select value={cashCurrency} onValueChange={(v: "SSP" | "USD") => setCashCurrency(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SSP">SSP (South Sudanese Pound)</SelectItem>
-                  <SelectItem value="USD">USD (US Dollar)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="mb-1 block">Notes (optional)</Label>
-              <Input
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g., ‘Daily totals’"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={prefFillDepartments}>
-              Prefill 5 Departments
-            </Button>
-            <Button type="button" variant="outline" onClick={prefFillProviders}>
-              Prefill Insurances
-            </Button>
-
-            <div className="ml-auto w-44">
-              <Label className="mb-1 block">Provider currency</Label>
-              <Select
-                value={providerCurrency}
-                onValueChange={(v: "SSP" | "USD") => setProviderCurrency(v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="USD" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="SSP">SSP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Cash by department */}
-          <div className="border rounded-lg">
-            <div className="px-3 py-2 bg-slate-50 text-xs font-medium text-slate-600 rounded-t-lg">
-              Cash by Department
-            </div>
-
-            <div className="grid grid-cols-12 gap-2 px-3 pt-2 text-xs text-slate-500">
-              <div className="col-span-7">Department</div>
-              <div className="col-span-4 text-right">Amount</div>
-              <div className="col-span-1" />
-            </div>
-
-            <div className="divide-y">
-              {deptRows.map((row, idx) => (
-                <div key={`d-${idx}`} className="grid grid-cols-12 gap-2 px-3 py-3">
-                  <div className="col-span-7">
-                    <Select
-                      value={row.departmentId ?? undefined}
-                      onValueChange={(v) => setDept(idx, { departmentId: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments
-                          .filter((d) => !!d?.id)
-                          .map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="col-span-4">
-                    <Input
-                      inputMode="numeric"
-                      className="text-right"
-                      placeholder="0"
-                      value={row.amount}
-                      onChange={(e) => setDept(idx, { amount: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="col-span-1 flex items-center justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setDeptRows((rows) => rows.filter((_, i) => i !== idx))
-                      }
-                      className="hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDeptRows((r) => [...r, emptyDeptRow()])}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add row
-              </Button>
-            </div>
-          </div>
-
-          {/* Insurance totals by provider */}
-          <div className="border rounded-lg">
-            <div className="px-3 py-2 bg-slate-50 text-xs font-medium text-slate-600 rounded-t-lg">
-              Insurance Totals (by provider)
-            </div>
-
-            <div className="grid grid-cols-12 gap-2 px-3 pt-2 text-xs text-slate-500">
-              <div className="col-span-7">Insurance Provider</div>
-              <div className="col-span-4 text-right">Amount</div>
-              <div className="col-span-1" />
-            </div>
-
-            <div className="divide-y">
-              {providerRows.map((row, idx) => (
-                <div key={`p-${idx}`} className="grid grid-cols-12 gap-2 px-3 py-3">
-                  <div className="col-span-7">
-                    <Select
-                      value={row.insuranceProviderId ?? undefined}
-                      onValueChange={(v) => setProv(idx, { insuranceProviderId: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {insuranceProviders
-                          .filter((p) => !!p?.id)
-                          .map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="col-span-4">
-                    <Input
-                      inputMode="numeric"
-                      className="text-right"
-                      placeholder="0"
-                      value={row.amount}
-                      onChange={(e) => setProv(idx, { amount: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="col-span-1 flex items-center justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setProviderRows((rows) => rows.filter((_, i) => i !== idx))
-                      }
-                      className="hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setProviderRows((r) => [...r, emptyProviderRow()])}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add row
-              </Button>
-            </div>
-          </div>
-        </fieldset>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button onClick={onSubmit} disabled={isPending}>
-            {isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              "Save Daily Income"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
