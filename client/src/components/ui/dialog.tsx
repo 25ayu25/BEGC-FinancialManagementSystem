@@ -3,7 +3,6 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
-
 import { cn } from "@/lib/utils"
 
 const Dialog = DialogPrimitive.Root
@@ -11,6 +10,7 @@ const DialogTrigger = DialogPrimitive.Trigger
 const DialogPortal = DialogPrimitive.Portal
 const DialogClose = DialogPrimitive.Close
 
+/* Lighter overlay and slight blur so the page is visible but de-emphasized */
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -18,8 +18,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      // lighter overlay + subtle blur (no “dark page” effect)
-      "fixed inset-0 z-50 bg-black/30 backdrop-blur-[1px] " +
+      "fixed inset-0 z-[99] bg-black/40 backdrop-blur-[1px] " +
         "data-[state=open]:animate-in data-[state=closed]:animate-out " +
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
@@ -29,6 +28,11 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+/**
+ * Content now renders as a full-screen flex container with the *panel* inside.
+ * The panel has max-h and its own scroll, so tall forms are fully usable on
+ * smaller screens without the modal running off-screen.
+ */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -37,30 +41,34 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      // keep animations; make card a tad nicer and readable on all modals
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 " +
-          "gap-4 border bg-white text-slate-900 p-6 shadow-2xl duration-200 " +
+        // full-screen positioning for proper centering & padding
+        "fixed inset-0 z-[100] flex items-start justify-center p-4 sm:p-6 " +
           "data-[state=open]:animate-in data-[state=closed]:animate-out " +
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 " +
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 " +
-          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] " +
-          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] " +
-          "sm:rounded-xl focus:outline-none",
-        className
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       )}
-      // avoid aria-describedby="undefined" warning in console
-      aria-describedby={(props as any)["aria-describedby"] ?? undefined}
+      // Avoid the aria warning when no <DialogDescription/> is provided
+      aria-describedby={props["aria-describedby"] ?? undefined}
       {...props}
     >
-      {children}
-      <DialogPrimitive.Close
-        className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
-        aria-label="Close"
+      {/* The actual visible panel */}
+      <div
+        className={cn(
+          "relative w-full max-w-3xl sm:max-w-4xl rounded-xl bg-white text-slate-900 " +
+            "shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-y-auto",
+          className
+        )}
       >
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+        {children}
+        <DialogPrimitive.Close
+          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity
+                     hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring
+                     focus:ring-offset-2"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </DialogPrimitive.Close>
+      </div>
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
