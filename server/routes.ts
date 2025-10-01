@@ -15,13 +15,11 @@ import { z } from "zod";
 
 function parseYMD(dateStr?: string | null): Date | undefined {
   if (!dateStr) return undefined;
-  // Accept "YYYY-MM-DD" exactly (build UTC midnight)
   const m = /^\d{4}-\d{2}-\d{2}$/.exec(dateStr);
   if (m) {
     const [y, mo, d] = dateStr.split("-").map((n) => parseInt(n, 10));
     return new Date(Date.UTC(y, mo - 1, d, 0, 0, 0, 0));
   }
-  // Fallback: let JS parse
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? undefined : d;
 }
@@ -33,14 +31,12 @@ function addDaysUTC(d: Date, days: number) {
 }
 
 function toNumberLoose(v: unknown): number {
-  // Handle "80,000", " 200.50 ", 200, etc.
   const n = Number(String(v ?? "").replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : NaN;
 }
 
 function isUUIDLike(s?: string | null): boolean {
   if (!s) return false;
-  // simple len/charset check; we still validate existence in our lookup maps
   return /^[0-9a-fA-F-]{20,}$/.test(s);
 }
 
@@ -57,14 +53,12 @@ const RAW_ALLOWED = (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "
 
 const ALLOWED_EXACT = new Set<string>([
   ...RAW_ALLOWED,
-  // Local dev
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
 
-// Allow common hosters (exact domain still preferred via env var)
 const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
 
 function isAllowedOrigin(origin?: string): boolean {
@@ -85,9 +79,9 @@ function applyCors(req: Request, res: Response) {
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
-  // allow common headers + our session header (both casings)
   res.setHeader(
     "Access-Control-Allow-Headers",
+    // include both casings for safety
     "Content-Type, Authorization, X-Requested-With, X-Session-Token, x-session-token"
   );
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
@@ -109,14 +103,11 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<void> {
-  // Make secure cookies work behind a proxy (Render/Netlify)
   app.set("trust proxy", 1);
 
-  // Global CORS + preflight (before any auth middleware)
   app.use((req, res, next) => {
     applyCors(req, res);
     if (req.method === "OPTIONS") {
-      // Preflight: respond quickly, cache briefly
       res.setHeader("Access-Control-Max-Age", "600");
       return res.status(204).end();
     }
@@ -135,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Auth middleware (cookie + Safari header fallback)               */
+  /* Auth middleware                                                 */
   /* --------------------------------------------------------------- */
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -216,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         secure: isProd,
         sameSite: "none",
         path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+        maxAge: 1000 * 60 * 60 * 24 * 30,
       });
 
       res.json(userSession);
@@ -440,7 +431,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
-      // paging: support both ?limit= and ?pageSize=
       const page = parseInt((req.query.page as string) || "1", 10);
       const limit = parseInt(
         (req.query.limit as string) || (req.query.pageSize as string) || "50",
@@ -448,7 +438,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       );
       const offset = (page - 1) * limit;
 
-      // half-open window [start, end)
       const startDate = parseYMD(req.query.startDate as string);
       const endDate = parseYMD(req.query.endDate as string);
 
@@ -497,23 +486,19 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* ---------------- NEW: Daily Bulk Income ----------------------- */
-  // Accepts either department-based cash rows or provider-only rows.
-  // Resolves both IDs and human names. Amounts like "60,000" are parsed.
   app.post("/api/transactions/bulk-income", requireAuth, async (req, res) => {
     try {
       const RowSchema = z.object({
-        // Clients sometimes (wrongly) send a name in departmentId; we handle both.
         departmentId: z.string().optional(),
         departmentName: z.string().optional(),
-        amount: z.any(), // we'll coerce
+        amount: z.any(),
         description: z.string().optional(),
-        // "no-insurance" | <uuid> | null | provider name (we resolve)
         insuranceProviderId: z.string().nullable().optional(),
         providerName: z.string().optional(),
       });
 
       const BulkSchema = z.object({
-        date: z.string().optional(), // YYYY-MM-DD (optional; defaults to today)
+        date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
         defaultInsuranceProviderId: z.string().nullable().optional(),
         notes: z.string().optional(),
@@ -521,61 +506,54 @@ export async function registerRoutes(app: Express): Promise<void> {
       });
 
       const payload = BulkSchema.parse(req.body);
-
       const dateObj = payload.date ? parseYMD(payload.date) : new Date();
       if (!dateObj) return res.status(400).json({ error: "Invalid date format" });
 
-      // Build lookup maps once per request (id + name)
       const [departments, providers] = await Promise.all([
         storage.getDepartments(),
         storage.getInsuranceProviders(),
       ]);
 
       const deptById = new Map<string, any>(departments.map((d: any) => [d.id, d]));
-      const deptByName = new Map<string, any>(
-        departments.map((d: any) => [normKey(d.name), d])
-      );
+      const deptByName = new Map<string, any>(departments.map((d: any) => [normKey(d.name), d]));
 
       const provById = new Map<string, any>(providers.map((p: any) => [p.id, p]));
-      const provByName = new Map<string, any>(
-        providers.map((p: any) => [normKey(p.name), p])
-      );
+      const provByName = new Map<string, any>(providers.map((p: any) => [normKey(p.name), p]));
 
       const createdBy = req.user!.id;
       const syncStatus = "synced";
-
       const created: any[] = [];
       const errors: any[] = [];
 
       for (let i = 0; i < payload.rows.length; i++) {
         const r = payload.rows[i];
-
         const amountNum = toNumberLoose(r.amount);
         if (!Number.isFinite(amountNum) || amountNum <= 0) {
           errors.push({ index: i, error: "Invalid amount" });
           continue;
         }
 
-        // Resolve department: accept id or name in either field
+        // Resolve department
         let deptId: string | undefined;
         if (r.departmentId) {
           if (isUUIDLike(r.departmentId) && deptById.has(r.departmentId)) {
             deptId = r.departmentId;
           } else {
-            const byName = deptByName.get(normKey(r.departmentId));
-            if (byName) deptId = byName.id;
+            const d = deptByName.get(normKey(r.departmentId));
+            if (d) deptId = d.id;
           }
         }
         if (!deptId && r.departmentName) {
-          const byName = deptByName.get(normKey(r.departmentName));
-          if (byName) deptId = byName.id;
+          const d = deptByName.get(normKey(r.departmentName));
+          if (d) deptId = d.id;
         }
 
-        // Resolve provider: accept "no-insurance", id or name, or default
+        // Resolve provider
         let chosenProvider =
-          r.insuranceProviderId !== undefined ? r.insuranceProviderId : payload.defaultInsuranceProviderId ?? null;
+          r.insuranceProviderId !== undefined
+            ? r.insuranceProviderId
+            : payload.defaultInsuranceProviderId ?? null;
 
-        // If a free-text providerName is present, let it override chosenProvider when it matches a known provider
         if (!chosenProvider && r.providerName) {
           const p = provByName.get(normKey(r.providerName));
           if (p) chosenProvider = p.id;
@@ -593,14 +571,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
-        // Valid row if:
-        //  - department row (deptId resolved) with any providerId (including null for cash)
-        //  - OR provider-only row (providerId resolved) without department
+        // Valid if dept row (with cash or provider) OR provider-only row
         if (!deptId && providerId === null) {
           errors.push({
             index: i,
             error:
-              "Provide a valid department (for cash/no-insurance) or a valid insurance provider for provider-only rows.",
+              "Provide a valid department (for cash/no-insurance) or a valid insurance provider.",
           });
           continue;
         }
@@ -608,12 +584,12 @@ export async function registerRoutes(app: Express): Promise<void> {
         const txCandidate = {
           type: "income" as const,
           date: dateObj,
-          departmentId: deptId, // may be undefined for provider-only rows
+          departmentId: deptId,
           amount: amountNum,
           currency: payload.currency,
           description: r.description || payload.notes || "Daily income",
           createdBy,
-          insuranceProviderId: providerId, // null means cash/no-insurance
+          insuranceProviderId: providerId,
           syncStatus,
         };
 
@@ -622,10 +598,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const tx = await storage.createTransaction(validated);
           created.push(tx);
         } catch (e: any) {
-          errors.push({
-            index: i,
-            error: e?.errors || e?.message || "Validation error",
-          });
+          errors.push({ index: i, error: e?.errors || e?.message || "Validation error" });
         }
       }
 
@@ -647,32 +620,29 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/transactions/bulk-expense", requireAuth, async (req, res) => {
     try {
       const RowSchema = z.object({
-        expenseCategory: z.string().min(1, "expenseCategory required"), // name or code; schema accepts string
-        amount: z.any(), // allow "250,000" etc.; convert below
+        expenseCategory: z.string().min(1, "expenseCategory required"),
+        amount: z.any(),
         description: z.string().optional(),
       });
 
       const BulkSchema = z.object({
-        date: z.string().optional(), // YYYY-MM-DD (optional)
+        date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
         notes: z.string().optional(),
         rows: z.array(RowSchema).min(1, "rows must contain at least one item"),
       });
 
       const payload = BulkSchema.parse(req.body);
-
       const dateObj = payload.date ? parseYMD(payload.date) : new Date();
       if (!dateObj) return res.status(400).json({ error: "Invalid date format" });
 
       const createdBy = req.user!.id;
       const syncStatus = "synced";
-
       const created: any[] = [];
       const errors: any[] = [];
 
       for (let i = 0; i < payload.rows.length; i++) {
         const r = payload.rows[i];
-
         const amountNum = toNumberLoose(r.amount);
         if (!Number.isFinite(amountNum) || amountNum <= 0) {
           errors.push({ index: i, error: "Invalid amount" });
@@ -695,10 +665,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const tx = await storage.createTransaction(validated);
           created.push(tx);
         } catch (e: any) {
-          errors.push({
-            index: i,
-            error: e?.errors || e?.message || "Validation error",
-          });
+          errors.push({ index: i, error: e?.errors || e?.message || "Validation error" });
         }
       }
 
@@ -752,8 +719,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* Drill-down endpoint used by chart click */
-  // GET /api/transactions/detailed?date=YYYY-MM-DD&currency=SSP|USD&type=income
-  // or /api/transactions/detailed?from=YYYY-MM-DD&to=YYYY-MM-DD&currency=...&type=...
   app.get("/api/transactions/detailed", requireAuth, async (req, res) => {
     try {
       const { date, from, to } = req.query as any;
@@ -771,13 +736,13 @@ export async function registerRoutes(app: Express): Promise<void> {
         const d = parseYMD(String(date));
         if (!d) return res.status(400).json({ error: "Invalid date" });
         start = d;
-        endExclusive = addDaysUTC(d, 1); // [date, date+1)
+        endExclusive = addDaysUTC(d, 1);
       } else if (from && to) {
         const f = parseYMD(String(from));
         const t = parseYMD(String(to));
         if (!f || !t) return res.status(400).json({ error: "Invalid from/to" });
         start = f;
-        endExclusive = t; // [from, to)
+        endExclusive = t;
       } else {
         return res
           .status(400)
@@ -841,14 +806,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       let data;
       if (range === "custom" && startDateStr && endDateStr) {
         const s = parseYMD(startDateStr)!;
-        const e = parseYMD(endDateStr)!; // [s, e)
+        const e = parseYMD(endDateStr)!;
         data = await storage.getIncomeTrendsForDateRange(s, e);
       } else if (range === "last-3-months") {
-        const endEx = new Date(); // now
-        const start = addDaysUTC(new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)), 0);
+        const endEx = new Date();
+        const start = addDaysUTC(
+          new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)),
+          0
+        );
         data = await storage.getIncomeTrendsForDateRange(start, endEx);
       } else if (range === "year") {
-        // [Jan 1, Jan 1 nextYear)
         const s = new Date(Date.UTC(year, 0, 1));
         const e = new Date(Date.UTC(year + 1, 0, 1));
         data = await storage.getIncomeTrendsForDateRange(s, e);
@@ -947,7 +914,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // NOTE: this path overlaps with /api/reports/:year/:month; keep it last
+  // NOTE: keep last
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {
       const path = req.params.path;
@@ -980,7 +947,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       const pageWidth = doc.internal.pageSize.width;
       const margin = 20;
 
-      // Header
       doc.setFillColor(20, 83, 75);
       doc.rect(0, 0, pageWidth, 60, "F");
       doc.setTextColor(255, 255, 255);
@@ -991,7 +957,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       doc.setFont("helvetica", "normal");
       doc.text("Financial Management System", margin, 40);
 
-      // Title
       doc.setTextColor(0, 0, 0);
       const monthName = new Date(year, month - 1).toLocaleDateString("en-US", {
         month: "long",
