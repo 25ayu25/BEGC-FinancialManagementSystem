@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
 import TransactionFilters from "@/components/transactions/transaction-filters";
+import BulkIncomeModal from "@/components/transactions/bulk-income-modal"; // ← NEW
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import {
 export default function Transactions() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false); // ← NEW
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
@@ -172,10 +174,17 @@ export default function Transactions() {
         title="Transaction Management" 
         subtitle="Add and manage daily income and expense transactions"
         actions={
-          <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Transaction
-          </Button>
+          <div className="flex gap-2">
+            {/* NEW: Daily Bulk Income */}
+            <Button variant="outline" onClick={() => setShowBulkModal(true)}>
+              Daily Bulk Income
+            </Button>
+            {/* Existing single-entry modal */}
+            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Transaction
+            </Button>
+          </div>
         }
       />
 
@@ -379,6 +388,7 @@ export default function Transactions() {
         </div>
       </main>
 
+      {/* Single-entry Add/Edit */}
       <AddTransactionModal 
         open={showAddModal} 
         onOpenChange={setShowAddModal}
@@ -388,6 +398,12 @@ export default function Transactions() {
         open={showEditModal} 
         onOpenChange={setShowEditModal}
         editTransaction={transactionToEdit}
+      />
+
+      {/* NEW: Daily Bulk Income modal */}
+      <BulkIncomeModal
+        open={showBulkModal}
+        onOpenChange={setShowBulkModal}
       />
 
       {/* Delete confirmation dialog */}
