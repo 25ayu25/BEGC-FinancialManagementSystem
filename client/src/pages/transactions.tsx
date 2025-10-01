@@ -1,4 +1,6 @@
-import { useState } from "react";
+"use client";
+
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
@@ -17,6 +19,8 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronRight as ChevronRightIcon,
+  CircleDollarSign,
+  ReceiptText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, api } from "@/lib/queryClient";
@@ -29,6 +33,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+/* ----------------------------- UTC helpers ----------------------------- */
+
+function formatUTCDate(iso: string) {
+  // Render as local string but pinned to UTC to avoid off-by-one day
+  return new Date(iso).toLocaleDateString("en-US", { timeZone: "UTC" });
+}
+
+function monthKeyUTC(iso: string) {
+  const d = new Date(iso);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function monthLabelUTC(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function Transactions() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -59,7 +92,7 @@ export default function Transactions() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete transaction",
+        description: error?.message || "Failed to delete transaction",
         variant: "destructive",
       });
     },
@@ -69,19 +102,24 @@ export default function Transactions() {
     setTransactionToDelete(transactionId);
     setDeleteDialogOpen(true);
   };
+
   const handleDeleteConfirm = () => {
     if (transactionToDelete) deleteTransactionMutation.mutate(transactionToDelete);
   };
+
   const handleEditClick = (transaction: any) => {
     setTransactionToEdit(transaction);
     setShowEditModal(true);
   };
 
-  // Build query params for server-side filtering & pagination
+  /* ----------------------------- Query params --------------------------- */
+
   const queryParams = new URLSearchParams({
     page: String(currentPage),
     limit: String(pageSize),
-    ...Object.fromEntries(Object.entries(appliedFilters).filter(([, v]) => v !== undefined && v !== "")),
+    ...Object.fromEntries(
+      Object.entries(appliedFilters).filter(([, v]) => v !== undefined && v !== "")
+    ),
   });
 
   const { data: transactionData, isLoading } = useQuery({
@@ -95,31 +133,40 @@ export default function Transactions() {
   const getDepartmentName = (departmentId: string) =>
     (departments as any)?.find((d: any) => d.id === departmentId)?.name || "Unknown";
 
-  // Group by month
-  const groupTransactionsByMonth = (transactions: any[]) => {
-    const groups: Record<string, any[]> = {};
-    transactions.forEach((t) => {
-      const date = new Date(t.date);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      const label = date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
-      groups[key] ||= [];
-      groups[key].push({ ...t, monthLabel: label });
-    });
-    return Object.entries(groups)
-      .map(([monthKey, txs]) => {
-        const totals = txs.reduce(
-          (acc: any, t: any) => {
-            const amt = Number(t.amount) || 0;
-            const signed = t.type === "income" ? amt : -amt;
-            (t.currency === "USD" ? (acc.usd += signed) : (acc.ssp += signed));
-            return acc;
-          },
-          { ssp: 0, usd: 0 }
-        );
-        return { monthKey, monthLabel: txs[0].monthLabel, transactions: txs, totals, transactionCount: txs.length };
-      })
-      .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-  };
+  /* ---------------------- Grouping (UTC-correct) ------------------------ */
+
+  const transactions = transactionData?.transactions || [];
+  const total = transactionData?.total || 0;
+  const totalPages = transactionData?.totalPages || 1;
+
+  const groupedTransactions = useMemo(() => {
+    const map: Record<
+      string,
+      { monthKey: string; monthLabel: string; transactions: any[]; totals: any; transactionCount: number }
+    > = {};
+
+    for (const t of transactions) {
+      const key = monthKeyUTC(t.date);
+      const label = monthLabelUTC(t.date);
+      if (!map[key]) {
+        map[key] = {
+          monthKey: key,
+          monthLabel: label,
+          transactions: [],
+          totals: { ssp: 0, usd: 0 },
+          transactionCount: 0,
+        };
+      }
+      map[key].transactions.push(t);
+      const amt = Number(t.amount) || 0;
+      const signed = t.type === "income" ? amt : -amt;
+      if (t.currency === "USD") map[key].totals.usd += signed;
+      else map[key].totals.ssp += signed;
+      map[key].transactionCount += 1;
+    }
+
+    return Object.values(map).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [transactions]);
 
   const toggleMonth = (key: string) =>
     setExpandedMonths((prev) => {
@@ -128,11 +175,7 @@ export default function Transactions() {
       return n;
     });
 
-  const transactions = transactionData?.transactions || [];
-  const total = transactionData?.total || 0;
-  const totalPages = transactionData?.totalPages || 1;
-
-  const groupedTransactions = groupTransactionsByMonth(transactions);
+  /* -------------------------------- UI ---------------------------------- */
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -140,14 +183,40 @@ export default function Transactions() {
         title="Transaction Management"
         subtitle="Add and manage daily income and expense transactions"
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowBulkExpense(true)}>Bulk Expenses</Button>
-            <Button variant="outline" onClick={() => setShowBulkIncome(true)}>Daily Bulk Income</Button>
-            <Button onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
-          </div>
+          <TooltipProvider delayDuration={150}>
+            <div className="flex flex-wrap gap-2">
+              {/* Order: Daily Bulk Income → Bulk Expenses → Add Transaction */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => setShowBulkIncome(true)}>
+                    <CircleDollarSign className="h-4 w-4 mr-2" />
+                    Daily Bulk Income
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Enter today’s department totals and insurer daily totals.</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => setShowBulkExpense(true)}>
+                    <ReceiptText className="h-4 w-4 mr-2" />
+                    Bulk Expenses
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Record multiple expenses for the day in one go.</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Transaction
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add a single income or expense entry.</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         }
       />
 
@@ -173,8 +242,10 @@ export default function Transactions() {
                 <div className="text-center py-8 text-gray-500">Loading transactions...</div>
               ) : !transactions?.length ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No transactions found. Add your first transaction to get started.</p>
-                  <Button className="mt-4" onClick={() => setShowAddModal(true)}>
+                  <p className="text-gray-500">
+                    No transactions found. Add your first transaction to get started.
+                  </p>
+                  <Button className="mt-4" variant="outline" onClick={() => setShowAddModal(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add First Transaction
                   </Button>
                 </div>
@@ -194,20 +265,29 @@ export default function Transactions() {
                             ) : (
                               <ChevronRightIcon className="h-4 w-4 text-gray-500" />
                             )}
-                            <h3 className="text-lg font-semibold text-gray-900">{m.monthLabel}</h3>
-                            <Badge variant="secondary">
-                              {m.transactionCount} transaction{m.transactionCount !== 1 ? "s" : ""}
-                            </Badge>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {m.monthLabel}
+                            </h3>
                           </div>
                           <div className="text-right space-y-1">
                             {m.totals.ssp !== 0 && (
-                              <div className={`text-sm font-semibold ${m.totals.ssp >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                {m.totals.ssp >= 0 ? "+" : ""}SSP {m.totals.ssp.toLocaleString()}
+                              <div
+                                className={`text-sm font-semibold ${
+                                  m.totals.ssp >= 0 ? "text-green-600" : "text-red-600"
+                                }`}
+                              >
+                                {m.totals.ssp >= 0 ? "+" : ""}SSP{" "}
+                                {m.totals.ssp.toLocaleString()}
                               </div>
                             )}
                             {m.totals.usd !== 0 && (
-                              <div className={`text-sm font-semibold ${m.totals.usd >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                {m.totals.usd >= 0 ? "+" : ""}USD {m.totals.usd.toLocaleString()}
+                              <div
+                                className={`text-sm font-semibold ${
+                                  m.totals.usd >= 0 ? "text-green-600" : "text-red-600"
+                                }`}
+                              >
+                                {m.totals.usd >= 0 ? "+" : ""}USD{" "}
+                                {m.totals.usd.toLocaleString()}
                               </div>
                             )}
                           </div>
@@ -244,28 +324,50 @@ export default function Transactions() {
                                 {m.transactions.map((t: any) => (
                                   <tr key={t.id} className="hover:bg-gray-50">
                                     <td className="py-3 px-4 text-sm text-gray-900">
-                                      {new Date(t.date).toLocaleDateString()}
+                                      {formatUTCDate(t.date)}
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-900">
                                       {t.insuranceProviderName
-                                        ? `${t.insuranceProviderName} ${t.description || "Income"}`
-                                        : t.description || (t.type === "income" ? "Income" : "Expense")}
+                                        ? `${t.insuranceProviderName} ${
+                                            t.description || "Income"
+                                          }`
+                                        : t.description ||
+                                          (t.type === "income" ? "Income" : "Expense")}
                                     </td>
                                     <td className="py-3 px-4">
-                                      <Badge variant={t.type === "income" ? "default" : "destructive"}>
+                                      <Badge
+                                        variant={
+                                          t.type === "income" ? "default" : "destructive"
+                                        }
+                                      >
                                         {t.type === "income"
-                                          ? (t.departmentId ? getDepartmentName(t.departmentId) : "Income")
-                                          : (t.expenseCategory || "Expense")}
+                                          ? t.departmentId
+                                            ? getDepartmentName(t.departmentId)
+                                            : "Income"
+                                          : t.expenseCategory || "Expense"}
                                       </Badge>
                                     </td>
                                     <td className="py-3 px-4 text-sm text-right font-medium">
-                                      <span className={t.type === "income" ? "text-green-600" : "text-red-600"}>
+                                      <span
+                                        className={
+                                          t.type === "income"
+                                            ? "text-green-600"
+                                            : "text-red-600"
+                                        }
+                                      >
                                         {t.type === "income" ? "+" : "-"}
-                                        {t.currency} {Math.round(Number(t.amount)).toLocaleString()}
+                                        {t.currency}{" "}
+                                        {Math.round(Number(t.amount)).toLocaleString()}
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-center">
-                                      <Badge variant={t.syncStatus === "synced" ? "default" : "secondary"}>
+                                      <Badge
+                                        variant={
+                                          t.syncStatus === "synced"
+                                            ? "default"
+                                            : "secondary"
+                                        }
+                                      >
                                         {t.syncStatus}
                                       </Badge>
                                     </td>
@@ -305,8 +407,9 @@ export default function Transactions() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
                 <div className="text-sm text-gray-500">
-                  Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, total)} of{" "}
-                  {total.toLocaleString()} transactions
+                  Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                  {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()}{" "}
+                  transactions
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -336,12 +439,49 @@ export default function Transactions() {
       </main>
 
       {/* Single-entry Add/Edit */}
-      <AddTransactionModal open={showAddModal} onOpenChange={setShowAddModal} />
-      <AddTransactionModal open={showEditModal} onOpenChange={setShowEditModal} editTransaction={transactionToEdit} />
+      <AddTransactionModal open={showAddModal} onOpenChange={(v) => {
+        setShowAddModal(v);
+        if (!v) {
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        }
+      }} />
+      <AddTransactionModal
+        open={showEditModal}
+        onOpenChange={(v) => {
+          setShowEditModal(v);
+          if (!v) {
+            setTransactionToEdit(null);
+            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          }
+        }}
+        editTransaction={transactionToEdit}
+      />
 
-      {/* Bulk modals (self-fetching) */}
-      <BulkIncomeModal open={showBulkIncome} onOpenChange={setShowBulkIncome} />
-      <BulkExpenseModal open={showBulkExpense} onOpenChange={setShowBulkExpense} />
+      {/* Bulk modals */}
+      <BulkIncomeModal
+        open={showBulkIncome}
+        onOpenChange={(v) => {
+          setShowBulkIncome(v);
+          if (!v) {
+            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          }
+        }}
+        departments={(departments as any[]) || []}
+        insuranceProviders={(insuranceProviders as any[]) || []}
+      />
+      <BulkExpenseModal
+        open={showBulkExpense}
+        onOpenChange={(v) => {
+          setShowBulkExpense(v);
+          if (!v) {
+            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          }
+        }}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -349,7 +489,8 @@ export default function Transactions() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
+              Are you sure you want to delete this transaction? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
