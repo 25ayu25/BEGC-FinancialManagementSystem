@@ -24,18 +24,22 @@ import { Plus, Trash2 } from "lucide-react";
 type Dept = { id: string; name: string };
 type Provider = { id: string; name: string };
 
-type Row = {
-  departmentId?: string;                 // must be a real id or undefined
-  amount: string;                        // keep as text for UX
-  insuranceProviderId?: string | "no-insurance";
-};
-
+// ----- constants
 const KNOWN_DEPTS = ["Consultation", "Laboratory", "Ultrasound", "X-Ray", "Pharmacy"];
 const KNOWN_PROVIDERS = ["CIC", "UAP", "CIGNA", "Nile International", "New Sudan"];
 
-function makeEmptyRow(): Row {
-  return { amount: "", departmentId: undefined, insuranceProviderId: "no-insurance" };
-}
+// ----- helpers
+const sanitizeAmount = (v: string) => {
+  if (typeof v !== "string") return Number(v);
+  const n = v.replace(/[^0-9.\-]/g, ""); // keep digits, dot, minus
+  return Number(n);
+};
+
+type DeptRow = { departmentId?: string; amount: string };
+type ProviderRow = { insuranceProviderId?: string; amount: string };
+
+function emptyDeptRow(): DeptRow { return { departmentId: undefined, amount: "" }; }
+function emptyProviderRow(): ProviderRow { return { insuranceProviderId: undefined, amount: "" }; }
 
 export default function BulkIncomeModal({
   open,
@@ -46,7 +50,7 @@ export default function BulkIncomeModal({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  date?: string;
+  date?: string;                         // YYYY-MM-DD
   departments: Dept[];
   insuranceProviders: Provider[];
 }) {
@@ -62,86 +66,109 @@ export default function BulkIncomeModal({
   });
   const [currency, setCurrency] = useState<"SSP" | "USD">("SSP");
   const [notes, setNotes] = useState("");
-  const [rows, setRows] = useState<Row[]>([makeEmptyRow(), makeEmptyRow(), makeEmptyRow(), makeEmptyRow(), makeEmptyRow()]);
+
+  // Cash by department
+  const [deptRows, setDeptRows] = useState<DeptRow[]>(
+    Array.from({ length: 5 }, () => emptyDeptRow())
+  );
+
+  // Insurance totals (by provider)
+  const [providerRows, setProviderRows] = useState<ProviderRow[]>(
+    Array.from({ length: 5 }, () => emptyProviderRow())
+  );
 
   useEffect(() => {
     if (initialDate) setDate(initialDate);
   }, [initialDate]);
 
-  // ---------- helpers ----------
-  const addRow = () => setRows((r) => [...r, makeEmptyRow()]);
-  const removeRow = (idx: number) => setRows((r) => r.filter((_, i) => i !== idx));
-  const patchRow = (idx: number, patch: Partial<Row>) =>
-    setRows((r) => r.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
-
-  const byName = (list: { id: string; name: string }[], name: string) =>
+  const byName = <T extends { id: string; name: string }>(list: T[], name: string) =>
     list.find((x) => x.name.localeCompare(name, undefined, { sensitivity: "base" }) === 0);
 
   const prefillFiveDepartments = () => {
-    const next: Row[] = [];
+    const next: DeptRow[] = [];
     for (const label of KNOWN_DEPTS) {
       const d = byName(departments, label);
-      if (d?.id) next.push({ departmentId: d.id, amount: "", insuranceProviderId: "no-insurance" });
+      if (d?.id) next.push({ departmentId: d.id, amount: "" });
     }
-    if (next.length) setRows(next);
+    if (next.length) setDeptRows(next);
   };
 
-  const setProviderForAll = (providerId: string | "no-insurance") => {
-    setRows((r) => r.map((row) => ({ ...row, insuranceProviderId: providerId })));
-  };
-
-  const quickUSDProviders = () => {
-    // Ensures currency USD and opens 5 rows with the common providers pre-selected for convenience.
-    setCurrency("USD");
-    const baseDepts = rows.length ? rows : KNOWN_DEPTS
-      .map((n) => byName(departments, n))
-      .filter(Boolean)
-      .map((d) => ({ departmentId: d!.id, amount: "", insuranceProviderId: "no-insurance" as const }));
-
-    const providerIds = KNOWN_PROVIDERS
+  const prefillProviders = () => {
+    const ids = KNOWN_PROVIDERS
       .map((n) => byName(insuranceProviders, n))
       .filter(Boolean)
       .map((p) => p!.id);
-
-    // Just set the first N rows to have those providers; users can add more rows if they want one row per provider.
-    const next = baseDepts.map((r, i) => ({
-      ...r,
-      insuranceProviderId: providerIds[i % providerIds.length] ?? "no-insurance",
-    }));
-    setRows(next);
+    const next: ProviderRow[] = ids.map((id) => ({ insuranceProviderId: id, amount: "" }));
+    if (next.length) setProviderRows(next);
   };
 
-  const validRows = useMemo(
+  // ---- table operations
+  const patchDept = (i: number, patch: Partial<DeptRow>) =>
+    setDeptRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const addDept = () => setDeptRows((r) => [...r, emptyDeptRow()]);
+  const removeDept = (i: number) => setDeptRows((r) => r.filter((_, idx) => idx !== i));
+
+  const patchProv = (i: number, patch: Partial<ProviderRow>) =>
+    setProviderRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const addProv = () => setProviderRows((r) => [...r, emptyProviderRow()]);
+  const removeProv = (i: number) => setProviderRows((r) => r.filter((_, idx) => idx !== i));
+
+  // ---- validation views
+  const validDeptRows = useMemo(
     () =>
-      rows
-        .map((r) => ({ ...r, amountNum: Number(r.amount) }))
+      deptRows
+        .map((r) => ({ ...r, amountNum: sanitizeAmount(r.amount) }))
         .filter((r) => r.departmentId && isFinite(r.amountNum) && r.amountNum > 0),
-    [rows]
+    [deptRows]
   );
 
-  // ---------- save ----------
+  const validProviderRows = useMemo(
+    () =>
+      providerRows
+        .map((r) => ({ ...r, amountNum: sanitizeAmount(r.amount) }))
+        .filter((r) => r.insuranceProviderId && isFinite(r.amountNum) && r.amountNum > 0),
+    [providerRows]
+  );
+
+  // ---- save
   const { mutateAsync, isPending } = useMutation({
     mutationFn: async () => {
+      // Combine both sections into single payload for /bulk-income
+      const rows = [
+        // cash by department → mark as cash (no-insurance)
+        ...validDeptRows.map((r) => ({
+          departmentId: r.departmentId!,
+          insuranceProviderId: "no-insurance" as const,
+          amount: sanitizeAmount(r.amount),
+        })),
+        // insurance totals → provider only, no department
+        ...validProviderRows.map((r) => ({
+          departmentId: null,
+          insuranceProviderId: r.insuranceProviderId!,
+          amount: sanitizeAmount(r.amount),
+        })),
+      ];
+
+      if (rows.length === 0) {
+        throw new Error("Please enter at least one positive amount (department or insurance).");
+      }
+
       const payload = {
         date,
         currency,
-        defaultInsuranceProviderId: "no-insurance" as const,
         notes: notes || undefined,
-        rows: validRows.map((r) => ({
-          departmentId: r.departmentId!,
-          amount: Number(r.amount),
-          insuranceProviderId: r.insuranceProviderId ?? "no-insurance",
-        })),
+        rows,
       };
-      if (payload.rows.length === 0) throw new Error("Please enter at least one positive amount.");
+
       return apiRequest("POST", "/api/transactions/bulk-income", payload);
     },
     onSuccess: () => {
-      toast({ title: "Saved", description: "Daily income saved for all departments." });
+      toast({ title: "Saved", description: "Daily income saved." });
       qc.invalidateQueries({ queryKey: ["/api/transactions"] });
       qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
       onOpenChange(false);
-      setRows([makeEmptyRow(), makeEmptyRow(), makeEmptyRow(), makeEmptyRow(), makeEmptyRow()]);
+      setDeptRows(Array.from({ length: 5 }, () => emptyDeptRow()));
+      setProviderRows(Array.from({ length: 5 }, () => emptyProviderRow()));
       setNotes("");
     },
     onError: (e: any) => {
@@ -156,14 +183,14 @@ export default function BulkIncomeModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        {/* Overlay kept behind the content */}
+        {/* Overlay behind the content (no dim over modal) */}
         <DialogOverlay className="fixed inset-0 z-[80] bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out" />
         <DialogContent className="fixed left-1/2 top-1/2 z-[90] grid w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-white p-5 shadow-xl">
           <DialogHeader>
             <DialogTitle>Daily Bulk Income</DialogTitle>
           </DialogHeader>
 
-          {/* top-line controls + quick buttons */}
+          {/* Top controls */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr] gap-3">
             <div>
               <Label className="mb-1 block">Transaction Date</Label>
@@ -189,85 +216,52 @@ export default function BulkIncomeModal({
             </div>
           </div>
 
+          {/* Quick buttons */}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={prefillFiveDepartments}>Prefill 5 departments</Button>
-            <Button type="button" variant="outline" onClick={quickUSDProviders}>Prefill providers (USD)</Button>
-
-            {/* set same provider for all rows */}
-            <Select onValueChange={(v) => setProviderForAll(v as any)}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Set provider for ALL…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="no-insurance">No insurance / Cash</SelectItem>
-                {insuranceProviders.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Button type="button" variant="outline" onClick={prefillProviders}>Prefill providers</Button>
           </div>
 
-          {/* table-like rows */}
+          {/* Cash by Department */}
           <div className="border rounded-lg">
+            <div className="px-3 py-2 bg-slate-100 text-sm font-semibold text-slate-700 rounded-t-lg">
+              Cash by Department
+            </div>
             <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50 text-xs font-medium text-slate-600">
-              <div className="col-span-5">Department</div>
-              <div className="col-span-3 text-right">Amount</div>
-              <div className="col-span-3">Insurance Provider</div>
+              <div className="col-span-7">Department</div>
+              <div className="col-span-4 text-right">Amount</div>
               <div className="col-span-1" />
             </div>
 
             <div className="divide-y">
-              {rows.map((row, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
-                  {/* Department */}
-                  <div className="col-span-5">
+              {deptRows.map((row, idx) => (
+                <div key={`d-${idx}`} className="grid grid-cols-12 gap-2 px-3 py-3">
+                  <div className="col-span-7">
                     <Select
                       value={row.departmentId ?? undefined}
-                      onValueChange={(v) => patchRow(idx, { departmentId: v })}
+                      onValueChange={(v) => patchDept(idx, { departmentId: v })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.filter((d) => !!d?.id).map((d) => (
+                        {departments.map((d) => (
                           <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Amount */}
-                  <div className="col-span-3">
+                  <div className="col-span-4">
                     <Input
                       inputMode="numeric"
                       value={row.amount}
-                      onChange={(e) => patchRow(idx, { amount: e.target.value })}
+                      onChange={(e) => patchDept(idx, { amount: e.target.value })}
                       placeholder="0"
                       className="text-right"
                     />
                   </div>
-
-                  {/* Provider */}
-                  <div className="col-span-3">
-                    <Select
-                      value={row.insuranceProviderId ?? "no-insurance"}
-                      onValueChange={(v) => patchRow(idx, { insuranceProviderId: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Insurance provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="no-insurance">No insurance / Cash</SelectItem>
-                        {insuranceProviders.filter((p) => !!p?.id).map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Remove */}
                   <div className="col-span-1 flex items-center justify-end">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeRow(idx)} className="hover:bg-red-50 hover:text-red-600">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDept(idx)} className="hover:bg-red-50 hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -276,7 +270,62 @@ export default function BulkIncomeModal({
             </div>
 
             <div className="p-3">
-              <Button type="button" onClick={addRow} variant="outline">
+              <Button type="button" onClick={addDept} variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Add row
+              </Button>
+            </div>
+          </div>
+
+          {/* Insurance Totals */}
+          <div className="border rounded-lg">
+            <div className="px-3 py-2 bg-slate-100 text-sm font-semibold text-slate-700 rounded-t-lg">
+              Insurance Totals (no department)
+            </div>
+            <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50 text-xs font-medium text-slate-600">
+              <div className="col-span-7">Insurance Provider</div>
+              <div className="col-span-4 text-right">Amount</div>
+              <div className="col-span-1" />
+            </div>
+
+            <div className="divide-y">
+              {providerRows.map((row, idx) => (
+                <div key={`p-${idx}`} className="grid grid-cols-12 gap-2 px-3 py-3">
+                  <div className="col-span-7">
+                    <Select
+                      value={row.insuranceProviderId ?? undefined}
+                      onValueChange={(v) => patchProv(idx, { insuranceProviderId: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select insurance provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {insuranceProviders.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-4">
+                    <Input
+                      inputMode="numeric"
+                      value={row.amount}
+                      onChange={(e) => patchProv(idx, { amount: e.target.value })}
+                      placeholder="0"
+                      className="text-right"
+                    />
+                  </div>
+                  <div className="col-span-1 flex items-center justify-end">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeProv(idx)} className="hover:bg-red-50 hover:text-red-600">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3">
+              <Button type="button" onClick={addProv} variant="outline">
                 <Plus className="h-4 w-4 mr-2" />
                 Add row
               </Button>
@@ -284,7 +333,9 @@ export default function BulkIncomeModal({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+              Cancel
+            </Button>
             <Button onClick={() => mutateAsync()} disabled={isPending}>
               {isPending ? "Saving…" : "Save Daily Income"}
             </Button>
