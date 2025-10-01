@@ -251,8 +251,8 @@ export default function BulkIncomeModal({
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 5 departments</Button>
-              <Button type="button" variant="outline" onClick={prefillProviders}>Prefill providers</Button>
+              <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 5 Departments</Button>
+              <Button type="button" variant="outline" onClick={prefillProviders}>Prefill Insurances</Button>
               <div className="ml-auto flex items-center gap-2">
                 <Label className="text-xs text-slate-600">Provider currency</Label>
                 <Select value={providerCurrency} onValueChange={(v: "SSP" | "USD") => setProviderCurrency(v)}>
