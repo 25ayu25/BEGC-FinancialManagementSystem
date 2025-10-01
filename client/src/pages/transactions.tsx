@@ -3,12 +3,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
 import TransactionFilters from "@/components/transactions/transaction-filters";
-import BulkIncomeModal from "@/components/transactions/bulk-income-modal"; // ← NEW
+import BulkIncomeModal from "@/components/transactions/bulk-income-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Filter, Download, Edit, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Plus,
+  Filter,
+  Download,
+  Edit,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, api } from "@/lib/queryClient";
@@ -26,7 +37,7 @@ import {
 export default function Transactions() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showBulkModal, setShowBulkModal] = useState(false); // ← NEW
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
@@ -81,8 +92,8 @@ export default function Transactions() {
     page: currentPage.toString(),
     limit: pageSize.toString(),
     ...Object.fromEntries(
-      Object.entries(appliedFilters).filter(([_, value]) => value !== undefined && value !== '')
-    )
+      Object.entries(appliedFilters).filter(([_, value]) => value !== undefined && value !== "")
+    ),
   });
 
   const { data: transactionData, isLoading } = useQuery({
@@ -102,18 +113,18 @@ export default function Transactions() {
   });
 
   const getDepartmentName = (departmentId: string) => {
-    return (departments as any)?.find((d: any) => d.id === departmentId)?.name || 'Unknown';
+    return (departments as any)?.find((d: any) => d.id === departmentId)?.name || "Unknown";
   };
 
   // Group transactions by month
   const groupTransactionsByMonth = (transactions: any[]) => {
     const groups: { [key: string]: any[] } = {};
-    
-    transactions.forEach(transaction => {
+
+    transactions.forEach((transaction) => {
       const date = new Date(transaction.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const monthLabel = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-      
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const monthLabel = date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
+
       if (!groups[monthKey]) {
         groups[monthKey] = [];
       }
@@ -124,31 +135,34 @@ export default function Transactions() {
     return Object.entries(groups)
       .map(([monthKey, transactions]) => {
         // Calculate totals separately by currency
-        const totals = transactions.reduce((acc, t) => {
-          const amount = parseFloat(t.amount) || 0;
-          const adjustedAmount = t.type === 'income' ? amount : -amount;
-          
-          if (t.currency === 'USD') {
-            acc.usd += adjustedAmount;
-          } else {
-            acc.ssp += adjustedAmount;
-          }
-          return acc;
-        }, { ssp: 0, usd: 0 });
+        const totals = transactions.reduce(
+          (acc, t) => {
+            const amount = parseFloat(t.amount) || 0;
+            const adjustedAmount = t.type === "income" ? amount : -amount;
+
+            if (t.currency === "USD") {
+              acc.usd += adjustedAmount;
+            } else {
+              acc.ssp += adjustedAmount;
+            }
+            return acc;
+          },
+          { ssp: 0, usd: 0 }
+        );
 
         return {
           monthKey,
           monthLabel: transactions[0].monthLabel,
           transactions,
           totals,
-          transactionCount: transactions.length
+          transactionCount: transactions.length,
         };
       })
       .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   };
 
   const toggleMonth = (monthKey: string) => {
-    setExpandedMonths(prev => {
+    setExpandedMonths((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(monthKey)) {
         newSet.delete(monthKey);
@@ -170,8 +184,8 @@ export default function Transactions() {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <Header 
-        title="Transaction Management" 
+      <Header
+        title="Transaction Management"
         subtitle="Add and manage daily income and expense transactions"
         actions={
           <div className="flex gap-2">
@@ -190,220 +204,258 @@ export default function Transactions() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="space-y-6">
-          <TransactionFilters 
+          <TransactionFilters
             onFilterChange={(filters) => {
-              console.log('Filters:', filters);
               setAppliedFilters(filters);
               setCurrentPage(1); // Reset to first page when filters change
             }}
-            onExport={() => console.log('Export requested')}
+            onExport={() => console.log("Export requested")}
             transactions={transactions}
             departments={departments as any[]}
             insuranceProviders={insuranceProviders as any[]}
           />
           <Card>
             <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Loading transactions...</p>
-              </div>
-            ) : !transactions?.length ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No transactions found. Add your first transaction to get started.</p>
-                <Button className="mt-4" onClick={() => setShowAddModal(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Transaction
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {groupedTransactions.map((monthGroup) => (
-                  <Collapsible
-                    key={monthGroup.monthKey}
-                    open={expandedMonths.has(monthGroup.monthKey)}
-                    onOpenChange={() => toggleMonth(monthGroup.monthKey)}
-                  >
-                    <CollapsibleTrigger asChild>
-                      <div className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            {expandedMonths.has(monthGroup.monthKey) ? (
-                              <ChevronDown className="h-4 w-4 text-gray-500" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-gray-500" />
-                            )}
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {monthGroup.monthLabel}
-                            </h3>
+              <CardTitle>Recent Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading transactions...</p>
+                </div>
+              ) : !transactions?.length ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">
+                    No transactions found. Add your first transaction to get started.
+                  </p>
+                  <Button className="mt-4" onClick={() => setShowAddModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Transaction
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groupedTransactions.map((monthGroup) => (
+                    <Collapsible
+                      key={monthGroup.monthKey}
+                      open={expandedMonths.has(monthGroup.monthKey)}
+                      onOpenChange={() => toggleMonth(monthGroup.monthKey)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                              {expandedMonths.has(monthGroup.monthKey) ? (
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-gray-500" />
+                              )}
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {monthGroup.monthLabel}
+                              </h3>
+                            </div>
+                            <Badge variant="secondary">
+                              {monthGroup.transactionCount} transaction
+                              {monthGroup.transactionCount !== 1 ? "s" : ""}
+                            </Badge>
                           </div>
-                          <Badge variant="secondary">
-                            {monthGroup.transactionCount} transaction{monthGroup.transactionCount !== 1 ? 's' : ''}
-                          </Badge>
+                          <div className="text-right space-y-1">
+                            {monthGroup.totals.ssp !== 0 && (
+                              <div
+                                className={`text-sm font-semibold ${
+                                  monthGroup.totals.ssp >= 0 ? "text-green-600" : "text-red-600"
+                                }`}
+                              >
+                                {monthGroup.totals.ssp >= 0 ? "+" : ""}
+                                SSP {monthGroup.totals.ssp.toLocaleString()}
+                              </div>
+                            )}
+                            {monthGroup.totals.usd !== 0 && (
+                              <div
+                                className={`text-sm font-semibold ${
+                                  monthGroup.totals.usd >= 0 ? "text-green-600" : "text-red-600"
+                                }`}
+                              >
+                                {monthGroup.totals.usd >= 0 ? "+" : ""}
+                                USD {monthGroup.totals.usd.toLocaleString()}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right space-y-1">
-                          {monthGroup.totals.ssp !== 0 && (
-                            <div className={`text-sm font-semibold ${monthGroup.totals.ssp >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {monthGroup.totals.ssp >= 0 ? '+' : ''}SSP {monthGroup.totals.ssp.toLocaleString()}
-                            </div>
-                          )}
-                          {monthGroup.totals.usd !== 0 && (
-                            <div className={`text-sm font-semibold ${monthGroup.totals.usd >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {monthGroup.totals.usd >= 0 ? '+' : ''}USD {monthGroup.totals.usd.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CollapsibleTrigger>
-                    
-                    <CollapsibleContent className="space-y-2 mt-2">
-                      <div className="bg-white border rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                  Date
-                                </th>
-                                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                  Description
-                                </th>
-                                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                  Department
-                                </th>
-                                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                  Amount
-                                </th>
-                                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                  Status
-                                </th>
-                                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                  Actions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {monthGroup.transactions.map((transaction: any) => (
-                                <tr key={transaction.id} className="hover:bg-gray-50 transition-colors" data-testid={`row-transaction-${transaction.id}`}>
-                                  <td className="py-3 px-4 text-sm text-gray-900">
-                                    {new Date(transaction.date).toLocaleDateString()}
-                                  </td>
-                                  <td className="py-3 px-4 text-sm text-gray-900">
-                                    {transaction.insuranceProviderName 
-                                      ? `${transaction.insuranceProviderName} ${transaction.description || 'Income'}`
-                                      : (transaction.description || (transaction.type === 'income' ? 'Income' : 'Expense'))
-                                    }
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>
-                                      {transaction.type === 'income' 
-                                        ? (transaction.departmentId ? getDepartmentName(transaction.departmentId) : 'Income')
-                                        : (transaction.expenseCategory || 'Expense')
-                                      }
-                                    </Badge>
-                                  </td>
-                                  <td className="py-3 px-4 text-sm text-right font-medium">
-                                    <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                                      {transaction.type === 'income' ? '+' : '-'}{transaction.currency} {Math.round(parseFloat(transaction.amount)).toLocaleString()}
-                                    </span>
-                                  </td>
-                                  <td className="py-3 px-4 text-center">
-                                    <Badge variant={transaction.syncStatus === 'synced' ? 'default' : 'secondary'}>
-                                      {transaction.syncStatus}
-                                    </Badge>
-                                  </td>
-                                  <td className="py-3 px-4 text-center">
-                                    <div className="flex items-center justify-center space-x-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
-                                        onClick={() => handleEditClick(transaction)}
-                                        data-testid={`button-edit-${transaction.id}`}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                                        onClick={() => handleDeleteClick(transaction.id)}
-                                        data-testid={`button-delete-${transaction.id}`}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </td>
+                      </CollapsibleTrigger>
+
+                      <CollapsibleContent className="space-y-2 mt-2">
+                        <div className="bg-white border rounded-lg overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Date
+                                  </th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Description
+                                  </th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Department
+                                  </th>
+                                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Amount
+                                  </th>
+                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Status
+                                  </th>
+                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Actions
+                                  </th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {monthGroup.transactions.map((transaction: any) => (
+                                  <tr
+                                    key={transaction.id}
+                                    className="hover:bg-gray-50 transition-colors"
+                                    data-testid={`row-transaction-${transaction.id}`}
+                                  >
+                                    <td className="py-3 px-4 text-sm text-gray-900">
+                                      {new Date(transaction.date).toLocaleDateString()}
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-900">
+                                      {transaction.insuranceProviderName
+                                        ? `${transaction.insuranceProviderName} ${
+                                            transaction.description || "Income"
+                                          }`
+                                        : transaction.description ||
+                                          (transaction.type === "income" ? "Income" : "Expense")}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <Badge
+                                        variant={
+                                          transaction.type === "income" ? "default" : "destructive"
+                                        }
+                                      >
+                                        {transaction.type === "income"
+                                          ? transaction.departmentId
+                                            ? getDepartmentName(transaction.departmentId)
+                                            : "Income"
+                                          : transaction.expenseCategory || "Expense"}
+                                      </Badge>
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-right font-medium">
+                                      <span
+                                        className={
+                                          transaction.type === "income"
+                                            ? "text-green-600"
+                                            : "text-red-600"
+                                        }
+                                      >
+                                        {transaction.type === "income" ? "+" : "-"}
+                                        {transaction.currency}{" "}
+                                        {Math.round(parseFloat(transaction.amount)).toLocaleString()}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-center">
+                                      <Badge
+                                        variant={
+                                          transaction.syncStatus === "synced"
+                                            ? "default"
+                                            : "secondary"
+                                        }
+                                      >
+                                        {transaction.syncStatus}
+                                      </Badge>
+                                    </td>
+                                    <td className="py-3 px-4 text-center">
+                                      <div className="flex items-center justify-center space-x-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                                          onClick={() => handleEditClick(transaction)}
+                                          data-testid={`button-edit-${transaction.id}`}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                          onClick={() => handleDeleteClick(transaction.id)}
+                                          data-testid={`button-delete-${transaction.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                  {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()} transactions
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+
+                  <div className="text-sm text-gray-500">
+                    Page {currentPage} of {totalPages}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
               </div>
             )}
-          </CardContent>
-          
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-              <div className="text-sm text-gray-500">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()} transactions
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  data-testid="button-prev-page"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                
-                <div className="text-sm text-gray-500">
-                  Page {currentPage} of {totalPages}
-                </div>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  data-testid="button-next-page"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
+          </Card>
         </div>
       </main>
 
       {/* Single-entry Add/Edit */}
-      <AddTransactionModal 
-        open={showAddModal} 
-        onOpenChange={setShowAddModal}
-      />
+      <AddTransactionModal open={showAddModal} onOpenChange={setShowAddModal} />
 
-      <AddTransactionModal 
-        open={showEditModal} 
+      <AddTransactionModal
+        open={showEditModal}
         onOpenChange={setShowEditModal}
         editTransaction={transactionToEdit}
       />
 
-      {/* NEW: Daily Bulk Income modal */}
+      {/* NEW: Daily Bulk Income modal — feed it data to avoid blank screen */}
       <BulkIncomeModal
         open={showBulkModal}
         onOpenChange={setShowBulkModal}
+        date={new Date().toISOString().slice(0, 10)}
+        departments={Array.isArray(departments) ? (departments as any[]) : []}
+        insuranceProviders={Array.isArray(insuranceProviders) ? (insuranceProviders as any[]) : []}
       />
 
       {/* Delete confirmation dialog */}
