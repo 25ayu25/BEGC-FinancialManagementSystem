@@ -9,7 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, api } from "@/lib/queryClient";
 import {
@@ -69,6 +77,7 @@ export default function Transactions() {
     setShowEditModal(true);
   };
 
+  // Build query params for server-side filtering & pagination
   const queryParams = new URLSearchParams({
     page: String(currentPage),
     limit: String(pageSize),
@@ -86,6 +95,7 @@ export default function Transactions() {
   const getDepartmentName = (departmentId: string) =>
     (departments as any)?.find((d: any) => d.id === departmentId)?.name || "Unknown";
 
+  // Group by month
   const groupTransactionsByMonth = (transactions: any[]) => {
     const groups: Record<string, any[]> = {};
     transactions.forEach((t) => {
@@ -185,6 +195,9 @@ export default function Transactions() {
                               <ChevronRightIcon className="h-4 w-4 text-gray-500" />
                             )}
                             <h3 className="text-lg font-semibold text-gray-900">{m.monthLabel}</h3>
+                            <Badge variant="secondary">
+                              {m.transactionCount} transaction{m.transactionCount !== 1 ? "s" : ""}
+                            </Badge>
                           </div>
                           <div className="text-right space-y-1">
                             {m.totals.ssp !== 0 && (
@@ -207,18 +220,32 @@ export default function Transactions() {
                             <table className="w-full">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Date</th>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Description</th>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Department</th>
-                                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Amount</th>
-                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Status</th>
-                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Actions</th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Date
+                                  </th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Description
+                                  </th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Department
+                                  </th>
+                                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Amount
+                                  </th>
+                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Status
+                                  </th>
+                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                                    Actions
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
                                 {m.transactions.map((t: any) => (
                                   <tr key={t.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4 text-sm text-gray-900">{new Date(t.date).toLocaleDateString()}</td>
+                                    <td className="py-3 px-4 text-sm text-gray-900">
+                                      {new Date(t.date).toLocaleDateString()}
+                                    </td>
                                     <td className="py-3 px-4 text-sm text-gray-900">
                                       {t.insuranceProviderName
                                         ? `${t.insuranceProviderName} ${t.description || "Income"}`
@@ -238,14 +265,26 @@ export default function Transactions() {
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-center">
-                                      <Badge variant={t.syncStatus === "synced" ? "default" : "secondary"}>{t.syncStatus}</Badge>
+                                      <Badge variant={t.syncStatus === "synced" ? "default" : "secondary"}>
+                                        {t.syncStatus}
+                                      </Badge>
                                     </td>
                                     <td className="py-3 px-4 text-center">
                                       <div className="flex items-center justify-center gap-1">
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600" onClick={() => handleEditClick(t)}>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                                          onClick={() => handleEditClick(t)}
+                                        >
                                           <Pencil className="h-4 w-4" />
                                         </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteClick(t.id)}>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                          onClick={() => handleDeleteClick(t.id)}
+                                        >
                                           <Trash2 className="h-4 w-4" />
                                         </Button>
                                       </div>
@@ -266,14 +305,27 @@ export default function Transactions() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
                 <div className="text-sm text-gray-500">
-                  Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()} transactions
+                  Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, total)} of{" "}
+                  {total.toLocaleString()} transactions
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
                     <ChevronLeft className="h-4 w-4 mr-1" /> Previous
                   </Button>
-                  <div className="text-sm text-gray-500">Page {currentPage} of {totalPages}</div>
-                  <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                  <div className="text-sm text-gray-500">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
                     Next <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
@@ -287,13 +339,8 @@ export default function Transactions() {
       <AddTransactionModal open={showAddModal} onOpenChange={setShowAddModal} />
       <AddTransactionModal open={showEditModal} onOpenChange={setShowEditModal} editTransaction={transactionToEdit} />
 
-      {/* Bulk modals */}
-      <BulkIncomeModal
-        open={showBulkIncome}
-        onOpenChange={setShowBulkIncome}
-        departments={(departments as any[]) || []}
-        insuranceProviders={(insuranceProviders as any[]) || []}
-      />
+      {/* Bulk modals (self-fetching) */}
+      <BulkIncomeModal open={showBulkIncome} onOpenChange={setShowBulkIncome} />
       <BulkExpenseModal open={showBulkExpense} onOpenChange={setShowBulkExpense} />
 
       {/* Delete confirmation */}
