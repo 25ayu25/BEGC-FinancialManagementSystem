@@ -1,279 +1,295 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, api } from "@/lib/queryClient";
-import Header from "@/components/layout/header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, FileText, Lock, Trash2, Calendar } from "lucide-react";
+// client/src/pages/reports.tsx
+'use client';
 
-export default function Reports() {
-  const { toast } = useToast();
-  const { data: reports, isLoading } = useQuery({
-    queryKey: ["/api/reports"],
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import { api } from '@/lib/queryClient';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+
+import {
+  Calendar,
+  FileText,
+  Loader2,
+  Download,
+  Trash2,
+} from 'lucide-react';
+
+/* ------------------------- helpers & constants -------------------------- */
+
+const months = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+];
+
+const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const fmtSSP = (n: number) => `SSP ${nf0.format(Math.round(Number(n || 0)))}`;
+
+/** robust PDF download that avoids blank file issues */
+async function fetchAndDownloadPdf(url: string, filename: string) {
+  const bust = url.includes('?') ? '&_=' : '?_=';
+  const res = await api.get(`${url}${bust}${Date.now()}`, {
+    responseType: 'blob',
   });
 
-  // State for month/year selection
-  const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString());
+  const blob = new Blob([res.data], {
+    type: res.headers['content-type'] || 'application/pdf',
+  });
 
-  // Generate year options (current year and past 2 years)
-  const yearOptions = [];
-  for (let i = 0; i < 3; i++) {
-    yearOptions.push((currentDate.getFullYear() - i).toString());
+  if (!blob || blob.size === 0) throw new Error('Empty PDF');
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+
+/* ------------------------------- page ---------------------------------- */
+
+type ReportRow = {
+  id: string;
+  month: number; // 1..12
+  year: number;
+  status?: 'draft' | 'approved' | 'locked';
+  pdfPath?: string | null;
+  netIncomeSSP?: number | string | null;
+  title?: string | null;
+};
+
+export default function ReportsPage() {
+  const now = new Date();
+  const [year, setYear] = useState<number>(now.getFullYear());
+  const [month, setMonth] = useState<number>(now.getMonth() + 1);
+
+  const yearOptions = useMemo(
+    () => [year, year - 1, year - 2, year - 3, year - 4],
+    [year],
+  );
+
+  const {
+    data: reportData,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ['/api/reports/list', year, month],
+    queryFn: async () => {
+      // Returns either { reports: ReportRow[] } or ReportRow[]
+      const { data } = await api.get(
+        `/api/reports?year=${year}&month=${month}`,
+      );
+      return Array.isArray(data) ? data : data?.reports ?? [];
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/api/reports/generate', { year, month });
+    },
+    onSuccess: () => refetch(),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/api/reports/${id}`);
+    },
+    onSuccess: () => refetch(),
+  });
+
+  const rows: ReportRow[] = Array.isArray(reportData) ? (reportData as any) : [];
+
+  async function onDownload(report: ReportRow) {
+    const m = months.find((x) => x.value === (report.month || month))?.label ?? 'Report';
+    const filename = `${m} ${report.year || year} Report`;
+
+    try {
+      if (report.pdfPath) {
+        await fetchAndDownloadPdf(report.pdfPath, filename);
+        return;
+      }
+      const url = report.id
+        ? `/api/reports/${report.id}/pdf`
+        : `/api/reports/${report.year || year}/${report.month || month}/pdf`;
+      await fetchAndDownloadPdf(url, filename);
+    } catch (err) {
+      console.error(err);
+      alert("Couldn't download the PDF. Try Generate Report first.");
+    }
   }
 
-  // Month options
-  const monthOptions = [
-    { value: "1", label: "January" },
-    { value: "2", label: "February" },
-    { value: "3", label: "March" },
-    { value: "4", label: "April" },
-    { value: "5", label: "May" },
-    { value: "6", label: "June" },
-    { value: "7", label: "July" },
-    { value: "8", label: "August" },
-    { value: "9", label: "September" },
-    { value: "10", label: "October" },
-    { value: "11", label: "November" },
-    { value: "12", label: "December" },
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'default';
-      case 'locked': return 'secondary';
-      case 'draft': return 'outline';
-      default: return 'outline';
-    }
-  };
-
-  const generateReport = async (year: number, month: number) => {
-    try {
-      const response = await api.post(`/api/reports/generate/${year}/${month}`);
-      
-      const result = response.data;
-      
-      // Refresh the reports list to show the newly generated report
-      await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
-      
-      toast({
-        title: "Report Generated",
-        description: `Monthly report for ${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} has been generated successfully.`
-      });
-    } catch (error: any) {
-      console.error('Error generating report:', error);
-      const errorMessage = error?.response?.status === 401 
-        ? "Please log in again to generate reports."
-        : "Failed to generate report. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const downloadReport = async (pdfPath: string, filename: string) => {
-    try {
-      console.log('Downloading report:', pdfPath, filename);
-      
-      // Use axios to download with proper authentication
-      const downloadUrl = `/api${pdfPath}`;
-      const response = await api.get(downloadUrl, {
-        responseType: 'blob' // Important for binary data
-      });
-      
-      // Create a blob URL and trigger download
-      const blob = response.data;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Download Started",
-        description: "The monthly report PDF is being downloaded."
-      });
-    } catch (error) {
-      console.error('Error downloading report:', error);
-      toast({
-        title: "Error",
-        description: "Failed to download report. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const deleteReport = async (reportId: string) => {
-    if (!confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      await api.delete(`/api/reports/${reportId}`);
-      
-      // Refresh the reports list
-      await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
-      
-      toast({
-        title: "Report Deleted",
-        description: "The monthly report has been deleted successfully."
-      });
-    } catch (error) {
-      console.error('Error deleting report:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete report. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
-    <div className="flex-1 flex flex-col h-full">
-      <Header 
-        title="Monthly Reports" 
-        subtitle="Generate and manage monthly financial reports"
-        actions={
-          <div className="flex items-center space-x-3">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-24">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={year}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Button 
-              onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
-              data-testid="button-generate-report"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Generate Report
-            </Button>
-          </div>
-        }
-      />
+    <div className="p-6 space-y-6">
+      {/* Header / Filters */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Monthly Reports</h1>
+          <p className="text-sm text-muted-foreground">
+            Generate and manage monthly financial reports
+          </p>
+        </div>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Reports</CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-96 overflow-y-auto">
-            {isLoading ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Loading reports...</p>
-              </div>
-            ) : !(reports as any)?.length ? (
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No reports generated yet.</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Reports are automatically generated at month-end or you can generate them manually.
-                </p>
-                <Button 
-                  className="mt-4" 
-                  onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
-                  data-testid="button-generate-first-report"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Generate First Report
-                </Button>
-              </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Month */}
+          <Select
+            value={String(month)}
+            onValueChange={(v) => setMonth(Number(v))}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Select Month..." />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((m) => (
+                <SelectItem key={m.value} value={String(m.value)}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Year */}
+          <Select
+            value={String(year)}
+            onValueChange={(v) => setYear(Number(v))}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Generate */}
+          <Button
+            onClick={() => generateMutation.mutate()}
+            disabled={generateMutation.isPending}
+            className="inline-flex items-center gap-2"
+          >
+            {generateMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating…
+              </>
             ) : (
-              <div className="space-y-4">
-                {(reports as any).map((report: any) => (
-                  <div 
-                    key={report.id} 
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    data-testid={`card-report-${report.id}`}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-blue-600" />
+              <>
+                <Calendar className="h-4 w-4" />
+                Generate Report
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Available Reports</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading reports…
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              No reports for the selected month yet. Click <span className="font-medium">Generate Report</span>.
+            </div>
+          ) : (
+            rows.map((r) => {
+              const mLabel =
+                months.find((m) => m.value === r.month)?.label ?? 'Month';
+              const title = r.title || `${mLabel} ${r.year} Report`;
+              const net = r.netIncomeSSP != null ? Number(r.netIncomeSSP) : null;
+
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between border rounded-lg px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-slate-50 border border-slate-200">
+                      <FileText className="h-4 w-4 text-slate-600" />
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">
+                        {title}
                       </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {new Date(report.year, report.month - 1).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long' 
-                          })} Report
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          Net Income: <span className={`font-medium ${parseFloat(report.netIncome) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            SSP {Math.round(parseFloat(report.netIncome)).toLocaleString()}
-                          </span>
-                        </p>
+                      <div className="text-xs text-slate-500">
+                        {net !== null ? (
+                          <>
+                            Net Income:&nbsp;
+                            <span className="font-medium">{fmtSSP(net)}</span>
+                          </>
+                        ) : (
+                          '—'
+                        )}
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <Badge variant={getStatusColor(report.status)}>
-                        {report.status === 'locked' && <Lock className="h-3 w-3 mr-1" />}
-                        {report.status}
-                      </Badge>
-                      
-                      {report.pdfPath ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => downloadReport(report.pdfPath, `Bahr_El_Ghazal_${new Date(report.year, report.month - 1).toLocaleDateString('en-US', { month: 'long' })}_${report.year}_Report.pdf`)}
-                          data-testid={`button-download-${report.id}`}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download PDF
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => generateReport(report.year, report.month)}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Generate PDF
-                        </Button>
-                      )}
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => deleteReport(report.id)}
-                        data-testid={`button-delete-${report.id}`}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+
+                  <div className="flex items-center gap-2">
+                    {r.status && (
+                      <Badge variant="outline" className="capitalize">
+                        {r.status}
+                      </Badge>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="inline-flex items-center gap-2"
+                      onClick={() => onDownload(r)}
+                    >
+                      <Download className="h-4 w-4" />
+                      Download PDF
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm('Delete this report?')) {
+                          deleteMutation.mutate(r.id);
+                        }
+                      }}
+                      title="Delete report"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
