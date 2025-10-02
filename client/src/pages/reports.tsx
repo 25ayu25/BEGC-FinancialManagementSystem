@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-
 import { api } from '@/lib/queryClient';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,16 +15,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Calendar, FileText, Loader2, Download, Trash2 } from 'lucide-react';
 
-import {
-  Calendar,
-  FileText,
-  Loader2,
-  Download,
-  Trash2,
-} from 'lucide-react';
-
-/* ------------------------- helpers & constants -------------------------- */
+/* ----------------------------- helpers ----------------------------- */
 
 const months = [
   { value: 1, label: 'January' },
@@ -45,103 +37,105 @@ const months = [
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const fmtSSP = (n: number) => `SSP ${nf0.format(Math.round(Number(n || 0)))}`;
 
-/** robust PDF download that avoids blank file issues */
-async function fetchAndDownloadPdf(url: string, filename: string) {
-  const bust = url.includes('?') ? '&_=' : '?_=';
-  const res = await api.get(`${url}${bust}${Date.now()}`, {
+async function downloadPdfViaApi(path: string, filename: string) {
+  // Always go through axios `api` so the configured baseURL is used.
+  const bust = path.includes('?') ? '&_=' : '?_=';
+  const { data, headers } = await api.get(`${path}${bust}${Date.now()}`, {
     responseType: 'blob',
   });
-
-  const blob = new Blob([res.data], {
-    type: res.headers['content-type'] || 'application/pdf',
+  const blob = new Blob([data], {
+    type: headers['content-type'] || 'application/pdf',
   });
-
   if (!blob || blob.size === 0) throw new Error('Empty PDF');
 
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-/* ------------------------------- page ---------------------------------- */
+/* ------------------------------- types ------------------------------ */
 
 type ReportRow = {
   id: string;
   month: number; // 1..12
   year: number;
   status?: 'draft' | 'approved' | 'locked';
-  pdfPath?: string | null;
+  pdfPath?: string | null; // relative path preferred
   netIncomeSSP?: number | string | null;
   title?: string | null;
 };
 
+/* -------------------------------- UI -------------------------------- */
+
 export default function ReportsPage() {
   const now = new Date();
-  const [year, setYear] = useState<number>(now.getFullYear());
-  const [month, setMonth] = useState<number>(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
 
   const yearOptions = useMemo(
     () => [year, year - 1, year - 2, year - 3, year - 4],
-    [year],
+    [year]
   );
 
-  const {
-    data: reportData,
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ['/api/reports/list', year, month],
+  // LIST
+  const { data: reportData, isLoading, refetch } = useQuery({
+    queryKey: ['reports/list', year, month],
     queryFn: async () => {
-      // Returns either { reports: ReportRow[] } or ReportRow[]
-      const { data } = await api.get(
-        `/api/reports?year=${year}&month=${month}`,
-      );
+      // *** IMPORTANT ***: No `/api` prefix here
+      const { data } = await api.get('/reports', {
+        params: { year, month },
+      });
+      // Accept either {reports:[]} or [].
       return Array.isArray(data) ? data : data?.reports ?? [];
     },
   });
 
+  // GENERATE
   const generateMutation = useMutation({
-    mutationFn: async () => {
-      await api.post('/api/reports/generate', { year, month });
-    },
+    // *** IMPORTANT ***: No `/api` prefix here
+    mutationFn: async () => api.post('/reports/generate', { year, month }),
     onSuccess: () => refetch(),
   });
 
+  // DELETE
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/api/reports/${id}`);
-    },
+    mutationFn: async (id: string) => api.delete(`/reports/${id}`),
     onSuccess: () => refetch(),
   });
 
-  const rows: ReportRow[] = Array.isArray(reportData) ? (reportData as any) : [];
+  const rows: ReportRow[] = Array.isArray(reportData) ? reportData : [];
 
-  async function onDownload(report: ReportRow) {
-    const m = months.find((x) => x.value === (report.month || month))?.label ?? 'Report';
-    const filename = `${m} ${report.year || year} Report`;
+  async function onDownload(r: ReportRow) {
+    const m = months.find((x) => x.value === (r.month || month))?.label ?? 'Report';
+    const filename = `${m} ${r.year || year} Report`;
 
     try {
-      if (report.pdfPath) {
-        await fetchAndDownloadPdf(report.pdfPath, filename);
+      // Prefer a relative path so it goes through axios baseURL
+      if (r.pdfPath && /^https?:\/\//i.test(r.pdfPath) === false) {
+        await downloadPdfViaApi(r.pdfPath, filename);
         return;
       }
-      const url = report.id
-        ? `/api/reports/${report.id}/pdf`
-        : `/api/reports/${report.year || year}/${report.month || month}/pdf`;
-      await fetchAndDownloadPdf(url, filename);
+
+      // Fallback to API endpoints
+      const path = r.id
+        ? `/reports/${r.id}/pdf`
+        : `/reports/${r.year || year}/${r.month || month}/pdf`;
+
+      await downloadPdfViaApi(path, filename);
     } catch (err) {
       console.error(err);
-      alert("Couldn't download the PDF. Try Generate Report first.");
+      alert("Couldn't download the PDF. Try clicking Generate Report first.");
     }
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header / Filters */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Monthly Reports</h1>
@@ -151,11 +145,7 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Month */}
-          <Select
-            value={String(month)}
-            onValueChange={(v) => setMonth(Number(v))}
-          >
+          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Select Month..." />
             </SelectTrigger>
@@ -168,11 +158,7 @@ export default function ReportsPage() {
             </SelectContent>
           </Select>
 
-          {/* Year */}
-          <Select
-            value={String(year)}
-            onValueChange={(v) => setYear(Number(v))}
-          >
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
             <SelectTrigger className="w-[120px]">
               <SelectValue />
             </SelectTrigger>
@@ -185,7 +171,6 @@ export default function ReportsPage() {
             </SelectContent>
           </Select>
 
-          {/* Generate */}
           <Button
             onClick={() => generateMutation.mutate()}
             disabled={generateMutation.isPending}
@@ -223,10 +208,10 @@ export default function ReportsPage() {
             </div>
           ) : (
             rows.map((r) => {
-              const mLabel =
-                months.find((m) => m.value === r.month)?.label ?? 'Month';
+              const mLabel = months.find((m) => m.value === r.month)?.label ?? 'Month';
               const title = r.title || `${mLabel} ${r.year} Report`;
-              const net = r.netIncomeSSP != null ? Number(r.netIncomeSSP) : null;
+              const net =
+                r.netIncomeSSP != null ? Number(r.netIncomeSSP) : null;
 
               return (
                 <div
@@ -274,12 +259,12 @@ export default function ReportsPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      title="Delete report"
                       onClick={() => {
                         if (confirm('Delete this report?')) {
                           deleteMutation.mutate(r.id);
                         }
                       }}
-                      title="Delete report"
                     >
                       <Trash2 className="h-4 w-4 text-red-600" />
                     </Button>
