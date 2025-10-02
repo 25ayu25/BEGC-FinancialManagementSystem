@@ -160,7 +160,7 @@ export default function BulkExpenseModal({
                 </Select>
               </div>
               <div className="flex items-end">
-                <Button type="button" variant="outline" onClick={prefillCommon}>Prefill common</Button>
+                <Button type="button" variant="outline" onClick={prefillCommon}>Prefill Expenses</Button>
               </div>
             </div>
 
