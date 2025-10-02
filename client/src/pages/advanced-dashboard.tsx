@@ -55,7 +55,6 @@ function InsuranceProvidersUSD({
   const [clamped, setClamped] = useState(true);
   const CLAMP_LIMIT = 8;
 
-  // Normalize breakdown to an array
   const rows = useMemo(() => {
     if (!breakdown) return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
@@ -74,20 +73,16 @@ function InsuranceProvidersUSD({
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
 
-  // Sort by amount desc
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
 
-  // Clamp list only for "year" to keep the right column tidy
   const shouldClamp = timeRange === "year" && sorted.length > CLAMP_LIMIT && clamped;
   const visible = shouldClamp ? sorted.slice(0, CLAMP_LIMIT) : sorted;
 
-  // Distinct color palette
   const palette = [
     "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
     "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
   ];
 
-  // Build “View all” link with current filter preserved
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
     timeRange === "custom" && customStartDate && customEndDate
@@ -136,7 +131,6 @@ function InsuranceProvidersUSD({
               })}
             </div>
 
-            {/* Toggle only in year view when clamped/expanded */}
             {timeRange === "year" && sorted.length > CLAMP_LIMIT && (
               <div className="flex justify-end pt-1">
                 <Button variant="outline" size="sm" onClick={() => setClamped(!clamped)}>
@@ -161,6 +155,7 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
+  // Normalize the “month-select” label
   const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
 
   const handleTimeRangeChange = (
@@ -175,6 +170,41 @@ export default function AdvancedDashboard() {
 
   const now = new Date();
   const thisYear = now.getFullYear();
+
+  // ---- Effective year/month + concrete date bounds for current-month / last-month / month-select
+  const effective = useMemo(() => {
+    let y = selectedYear ?? thisYear;
+    let m = selectedMonth ?? (now.getMonth() + 1);
+    let start: Date | undefined;
+    let end: Date | undefined;
+
+    if (timeRange === "last-month") {
+      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      y = d.getFullYear();
+      m = d.getMonth() + 1;
+      start = new Date(y, m - 1, 1);
+      end = new Date(y, m, 0);
+    } else if (timeRange === "current-month") {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      y = d.getFullYear();
+      m = d.getMonth() + 1;
+      start = new Date(y, m - 1, 1);
+      end = new Date(y, m, 0);
+    } else if (timeRange === "month-select") {
+      if (selectedYear && selectedMonth) {
+        y = selectedYear;
+        m = selectedMonth;
+      }
+      start = new Date(y, m - 1, 1);
+      end = new Date(y, m, 0);
+    } else if (timeRange === "custom") {
+      start = customStartDate;
+      end = customEndDate;
+    }
+
+    return { year: y, month: m, start, end };
+  }, [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate, now, thisYear]);
+
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
   const months = [
     { label: "January", value: 1 },
@@ -195,17 +225,20 @@ export default function AdvancedDashboard() {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
-      selectedYear,
-      selectedMonth,
+      effective.year,
+      effective.month,
       normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      effective.start?.toISOString(),
+      effective.end?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+      let url = `/api/dashboard?year=${effective.year}&month=${effective.month}&range=${normalizedRange}`;
+
+      // Force explicit bounds for month-ish ranges to keep API behavior consistent
+      if (effective.start && effective.end) {
+        url += `&startDate=${format(effective.start, "yyyy-MM-dd")}&endDate=${format(effective.end, "yyyy-MM-dd")}`;
       }
+
       const { data } = await api.get(url);
       return data;
     },
@@ -216,16 +249,16 @@ export default function AdvancedDashboard() {
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
-      selectedYear,
-      selectedMonth,
+      effective.year,
+      effective.month,
       normalizedRange,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      effective.start?.toISOString(),
+      effective.end?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/income-trends/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+      let url = `/api/income-trends/${effective.year}/${effective.month}?range=${normalizedRange}`;
+      if (effective.start && effective.end) {
+        url += `&startDate=${format(effective.start, "yyyy-MM-dd")}&endDate=${format(effective.end, "yyyy-MM-dd")}`;
       }
       const { data } = await api.get(url);
       return data;
@@ -246,8 +279,8 @@ export default function AdvancedDashboard() {
       fullDate: r.date,
     }));
   } else {
-    const y = selectedYear!;
-    const m = selectedMonth!;
+    const y = effective.year;
+    const m = effective.month;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
@@ -310,7 +343,7 @@ export default function AdvancedDashboard() {
         return { year: d.getFullYear(), month: d.getMonth() + 1 };
       }
       case "year": return { year: currentDate.getFullYear(), month: 1 };
-      case "month-select": return { year: selectedYear, month: selectedMonth };
+      case "month-select": return { year: effective.year, month: effective.month };
       case "custom":
         return customStartDate
           ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
@@ -545,7 +578,7 @@ export default function AdvancedDashboard() {
         <Link href={`/insurance-providers?range=${normalizedRange}${
           timeRange === "custom" && customStartDate && customEndDate
             ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-            : `&year=${selectedYear}&month=${selectedMonth}`
+            : `&year=${effective.year}&month=${effective.month}`
         }`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
@@ -605,8 +638,8 @@ export default function AdvancedDashboard() {
         <div className="space-y-6">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
+            selectedYear={effective.year}
+            selectedMonth={effective.month}
             customStartDate={customStartDate ?? undefined}
             customEndDate={customEndDate ?? undefined}
           />
@@ -669,8 +702,8 @@ export default function AdvancedDashboard() {
             breakdown={dashboardData?.insuranceBreakdown}
             totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
             timeRange={normalizedRange}
-            selectedYear={selectedYear ?? undefined}
-            selectedMonth={selectedMonth ?? undefined}
+            selectedYear={effective.year}
+            selectedMonth={effective.month}
             customStartDate={customStartDate ?? undefined}
             customEndDate={customEndDate ?? undefined}
           />
