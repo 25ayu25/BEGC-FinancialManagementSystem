@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 // Same list your single-entry form exposes
 const EXPENSES = [
@@ -51,6 +51,8 @@ export default function BulkExpenseModal({
   const [currency, setCurrency] = useState<"SSP" | "USD">("SSP");
   const [rows, setRows] = useState<Row[]>([{ expenseCategory: undefined, amount: "" }]);
 
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     if (initialDate) setDate(initialDate);
   }, [initialDate]);
@@ -86,6 +88,10 @@ export default function BulkExpenseModal({
       toast({ title: "Nothing to save", description: "Enter at least one positive amount.", variant: "destructive" });
       return;
     }
+
+    if (isSaving) return;
+    setIsSaving(true);
+
     const when = new Date(date).toISOString();
     const reqs = validPayloads.map((r) =>
       apiRequest("POST", "/api/transactions", {
@@ -114,6 +120,9 @@ export default function BulkExpenseModal({
     if (fail) {
       toast({ title: "Some rows failed", description: `${fail} didn’t save.`, variant: "destructive" });
     }
+
+    setIsSaving(false);
+
     if (ok && !fail) {
       setRows([{ expenseCategory: undefined, amount: "" }]);
       onOpenChange(false);
@@ -124,9 +133,9 @@ export default function BulkExpenseModal({
 
   return (
     <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={() => onOpenChange(false)} />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" onClick={() => onOpenChange(false)} />
       <div className="absolute inset-0 flex items-start justify-center p-6">
-        <div className="w-full max-w-2xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto">
+        <div className="w-full max-w-2xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto relative">
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold">Bulk Expenses</h2>
             <button onClick={() => onOpenChange(false)} className="px-2 py-1 rounded hover:bg-slate-100 text-gray-500 hover:text-gray-700">
@@ -190,8 +199,15 @@ export default function BulkExpenseModal({
 
           <div className="flex items-center justify-end gap-3 p-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={saveAll} disabled={validPayloads.length === 0}>Save Expenses</Button>
+            <Button onClick={saveAll} disabled={validPayloads.length === 0 || isSaving}>Save Expenses</Button>
           </div>
+
+          {/* saving overlay + spinner */}
+          {isSaving && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-50">
+              <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
+            </div>
+          )}
         </div>
       </div>
     </div>
