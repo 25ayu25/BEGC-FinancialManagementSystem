@@ -28,54 +28,42 @@ import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-dail
 /* ================== number formatting helpers ================== */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
 const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== helpers: resolve effective month/year ================== */
-/** Normalize the range label for the API and compute the effective year/month
- *  so "Last Month" (and other relative ranges) send consistent params.
+/* ================== helper: normalize range ================== */
+/**
+ * Map the UI timeRange + selection into what we actually send to the API.
+ * For "last-month" and "month-select" we send range="current-month" with explicit year/month.
  */
-function resolvePeriod(
-  timeRange:
-    | "current-month"
-    | "last-month"
-    | "last-3-months"
-    | "year"
-    | "month-select"
-    | "custom",
+function computeRangeParams(
+  timeRange: string,
   selectedYear: number | null,
   selectedMonth: number | null
 ) {
-  const now = new Date();
-  let norm = timeRange === "month-select" ? "current-month" : timeRange;
+  const today = new Date();
+  const fallbackY = today.getFullYear();
+  const fallbackM = today.getMonth() + 1;
 
-  // defaults if nothing selected yet
-  let year = selectedYear ?? now.getFullYear();
-  let month = selectedMonth ?? now.getMonth() + 1;
-
-  if (timeRange === "current-month") {
-    year = now.getFullYear();
-    month = now.getMonth() + 1;
-  } else if (timeRange === "last-month") {
-    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    year = d.getFullYear();
-    month = d.getMonth() + 1;
-  } else if (timeRange === "month-select") {
-    // keep the explicit user selection
-    year = selectedYear ?? now.getFullYear();
-    month = selectedMonth ?? now.getMonth() + 1;
-  } else if (timeRange === "last-3-months") {
-    // anchor to the END of the window (current month). API uses range anyway.
-    year = now.getFullYear();
-    month = now.getMonth() + 1;
-  } else if (timeRange === "year") {
-    // anchor to current month in the selected (or current) year
-    year = selectedYear ?? now.getFullYear();
-    month = now.getMonth() + 1;
+  if (timeRange === "last-month") {
+    const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return { rangeToSend: "current-month", yearToSend: d.getFullYear(), monthToSend: d.getMonth() + 1 };
   }
-  return { norm, year, month };
+  if (timeRange === "month-select") {
+    return {
+      rangeToSend: "current-month",
+      yearToSend: selectedYear ?? fallbackY,
+      monthToSend: selectedMonth ?? fallbackM,
+    };
+  }
+  return {
+    rangeToSend: timeRange,
+    yearToSend: selectedYear ?? fallbackY,
+    monthToSend: selectedMonth ?? fallbackM,
+  };
 }
 
 /* ================== Insurance Providers Card ================== */
@@ -182,9 +170,9 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // IMPORTANT: resolve effective year/month and normalized range (fix for "Last month")
-  const { norm: normalizedRange, year: effectiveYear, month: effectiveMonth } = resolvePeriod(
-    timeRange, selectedYear, selectedMonth
+  // Normalize the range for API/links (key fix for "Last Month")
+  const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
+    timeRange, selectedYear ?? null, selectedMonth ?? null
   );
 
   const handleTimeRangeChange = (
@@ -197,7 +185,6 @@ export default function AdvancedDashboard() {
       | "custom"
   ) => setTimeRange(range);
 
-  // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
@@ -220,14 +207,14 @@ export default function AdvancedDashboard() {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
-      effectiveYear,
-      effectiveMonth,
-      normalizedRange,
+      yearToSend,
+      monthToSend,
+      rangeToSend,
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${effectiveYear}&month=${effectiveMonth}&range=${normalizedRange}`;
+      let url = `/api/dashboard?year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
@@ -241,14 +228,14 @@ export default function AdvancedDashboard() {
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
-      effectiveYear,
-      effectiveMonth,
-      normalizedRange,
+      yearToSend,
+      monthToSend,
+      rangeToSend,
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/income-trends/${effectiveYear}/${effectiveMonth}?range=${normalizedRange}`;
+      let url = `/api/income-trends/${yearToSend}/${monthToSend}?range=${rangeToSend}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
@@ -271,8 +258,8 @@ export default function AdvancedDashboard() {
       fullDate: r.date,
     }));
   } else {
-    const y = effectiveYear;
-    const m = effectiveMonth;
+    const y = yearToSend!;
+    const m = monthToSend!;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
@@ -296,8 +283,12 @@ export default function AdvancedDashboard() {
   // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
+  const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
+  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
+  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
+  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
+  const showAvgLine = daysWithSSP >= 2;
+  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
 
   // loading
   if (isLoading) {
@@ -311,10 +302,12 @@ export default function AdvancedDashboard() {
     );
   }
 
-  const getPatientVolumeNavigation = () => {
-    // navigate with the same effective period to keep pages consistent
-    return { year: effectiveYear, month: effectiveMonth };
-  };
+  // summary numbers
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
+  const sspRevenue = monthTotalSSP || sspIncome;
+  const sspNetIncome = sspRevenue - totalExpenses;
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
@@ -347,7 +340,7 @@ export default function AdvancedDashboard() {
             {timeRange === "month-select" && (
               <>
                 <Select
-                  value={String(selectedYear ?? effectiveYear)}
+                  value={String(selectedYear)}
                   onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
                 >
                   <SelectTrigger className="h-9 w-[120px]">
@@ -361,7 +354,7 @@ export default function AdvancedDashboard() {
                 </Select>
 
                 <Select
-                  value={String(selectedMonth ?? effectiveMonth)}
+                  value={String(selectedMonth)}
                   onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
                 >
                   <SelectTrigger className="h-9 w-[140px]">
@@ -539,10 +532,10 @@ export default function AdvancedDashboard() {
         </Card>
 
         {/* Insurance (USD) quick nav */}
-        <Link href={`/insurance-providers?range=${normalizedRange}${
+        <Link href={`/insurance-providers?range=${rangeToSend}${
           timeRange === "custom" && customStartDate && customEndDate
             ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-            : `&year=${effectiveYear}&month=${effectiveMonth}`
+            : `&year=${yearToSend}&month=${monthToSend}`
         }`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
@@ -576,7 +569,7 @@ export default function AdvancedDashboard() {
         </Link>
 
         {/* Patient Volume */}
-        <Link href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}>
+        <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
               <div className="flex items-center justify-between">
@@ -596,15 +589,14 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* ======= Main Content: Two-column layout ======= */}
+      {/* ======= Main Content: Two-column layout to eliminate gaps ======= */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-        {/* LEFT COLUMN */}
+        {/* LEFT COLUMN: chart + quick actions */}
         <div className="space-y-6">
           <RevenueAnalyticsDaily
-            timeRange={timeRange}
-            // pass effective values so charts match the cards for "Last Month"
-            selectedYear={effectiveYear}
-            selectedMonth={effectiveMonth}
+            timeRange={rangeToSend}
+            selectedYear={yearToSend}
+            selectedMonth={monthToSend}
             customStartDate={customStartDate ?? undefined}
             customEndDate={customEndDate ?? undefined}
           />
@@ -655,7 +647,7 @@ export default function AdvancedDashboard() {
           </Card>
         </div>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT COLUMN: departments + providers + system status */}
         <div className="space-y-6">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
@@ -666,9 +658,9 @@ export default function AdvancedDashboard() {
           <InsuranceProvidersUSD
             breakdown={dashboardData?.insuranceBreakdown}
             totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
-            timeRange={normalizedRange}
-            selectedYear={effectiveYear}
-            selectedMonth={effectiveMonth}
+            timeRange={rangeToSend}
+            selectedYear={yearToSend}
+            selectedMonth={monthToSend}
             customStartDate={customStartDate ?? undefined}
             customEndDate={customEndDate ?? undefined}
           />
