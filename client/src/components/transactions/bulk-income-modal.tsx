@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-// Import Loader2 for the saving spinner
 import { Loader2, X } from "lucide-react";
 
 /**
@@ -37,9 +36,6 @@ export default function BulkIncomeModal({
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // ++ ADDITION: State to track saving process
-  const [isSaving, setIsSaving] = useState(false);
-
   // Fetch choices once (same as AddTransaction)
   const { data: departments = [] as Dept[] } = useQuery({ queryKey: ["/api/departments"] });
   const { data: insuranceProviders = [] as Provider[] } = useQuery({ queryKey: ["/api/insurance-providers"] });
@@ -62,6 +58,8 @@ export default function BulkIncomeModal({
   const [provRows, setProvRows] = useState<ProviderRow[]>([
     { insuranceProviderId: undefined, amount: "" },
   ]);
+
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (initialDate) setDate(initialDate);
@@ -144,85 +142,78 @@ export default function BulkIncomeModal({
   const savingDisabled = validDeptPayloads.length === 0 && validProvPayloads.length === 0;
 
   const saveAll = async () => {
-    // ++ MODIFICATION: Add guards for both disabled state and saving state
-    if (savingDisabled || isSaving) {
-      if (!savingDisabled) toast({ title: "Already saving...", variant: "destructive" });
-      else toast({ title: "Nothing to save", description: "Enter at least one positive amount.", variant: "destructive" });
+    if (savingDisabled) {
+      toast({ title: "Nothing to save", description: "Enter at least one positive amount.", variant: "destructive" });
       return;
     }
 
-    // ++ MODIFICATION: Use try/finally to ensure isSaving is reset
-    try {
-      setIsSaving(true); // Lock the UI
+    if (isSaving) return;
+    setIsSaving(true);
 
-      const when = new Date(date).toISOString();
-      const reqs: Promise<any>[] = [];
+    const when = new Date(date).toISOString();
+    const reqs: Promise<any>[] = [];
 
-      // Cash by department → income rows (no provider)
-      for (const r of validDeptPayloads) {
-        reqs.push(
-          apiRequest("POST", "/api/transactions", {
-            type: "income",
-            date: when,
-            departmentId: r.departmentId,
-            insuranceProviderId: null, // cash
-            amount: String(r.amount),
-            currency: cashCurrency,
-            description: notes || "Daily income",
-            receiptPath: null,
-            expenseCategory: null,
-            staffType: null,
-          })
-        );
-      }
+    // Cash by department → income rows (no provider)
+    for (const r of validDeptPayloads) {
+      reqs.push(
+        apiRequest("POST", "/api/transactions", {
+          type: "income",
+          date: when,
+          departmentId: r.departmentId,
+          insuranceProviderId: null, // cash
+          amount: String(r.amount),
+          currency: cashCurrency,
+          description: notes || "Daily income",
+          receiptPath: null,
+          expenseCategory: null,
+          staffType: null,
+        })
+      );
+    }
 
-      // Insurance totals → income rows with provider (no department)
-      for (const r of validProvPayloads) {
-        reqs.push(
-          apiRequest("POST", "/api/transactions", {
-            type: "income",
-            date: when,
-            departmentId: null,
-            insuranceProviderId: r.insuranceProviderId,
-            amount: String(r.amount),
-            currency: providerCurrency, // usually USD
-            description: notes || "Insurance daily total",
-            receiptPath: null,
-            expenseCategory: null,
-            staffType: null,
-          })
-        );
-      }
+    // Insurance totals → income rows with provider (no department)
+    for (const r of validProvPayloads) {
+      reqs.push(
+        apiRequest("POST", "/api/transactions", {
+          type: "income",
+          date: when,
+          departmentId: null,
+          insuranceProviderId: r.insuranceProviderId,
+          amount: String(r.amount),
+          currency: providerCurrency, // usually USD
+          description: notes || "Insurance daily total",
+          receiptPath: null,
+          expenseCategory: null,
+          staffType: null,
+        })
+      );
+    }
 
-      const results = await Promise.allSettled(reqs);
-      const ok = results.filter((r) => r.status === "fulfilled").length;
-      const fail = results.length - ok;
+    const results = await Promise.allSettled(reqs);
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const fail = results.length - ok;
 
-      if (ok) {
-        toast({ title: "Saved", description: `${ok} transaction${ok > 1 ? "s" : ""} created.` });
-        qc.invalidateQueries({ queryKey: ["/api/transactions"] });
-        qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      }
-      if (fail) {
-        toast({
-          title: "Some rows failed",
-          description: `${fail} didn’t save. Please review amounts/choices and try again.`,
-          variant: "destructive",
-        });
-      }
+    if (ok) {
+      toast({ title: "Saved", description: `${ok} transaction${ok > 1 ? "s" : ""} created.` });
+      qc.invalidateQueries({ queryKey: ["/api/transactions"] });
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    }
+    if (fail) {
+      toast({
+        title: "Some rows failed",
+        description: `${fail} didn’t save. Please review amounts/choices and try again.`,
+        variant: "destructive",
+      });
+    }
 
-      if (ok && !fail) {
-        // reset & close for next entry
-        setDeptRows([{ departmentId: undefined, amount: "" }]);
-        setProvRows([{ insuranceProviderId: undefined, amount: "" }]);
-        setNotes("");
-        onOpenChange(false);
-      }
-    } catch (error) {
-        console.error("An unexpected error occurred during saveAll:", error);
-        toast({ title: "An error occurred", description: "Could not save transactions.", variant: "destructive" });
-    } finally {
-      setIsSaving(false); // Unlock the UI
+    setIsSaving(false);
+
+    if (ok && !fail) {
+      // reset & close for next entry
+      setDeptRows([{ departmentId: undefined, amount: "" }]);
+      setProvRows([{ insuranceProviderId: undefined, amount: "" }]);
+      setNotes("");
+      onOpenChange(false);
     }
   };
 
@@ -230,21 +221,10 @@ export default function BulkIncomeModal({
 
   return (
     <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true">
-      {/* overlay (no extra opacity classes applied to the card) */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={() => onOpenChange(false)} />
+      {/* overlay (lightened) */}
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" onClick={() => onOpenChange(false)} />
       <div className="absolute inset-0 flex items-start justify-center p-6">
-        {/* ++ MODIFICATION: Add `relative` positioning for the overlay */}
-        <div className="relative w-full max-w-3xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto">
-          {/* ++ ADDITION: Saving overlay */}
-          {isSaving && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-[2px]">
-              <div className="flex items-center gap-2 text-slate-700">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span className="font-medium">Saving Transactions...</span>
-              </div>
-            </div>
-          )}
-
+        <div className="w-full max-w-3xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto relative">
           {/* header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold">Daily Bulk Income</h2>
@@ -253,126 +233,126 @@ export default function BulkIncomeModal({
             </button>
           </div>
 
-          {/* ++ MODIFICATION: Wrap form body and footer in a fieldset to disable all controls during save */}
-          <fieldset disabled={isSaving}>
-            {/* body */}
-            <div className="p-4 space-y-6">
-              {/* top controls */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <Label className="mb-1 block">Transaction Date</Label>
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="mb-1 block">Currency (cash by department)</Label>
-                  <Select value={cashCurrency} onValueChange={(v: "SSP" | "USD") => setCashCurrency(v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="SSP">SSP (South Sudanese Pound)</SelectItem>
-                      <SelectItem value="USD">USD (US Dollar)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="mb-1 block">Notes (optional)</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., ‘Daily totals’" />
-                </div>
+          {/* body */}
+          <div className="p-4 space-y-6">
+            {/* top controls */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <Label className="mb-1 block">Transaction Date</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
-
-              <div className="flex gap-2 flex-wrap">
-                <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 5 departments</Button>
-                <Button type="button" variant="outline" onClick={prefillProviders}>Prefill providers</Button>
-                <div className="ml-auto flex items-center gap-2">
-                  <Label className="text-xs text-slate-600">Provider currency</Label>
-                  <Select value={providerCurrency} onValueChange={(v: "SSP" | "USD") => setProviderCurrency(v)}>
-                    <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="SSP">SSP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label className="mb-1 block">Currency (cash by department)</Label>
+                <Select value={cashCurrency} onValueChange={(v: "SSP" | "USD") => setCashCurrency(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SSP">SSP (South Sudanese Pound)</SelectItem>
+                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
-              {/* CASH BY DEPARTMENT */}
-              <div className="border rounded-lg">
-                <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Cash by Department</div>
-                <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
-                  <div className="col-span-7">Department</div>
-                  <div className="col-span-4 text-right">Amount</div>
-                  <div className="col-span-1" />
-                </div>
-                <div className="divide-y">
-                  {deptRows.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
-                      <div className="col-span-7">
-                        <Select value={row.departmentId ?? undefined} onValueChange={(v) => patchDept(idx, { departmentId: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                          <SelectContent>
-                            {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-4">
-                        <Input inputMode="numeric" className="text-right" placeholder="0"
-                          value={row.amount} onChange={(e) => patchDept(idx, { amount: e.target.value })} />
-                      </div>
-                      <div className="col-span-1 flex items-center justify-end">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => rmDeptRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3">
-                  <Button type="button" variant="outline" onClick={addDeptRow}>＋ Add row</Button>
-                </div>
-              </div>
-
-              {/* INSURANCE TOTALS */}
-              <div className="border rounded-lg">
-                <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Insurance Totals (by provider)</div>
-                <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
-                  <div className="col-span-7">Insurance Provider</div>
-                  <div className="col-span-4 text-right">Amount</div>
-                  <div className="col-span-1" />
-                </div>
-                <div className="divide-y">
-                  {provRows.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
-                      <div className="col-span-7">
-                        <Select value={row.insuranceProviderId ?? undefined} onValueChange={(v) => patchProv(idx, { insuranceProviderId: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
-                          <SelectContent>
-                            {insuranceProviders.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-4">
-                        <Input inputMode="numeric" className="text-right" placeholder="0"
-                          value={row.amount} onChange={(e) => patchProv(idx, { amount: e.target.value })} />
-                      </div>
-                      <div className="col-span-1 flex items-center justify-end">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => rmProvRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3">
-                  <Button type="button" variant="outline" onClick={addProvRow}>＋ Add row</Button>
-                </div>
+              <div>
+                <Label className="mb-1 block">Notes (optional)</Label>
+                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., ‘Daily totals’" />
               </div>
             </div>
 
-            {/* footer */}
-            <div className="flex items-center justify-end gap-3 p-4 border-t">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              {/* ++ MODIFICATION: Update save button to show loading state */}
-              <Button onClick={saveAll} disabled={savingDisabled || isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? "Saving..." : "Save Daily Income"}
-              </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 5 departments</Button>
+              <Button type="button" variant="outline" onClick={prefillProviders}>Prefill providers</Button>
+              <div className="ml-auto flex items-center gap-2">
+                <Label className="text-xs text-slate-600">Provider currency</Label>
+                <Select value={providerCurrency} onValueChange={(v: "SSP" | "USD") => setProviderCurrency(v)}>
+                  <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="SSP">SSP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </fieldset>
+
+            {/* CASH BY DEPARTMENT */}
+            <div className="border rounded-lg">
+              <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Cash by Department</div>
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
+                <div className="col-span-7">Department</div>
+                <div className="col-span-4 text-right">Amount</div>
+                <div className="col-span-1" />
+              </div>
+              <div className="divide-y">
+                {deptRows.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                    <div className="col-span-7">
+                      <Select value={row.departmentId ?? undefined} onValueChange={(v) => patchDept(idx, { departmentId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-4">
+                      <Input inputMode="numeric" className="text-right" placeholder="0"
+                        value={row.amount} onChange={(e) => patchDept(idx, { amount: e.target.value })} />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => rmDeptRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3">
+                <Button type="button" variant="outline" onClick={addDeptRow}>＋ Add row</Button>
+              </div>
+            </div>
+
+            {/* INSURANCE TOTALS */}
+            <div className="border rounded-lg">
+              <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Insurance Totals (by provider)</div>
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
+                <div className="col-span-7">Insurance Provider</div>
+                <div className="col-span-4 text-right">Amount</div>
+                <div className="col-span-1" />
+              </div>
+              <div className="divide-y">
+                {provRows.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                    <div className="col-span-7">
+                      <Select value={row.insuranceProviderId ?? undefined} onValueChange={(v) => patchProv(idx, { insuranceProviderId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                        <SelectContent>
+                          {insuranceProviders.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-4">
+                      <Input inputMode="numeric" className="text-right" placeholder="0"
+                        value={row.amount} onChange={(e) => patchProv(idx, { amount: e.target.value })} />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => rmProvRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3">
+                <Button type="button" variant="outline" onClick={addProvRow}>＋ Add row</Button>
+              </div>
+            </div>
+          </div>
+
+          {/* footer */}
+          <div className="flex items-center justify-end gap-3 p-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={saveAll} disabled={savingDisabled || isSaving}>Save Daily Income</Button>
+          </div>
+
+          {/* saving overlay + spinner */}
+          {isSaving && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-50">
+              <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
+            </div>
+          )}
         </div>
       </div>
     </div>
