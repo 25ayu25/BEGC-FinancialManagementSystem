@@ -1,66 +1,84 @@
-// client/src/lib/queryClient.ts
-import axios from "axios";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import axios from 'axios';
 
-/** Your API root. Leave blank to use same-origin in dev. */
-const BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim();
+// Development vs Production API URL
+const baseURL =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.DEV ? "http://localhost:5000" : "https://bgc-financialmanagementsystem.onrender.com");
 
-console.log("[CFG] API base URL =", BASE_URL || "(same-origin)");
+console.info("[CFG] API base URL =", baseURL); // <-- leaves a breadcrumb in DevTools
 
+// Create axios instance with credentials
 export const api = axios.create({
-  baseURL: BASE_URL,         // e.g. https://bgc-financialmanagementsystem.onrender.com
-  withCredentials: false,
+  baseURL,
+  withCredentials: true,  // send cookies cross-site
   headers: {
-    Accept: "application/json",
+    'Content-Type': 'application/json',
   },
 });
 
-/**
- * Ensure all known endpoints are routed under /api.
- * If a request already starts with /api or is absolute (http/https), we don't touch it.
- */
-const KNOWN_SEGMENTS = [
-  "reports",
-  "dashboard",
-  "income-trends",
-  "departments",
-  "insurance-providers",
-  "patients",
-  "transactions",
-];
-
+// Add Safari fallback token to all requests
 api.interceptors.request.use((config) => {
-  let url = config.url ?? "";
-
-  // absolute URL? do nothing
-  if (/^https?:\/\//i.test(url)) return config;
-
-  // normalize leading slash
-  if (url && !url.startsWith("/")) url = `/${url}`;
-
-  // already /api?
-  if (url.startsWith("/api/")) {
-    config.url = url;
-    return config;
+  const sessionBackup = localStorage.getItem('user_session_backup');
+  if (sessionBackup) {
+    config.headers['x-session-token'] = sessionBackup;
   }
-
-  // prefix /api for our known app endpoints
-  const needsPrefix = KNOWN_SEGMENTS.some(
-    (seg) => url === `/${seg}` || url.startsWith(`/${seg}/`) || url.startsWith(`/${seg}?`)
-  );
-  if (needsPrefix) url = `/api${url}`;
-
-  config.url = url;
   return config;
 });
 
-/** Shared React Query client */
+export async function apiRequest(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  try {
+    const response = await api.request({
+      method,
+      url,
+      data,
+    });
+    
+    // Convert axios response to fetch Response format for compatibility
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      statusText: response.statusText,
+      json: async () => response.data,
+      text: async () => JSON.stringify(response.data),
+    } as Response;
+  } catch (error: any) {
+    throw new Error(`${error.response?.status || 500}: ${error.response?.data?.error || error.message}`);
+  }
+}
+
+type UnauthorizedBehavior = "returnNull" | "throw";
+export const getQueryFn: <T>(options: {
+  on401: UnauthorizedBehavior;
+}) => QueryFunction<T> =
+  ({ on401: unauthorizedBehavior }) =>
+  async ({ queryKey }) => {
+    try {
+      const response = await api.get(queryKey.join("/"));
+      return response.data;
+    } catch (error: any) {
+      if (unauthorizedBehavior === "returnNull" && error.response?.status === 401) {
+        return null;
+      }
+      throw new Error(`${error.response?.status || 500}: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      queryFn: getQueryFn({ on401: "throw" }),
+      refetchInterval: false,
       refetchOnWindowFocus: false,
-      retry: 1,
+      staleTime: Infinity,
+      retry: false,
+    },
+    mutations: {
+      retry: false,
     },
   },
 });
