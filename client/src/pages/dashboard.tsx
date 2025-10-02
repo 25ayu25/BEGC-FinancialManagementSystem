@@ -15,7 +15,7 @@ import { api } from "@/lib/queryClient";
 import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
 import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
-import MonthlyIncome from "@/components/dashboard/monthly-income"; // <-- ensure this file exists
+import MonthlyIncome from "@/components/dashboard/monthly-income";
 import { Link } from "wouter";
 
 type TimeRange =
@@ -64,7 +64,11 @@ export default function Dashboard() {
     }
   };
 
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
+  // IMPORTANT FIX: treat last-month like a specific month for API calls
+  const normalizedRange =
+    timeRange === "month-select" || timeRange === "last-month"
+      ? "current-month"
+      : timeRange;
 
   const getPatientVolumeNavigation = () => {
     const now = new Date();
