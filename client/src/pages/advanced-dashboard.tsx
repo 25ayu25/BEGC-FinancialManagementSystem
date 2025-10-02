@@ -28,13 +28,57 @@ import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-dail
 /* ================== number formatting helpers ================== */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
 const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== Insurance Providers Card (with year clamp) ================== */
+/* ================== helpers: resolve effective month/year ================== */
+/** Normalize the range label for the API and compute the effective year/month
+ *  so "Last Month" (and other relative ranges) send consistent params.
+ */
+function resolvePeriod(
+  timeRange:
+    | "current-month"
+    | "last-month"
+    | "last-3-months"
+    | "year"
+    | "month-select"
+    | "custom",
+  selectedYear: number | null,
+  selectedMonth: number | null
+) {
+  const now = new Date();
+  let norm = timeRange === "month-select" ? "current-month" : timeRange;
+
+  // defaults if nothing selected yet
+  let year = selectedYear ?? now.getFullYear();
+  let month = selectedMonth ?? now.getMonth() + 1;
+
+  if (timeRange === "current-month") {
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+  } else if (timeRange === "last-month") {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    year = d.getFullYear();
+    month = d.getMonth() + 1;
+  } else if (timeRange === "month-select") {
+    // keep the explicit user selection
+    year = selectedYear ?? now.getFullYear();
+    month = selectedMonth ?? now.getMonth() + 1;
+  } else if (timeRange === "last-3-months") {
+    // anchor to the END of the window (current month). API uses range anyway.
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+  } else if (timeRange === "year") {
+    // anchor to current month in the selected (or current) year
+    year = selectedYear ?? now.getFullYear();
+    month = now.getMonth() + 1;
+  }
+  return { norm, year, month };
+}
+
+/* ================== Insurance Providers Card ================== */
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
@@ -52,9 +96,6 @@ function InsuranceProvidersUSD({
   customStartDate?: Date;
   customEndDate?: Date;
 }) {
-  const [clamped, setClamped] = useState(true);
-  const CLAMP_LIMIT = 8;
-
   const rows = useMemo(() => {
     if (!breakdown) return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
@@ -72,11 +113,7 @@ function InsuranceProvidersUSD({
 
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
-
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
-
-  const shouldClamp = timeRange === "year" && sorted.length > CLAMP_LIMIT && clamped;
-  const visible = shouldClamp ? sorted.slice(0, CLAMP_LIMIT) : sorted;
 
   const palette = [
     "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
@@ -104,41 +141,31 @@ function InsuranceProvidersUSD({
           Totals in period: <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
         </div>
 
-        {visible.length === 0 ? (
+        {sorted.length === 0 ? (
           <div className="text-sm text-slate-500">No insurance receipts for this period.</div>
         ) : (
-          <>
-            <div className="space-y-3">
-              {visible.map((item, idx) => {
-                const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
-                const color = palette[idx % palette.length];
-                return (
-                  <div key={`${item.name}-${idx}`} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
-                        <span className="text-sm text-slate-700">{item.name}</span>
-                      </div>
-                      <div className="text-xs font-medium text-slate-600">
-                        USD {fmtUSD(item.amount)}
-                      </div>
+          <div className="space-y-3">
+            {sorted.map((item, idx) => {
+              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
+              const color = palette[idx % palette.length];
+              return (
+                <div key={`${item.name}-${idx}`} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+                      <span className="text-sm text-slate-700">{item.name}</span>
                     </div>
-                    <div className="h-2 rounded bg-slate-100 overflow-hidden">
-                      <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    <div className="text-xs font-medium text-slate-600">
+                      USD {fmtUSD(item.amount)}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {timeRange === "year" && sorted.length > CLAMP_LIMIT && (
-              <div className="flex justify-end pt-1">
-                <Button variant="outline" size="sm" onClick={() => setClamped(!clamped)}>
-                  {clamped ? `Show all (${sorted.length})` : "Show less"}
-                </Button>
-              </div>
-            )}
-          </>
+                  <div className="h-2 rounded bg-slate-100 overflow-hidden">
+                    <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </CardContent>
     </Card>
@@ -155,8 +182,10 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // Normalize the “month-select” label
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
+  // IMPORTANT: resolve effective year/month and normalized range (fix for "Last month")
+  const { norm: normalizedRange, year: effectiveYear, month: effectiveMonth } = resolvePeriod(
+    timeRange, selectedYear, selectedMonth
+  );
 
   const handleTimeRangeChange = (
     range:
@@ -168,43 +197,9 @@ export default function AdvancedDashboard() {
       | "custom"
   ) => setTimeRange(range);
 
+  // Month/year choices for month-select UI
   const now = new Date();
   const thisYear = now.getFullYear();
-
-  // ---- Effective year/month + concrete date bounds for current-month / last-month / month-select
-  const effective = useMemo(() => {
-    let y = selectedYear ?? thisYear;
-    let m = selectedMonth ?? (now.getMonth() + 1);
-    let start: Date | undefined;
-    let end: Date | undefined;
-
-    if (timeRange === "last-month") {
-      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      y = d.getFullYear();
-      m = d.getMonth() + 1;
-      start = new Date(y, m - 1, 1);
-      end = new Date(y, m, 0);
-    } else if (timeRange === "current-month") {
-      const d = new Date(now.getFullYear(), now.getMonth(), 1);
-      y = d.getFullYear();
-      m = d.getMonth() + 1;
-      start = new Date(y, m - 1, 1);
-      end = new Date(y, m, 0);
-    } else if (timeRange === "month-select") {
-      if (selectedYear && selectedMonth) {
-        y = selectedYear;
-        m = selectedMonth;
-      }
-      start = new Date(y, m - 1, 1);
-      end = new Date(y, m, 0);
-    } else if (timeRange === "custom") {
-      start = customStartDate;
-      end = customEndDate;
-    }
-
-    return { year: y, month: m, start, end };
-  }, [timeRange, selectedYear, selectedMonth, customStartDate, customEndDate, now, thisYear]);
-
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
   const months = [
     { label: "January", value: 1 },
@@ -225,20 +220,17 @@ export default function AdvancedDashboard() {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
-      effective.year,
-      effective.month,
+      effectiveYear,
+      effectiveMonth,
       normalizedRange,
-      effective.start?.toISOString(),
-      effective.end?.toISOString(),
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${effective.year}&month=${effective.month}&range=${normalizedRange}`;
-
-      // Force explicit bounds for month-ish ranges to keep API behavior consistent
-      if (effective.start && effective.end) {
-        url += `&startDate=${format(effective.start, "yyyy-MM-dd")}&endDate=${format(effective.end, "yyyy-MM-dd")}`;
+      let url = `/api/dashboard?year=${effectiveYear}&month=${effectiveMonth}&range=${normalizedRange}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
-
       const { data } = await api.get(url);
       return data;
     },
@@ -249,16 +241,16 @@ export default function AdvancedDashboard() {
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
-      effective.year,
-      effective.month,
+      effectiveYear,
+      effectiveMonth,
       normalizedRange,
-      effective.start?.toISOString(),
-      effective.end?.toISOString(),
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/income-trends/${effective.year}/${effective.month}?range=${normalizedRange}`;
-      if (effective.start && effective.end) {
-        url += `&startDate=${format(effective.start, "yyyy-MM-dd")}&endDate=${format(effective.end, "yyyy-MM-dd")}`;
+      let url = `/api/income-trends/${effectiveYear}/${effectiveMonth}?range=${normalizedRange}`;
+      if (timeRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const { data } = await api.get(url);
       return data;
@@ -279,8 +271,8 @@ export default function AdvancedDashboard() {
       fullDate: r.date,
     }));
   } else {
-    const y = effective.year;
-    const m = effective.month;
+    const y = effectiveYear;
+    const m = effectiveMonth;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
@@ -304,12 +296,8 @@ export default function AdvancedDashboard() {
   // ---------- totals & metrics ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
-  const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
-  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
-  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
-  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
-  const showAvgLine = daysWithSSP >= 2;
-  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
+  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const sspRevenue = monthTotalSSP || sspIncome;
 
   // loading
   if (isLoading) {
@@ -323,33 +311,9 @@ export default function AdvancedDashboard() {
     );
   }
 
-  // summary numbers
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
-  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
-  const sspNetIncome = sspRevenue - totalExpenses;
-
   const getPatientVolumeNavigation = () => {
-    const currentDate = new Date();
-    switch (timeRange) {
-      case "current-month": return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
-      case "last-month": {
-        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1);
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
-      }
-      case "last-3-months": {
-        const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2);
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
-      }
-      case "year": return { year: currentDate.getFullYear(), month: 1 };
-      case "month-select": return { year: effective.year, month: effective.month };
-      case "custom":
-        return customStartDate
-          ? { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 }
-          : { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
-      default: return { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 };
-    }
+    // navigate with the same effective period to keep pages consistent
+    return { year: effectiveYear, month: effectiveMonth };
   };
 
   return (
@@ -383,7 +347,7 @@ export default function AdvancedDashboard() {
             {timeRange === "month-select" && (
               <>
                 <Select
-                  value={String(selectedYear)}
+                  value={String(selectedYear ?? effectiveYear)}
                   onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
                 >
                   <SelectTrigger className="h-9 w-[120px]">
@@ -397,7 +361,7 @@ export default function AdvancedDashboard() {
                 </Select>
 
                 <Select
-                  value={String(selectedMonth)}
+                  value={String(selectedMonth ?? effectiveMonth)}
                   onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
                 >
                   <SelectTrigger className="h-9 w-[140px]">
@@ -578,7 +542,7 @@ export default function AdvancedDashboard() {
         <Link href={`/insurance-providers?range=${normalizedRange}${
           timeRange === "custom" && customStartDate && customEndDate
             ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-            : `&year=${effective.year}&month=${effective.month}`
+            : `&year=${effectiveYear}&month=${effectiveMonth}`
         }`}>
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-4 sm:p-3">
@@ -632,14 +596,15 @@ export default function AdvancedDashboard() {
         </Link>
       </div>
 
-      {/* ======= Main Content: Two-column layout to eliminate gaps ======= */}
+      {/* ======= Main Content: Two-column layout ======= */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-        {/* LEFT COLUMN: chart + quick actions */}
+        {/* LEFT COLUMN */}
         <div className="space-y-6">
           <RevenueAnalyticsDaily
             timeRange={timeRange}
-            selectedYear={effective.year}
-            selectedMonth={effective.month}
+            // pass effective values so charts match the cards for "Last Month"
+            selectedYear={effectiveYear}
+            selectedMonth={effectiveMonth}
             customStartDate={customStartDate ?? undefined}
             customEndDate={customEndDate ?? undefined}
           />
@@ -690,7 +655,7 @@ export default function AdvancedDashboard() {
           </Card>
         </div>
 
-        {/* RIGHT COLUMN: departments + providers + system status */}
+        {/* RIGHT COLUMN */}
         <div className="space-y-6">
           <DepartmentsPanel
             departments={Array.isArray(departments) ? (departments as any[]) : []}
@@ -702,8 +667,8 @@ export default function AdvancedDashboard() {
             breakdown={dashboardData?.insuranceBreakdown}
             totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
             timeRange={normalizedRange}
-            selectedYear={effective.year}
-            selectedMonth={effective.month}
+            selectedYear={effectiveYear}
+            selectedMonth={effectiveMonth}
             customStartDate={customStartDate ?? undefined}
             customEndDate={customEndDate ?? undefined}
           />
