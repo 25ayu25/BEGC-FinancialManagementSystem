@@ -8,6 +8,8 @@ import {
 } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -185,19 +187,24 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (sessionCookie) {
         try { userSession = JSON.parse(sessionCookie); } catch {}
       }
+
       if (!userSession) {
         const header = req.headers["x-session-token"];
         if (header) {
           try { userSession = JSON.parse(header as string); } catch {}
         }
       }
-      if (!userSession) return res.status(401).json({ error: "Authentication required" });
+
+      if (!userSession) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
 
       const user = await storage.getUser(userSession.id);
       if (!user || user.status === "inactive") {
         res.clearCookie("user_session");
         return res.status(401).json({ error: "Session invalid" });
       }
+
       req.user = {
         id: user.id,
         username: user.username,
@@ -205,6 +212,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         location: user.location,
         fullName: user.fullName,
       };
+
       next();
     } catch (err) {
       console.error("Auth middleware error:", err);
@@ -221,6 +229,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password are required" });
       }
+
       const user = await storage.getUserByUsername(String(username).toLowerCase());
       if (!user || user.password !== password) {
         return res.status(401).json({ error: "Invalid credentials" });
@@ -228,6 +237,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (user.status === "inactive") {
         return res.status(401).json({ error: "Account is deactivated" });
       }
+
       await storage.updateUser(user.id, { lastLogin: new Date() });
 
       const userSession = {
@@ -237,10 +247,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         location: user.location,
         fullName: user.fullName,
       };
+
       const isProd = process.env.NODE_ENV === "production";
       res.cookie("user_session", JSON.stringify(userSession), {
-        httpOnly: true, secure: isProd, sameSite: "none", path: "/", maxAge: 1000 * 60 * 60 * 24 * 30,
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "none",
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24 * 30,
       });
+
       res.json(userSession);
     } catch (error) {
       console.error("Login error:", error);
@@ -262,18 +278,34 @@ export async function registerRoutes(app: Express): Promise<void> {
         const user = await storage.getUser(session.id);
         if (user && user.status !== "inactive") {
           return {
-            id: user.id, username: user.username, email: user.email,
-            role: user.role, location: user.location, fullName: user.fullName,
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            location: user.location,
+            fullName: user.fullName,
             defaultCurrency: user.defaultCurrency,
-            emailNotifications: user.emailNotifications, reportAlerts: user.reportAlerts,
+            emailNotifications: user.emailNotifications,
+            reportAlerts: user.reportAlerts,
           };
         }
         return null;
       };
+
       const cookieRaw = (req as any).cookies?.user_session;
-      if (cookieRaw) { try { const u = await tryResolve(cookieRaw); if (u) return res.json(u); } catch {} }
+      if (cookieRaw) {
+        try {
+          const u = await tryResolve(cookieRaw);
+          if (u) return res.json(u);
+        } catch {}
+      }
       const header = req.headers["x-session-token"];
-      if (header) { try { const u = await tryResolve(header as string); if (u) return res.json(u); } catch {} }
+      if (header) {
+        try {
+          const u = await tryResolve(header as string);
+          if (u) return res.json(u);
+        } catch {}
+      }
       res.status(401).json({ error: "Authentication required" });
     } catch (error) {
       console.error("Auth check error:", error);
@@ -290,13 +322,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (String(newPassword).length < 8) {
         return res.status(400).json({ error: "New password must be at least 8 characters long" });
       }
+
       const me = await storage.getUser(req.user!.id);
       if (!me) return res.status(404).json({ error: "User not found" });
       if (me.password !== currentPassword) {
         return res.status(400).json({ error: "Current password is incorrect" });
       }
+
       const updatedUser = await storage.updateUser(req.user!.id, { password: newPassword });
       if (!updatedUser) return res.status(500).json({ error: "Failed to update password" });
+
       res.json({ success: true, message: "Password updated successfully" });
     } catch (error) {
       console.error("Error changing password:", error);
@@ -323,7 +358,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
       const { id } = req.params;
       const updates = { ...req.body };
-      delete (updates as any).id; delete (updates as any).password;
+      delete (updates as any).id;
+      delete (updates as any).password;
       const updatedUser = await storage.updateUser(id, updates);
       res.json(updatedUser);
     } catch (error: any) {
@@ -347,10 +383,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!newPassword) return res.status(400).json({ error: "New password is required" });
       if (String(newPassword).length < 8)
         return res.status(400).json({ error: "Password must be at least 8 characters" });
+
       const existing = await storage.getUser(userId);
       if (!existing) return res.status(404).json({ error: "User not found" });
+
       const updatedUser = await storage.updateUser(userId, { password: newPassword });
       if (!updatedUser) return res.status(500).json({ error: "Failed to update password" });
+
       res.json({ success: true, message: "Password reset successfully" });
     } catch (error) {
       console.error("Error resetting password:", error);
@@ -361,17 +400,26 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/users", requireAuth, async (req, res) => {
     try {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
+
       const { username, email, fullName, role, password, permissions } = req.body;
       const location = "clinic";
       if (!username || !email || !fullName || !role) {
-        return res.status(400).json({ error: "Missing required fields: username, email, fullName, role" });
+        return res
+          .status(400)
+          .json({ error: "Missing required fields: username, email, fullName, role" });
       }
+
       const userData = {
-        username, email, fullName: fullName || "", role, location,
+        username,
+        email,
+        fullName: fullName || "",
+        role,
+        location,
         password: password || "defaultPassword123",
         permissions: JSON.stringify(permissions || []),
         status: "active" as const,
       };
+
       const user = await storage.createUser(userData);
       res.status(201).json(user);
     } catch (error: any) {
@@ -390,8 +438,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
+
       const { id } = req.params;
       if (id === req.user!.id) return res.status(400).json({ error: "Cannot delete your own account" });
+
       await storage.deleteUser(id);
       res.json({ success: true });
     } catch (error) {
@@ -429,7 +479,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
       const page = parseInt((req.query.page as string) || "1", 10);
-      const limit = parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10);
+      const limit = parseInt(
+        (req.query.limit as string) || (req.query.pageSize as string) || "50",
+        10
+      );
       const offset = (page - 1) * limit;
 
       const startDate = parseYMD(req.query.startDate as string);
@@ -440,7 +493,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (endDate) filters.endDate = endDate;
 
       if (req.query.departmentId) filters.departmentId = String(req.query.departmentId);
-      if (req.query.insuranceProviderId) filters.insuranceProviderId = String(req.query.insuranceProviderId);
+      if (req.query.insuranceProviderId)
+        filters.insuranceProviderId = String(req.query.insuranceProviderId);
       if (req.query.currency) filters.currency = String(req.query.currency).toUpperCase();
       if (req.query.type) filters.type = String(req.query.type).toLowerCase();
       if (req.query.searchQuery) filters.searchQuery = String(req.query.searchQuery);
@@ -464,6 +518,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
         syncStatus,
       };
+
       const validated = insertTransactionSchema.parse(bodyWithDate);
       const transaction = await storage.createTransaction(validated);
       res.status(201).json(transaction);
@@ -488,6 +543,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         insuranceProviderId: z.string().nullable().optional(),
         providerName: z.string().optional(),
       });
+
       const BulkSchema = z.object({
         date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
@@ -507,6 +563,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const deptById = new Map<string, any>(departments.map((d: any) => [d.id, d]));
       const deptByName = new Map<string, any>(departments.map((d: any) => [normKey(d.name), d]));
+
       const provById = new Map<string, any>(providers.map((p: any) => [p.id, p]));
       const provByName = new Map<string, any>(providers.map((p: any) => [normKey(p.name), p]));
 
@@ -614,6 +671,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         amount: z.any(),
         description: z.string().optional(),
       });
+
       const BulkSchema = z.object({
         date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
@@ -733,11 +791,17 @@ export async function registerRoutes(app: Express): Promise<void> {
         start = f;
         endExclusive = t;
       } else {
-        return res.status(400).json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
+        return res
+          .status(400)
+          .json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
       }
 
       const rows = await storage.getTransactionsBetween(start!, endExclusive!, {
-        currency, type, departmentId, insuranceProviderId, limit: 2000,
+        currency,
+        type,
+        departmentId,
+        insuranceProviderId,
+        limit: 2000,
       });
 
       res.json({ count: rows.length, transactions: rows });
@@ -886,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // NEW: deletes — use whichever identifier you have
+  // Deletes — multiple shapes supported
   app.delete("/api/reports/:year/:month", requireAuth, async (req, res) => {
     try {
       const year = parseInt(req.params.year, 10);
@@ -952,15 +1016,18 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       const { year, month } = parsed;
 
+      // Must exist in DB
       const report = await storage.getMonthlyReport(year, month);
       if (!report) return res.status(404).json({ error: "Report not found" });
 
+      // Aggregates
       const dashboardData = await storage.getDashboardData({
         year,
         month,
         range: "current-month",
       });
 
+      // Lookups for pretty names
       const [departments, providers] = await Promise.all([
         storage.getDepartments(),
         storage.getInsuranceProviders(),
@@ -968,28 +1035,79 @@ export async function registerRoutes(app: Express): Promise<void> {
       const deptMap = new Map(departments.map((d: any) => [d.id, d.name]));
       const provMap = new Map(providers.map((p: any) => [p.id, p.name]));
 
-      // ---------- formatting ----------
+      // ---------- number / label utils ----------
       const toNumber = (x: any) => {
         const n = Number(String(x ?? "").replace(/,/g, "").trim());
         return Number.isFinite(n) ? n : 0;
       };
       const fmt0 = (x: any) =>
         toNumber(x).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      const cap = (s: string, max = 52) =>
-        (s || "").length > max ? s.slice(0, max - 1) + "…" : s || "-";
+
+      const titleCase = (s: string) =>
+        (s || "")
+          .toLowerCase()
+          .split(/[\s_-]+/)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
 
       const normalizePairs = (pairsRaw: Array<[string, number]>, idToName?: Map<string, string>) =>
         pairsRaw
           .map(([k, v]) => [idToName?.get(k) || k, toNumber(v)] as [string, number])
           .filter(([, v]) => v !== 0);
 
-      const deptPairs = normalizePairs((Array.isArray(dashboardData?.departmentBreakdown) ? dashboardData?.departmentBreakdown : toPairs(dashboardData?.departmentBreakdown)) || [], deptMap);
-      const insPairs  = normalizePairs((Array.isArray(dashboardData?.insuranceBreakdown) ? dashboardData?.insuranceBreakdown : toPairs(dashboardData?.insuranceBreakdown)) || [], provMap);
-      const expPairs  = normalizePairs((Array.isArray(dashboardData?.expenseBreakdown) ? dashboardData?.expenseBreakdown : toPairs(dashboardData?.expenseBreakdown)) || []);
+      // Professionalize labels (known mappings; otherwise Title Case)
+      const proLabel = (raw: string): string => {
+        const s = String(raw || "");
+        const L = s.toLowerCase();
 
-      const totalIncome   = toNumber(dashboardData?.totalIncome);
+        const map: Array<[RegExp, string]> = [
+          [/^lab tech\b.*payments?$/i, "Laboratory Technician Payroll"],
+          [/^radiographer\b.*payments?$/i, "Radiographer Payroll"],
+          [/^doctor\b.*payments?$/i, "Physician Fees"],
+          [/^drugs?\b.*purchased$/i, "Pharmaceutical Purchases"],
+          [/^lab\b.*reagents?$/i, "Laboratory Reagents"],
+          [/^landlord$/i, "Facility Rent"],
+          [/^staff\b.*salaries?$/i, "Administrative Salaries"],
+          [/^equipment$/i, "Medical Equipment"],
+          [/^x-?ray$/i, "Radiology (X-ray)"],
+          [/^pharmacy$/i, "Pharmacy Sales"],
+          [/^consultation$/i, "Consultation Fees"],
+          [/^laboratory$/i, "Laboratory Services"],
+        ];
+        for (const [re, nice] of map) if (re.test(s)) return nice;
+        return titleCase(s);
+      };
+
+      const proPairs = (pairs: Array<[string, number]>) =>
+        pairs.map(([name, val]) => [proLabel(name), val] as [string, number]);
+
+      const deptPairs = proPairs(
+        normalizePairs(
+          Array.isArray(dashboardData?.departmentBreakdown)
+            ? dashboardData?.departmentBreakdown
+            : toPairs(dashboardData?.departmentBreakdown || {}),
+          deptMap
+        )
+      );
+      const insPairs = proPairs(
+        normalizePairs(
+          Array.isArray(dashboardData?.insuranceBreakdown)
+            ? dashboardData?.insuranceBreakdown
+            : toPairs(dashboardData?.insuranceBreakdown || {}),
+          provMap
+        )
+      );
+      const expPairs = proPairs(
+        normalizePairs(
+          Array.isArray(dashboardData?.expenseBreakdown)
+            ? dashboardData?.expenseBreakdown
+            : toPairs(dashboardData?.expenseBreakdown || {})
+        )
+      );
+
+      const totalIncome = toNumber(dashboardData?.totalIncome);
       const totalExpenses = toNumber(dashboardData?.totalExpenses);
-      const netIncome     = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
+      const netIncome = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
 
       // ---------- PDF ----------
       const { jsPDF } = await import("jspdf");
@@ -999,21 +1117,59 @@ export async function registerRoutes(app: Express): Promise<void> {
       const pageH = doc.internal.pageSize.getHeight();
       const M = 48;
 
-      const brand = { r: 20, g: 83, b: 75 };
+      // Colors / type
+      const brandNavy = { r: 17, g: 24, b: 39 }; // dark navy
+      const textPrimary = { r: 17, g: 24, b: 39 };
+      const textMuted = { r: 100, g: 116, b: 139 };
 
-      // Header
-      doc.setFillColor(brand.r, brand.g, brand.b);
-      doc.rect(0, 0, pageW, 72, "F");
+      // Try load logo (optional)
+      const tryLoadLogoBase64 = (): { data: string; fmt: "PNG" | "JPEG" } | null => {
+        const cand = [
+          process.env.REPORT_LOGO_PATH || "",
+          "client/src/assets/clinic-logo.jpeg",
+          "client/src/assets/clinic-logo.jpg",
+          "client/src/assets/clinic-logo.png",
+        ].filter(Boolean);
+
+        for (const p of cand) {
+          const abs = p.startsWith("/") ? p : join(process.cwd(), p);
+          if (existsSync(abs)) {
+            const buf = readFileSync(abs);
+            const b64 = buf.toString("base64");
+            const ext = abs.toLowerCase().endsWith(".png") ? "PNG" : "JPEG";
+            return { data: `data:image/${ext.toLowerCase()};base64,${b64}`, fmt: ext as any };
+          }
+        }
+        return null;
+      };
+
+      // Header (premium)
+      const headerH = 84;
+      doc.setFillColor(brandNavy.r, brandNavy.g, brandNavy.b);
+      doc.rect(0, 0, pageW, headerH, "F");
+
+      const logo = tryLoadLogoBase64();
+      const logoH = 36;
+      if (logo) {
+        const logoW = logoH * 1.2;
+        doc.addImage(logo.data, logo.fmt, M, 24, logoW, logoH);
+      }
+
       doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(20);
-      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", M, 36);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      const titleX = logo ? M + 1.2 * logoH + 12 : M;
+      doc.text("Bahr El Ghazal Clinic", titleX, 34);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.text("Monthly Financial Report", titleX, 54);
 
       // Period
-      doc.setTextColor(17, 24, 39);
+      doc.setTextColor(textPrimary.r, textPrimary.g, textPrimary.b);
       doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-      doc.text(monthLabel(year, month), M, 108);
+      doc.text(monthLabel(year, month), M, headerH + 36);
 
-      // KPIs — auto-fit
+      // KPI cards (auto-fit)
       const fitFontSize = (text: string, maxWidth: number, maxSize: number, minSize = 14) => {
         let size = maxSize;
         doc.setFontSize(size);
@@ -1023,37 +1179,38 @@ export async function registerRoutes(app: Express): Promise<void> {
         return size;
       };
       const drawCard = (x: number, y: number, w: number, h: number, label: string, value: string) => {
-        const PADX = 16, PADY = 18;
-        doc.setDrawColor(235);
+        const PADX = 16, PADY = 16;
+        doc.setDrawColor(234);
         doc.setFillColor(249, 250, 251);
         doc.roundedRect(x, y, w, h, 10, 10, "FD");
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.text(label.toUpperCase(), x + PADX, y + PADY + 2);
         const maxTextWidth = w - PADX * 2;
         const size = fitFontSize(value, maxTextWidth, 24, 16);
         doc.setFont("helvetica", "bold"); doc.setFontSize(size);
-        doc.setTextColor(17, 24, 39);
+        doc.setTextColor(textPrimary.r, textPrimary.g, textPrimary.b);
         doc.text(value, x + PADX, y + PADY + 28);
       };
-      const cardY = 124, cardH = 68, gap = 14;
+      const cardsTop = headerH + 52, cardH = 68, gap = 14;
       const cardW = (pageW - M * 2 - gap * 2) / 3;
-      drawCard(M + 0 * (cardW + gap), cardY, cardW, cardH, "Total Revenue",  `SSP ${fmt0(totalIncome)}`);
-      drawCard(M + 1 * (cardW + gap), cardY, cardW, cardH, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
-      drawCard(M + 2 * (cardW + gap), cardY, cardW, cardH, "Net Income",     `SSP ${fmt0(netIncome)}`);
+      drawCard(M + 0 * (cardW + gap), cardsTop, cardW, cardH, "Total Revenue",  `SSP ${fmt0(totalIncome)}`);
+      drawCard(M + 1 * (cardW + gap), cardsTop, cardW, cardH, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
+      drawCard(M + 2 * (cardW + gap), cardsTop, cardW, cardH, "Net Income",     `SSP ${fmt0(netIncome)}`);
 
       // Tables
-      let y = cardY + cardH + 28;
-      const spacer = (h = 16) => { y += h; };
+      let y = cardsTop + cardH + 28;
+
       const ensurePage = (need = 160) => {
         if (y + need > pageH - 48) {
           doc.addPage(); y = 64;
           doc.setFont("helvetica", "bold"); doc.setFontSize(12);
-          doc.setTextColor(100, 116, 139);
+          doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
           doc.text(monthLabel(year, month), M, y - 22);
-          doc.setTextColor(17, 24, 39);
+          doc.setTextColor(textPrimary.r, textPrimary.g, textPrimary.b);
         }
       };
+
       const sectionTitle = (label: string) => {
         doc.setFont("helvetica", "bold"); doc.setFontSize(13);
         doc.text(label, M, y);
@@ -1063,22 +1220,29 @@ export async function registerRoutes(app: Express): Promise<void> {
       };
 
       type Row = [string, number];
-      const rollupTopN = (pairs: Row[], n = 10): Row[] => {
-        const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
-        const top = sorted.slice(0, n);
-        const others = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
-        if (others > 0) top.push(["Other", others]);
-        return top;
-      };
 
-      const drawTable = (title: string, rows: Row[], currencyLabel = "SSP") => {
-        if (!rows.length) return;
+      const drawTable = (
+        title: string,
+        rows: Row[],
+        currencyLabel = "SSP",
+        targetTotal?: number
+      ) => {
+        if (!rows.length && !targetTotal) return;
 
         ensurePage(180);
         sectionTitle(title);
 
         const col1X = M, col2X = pageW - M;
         const headerH = 28, rowH = 24;
+
+        // Optional balancing to match KPI totals
+        const currentSum = rows.reduce((s, [, v]) => s + v, 0);
+        if (typeof targetTotal === "number" && Number.isFinite(targetTotal)) {
+          const diff = Math.round(targetTotal - currentSum);
+          if (Math.abs(diff) >= 1) {
+            rows = [...rows, ["Other / Adjustments", diff]];
+          }
+        }
 
         // Header
         doc.setFillColor(243, 244, 246);
@@ -1093,9 +1257,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.setFont("helvetica", "normal"); doc.setFontSize(11);
         let zebra = false;
 
-        const top = rollupTopN(rows, 10);
-
-        top.forEach(([name, val]) => {
+        rows.forEach(([name, val]) => {
           ensurePage(rowH + 6);
           if (zebra) {
             doc.setFillColor(250, 250, 250);
@@ -1104,7 +1266,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           zebra = !zebra;
 
           doc.setTextColor(31, 41, 55);
-          doc.text(cap(name, 64), col1X + 10, y + 15);
+          doc.text(String(name), col1X + 10, y + 15);
 
           doc.setFont("helvetica", "bold");
           doc.setTextColor(17, 24, 39);
@@ -1113,28 +1275,27 @@ export async function registerRoutes(app: Express): Promise<void> {
           y += rowH;
         });
 
-        // Subtotal (extra separation afterwards to avoid visual collision)
-        const sectionTotal = top.reduce((s, [, v]) => s + v, 0);
+        // Subtotal and spacing
+        const finalTotal = rows.reduce((s, [, v]) => s + v, 0);
         doc.setDrawColor(230); doc.line(M, y, pageW - M, y);
         y += 8;
         doc.setFont("helvetica", "bold"); doc.setFontSize(11);
         doc.text("Subtotal", col1X + 10, y + 16);
-        doc.text(fmt0(sectionTotal), col2X - 10, y + 16, { align: "right" });
-        y += rowH;
-        spacer(18);            // <<— added: clear gap after subtotal
-        ensurePage(24);        // <<— added: make sure next section starts cleanly
+        doc.text(fmt0(finalTotal), col2X - 10, y + 16, { align: "right" });
+        y += rowH + 18;       // clear gap so next section never collides
+        ensurePage(24);
       };
 
-      drawTable("Revenue by Department",  deptPairs, "SSP");
-      drawTable("Insurance Payers (USD)", insPairs,  "USD");
-      drawTable("Operating Expenses",     expPairs,  "SSP");
+      drawTable("Revenue by Department (SSP)",  deptPairs, "SSP");
+      drawTable("Insurance Payers (USD)",       insPairs,  "USD");
+      drawTable("Operating Expenses",           expPairs,  "SSP", totalExpenses); // << exact parity here
 
       // Footer
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
         doc.text(`Page ${i} of ${totalPages}`, pageW - M, pageH - 20, { align: "right" });
       }
 
