@@ -980,101 +980,207 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       const { year, month } = parsed;
 
-      // must exist as a saved monthly report
+      // Must exist as a saved monthly report
       const report = await storage.getMonthlyReport(year, month);
       if (!report) return res.status(404).json({ error: "Report not found" });
 
-      // refresh data for current numbers
+      // Fresh numbers for the PDF
       const dashboardData = await storage.getDashboardData({
         year,
         month,
         range: "current-month",
       });
 
+      // Lookups for names (no UUIDs in output)
+      const [departments, providers] = await Promise.all([
+        storage.getDepartments(),
+        storage.getInsuranceProviders(),
+      ]);
+      const deptMap = new Map(departments.map((d: any) => [d.id, d.name]));
+      const provMap = new Map(providers.map((p: any) => [p.id, p.name]));
+
+      // ---------- Formatting helpers (NO DECIMALS) ----------
+      const toNumber = (x: any) => {
+        const n = Number(String(x ?? "").replace(/,/g, "").trim());
+        return Number.isFinite(n) ? n : 0;
+      };
+      const fmt0 = (x: any) =>
+        toNumber(x).toLocaleString("en-US", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        });
+      const cap = (s: string, max = 38) =>
+        (s || "").length > max ? s.slice(0, max - 1) + "…" : s || "-";
+
+      const normalizePairs = (pairsRaw: Array<[string, number]>, idToName?: Map<string, string>) =>
+        pairsRaw
+          .map(([k, v]) => [idToName?.get(k) || k, toNumber(v)] as [string, number])
+          .filter(([, v]) => v !== 0);
+
+      const deptPairs = normalizePairs(toPairs(dashboardData?.departmentBreakdown || {}), deptMap);
+      const insPairs  = normalizePairs(toPairs(dashboardData?.insuranceBreakdown || {}), provMap);
+      const expPairs  = normalizePairs(toPairs(dashboardData?.expenseBreakdown || {}));
+
+      const totalIncome   = toNumber(dashboardData?.totalIncome);
+      const totalExpenses = toNumber(dashboardData?.totalExpenses);
+      const netIncome     = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
+
+      // ---------- Build the PDF (Fortune-500 style, no decimals) ----------
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", compress: true });
-      const pageWidth = doc.internal.pageSize.getWidth();
+
+      const pageWidth  = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX    = 48;
+
+      // Brand colors
+      const brand = { r: 20, g: 83, b: 75 };     // deep teal
+      const accent = { r: 6, g: 95, b: 70 };     // darker accent
 
       // Header band
-      doc.setFillColor(20, 83, 75);
-      doc.rect(0, 0, pageWidth, 60, "F");
+      doc.setFillColor(brand.r, brand.g, brand.b);
+      doc.rect(0, 0, pageWidth, 72, "F");
+
+      // Header text
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
-      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", 40, 28);
+      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", marginX, 32);
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(12);
-      doc.text("Financial Management System", 40, 46);
+      doc.text("Financial Management System", marginX, 52);
 
-      // Title
+      // Report title (Month Year)
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text(monthLabel(year, month), 40, 88);
+      doc.text(monthLabel(year, month), marginX, 96);
 
-      // Write a simple "table" without extra libs
-      let y = 112;
-      const step = 16;
-      const marginX = 40;
-      const rightX = pageWidth - 40;
+      // ---------- KPI Cards ----------
+      const drawCard = (
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        title: string,
+        value: string,
+        fillRGB = { r: 241, g: 245, b: 249 }, // slate-100
+        stripeRGB = accent
+      ) => {
+        // container
+        doc.setDrawColor(230);
+        doc.setFillColor(fillRGB.r, fillRGB.g, fillRGB.b);
+        doc.roundedRect(x, y, w, h, 8, 8, "FD");
 
-      function writeKV(label: string, value: string | number) {
+        // stripe
+        doc.setFillColor(stripeRGB.r, stripeRGB.g, stripeRGB.b);
+        doc.roundedRect(x, y, 6, h, 8, 8, "F");
+
+        // title
+        doc.setTextColor(100, 116, 139); // slate-500
         doc.setFont("helvetica", "normal");
         doc.setFontSize(11);
-        doc.text(label, marginX, y);
-        const v = typeof value === "number" ? value.toLocaleString("en-US") : String(value);
-        doc.text(v, rightX, y, { align: "right" });
-        y += step;
-        if (y > pageHeight - 40) { doc.addPage(); y = 40; }
-      }
+        doc.text(title, x + 16, y + 20);
 
-      function writeSection(title: string) {
+        // value
+        doc.setTextColor(17, 24, 39); // slate-900
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
+        doc.setFontSize(18);
+        doc.text(value, x + 16, y + 44);
+      };
+
+      const cardW = (pageWidth - marginX * 2 - 24) / 3; // 2 * 12px gaps
+      const cardY = 116;
+      drawCard(marginX + 0 * (cardW + 12), cardY, cardW, 70, "Total Income",   `SSP ${fmt0(totalIncome)}`);
+      drawCard(marginX + 1 * (cardW + 12), cardY, cardW, 70, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
+      drawCard(marginX + 2 * (cardW + 12), cardY, cardW, 70, "Net Income",     `SSP ${fmt0(netIncome)}`);
+
+      // ---------- Sections with “bar lists” ----------
+      let y = cardY + 100;
+      const gap = 18;
+
+      const sectionTitle = (title: string) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(17, 24, 39);
         doc.text(title, marginX, y);
-        y += step;
-        if (y > pageHeight - 40) { doc.addPage(); y = 40; }
+        y += 10;
+        // thin divider
+        doc.setDrawColor(230);
+        doc.line(marginX, y, pageWidth - marginX, y);
+        y += 14;
+      };
+
+      const ensurePage = (need = 140) => {
+        if (y + need > pageHeight - 48) {
+          doc.addPage();
+          y = 64;
+          // page header carry-over
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.setTextColor(100, 116, 139);
+          doc.text(monthLabel(year, month), marginX, y - 24);
+        }
+      };
+
+      const drawBarList = (pairs: Array<[string, number]>, title: string) => {
+        if (!pairs.length) return;
+        ensurePage(120);
+        sectionTitle(title);
+
+        // sort desc, take top 8, roll-up "Others"
+        const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
+        const top = sorted.slice(0, 8);
+        const others = sorted.slice(8).reduce((sum, [, v]) => sum + v, 0);
+        if (others > 0) top.push(["Others", others]);
+
+        const maxVal = Math.max(...top.map(([, v]) => v), 1);
+        const barMaxW = pageWidth - marginX * 2 - 160; // leave room on the right for number
+
+        for (const [labelRaw, val] of top) {
+          ensurePage(26);
+          const label = cap(labelRaw);
+          const barW = Math.max(2, Math.round((val / maxVal) * barMaxW));
+
+          // label
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          doc.setTextColor(55, 65, 81); // slate-700
+          doc.text(label, marginX, y + 10);
+
+          // bar
+          doc.setFillColor(brand.r, brand.g, brand.b);
+          doc.roundedRect(marginX + 160, y, barW, 12, 4, 4, "F");
+
+          // value (right aligned)
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(17, 24, 39);
+          doc.text(`SSP ${fmt0(val)}`, pageWidth - marginX, y + 10, { align: "right" });
+
+          y += gap;
+        }
+        y += 6;
+      };
+
+      drawBarList(deptPairs, "Department Breakdown");
+      drawBarList(insPairs,  "Insurance Breakdown");
+      drawBarList(expPairs,  "Expense Breakdown");
+
+      // Footer (timestamp + page numbers)
+      const footer = `Generated: ${new Date().toISOString()}`;
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        // left: timestamp
+        doc.text(footer, marginX, pageHeight - 24);
+        // right: page x of y
+        const pageLabel = `Page ${i} of ${totalPages}`;
+        doc.text(pageLabel, pageWidth - marginX, pageHeight - 24, { align: "right" });
       }
-
-      // Summary
-      writeSection("Summary");
-      const totalIncome = dashboardData?.totalIncome ?? 0;
-      const totalExpenses = dashboardData?.totalExpenses ?? 0;
-      const netIncome = dashboardData?.netIncome ?? (totalIncome - totalExpenses);
-      writeKV("Total Income", totalIncome);
-      writeKV("Total Expenses", totalExpenses);
-      writeKV("Net Income", netIncome);
-
-      // Department Breakdown
-      const deptPairs = toPairs(dashboardData?.departmentBreakdown);
-      if (deptPairs.length) {
-        y += 8;
-        writeSection("Department Breakdown");
-        for (const [name, amt] of deptPairs) writeKV(name || "-", amt || 0);
-      }
-
-      // Insurance Breakdown
-      const insPairs = toPairs(dashboardData?.insuranceBreakdown);
-      if (insPairs.length) {
-        y += 8;
-        writeSection("Insurance Breakdown");
-        for (const [name, amt] of insPairs) writeKV(name || "-", amt || 0);
-      }
-
-      // Expense Breakdown (if available)
-      const expPairs = toPairs(dashboardData?.expenseBreakdown);
-      if (expPairs.length) {
-        y += 8;
-        writeSection("Expense Breakdown");
-        for (const [name, amt] of expPairs) writeKV(name || "-", amt || 0);
-      }
-
-      // Footer
-      y = Math.min(y + 12, pageHeight - 24);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(`Generated: ${new Date().toISOString()}`, marginX, y);
 
       const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long" });
       const filename = `Bahr_El_Ghazal_${monthName}_${year}_Report.pdf`;
