@@ -108,12 +108,14 @@ const MONTHS = [
 ];
 
 function parseReportPathToYearMonth(path: string): { year: number; month: number } | null {
+  // numeric: 2025-09.pdf   or /reports/2025-09.pdf
   const m1 = path.match(/(^|\/)(\d{4})-(\d{2})\.pdf$/i);
   if (m1) {
     const year = +m1[2];
     const month = +m1[3];
     if (year >= 2000 && month >= 1 && month <= 12) return { year, month };
   }
+  // friendly: _September_2025_
   const m2 = path.match(
     /_(January|February|March|April|May|June|July|August|September|October|November|December)_(\d{4})_/i
   );
@@ -387,8 +389,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
+
       const { id } = req.params;
       if (id === req.user!.id) return res.status(400).json({ error: "Cannot delete your own account" });
+
       await storage.deleteUser(id);
       res.json({ success: true });
     } catch (error) {
@@ -790,7 +794,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         data = await storage.getIncomeTrendsForDateRange(s, e);
       } else if (range === "last-3-months") {
         const endEx = new Date();
-        const start = addDaysUTC(new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)), 0);
+        const start = addDaysUTC(
+          new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)),
+          0
+        );
         data = await storage.getIncomeTrendsForDateRange(start, endEx);
       } else if (range === "year") {
         const s = new Date(Date.UTC(year, 0, 1));
@@ -799,6 +806,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       } else {
         data = await storage.getIncomeTrendsForMonth(year, month);
       }
+
       res.json(data);
     } catch (error) {
       console.error("Error fetching income trends for month:", error);
@@ -824,7 +832,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {
       const { limit } = req.query;
-      const reports = await storage.getMonthlyReports(limit ? parseInt(limit as string, 10) : undefined);
+      const reports = await storage.getMonthlyReports(
+        limit ? parseInt(limit as string, 10) : undefined
+      );
       res.json(reports);
     } catch (error) {
       console.error("Error fetching reports:", error);
@@ -851,7 +861,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       const month = parseInt(req.params.month, 10);
       const userId = req.user!.id;
 
-      const dashboardData = await storage.getDashboardData({ year, month, range: "current-month" });
+      const dashboardData = await storage.getDashboardData({
+        year, month, range: "current-month",
+      });
       const reportData = {
         year, month,
         totalIncome: dashboardData.totalIncome,
@@ -871,7 +883,36 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // NOTE: keep last (single-segment path) — Modern Boardroom PDF (no bars, no KPI separators)
+  /* ---------- NEW: Deletion by date or friendly path ------------- */
+  app.delete("/api/reports/by-date/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year, 10);
+      const month = parseInt(req.params.month, 10);
+      const report = await storage.getMonthlyReport(year, month);
+      if (!report) return res.status(404).json({ error: "Report not found" });
+      await storage.deleteMonthlyReport(report.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting report by date:", error);
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
+  app.delete("/api/reports/by-path/:path(*)", requireAuth, async (req, res) => {
+    try {
+      const parsed = parseReportPathToYearMonth(req.params.path);
+      if (!parsed) return res.status(400).json({ error: "Unrecognized report path" });
+      const report = await storage.getMonthlyReport(parsed.year, parsed.month);
+      if (!report) return res.status(404).json({ error: "Report not found" });
+      await storage.deleteMonthlyReport(report.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting report by path:", error);
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
+  // NOTE: keep last (single-segment path) — Boardroom PDF (redesigned KPIs with auto-fit)
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {
       const rawPath = req.params.path;
@@ -884,11 +925,18 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       const { year, month } = parsed;
 
+      // Must exist as a saved monthly report
       const report = await storage.getMonthlyReport(year, month);
       if (!report) return res.status(404).json({ error: "Report not found" });
 
-      const dashboardData = await storage.getDashboardData({ year, month, range: "current-month" });
+      // Fresh aggregates for the PDF
+      const dashboardData = await storage.getDashboardData({
+        year,
+        month,
+        range: "current-month",
+      });
 
+      // Lookups so we render names, not IDs
       const [departments, providers] = await Promise.all([
         storage.getDepartments(),
         storage.getInsuranceProviders(),
@@ -926,13 +974,14 @@ export async function registerRoutes(app: Express): Promise<void> {
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
       const M = 48; // margin
+
       const brand = { r: 20, g: 83, b: 75 }; // deep green
 
       // Header band
       doc.setFillColor(brand.r, brand.g, brand.b);
       doc.rect(0, 0, pageW, 72, "F");
 
-      // Title (no product/subtitle)
+      // Title
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold"); doc.setFontSize(20);
       doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", M, 36);
@@ -942,28 +991,44 @@ export async function registerRoutes(app: Express): Promise<void> {
       doc.setFont("helvetica", "bold"); doc.setFontSize(16);
       doc.text(monthLabel(year, month), M, 108);
 
-      // ---------- KPI Cards (no separators) ----------
-      const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string) => {
-        doc.setDrawColor(235);
-        doc.setFillColor(249, 250, 251);
-        doc.roundedRect(x, y, w, h, 10, 10, "FD"); // clean card, no accent stripe
-
-        doc.setTextColor(100, 116, 139);
-        doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-        doc.text(title.toUpperCase(), x + 16, y + 22);
-
-        doc.setTextColor(17, 24, 39);
-        doc.setFont("helvetica", "bold"); doc.setFontSize(22);
-        doc.text(value, x + 16, y + 48);
+      // ---------- KPI Cards (elegant, auto-fit numbers; no separators) ----------
+      const fitFontSize = (text: string, maxWidth: number, maxSize: number, minSize = 14) => {
+        let size = maxSize;
+        doc.setFontSize(size);
+        while (size > minSize && doc.getTextWidth(text) > maxWidth) {
+          size -= 1;
+          doc.setFontSize(size);
+        }
+        return size;
       };
 
-      const cardY = 124, cardH = 78, gap = 14;
+      const drawCard = (x: number, y: number, w: number, h: number, label: string, value: string) => {
+        const PADX = 16, PADY = 18;
+        // Card
+        doc.setDrawColor(235);
+        doc.setFillColor(249, 250, 251);
+        doc.roundedRect(x, y, w, h, 10, 10, "FD");
+
+        // Label (small)
+        doc.setTextColor(100, 116, 139);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+        doc.text(label.toUpperCase(), x + PADX, y + PADY + 2);
+
+        // Value (big, auto-fit)
+        const maxTextWidth = w - PADX * 2;
+        const size = fitFontSize(value, maxTextWidth, 24, 16);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(size);
+        doc.setTextColor(17, 24, 39);
+        doc.text(value, x + PADX, y + PADY + 28);
+      };
+
+      const cardY = 124, cardH = 68, gap = 14;
       const cardW = (pageW - M * 2 - gap * 2) / 3;
       drawCard(M + 0 * (cardW + gap), cardY, cardW, cardH, "Total Revenue",  `SSP ${fmt0(totalIncome)}`);
       drawCard(M + 1 * (cardW + gap), cardY, cardW, cardH, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
       drawCard(M + 2 * (cardW + gap), cardY, cardW, cardH, "Net Income",     `SSP ${fmt0(netIncome)}`);
 
-      // ---------- Tables (no bars) ----------
+      // ---------- Tables (minimalist; no bars) ----------
       let y = cardY + cardH + 28;
 
       const ensurePage = (need = 160) => {
@@ -985,7 +1050,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       };
 
       type Row = [string, number];
-      const rollupTopN = (pairs: Row[], n = 8): Row[] => {
+      const rollupTopN = (pairs: Row[], n = 10): Row[] => {
         const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
         const top = sorted.slice(0, n);
         const others = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
@@ -1000,7 +1065,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         sectionTitle(title);
 
         const col1X = M, col2X = pageW - M;
-        const headerH = 28, rowH = 26;
+        const headerH = 28, rowH = 24;
 
         // Header
         doc.setFillColor(243, 244, 246);
@@ -1011,14 +1076,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.text(`Amount (${currencyLabel})`, col2X - 10, y + 18, { align: "right" });
         y += headerH;
 
-        // Body (no bars, just clean numbers)
+        // Body
         doc.setFont("helvetica", "normal"); doc.setFontSize(11);
         let zebra = false;
 
-        const top = rollupTopN(rows, 8);
+        const top = rollupTopN(rows, 10);
 
         top.forEach(([name, val]) => {
-          ensurePage(rowH + 8);
+          ensurePage(rowH + 6);
           if (zebra) {
             doc.setFillColor(250, 250, 250);
             doc.rect(M, y, pageW - 2 * M, rowH, "F");
@@ -1026,11 +1091,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           zebra = !zebra;
 
           doc.setTextColor(31, 41, 55);
-          doc.text(cap(name, 64), col1X + 10, y + 16);
+          doc.text(cap(name, 64), col1X + 10, y + 15);
 
           doc.setFont("helvetica", "bold");
           doc.setTextColor(17, 24, 39);
-          doc.text(fmt0(val), col2X - 10, y + 16, { align: "right" });
+          doc.text(fmt0(val), col2X - 10, y + 15, { align: "right" });
           doc.setFont("helvetica", "normal");
           y += rowH;
         });
@@ -1045,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         y += rowH;
       };
 
-      // Sections (professional wording)
+      // Sections
       drawTable("Revenue by Department",  deptPairs, "SSP");
       drawTable("Insurance Payers (USD)", insPairs,  "USD");
       drawTable("Operating Expenses",     expPairs,  "SSP");
@@ -1181,7 +1246,10 @@ export async function registerRoutes(app: Express): Promise<void> {
           const months: any[] = [];
           for (let i = 0; i < 3; i++) {
             const d = new Date(year, month - 1 - i);
-            const mv = await storage.getPatientVolumeForMonth(d.getFullYear(), d.getMonth() + 1);
+            const mv = await storage.getPatientVolumeForMonth(
+              d.getFullYear(),
+              d.getMonth() + 1
+            );
             months.push(...mv);
           }
           volumes = months;
@@ -1197,8 +1265,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           break;
         }
         case "custom": {
-          const s = parseYMD(req.query.startDate as string) || new Date(Date.UTC(year, month - 1, 1));
-          const e = parseYMD(req.query.endDate as string) || new Date(Date.UTC(year, month, 1));
+          const s =
+            parseYMD(req.query.startDate as string) ||
+            new Date(Date.UTC(year, month - 1, 1));
+          const e =
+            parseYMD(req.query.endDate as string) ||
+            new Date(Date.UTC(year, month, 1));
           volumes = await storage.getPatientVolumeByDateRange(s, e);
           break;
         }
@@ -1206,6 +1278,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           volumes = await storage.getPatientVolumeForMonth(year, month);
         }
       }
+
       res.json(volumes);
     } catch (error) {
       console.error("Error getting patient volume for period:", error);
