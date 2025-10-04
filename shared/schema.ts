@@ -92,6 +92,49 @@ export const patientVolume = pgTable("patient_volume", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+/* =======================
+   Insurance Management
+   ======================= */
+
+// One claim per provider per month/period
+export const insuranceClaims = pgTable("insurance_claims", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  providerId: varchar("provider_id").notNull().references(() => insuranceProviders.id),
+  periodYear: integer("period_year").notNull(),           // e.g. 2025
+  periodMonth: integer("period_month").notNull(),         // 1..12
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+
+  currency: text("currency").notNull().default("USD"),    // "USD" | "SSP"
+  claimedAmount: decimal("claimed_amount", { precision: 10, scale: 2 }).notNull(),
+
+  status: text("status").notNull().default("submitted"),  // "submitted" | "partially_paid" | "paid" | "rejected" | "written_off"
+  notes: text("notes"),
+
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Cash received from insurers (optionally linked to a claim)
+export const insurancePayments = pgTable("insurance_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  providerId: varchar("provider_id").notNull().references(() => insuranceProviders.id),
+  claimId: varchar("claim_id").references(() => insuranceClaims.id), // optional
+
+  paymentDate: timestamp("payment_date").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),    // "USD" | "SSP"
+
+  reference: text("reference"),                            // bank ref / receipt #
+  notes: text("notes"),
+
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -131,6 +174,18 @@ export const insertPatientVolumeSchema = createInsertSchema(patientVolume).omit(
   date: z.string().transform((str) => new Date(str)),
 });
 
+// ---- NEW: Insurance insert schemas ----
+export const insertInsuranceClaimSchema = createInsertSchema(insuranceClaims).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInsurancePaymentSchema = createInsertSchema(insurancePayments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -152,3 +207,10 @@ export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
 
 export type PatientVolume = typeof patientVolume.$inferSelect;
 export type InsertPatientVolume = z.infer<typeof insertPatientVolumeSchema>;
+
+// ---- NEW: Insurance types ----
+export type InsuranceClaim = typeof insuranceClaims.$inferSelect;
+export type InsertInsuranceClaim = z.infer<typeof insertInsuranceClaimSchema>;
+
+export type InsurancePayment = typeof insurancePayments.$inferSelect;
+export type InsertInsurancePayment = z.infer<typeof insertInsurancePaymentSchema>;
