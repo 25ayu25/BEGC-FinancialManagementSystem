@@ -1061,9 +1061,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         const L = s.toLowerCase();
 
         const map: Array<[RegExp, string]> = [
-          [/^lab tech\b.*payments?$/i, "Laboratory Technician Payroll"],
-          [/^radiographer\b.*payments?$/i, "Radiographer Payroll"],
-          [/^doctor\b.*payments?$/i, "Physician Fees"],
+          [/^lab tech\b.*payments?$/i, "Laboratory Staff Compensation"],
+          [/^radiographer\b.*payments?$/i, "Laboratory Staff Compensation"],
+          [/^doctor\b.*payments?$/i, "Physicians Compensation"],
           [/^drugs?\b.*purchased$/i, "Pharmaceutical Purchases"],
           [/^lab\b.*reagents?$/i, "Laboratory Reagents"],
           [/^landlord$/i, "Facility Rent"],
