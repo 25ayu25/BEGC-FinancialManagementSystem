@@ -104,8 +104,18 @@ declare global {
 /* ------------------------------ Report helpers ------------------------------ */
 
 const MONTHS = [
-  "january","february","march","april","may","june",
-  "july","august","september","october","november","december"
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
 ];
 
 function parseReportPathToYearMonth(path: string): { year: number; month: number } | null {
@@ -117,7 +127,9 @@ function parseReportPathToYearMonth(path: string): { year: number; month: number
     if (year >= 2000 && month >= 1 && month <= 12) return { year, month };
   }
   // friendly: _September_2025_  (any prefix/suffix; underscores around month/year)
-  const m2 = path.match(/_(January|February|March|April|May|June|July|August|September|October|November|December)_(\d{4})_/i);
+  const m2 = path.match(
+    /_(January|February|March|April|May|June|July|August|September|October|November|December)_(\d{4})_/i
+  );
   if (m2) {
     const idx = MONTHS.indexOf(m2[1].toLowerCase());
     const year = +m2[2];
@@ -128,7 +140,7 @@ function parseReportPathToYearMonth(path: string): { year: number; month: number
 
 function monthWindow(year: number, month: number) {
   const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
-  const end   = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59));
   return { start, end };
 }
 
@@ -625,7 +637,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
-        // Valid if dept row (with cash or provider) OR provider-only row
+        // Valid if dept row (with cash/no-ins) OR provider-only row
         if (!deptId && providerId === null) {
           errors.push({
             index: i,
@@ -798,9 +810,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         start = f;
         endExclusive = t;
       } else {
-        return res
-          .status(400)
-          .json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
+        return res.status(400).json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
       }
 
       const rows = await storage.getTransactionsBetween(start!, endExclusive!, {
@@ -864,10 +874,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         data = await storage.getIncomeTrendsForDateRange(s, e);
       } else if (range === "last-3-months") {
         const endEx = new Date();
-        const start = addDaysUTC(
-          new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)),
-          0
-        );
+        const start = addDaysUTC(new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)), 0);
         data = await storage.getIncomeTrendsForDateRange(start, endEx);
       } else if (range === "year") {
         const s = new Date(Date.UTC(year, 0, 1));
@@ -975,7 +982,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       const parsed = parseReportPathToYearMonth(rawPath);
       if (!parsed) {
         return res.status(400).json({
-          error: "Unrecognized report path. Use /api/reports/YYYY-MM.pdf or a friendly Month_YYYY name.",
+          error:
+            "Unrecognized report path. Use /api/reports/YYYY-MM.pdf or a friendly Month_YYYY name.",
         });
       }
       const { year, month } = parsed;
@@ -1009,7 +1017,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         });
-      const cap = (s: string, max = 38) =>
+      const cap = (s: string, max = 44) =>
         (s || "").length > max ? s.slice(0, max - 1) + "…" : s || "-";
 
       const normalizePairs = (pairsRaw: Array<[string, number]>, idToName?: Map<string, string>) =>
@@ -1018,44 +1026,50 @@ export async function registerRoutes(app: Express): Promise<void> {
           .filter(([, v]) => v !== 0);
 
       const deptPairs = normalizePairs(toPairs(dashboardData?.departmentBreakdown || {}), deptMap);
-      const insPairs  = normalizePairs(toPairs(dashboardData?.insuranceBreakdown || {}), provMap);
-      const expPairs  = normalizePairs(toPairs(dashboardData?.expenseBreakdown || {}));
+      const insPairs = normalizePairs(toPairs(dashboardData?.insuranceBreakdown || {}), provMap);
+      const expPairs = normalizePairs(toPairs(dashboardData?.expenseBreakdown || {}));
 
-      const totalIncome   = toNumber(dashboardData?.totalIncome);
+      const totalIncome = toNumber(dashboardData?.totalIncome);
       const totalExpenses = toNumber(dashboardData?.totalExpenses);
-      const netIncome     = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
+      const netIncome = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
 
       // ---------- Build the PDF (Fortune-500 style, no decimals) ----------
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", compress: true });
 
-      const pageWidth  = doc.internal.pageSize.getWidth();
+      const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const marginX    = 48;
+      const marginX = 48;
 
       // Brand colors
-      const brand = { r: 20, g: 83, b: 75 };     // deep teal
-      const accent = { r: 6, g: 95, b: 70 };     // darker accent
+      const brand = { r: 20, g: 83, b: 75 }; // deep teal
+      const accent = { r: 6, g: 95, b: 70 }; // darker accent
 
       // Header band
       doc.setFillColor(brand.r, brand.g, brand.b);
-      doc.rect(0, 0, pageWidth, 72, "F");
+      doc.rect(0, 0, pageWidth, 80, "F");
 
       // Header text
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", marginX, 32);
+      doc.setFontSize(20);
+      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", marginX, 36);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(12);
-      doc.text("Financial Management System", marginX, 52);
+      doc.text("Financial Management System", marginX, 56);
+
+      // Watermark (subtle)
+      doc.setTextColor(200);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(60);
+      doc.text("CONFIDENTIAL", pageWidth / 2, pageHeight / 2, { align: "center", angle: 30 });
 
       // Report title (Month Year)
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text(monthLabel(year, month), marginX, 96);
+      doc.text(monthLabel(year, month), marginX, 110);
 
       // ---------- KPI Cards ----------
       const drawCard = (
@@ -1065,121 +1079,159 @@ export async function registerRoutes(app: Express): Promise<void> {
         h: number,
         title: string,
         value: string,
-        fillRGB = { r: 241, g: 245, b: 249 }, // slate-100
+        fillRGB = { r: 246, g: 248, b: 250 }, // soft gray
         stripeRGB = accent
       ) => {
         // container
         doc.setDrawColor(230);
         doc.setFillColor(fillRGB.r, fillRGB.g, fillRGB.b);
-        doc.roundedRect(x, y, w, h, 8, 8, "FD");
+        doc.roundedRect(x, y, w, h, 10, 10, "FD");
 
         // stripe
         doc.setFillColor(stripeRGB.r, stripeRGB.g, stripeRGB.b);
-        doc.roundedRect(x, y, 6, h, 8, 8, "F");
+        doc.roundedRect(x, y, 6, h, 10, 10, "F");
 
         // title
         doc.setTextColor(100, 116, 139); // slate-500
         doc.setFont("helvetica", "normal");
         doc.setFontSize(11);
-        doc.text(title, x + 16, y + 20);
+        doc.text(title, x + 16, y + 22);
 
         // value
         doc.setTextColor(17, 24, 39); // slate-900
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(value, x + 16, y + 44);
+        doc.setFontSize(20);
+        doc.text(value, x + 16, y + 46);
       };
 
       const cardW = (pageWidth - marginX * 2 - 24) / 3; // 2 * 12px gaps
-      const cardY = 116;
-      drawCard(marginX + 0 * (cardW + 12), cardY, cardW, 70, "Total Income",   `SSP ${fmt0(totalIncome)}`);
-      drawCard(marginX + 1 * (cardW + 12), cardY, cardW, 70, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
-      drawCard(marginX + 2 * (cardW + 12), cardY, cardW, 70, "Net Income",     `SSP ${fmt0(netIncome)}`);
+      const cardY = 130;
+      const cardH = 76;
+      drawCard(marginX + 0 * (cardW + 12), cardY, cardW, cardH, "Total Income", `SSP ${fmt0(totalIncome)}`);
+      drawCard(
+        marginX + 1 * (cardW + 12),
+        cardY,
+        cardW,
+        cardH,
+        "Total Expenses",
+        `SSP ${fmt0(totalExpenses)}`
+      );
+      drawCard(marginX + 2 * (cardW + 12), cardY, cardW, cardH, "Net Income", `SSP ${fmt0(netIncome)}`);
 
-      // ---------- Sections with “bar lists” ----------
-      let y = cardY + 100;
-      const gap = 18;
-
-      const sectionTitle = (title: string) => {
+      // ---------- Table helpers ----------
+      let y = cardY + cardH + 28;
+      const ensurePage = (need = 140) => {
+        if (y + need > pageHeight - 48) {
+          doc.addPage();
+          y = 64;
+          // carry-over header
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.setTextColor(100, 116, 139);
+          doc.text(monthLabel(year, month), marginX, y - 24);
+          doc.setTextColor(0);
+        }
+      };
+      const drawSectionTitle = (label: string) => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(13);
         doc.setTextColor(17, 24, 39);
-        doc.text(title, marginX, y);
+        doc.text(label, marginX, y);
         y += 10;
-        // thin divider
         doc.setDrawColor(230);
         doc.line(marginX, y, pageWidth - marginX, y);
         y += 14;
       };
 
-      const ensurePage = (need = 140) => {
-        if (y + need > pageHeight - 48) {
-          doc.addPage();
-          y = 64;
-          // page header carry-over
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
-          doc.setTextColor(100, 116, 139);
-          doc.text(monthLabel(year, month), marginX, y - 24);
-        }
+      type Row = [string, number];
+      const rollupTopN = (pairs: Row[], n = 8): Row[] => {
+        const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
+        const top = sorted.slice(0, n);
+        const others = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
+        if (others > 0) top.push(["Others", others]);
+        return top;
       };
 
-      const drawBarList = (pairs: Array<[string, number]>, title: string) => {
-        if (!pairs.length) return;
-        ensurePage(120);
-        sectionTitle(title);
+      const drawTable = (title: string, rows: Row[], amountLabel = "SSP") => {
+        if (!rows.length) return;
+        ensurePage(160);
+        drawSectionTitle(title);
 
-        // sort desc, take top 8, roll-up "Others"
-        const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
-        const top = sorted.slice(0, 8);
-        const others = sorted.slice(8).reduce((sum, [, v]) => sum + v, 0);
-        if (others > 0) top.push(["Others", others]);
+        // Header
+        const col1X = marginX,
+          col2X = pageWidth - marginX;
+        const rowH = 24;
+        const headerH = 26;
 
-        const maxVal = Math.max(...top.map(([, v]) => v), 1);
-        const barMaxW = pageWidth - marginX * 2 - 160; // leave room on the right for number
+        doc.setFillColor(243, 244, 246); // header bg
+        doc.rect(marginX, y, pageWidth - 2 * marginX, headerH, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(55, 65, 81);
+        doc.text("Name", col1X + 10, y + 17);
+        doc.text(`Amount (${amountLabel})`, col2X - 10, y + 17, { align: "right" });
+        y += headerH;
 
-        for (const [labelRaw, val] of top) {
-          ensurePage(26);
-          const label = cap(labelRaw);
-          const barW = Math.max(2, Math.round((val / maxVal) * barMaxW));
+        // Body rows (zebra)
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        let zebra = false;
 
-          // label
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(11);
-          doc.setTextColor(55, 65, 81); // slate-700
-          doc.text(label, marginX, y + 10);
+        const top = rollupTopN(rows, 8);
 
-          // bar
-          doc.setFillColor(brand.r, brand.g, brand.b);
-          doc.roundedRect(marginX + 160, y, barW, 12, 4, 4, "F");
-
+        top.forEach(([name, val]) => {
+          ensurePage(rowH + 6);
+          if (zebra) {
+            doc.setFillColor(250, 250, 250);
+            doc.rect(marginX, y, pageWidth - 2 * marginX, rowH, "F");
+          }
+          zebra = !zebra;
+          // name
+          doc.setTextColor(31, 41, 55);
+          doc.text(cap(name, 60), col1X + 10, y + 16);
           // value (right aligned)
           doc.setFont("helvetica", "bold");
           doc.setTextColor(17, 24, 39);
-          doc.text(`SSP ${fmt0(val)}`, pageWidth - marginX, y + 10, { align: "right" });
+          doc.text(fmt0(val), col2X - 10, y + 16, { align: "right" });
+          doc.setFont("helvetica", "normal");
+          y += rowH;
+        });
 
-          y += gap;
-        }
+        // Section total
+        const sectionTotal = top.reduce((s, [, v]) => s + v, 0);
+        doc.setDrawColor(230);
+        doc.line(marginX, y, pageWidth - marginX, y);
         y += 6;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text("Section Total", col1X + 10, y + 16);
+        doc.text(fmt0(sectionTotal), col2X - 10, y + 16, { align: "right" });
+        y += rowH;
       };
 
-      drawBarList(deptPairs, "Department Breakdown");
-      drawBarList(insPairs,  "Insurance Breakdown");
-      drawBarList(expPairs,  "Expense Breakdown");
+      // ---------- Render sections ----------
+      drawTable("Department Income Breakdown", deptPairs, "SSP");
+      drawTable("Insurance Income Breakdown", insPairs, "SSP");
+      drawTable("Expense Breakdown", expPairs, "SSP");
 
-      // Footer (timestamp + page numbers)
-      const footer = `Generated: ${new Date().toISOString()}`;
+      // ---- Footer (timestamp + page x of y + confidentiality)
+      const footerLeft = `Generated: ${new Date().toISOString()}`;
+      const footerRight = "Confidential — Internal Use Only";
       const totalPages = doc.getNumberOfPages();
+
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
-        // left: timestamp
-        doc.text(footer, marginX, pageHeight - 24);
-        // right: page x of y
-        const pageLabel = `Page ${i} of ${totalPages}`;
-        doc.text(pageLabel, pageWidth - marginX, pageHeight - 24, { align: "right" });
+        // left
+        doc.text(footerLeft, marginX, pageHeight - 22);
+        // center: page x of y
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 22, {
+          align: "center",
+        });
+        // right
+        doc.text(footerRight, pageWidth - marginX, pageHeight - 22, { align: "right" });
       }
 
       const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long" });
@@ -1304,10 +1356,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const months: any[] = [];
           for (let i = 0; i < 3; i++) {
             const d = new Date(year, month - 1 - i);
-            const mv = await storage.getPatientVolumeForMonth(
-              d.getFullYear(),
-              d.getMonth() + 1
-            );
+            const mv = await storage.getPatientVolumeForMonth(d.getFullYear(), d.getMonth() + 1);
             months.push(...mv);
           }
           volumes = months;
@@ -1323,12 +1372,8 @@ export async function registerRoutes(app: Express): Promise<void> {
           break;
         }
         case "custom": {
-          const s =
-            parseYMD(req.query.startDate as string) ||
-            new Date(Date.UTC(year, month - 1, 1));
-          const e =
-            parseYMD(req.query.endDate as string) ||
-            new Date(Date.UTC(year, month, 1));
+          const s = parseYMD(req.query.startDate as string) || new Date(Date.UTC(year, month - 1, 1));
+          const e = parseYMD(req.query.endDate as string) || new Date(Date.UTC(year, month, 1));
           volumes = await storage.getPatientVolumeByDateRange(s, e);
           break;
         }
