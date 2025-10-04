@@ -72,8 +72,8 @@ function isAllowedOrigin(origin?: string): boolean {
   }
 }
 
-function applyCors(req: Request, res: Response) {
-  const origin = req.headers.origin as string | undefined;
+function applyCors(_req: Request, res: Response) {
+  const origin = _req.headers.origin as string | undefined;
   if (origin && isAllowedOrigin(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -81,7 +81,6 @@ function applyCors(req: Request, res: Response) {
   }
   res.setHeader(
     "Access-Control-Allow-Headers",
-    // include both casings for safety
     "Content-Type, Authorization, X-Requested-With, X-Session-Token, x-session-token"
   );
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
@@ -101,6 +100,61 @@ declare global {
     }
   }
 }
+
+/* ------------------------------ Report helpers ------------------------------ */
+
+const MONTHS = [
+  "january","february","march","april","may","june",
+  "july","august","september","october","november","december"
+];
+
+function parseReportPathToYearMonth(path: string): { year: number; month: number } | null {
+  // numeric: 2025-09.pdf   or /reports/2025-09.pdf
+  const m1 = path.match(/(^|\/)(\d{4})-(\d{2})\.pdf$/i);
+  if (m1) {
+    const year = +m1[2];
+    const month = +m1[3];
+    if (year >= 2000 && month >= 1 && month <= 12) return { year, month };
+  }
+  // friendly: _September_2025_  (any prefix/suffix; underscores around month/year)
+  const m2 = path.match(/_(January|February|March|April|May|June|July|August|September|October|November|December)_(\d{4})_/i);
+  if (m2) {
+    const idx = MONTHS.indexOf(m2[1].toLowerCase());
+    const year = +m2[2];
+    if (idx >= 0 && year >= 2000) return { year, month: idx + 1 };
+  }
+  return null;
+}
+
+function monthWindow(year: number, month: number) {
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+  const end   = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+  return { start, end };
+}
+
+function monthLabel(year: number, month: number) {
+  const name = MONTHS[month - 1][0].toUpperCase() + MONTHS[month - 1].slice(1);
+  return `${name} ${year}`;
+}
+
+function toPairs(rec: any): Array<[string, number]> {
+  if (!rec) return [];
+  if (Array.isArray(rec)) {
+    // try common shapes: {name,amount} or {department,amount} or [key,value]
+    return rec.map((r: any) => {
+      if (Array.isArray(r) && r.length >= 2) return [String(r[0]), Number(r[1] ?? 0)];
+      if (typeof r === "object") {
+        const k = r.name ?? r.department ?? r.provider ?? r.key ?? "";
+        const v = Number(r.amount ?? r.value ?? 0);
+        return [String(k), v];
+      }
+      return [String(r), 0];
+    });
+  }
+  return Object.entries(rec).map(([k, v]) => [String(k), Number(v as number)]);
+}
+
+/* ------------------------------ Register Routes ------------------------------ */
 
 export async function registerRoutes(app: Express): Promise<void> {
   app.set("trust proxy", 1);
@@ -784,9 +838,9 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.get("/api/income-trends", requireAuth, async (req, res) => {
+  app.get("/api/income-trends", requireAuth, async (_req, res) => {
     try {
-      const days = parseInt((req.query.days as string) || "7");
+      const days = parseInt((_req.query.days as string) || "7");
       const data = await storage.getIncomeTrends(days);
       res.json(data);
     } catch (error) {
@@ -914,64 +968,122 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // NOTE: keep last
+  // NOTE: keep last (single-segment path)
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {
-      const path = req.params.path;
-      const pathParts = path.replace(".pdf", "").split("-");
-      const year = parseInt(pathParts[0], 10);
-      const month = parseInt(pathParts[1], 10);
+      const rawPath = req.params.path;
+      const parsed = parseReportPathToYearMonth(rawPath);
+      if (!parsed) {
+        return res.status(400).json({
+          error: "Unrecognized report path. Use /api/reports/YYYY-MM.pdf or a friendly Month_YYYY name.",
+        });
+      }
+      const { year, month } = parsed;
 
+      // must exist as a saved monthly report
+      const report = await storage.getMonthlyReport(year, month);
+      if (!report) return res.status(404).json({ error: "Report not found" });
+
+      // refresh data for current numbers
       const dashboardData = await storage.getDashboardData({
         year,
         month,
         range: "current-month",
       });
-      const report = await storage.getMonthlyReport(year, month);
-      if (!report) return res.status(404).json({ error: "Report not found" });
-
-      const reportData = {
-        ...report,
-        totalIncomeSSP: dashboardData.totalIncomeSSP,
-        totalIncomeUSD: dashboardData.totalIncomeUSD,
-        totalIncome: dashboardData.totalIncome,
-        totalExpenses: dashboardData.totalExpenses,
-        netIncome: dashboardData.netIncome,
-        departmentBreakdown: dashboardData.departmentBreakdown,
-        insuranceBreakdown: dashboardData.insuranceBreakdown,
-        expenseBreakdown: dashboardData.expenseBreakdown,
-      };
 
       const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.width;
-      const margin = 20;
+      const doc = new jsPDF({ unit: "pt", compress: true });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
+      // Header band
       doc.setFillColor(20, 83, 75);
       doc.rect(0, 0, pageWidth, 60, "F");
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
-      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", margin, 25);
-      doc.setFontSize(16);
+      doc.setFontSize(18);
+      doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", 40, 28);
       doc.setFont("helvetica", "normal");
-      doc.text("Financial Management System", margin, 40);
+      doc.setFontSize(12);
+      doc.text("Financial Management System", 40, 46);
 
+      // Title
       doc.setTextColor(0, 0, 0);
-      const monthName = new Date(year, month - 1).toLocaleDateString("en-US", {
-        month: "long",
-      });
-      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text(`${monthName} ${year}`, margin, 80);
+      doc.setFontSize(16);
+      doc.text(monthLabel(year, month), 40, 88);
 
-      const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
+      // Write a simple "table" without extra libs
+      let y = 112;
+      const step = 16;
+      const marginX = 40;
+      const rightX = pageWidth - 40;
+
+      function writeKV(label: string, value: string | number) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        doc.text(label, marginX, y);
+        const v = typeof value === "number" ? value.toLocaleString("en-US") : String(value);
+        doc.text(v, rightX, y, { align: "right" });
+        y += step;
+        if (y > pageHeight - 40) { doc.addPage(); y = 40; }
+      }
+
+      function writeSection(title: string) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(title, marginX, y);
+        y += step;
+        if (y > pageHeight - 40) { doc.addPage(); y = 40; }
+      }
+
+      // Summary
+      writeSection("Summary");
+      const totalIncome = dashboardData?.totalIncome ?? 0;
+      const totalExpenses = dashboardData?.totalExpenses ?? 0;
+      const netIncome = dashboardData?.netIncome ?? (totalIncome - totalExpenses);
+      writeKV("Total Income", totalIncome);
+      writeKV("Total Expenses", totalExpenses);
+      writeKV("Net Income", netIncome);
+
+      // Department Breakdown
+      const deptPairs = toPairs(dashboardData?.departmentBreakdown);
+      if (deptPairs.length) {
+        y += 8;
+        writeSection("Department Breakdown");
+        for (const [name, amt] of deptPairs) writeKV(name || "-", amt || 0);
+      }
+
+      // Insurance Breakdown
+      const insPairs = toPairs(dashboardData?.insuranceBreakdown);
+      if (insPairs.length) {
+        y += 8;
+        writeSection("Insurance Breakdown");
+        for (const [name, amt] of insPairs) writeKV(name || "-", amt || 0);
+      }
+
+      // Expense Breakdown (if available)
+      const expPairs = toPairs(dashboardData?.expenseBreakdown);
+      if (expPairs.length) {
+        y += 8;
+        writeSection("Expense Breakdown");
+        for (const [name, amt] of expPairs) writeKV(name || "-", amt || 0);
+      }
+
+      // Footer
+      y = Math.min(y + 12, pageHeight - 24);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Generated: ${new Date().toISOString()}`, marginX, y);
+
+      const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long" });
       const filename = `Bahr_El_Ghazal_${monthName}_${year}_Report.pdf`;
+      const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.setHeader("Content-Length", pdfBuffer.length);
-      res.send(pdfBuffer);
+      res.setHeader("Content-Length", String(pdfBuffer.length));
+      return res.status(200).send(pdfBuffer);
     } catch (error) {
       console.error("Error downloading report:", error);
       res.status(500).json({ error: "Failed to download report" });
