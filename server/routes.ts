@@ -952,18 +952,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.delete("/api/reports/:reportId", requireAuth, async (req, res) => {
-    try {
-      const { reportId } = req.params;
-      await storage.deleteMonthlyReport(reportId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting report:", error);
-      res.status(500).json({ error: "Failed to delete report" });
-    }
-  });
-
-  // NOTE: keep last (single-segment path)
+  // NOTE: keep last (single-segment path) — Modern Boardroom PDF
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {
       const rawPath = req.params.path;
@@ -1018,7 +1007,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const totalExpenses = toNumber(dashboardData?.totalExpenses);
       const netIncome     = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
 
-      // ---------- Build the PDF (clean & modern; no confidential notices) ----------
+      // ---------- Build the PDF (clean & modern; no subtitle) ----------
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", compress: true });
 
@@ -1037,8 +1026,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold"); doc.setFontSize(20);
       doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", M, 36);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(12);
-      doc.text("Financial Management System", M, 54);
 
       // Title (Month Year)
       doc.setTextColor(17, 24, 39);
@@ -1066,7 +1053,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const cardY = 124, cardH = 78, gap = 14;
       const cardW = (pageW - M * 2 - gap * 2) / 3;
-      drawCard(M + 0 * (cardW + gap), cardY, cardW, cardH, "Total Income",   `SSP ${fmt0(totalIncome)}`);
+      drawCard(M + 0 * (cardW + gap), cardY, cardW, cardH, "Total Revenue",  `SSP ${fmt0(totalIncome)}`);
       drawCard(M + 1 * (cardW + gap), cardY, cardW, cardH, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
       drawCard(M + 2 * (cardW + gap), cardY, cardW, cardH, "Net Income",     `SSP ${fmt0(netIncome)}`);
 
@@ -1096,7 +1083,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
         const top = sorted.slice(0, n);
         const others = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
-        if (others > 0) top.push(["Others", others]);
+        if (others > 0) top.push(["Other (long tail)", others]);
         return top;
       };
 
@@ -1123,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.rect(M, y, pageW - 2 * M, headerH, "F");
         doc.setFont("helvetica", "bold"); doc.setFontSize(11);
         doc.setTextColor(55, 65, 81);
-        doc.text("Name", col1X + 10, y + 18);
+        doc.text("Line Item", col1X + 10, y + 18);
         doc.text(`Amount (${currencyLabel})`, col2X - 10, y + 18, { align: "right" });
         y += headerH;
 
@@ -1158,29 +1145,27 @@ export async function registerRoutes(app: Express): Promise<void> {
           y += rowH;
         });
 
-        // Section total
+        // Section subtotal (professional wording)
         const sectionTotal = top.reduce((s, [, v]) => s + v, 0);
         doc.setDrawColor(230); doc.line(M, y, pageW - M, y);
         y += 8;
         doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-        doc.text("Section Total", col1X + 10, y + 16);
+        doc.text("Subtotal", col1X + 10, y + 16);
         doc.text(fmt0(sectionTotal), col2X - 10, y + 16, { align: "right" });
         y += rowH;
       };
 
-      // Sections
-      drawTable("Department Income Breakdown", deptPairs, "SSP");
-      drawTable("Insurance Income Breakdown",  insPairs,  "SSP");
-      drawTable("Expense Breakdown",           expPairs,  "SSP");
+      // Sections (professional wording)
+      drawTable("Revenue by Department",  deptPairs, "SSP");
+      drawTable("Insurance Payers (USD)", insPairs,  "USD");
+      drawTable("Operating Expenses",     expPairs,  "SSP");
 
-      // Footer (page numbers + timestamp only)
+      // Footer (page numbers only)
       const totalPages = doc.getNumberOfPages();
-      const generatedOn = `Generated: ${new Date().toLocaleString("en-US")}`;
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
-        doc.text(generatedOn, M, pageH - 20);
         doc.text(`Page ${i} of ${totalPages}`, pageW - M, pageH - 20, { align: "right" });
       }
 
