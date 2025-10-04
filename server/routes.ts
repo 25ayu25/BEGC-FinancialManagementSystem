@@ -810,7 +810,105 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ error: "Failed to fetch detailed transactions" });
     }
   });
+    /* --------------------------------------------------------------- */
+  /* Insurance Management                                            */
+  /* --------------------------------------------------------------- */
 
+  // Zod request schemas
+  const ClaimCreate = z.object({
+    providerId: z.string().min(1),
+    periodYear: z.number().int(),
+    periodMonth: z.number().int().min(1).max(12),
+    periodStart: z.string().min(8), // "YYYY-MM-DD" or ISO
+    periodEnd: z.string().min(8),
+    currency: z.enum(["USD", "SSP"]).default("USD"),
+    claimedAmount: z.number().nonnegative(),
+    status: z.enum(["submitted","partially_paid","paid","rejected","written_off"]).optional(),
+    notes: z.string().optional(),
+  });
+
+  const ClaimPatch = z.object({
+    claimedAmount: z.number().nonnegative().optional(),
+    status: z.enum(["submitted","partially_paid","paid","rejected","written_off"]).optional(),
+    notes: z.string().optional(),
+  });
+
+  const PaymentCreate = z.object({
+    providerId: z.string().min(1),
+    claimId: z.string().min(1).optional(),  // can credit a specific claim or leave null
+    paymentDate: z.string().min(8),          // "YYYY-MM-DD" or ISO
+    amount: z.number().positive(),
+    currency: z.enum(["USD","SSP"]).default("USD"),
+    reference: z.string().optional(),
+    notes: z.string().optional(),
+  });
+
+  /** Create a monthly claim (does not touch revenue) */
+  app.post("/api/insurance-claims", requireAuth, async (req, res, next) => {
+    try {
+      const input = ClaimCreate.parse(req.body);
+      const row = await storage.createInsuranceClaim({
+        ...input,
+        createdBy: req.user?.id ?? null,
+      });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
+
+  /** List claims (?providerId=&year=&month=&status=) */
+  app.get("/api/insurance-claims", requireAuth, async (req, res, next) => {
+    try {
+      const rows = await storage.listInsuranceClaims({
+        providerId: req.query.providerId as string | undefined,
+        year: req.query.year ? Number(req.query.year) : undefined,
+        month: req.query.month ? Number(req.query.month) : undefined,
+        status: req.query.status as string | undefined,
+      });
+      res.json(rows);
+    } catch (err) { next(err); }
+  });
+
+  /** Get one claim */
+  app.get("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+    try {
+      const row = await storage.getInsuranceClaim(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
+
+  /** Update claim amount/status/notes */
+  app.patch("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+    try {
+      const patch = ClaimPatch.parse(req.body);
+      const row = await storage.updateInsuranceClaim(req.params.id, patch);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
+
+  /** Record a payment (collections). Not mirrored to transactions. */
+  app.post("/api/insurance-payments", requireAuth, async (req, res, next) => {
+    try {
+      const input = PaymentCreate.parse(req.body);
+      const row = await storage.createInsurancePayment({
+        ...input,
+        createdBy: req.user?.id ?? null,
+      });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
+
+  /** Provider + per-claim balances */
+  app.get("/api/insurance-balances", requireAuth, async (req, res, next) => {
+    try {
+      const data = await storage.getInsuranceBalances({
+        providerId: req.query.providerId as string | undefined,
+      });
+      res.json(data);
+    } catch (err) { next(err); }
+  });
+  
   /* --------------------------------------------------------------- */
   /* Dashboard & Trends                                              */
   /* --------------------------------------------------------------- */
