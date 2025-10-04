@@ -6,6 +6,10 @@ import {
   monthlyReports,
   receipts,
   patientVolume,
+  // NEW: insurance
+  insuranceClaims,
+  insurancePayments,
+  // Types
   type User,
   type InsertUser,
   type Department,
@@ -20,6 +24,11 @@ import {
   type InsertReceipt,
   type PatientVolume,
   type InsertPatientVolume,
+  // NEW: insurance types
+  type InsuranceClaim,
+  type InsertInsuranceClaim,
+  type InsurancePayment,
+  type InsertInsurancePayment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lt, sql } from "drizzle-orm";
@@ -205,6 +214,39 @@ export interface IStorage {
       description: string;
     }>
   >;
+
+  /* -------- NEW: Insurance Management -------- */
+
+  createInsuranceClaim(claim: InsertInsuranceClaim): Promise<InsuranceClaim>;
+  listInsuranceClaims(filters?: {
+    providerId?: string;
+    year?: number;
+    month?: number;
+    status?: string;
+  }): Promise<
+    Array<
+      InsuranceClaim & {
+        providerName: string;
+        paidToDate: number;
+        balance: number;
+      }
+    >
+  >;
+  getInsuranceClaim(id: string): Promise<
+    (InsuranceClaim & { providerName: string; paidToDate: number; balance: number }) | undefined
+  >;
+  updateInsuranceClaim(id: string, updates: Partial<InsuranceClaim>): Promise<InsuranceClaim | undefined>;
+
+  createInsurancePayment(payment: InsertInsurancePayment): Promise<InsurancePayment>;
+
+  getInsuranceBalances(filters?: {
+    providerId?: string;
+  }): Promise<{
+    providers: Array<{ providerId: string; providerName: string; claimed: number; paid: number; balance: number }>;
+    claims: Array<
+      InsuranceClaim & { providerName: string; paidToDate: number; balance: number }
+    >;
+  }>;
 }
 
 /* ----------------------------- implementation ----------------------------- */
@@ -817,6 +859,142 @@ export class DatabaseStorage implements IStorage {
 
   async deletePatientVolume(id: string): Promise<void> {
     await db.delete(patientVolume).where(eq(patientVolume.id, id));
+  }
+
+  /* ---------------- Insurance Management (new) ---------------- */
+
+  // Create a monthly claim
+  async createInsuranceClaim(claim: InsertInsuranceClaim): Promise<InsuranceClaim> {
+    const [row] = await db.insert(insuranceClaims).values(claim).returning();
+    return row;
+  }
+
+  // List claims with paid-to-date and balance
+  async listInsuranceClaims(filters?: {
+    providerId?: string;
+    year?: number;
+    month?: number;
+    status?: string;
+  }) {
+    const whereConds: any[] = [];
+    if (filters?.providerId) whereConds.push(eq(insuranceClaims.providerId, filters.providerId));
+    if (filters?.year) whereConds.push(eq(insuranceClaims.periodYear, filters.year));
+    if (filters?.month) whereConds.push(eq(insuranceClaims.periodMonth, filters.month));
+    if (filters?.status) whereConds.push(eq(insuranceClaims.status, filters.status));
+
+    const paidSub = db
+      .select({
+        claimId: insurancePayments.claimId,
+        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`,
+      })
+      .from(insurancePayments)
+      .where(sql`${insurancePayments.claimId} IS NOT NULL`)
+      .groupBy(insurancePayments.claimId)
+      .as("p");
+
+    let q = db
+      .select({
+        id: insuranceClaims.id,
+        providerId: insuranceClaims.providerId,
+        providerName: insuranceProviders.name,
+        periodYear: insuranceClaims.periodYear,
+        periodMonth: insuranceClaims.periodMonth,
+        periodStart: insuranceClaims.periodStart,
+        periodEnd: insuranceClaims.periodEnd,
+        currency: insuranceClaims.currency,
+        claimedAmount: insuranceClaims.claimedAmount,
+        status: insuranceClaims.status,
+        notes: insuranceClaims.notes,
+        createdBy: insuranceClaims.createdBy,
+        createdAt: insuranceClaims.createdAt,
+        updatedAt: insuranceClaims.updatedAt,
+        paidToDate: sql<number>`COALESCE(${paidSub}.paid, 0)`,
+        balance: sql<number>`(${insuranceClaims.claimedAmount} - COALESCE(${paidSub}.paid, 0))`,
+      })
+      .from(insuranceClaims)
+      .innerJoin(insuranceProviders, eq(insuranceProviders.id, insuranceClaims.providerId))
+      .leftJoin(paidSub, eq(paidSub.claimId, insuranceClaims.id));
+
+    if (whereConds.length) q = q.where(and(...whereConds));
+
+    const rows = await q
+      .orderBy(desc(insuranceClaims.periodYear), desc(insuranceClaims.periodMonth), desc(insuranceClaims.createdAt));
+
+    // Normalize numerics -> number
+    return rows.map((r: any) => ({
+      ...r,
+      claimedAmount: Number(r.claimedAmount),
+      paidToDate: Number(r.paidToDate),
+      balance: Number(r.balance),
+    }));
+  }
+
+  async getInsuranceClaim(id: string) {
+    const list = await this.listInsuranceClaims();
+    return list.find((c) => c.id === id);
+  }
+
+  async updateInsuranceClaim(id: string, updates: Partial<InsuranceClaim>) {
+    const [row] = await db
+      .update(insuranceClaims)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(insuranceClaims.id, id))
+      .returning();
+    return row || undefined;
+  }
+
+  // Record a payment (cash collection) – not mirrored to transactions
+  async createInsurancePayment(payment: InsertInsurancePayment): Promise<InsurancePayment> {
+    const [row] = await db.insert(insurancePayments).values(payment).returning();
+    return row;
+  }
+
+  // Provider + claim balances
+  async getInsuranceBalances(filters?: { providerId?: string }) {
+    const claimsAgg = db
+      .select({
+        providerId: insuranceClaims.providerId,
+        claimed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}), 0)`,
+      })
+      .from(insuranceClaims)
+      .groupBy(insuranceClaims.providerId)
+      .as("cagg");
+
+    const payAgg = db
+      .select({
+        providerId: insurancePayments.providerId,
+        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`,
+      })
+      .from(insurancePayments)
+      .groupBy(insurancePayments.providerId)
+      .as("pagg");
+
+    let provQ = db
+      .select({
+        providerId: insuranceProviders.id,
+        providerName: insuranceProviders.name,
+        claimed: sql<number>`COALESCE(${claimsAgg}.claimed, 0)`,
+        paid: sql<number>`COALESCE(${payAgg}.paid, 0)`,
+        balance: sql<number>`COALESCE(${claimsAgg}.claimed, 0) - COALESCE(${payAgg}.paid, 0)`,
+      })
+      .from(insuranceProviders)
+      .leftJoin(claimsAgg, eq(claimsAgg.providerId, insuranceProviders.id))
+      .leftJoin(payAgg, eq(payAgg.providerId, insuranceProviders.id));
+
+    if (filters?.providerId) provQ = provQ.where(eq(insuranceProviders.id, filters.providerId));
+
+    const providers = (await provQ.orderBy(insuranceProviders.name)).map((r) => ({
+      ...r,
+      claimed: Number(r.claimed),
+      paid: Number(r.paid),
+      balance: Number(r.balance),
+    }));
+
+    const claims = await this.listInsuranceClaims({
+      providerId: filters?.providerId,
+    });
+
+    return { providers, claims };
   }
 }
 
