@@ -58,6 +58,7 @@ const ALLOWED_EXACT = new Set<string>([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
+
 const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
 
 function isAllowedOrigin(origin?: string): boolean {
@@ -389,10 +390,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
-
       const { id } = req.params;
       if (id === req.user!.id) return res.status(400).json({ error: "Cannot delete your own account" });
-
       await storage.deleteUser(id);
       res.json({ success: true });
     } catch (error) {
@@ -862,10 +861,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       const userId = req.user!.id;
 
       const dashboardData = await storage.getDashboardData({
-        year, month, range: "current-month",
+        year,
+        month,
+        range: "current-month",
       });
       const reportData = {
-        year, month,
+        year,
+        month,
         totalIncome: dashboardData.totalIncome,
         totalExpenses: dashboardData.totalExpenses,
         netIncome: dashboardData.netIncome,
@@ -875,6 +877,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         pdfPath: `/reports/${year}-${month.toString().padStart(2, "0")}.pdf`,
         generatedBy: userId,
       };
+
       const report = await storage.createMonthlyReport(reportData);
       res.status(201).json(report);
     } catch (error) {
@@ -883,7 +886,21 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  /* ---------- NEW: Deletion by date or friendly path ------------- */
+  // NEW: deletes — use whichever identifier you have
+  app.delete("/api/reports/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year, 10);
+      const month = parseInt(req.params.month, 10);
+      const report = await storage.getMonthlyReport(year, month);
+      if (!report) return res.status(404).json({ error: "Report not found" });
+      await storage.deleteMonthlyReport(report.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting report (year/month):", error);
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
   app.delete("/api/reports/by-date/:year/:month", requireAuth, async (req, res) => {
     try {
       const year = parseInt(req.params.year, 10);
@@ -912,7 +929,17 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // NOTE: keep last (single-segment path) — Boardroom PDF (redesigned KPIs with auto-fit)
+  app.delete("/api/reports/:reportId", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteMonthlyReport(req.params.reportId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting report by id:", error);
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
+  // NOTE: keep last (single-segment path) — PDF render
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {
       const rawPath = req.params.path;
@@ -925,18 +952,15 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       const { year, month } = parsed;
 
-      // Must exist as a saved monthly report
       const report = await storage.getMonthlyReport(year, month);
       if (!report) return res.status(404).json({ error: "Report not found" });
 
-      // Fresh aggregates for the PDF
       const dashboardData = await storage.getDashboardData({
         year,
         month,
         range: "current-month",
       });
 
-      // Lookups so we render names, not IDs
       const [departments, providers] = await Promise.all([
         storage.getDepartments(),
         storage.getInsuranceProviders(),
@@ -944,7 +968,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const deptMap = new Map(departments.map((d: any) => [d.id, d.name]));
       const provMap = new Map(providers.map((p: any) => [p.id, p.name]));
 
-      // ---------- Formatting helpers (NO DECIMALS) ----------
+      // ---------- formatting ----------
       const toNumber = (x: any) => {
         const n = Number(String(x ?? "").replace(/,/g, "").trim());
         return Number.isFinite(n) ? n : 0;
@@ -959,78 +983,68 @@ export async function registerRoutes(app: Express): Promise<void> {
           .map(([k, v]) => [idToName?.get(k) || k, toNumber(v)] as [string, number])
           .filter(([, v]) => v !== 0);
 
-      const deptPairs = normalizePairs(toPairs(dashboardData?.departmentBreakdown || {}), deptMap);
-      const insPairs  = normalizePairs(toPairs(dashboardData?.insuranceBreakdown || {}), provMap);
-      const expPairs  = normalizePairs(toPairs(dashboardData?.expenseBreakdown || {}));
+      const deptPairs = normalizePairs((Array.isArray(dashboardData?.departmentBreakdown) ? dashboardData?.departmentBreakdown : toPairs(dashboardData?.departmentBreakdown)) || [], deptMap);
+      const insPairs  = normalizePairs((Array.isArray(dashboardData?.insuranceBreakdown) ? dashboardData?.insuranceBreakdown : toPairs(dashboardData?.insuranceBreakdown)) || [], provMap);
+      const expPairs  = normalizePairs((Array.isArray(dashboardData?.expenseBreakdown) ? dashboardData?.expenseBreakdown : toPairs(dashboardData?.expenseBreakdown)) || []);
 
       const totalIncome   = toNumber(dashboardData?.totalIncome);
       const totalExpenses = toNumber(dashboardData?.totalExpenses);
       const netIncome     = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
 
-      // ---------- Build the PDF (clean & modern) ----------
+      // ---------- PDF ----------
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", compress: true });
 
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
-      const M = 48; // margin
+      const M = 48;
 
-      const brand = { r: 20, g: 83, b: 75 }; // deep green
+      const brand = { r: 20, g: 83, b: 75 };
 
-      // Header band
+      // Header
       doc.setFillColor(brand.r, brand.g, brand.b);
       doc.rect(0, 0, pageW, 72, "F");
-
-      // Title
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold"); doc.setFontSize(20);
       doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", M, 36);
 
-      // Period label
+      // Period
       doc.setTextColor(17, 24, 39);
       doc.setFont("helvetica", "bold"); doc.setFontSize(16);
       doc.text(monthLabel(year, month), M, 108);
 
-      // ---------- KPI Cards (elegant, auto-fit numbers; no separators) ----------
+      // KPIs — auto-fit
       const fitFontSize = (text: string, maxWidth: number, maxSize: number, minSize = 14) => {
         let size = maxSize;
         doc.setFontSize(size);
         while (size > minSize && doc.getTextWidth(text) > maxWidth) {
-          size -= 1;
-          doc.setFontSize(size);
+          size -= 1; doc.setFontSize(size);
         }
         return size;
       };
-
       const drawCard = (x: number, y: number, w: number, h: number, label: string, value: string) => {
         const PADX = 16, PADY = 18;
-        // Card
         doc.setDrawColor(235);
         doc.setFillColor(249, 250, 251);
         doc.roundedRect(x, y, w, h, 10, 10, "FD");
-
-        // Label (small)
         doc.setTextColor(100, 116, 139);
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.text(label.toUpperCase(), x + PADX, y + PADY + 2);
-
-        // Value (big, auto-fit)
         const maxTextWidth = w - PADX * 2;
         const size = fitFontSize(value, maxTextWidth, 24, 16);
         doc.setFont("helvetica", "bold"); doc.setFontSize(size);
         doc.setTextColor(17, 24, 39);
         doc.text(value, x + PADX, y + PADY + 28);
       };
-
       const cardY = 124, cardH = 68, gap = 14;
       const cardW = (pageW - M * 2 - gap * 2) / 3;
       drawCard(M + 0 * (cardW + gap), cardY, cardW, cardH, "Total Revenue",  `SSP ${fmt0(totalIncome)}`);
       drawCard(M + 1 * (cardW + gap), cardY, cardW, cardH, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
       drawCard(M + 2 * (cardW + gap), cardY, cardW, cardH, "Net Income",     `SSP ${fmt0(netIncome)}`);
 
-      // ---------- Tables (minimalist; no bars) ----------
+      // Tables
       let y = cardY + cardH + 28;
-
+      const spacer = (h = 16) => { y += h; };
       const ensurePage = (need = 160) => {
         if (y + need > pageH - 48) {
           doc.addPage(); y = 64;
@@ -1040,7 +1054,6 @@ export async function registerRoutes(app: Express): Promise<void> {
           doc.setTextColor(17, 24, 39);
         }
       };
-
       const sectionTitle = (label: string) => {
         doc.setFont("helvetica", "bold"); doc.setFontSize(13);
         doc.text(label, M, y);
@@ -1100,7 +1113,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           y += rowH;
         });
 
-        // Subtotal
+        // Subtotal (extra separation afterwards to avoid visual collision)
         const sectionTotal = top.reduce((s, [, v]) => s + v, 0);
         doc.setDrawColor(230); doc.line(M, y, pageW - M, y);
         y += 8;
@@ -1108,14 +1121,15 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.text("Subtotal", col1X + 10, y + 16);
         doc.text(fmt0(sectionTotal), col2X - 10, y + 16, { align: "right" });
         y += rowH;
+        spacer(18);            // <<— added: clear gap after subtotal
+        ensurePage(24);        // <<— added: make sure next section starts cleanly
       };
 
-      // Sections
       drawTable("Revenue by Department",  deptPairs, "SSP");
       drawTable("Insurance Payers (USD)", insPairs,  "USD");
       drawTable("Operating Expenses",     expPairs,  "SSP");
 
-      // Footer (page numbers only)
+      // Footer
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
@@ -1298,9 +1312,9 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.delete("/api/patient-volume/:id", requireAuth, async (req, res) => {
+  app.delete("/api/patient-volume/:id", requireAuth, async (_req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = _req.params;
       await storage.deletePatientVolume(id);
       res.status(204).send();
     } catch (error) {
