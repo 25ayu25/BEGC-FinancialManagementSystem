@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format, parseISO, addMonths, isSameMonth } from "date-fns";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,8 @@ import {
   Table as TableIcon,
   X,
   Save,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 import {
@@ -32,7 +34,6 @@ import {
   Tooltip,
 } from "recharts";
 
-// NEW: responsive container
 import AppContainer from "@/components/layout/AppContainer";
 
 type PatientVolume = {
@@ -43,7 +44,7 @@ type PatientVolume = {
 };
 
 export default function PatientVolumePage() {
-  // Read URL params coming from dashboard links (optional)
+  // URL deep-link support from dashboards (optional)
   const params = new URLSearchParams(window.location.search);
   const viewParam = params.get("view"); // "monthly" or null
   const yearParam = params.get("year");
@@ -52,7 +53,7 @@ export default function PatientVolumePage() {
   // Default to current month unless explicitly set via URL (from dashboard)
   const initialMonthDate = useMemo(() => {
     if (viewParam === "monthly" && yearParam && monthParam) {
-      return new Date(Number(yearParam), Number(monthParam) - 1, 1, 12); // noon to avoid tz drift
+      return new Date(Number(yearParam), Number(monthParam) - 1, 1, 12);
     }
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1, 12);
@@ -69,10 +70,23 @@ export default function PatientVolumePage() {
 
   const queryClient = useQueryClient();
 
-  // --- Fetch this month's volumes ---
+  // --- Derived helpers for quick chips ---
+  const now = new Date();
+  const thisMonthAnchor = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+  const lastMonthAnchor = addMonths(thisMonthAnchor, -1);
+
+  const isThisMonth = isSameMonth(selectedMonth, thisMonthAnchor);
+  const isLastMonth = isSameMonth(selectedMonth, lastMonthAnchor);
+
+  const goPrevMonth = () => setSelectedMonth(addMonths(selectedMonth, -1));
+  const goNextMonth = () => setSelectedMonth(addMonths(selectedMonth, +1));
+  const jumpThisMonth = () => setSelectedMonth(thisMonthAnchor);
+  const jumpLastMonth = () => setSelectedMonth(lastMonthAnchor);
+
+  // --- Fetch the selected month's volumes ---
   const year = selectedMonth.getFullYear();
   const monthIndex = selectedMonth.getMonth(); // 0-based
-  const monthNumber = monthIndex + 1;         // 1-based
+  const monthNumber = monthIndex + 1;          // 1-based
 
   const { data: rawVolumes = [], isLoading } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/period", year, monthNumber],
@@ -198,7 +212,7 @@ export default function PatientVolumePage() {
               <div className="text-xs text-slate-500">{monthTitle}</div>
             </CardContent>
           </Card>
-          <Card>
+        <Card>
             <CardContent className="p-4">
               <div className="text-xs text-slate-600">Average / Active Day</div>
               <div className="text-2xl font-semibold">
@@ -218,21 +232,52 @@ export default function PatientVolumePage() {
           </Card>
         </div>
 
-        {/* Section header with chip + toggle */}
+        {/* Controls: month navigation + quick chips + month picker */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Patient Volume
-              <span className="mx-1 text-slate-300">•</span>
-              <span className="rounded-full border px-2 py-0.5 text-sm bg-slate-50 border-slate-200">
-                {monthTitle}
-              </span>
-            </h2>
-            <div className="text-sm text-slate-500">
-              Total: <span className="font-medium text-slate-800">{totalPatients}</span> patients
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={goPrevMonth} title="Previous month">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-8">
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                  {monthTitle}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
+                <Calendar
+                  mode="single"
+                  selected={selectedMonth}
+                  onSelect={(d) => d && setSelectedMonth(new Date(d.getFullYear(), d.getMonth(), 1, 12))}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={goNextMonth} title="Next month">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+
+            <div className="mx-1 h-6 w-px bg-slate-200" />
+
+            <Button
+              variant={isThisMonth ? "default" : "outline"}
+              className={cn("h-8", isThisMonth ? "bg-slate-900 text-white hover:bg-slate-800" : "")}
+              onClick={jumpThisMonth}
+            >
+              This month
+            </Button>
+            <Button
+              variant={isLastMonth ? "default" : "outline"}
+              className={cn("h-8", isLastMonth ? "bg-slate-900 text-white hover:bg-slate-800" : "")}
+              onClick={jumpLastMonth}
+            >
+              Last month
+            </Button>
           </div>
+
           <div className="flex gap-2">
             <Button
               variant={mode === "chart" ? "default" : "outline"}
@@ -294,7 +339,6 @@ export default function PatientVolumePage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              // Scrollable on mobile so columns never squish
               <div className="overflow-x-auto">
                 <div className="min-w-[480px]">
                   <div className="grid grid-cols-[1fr_120px_44px] bg-slate-50 text-slate-600 text-sm px-3 py-2 font-medium">
@@ -345,11 +389,10 @@ export default function PatientVolumePage() {
           </CardContent>
         </Card>
 
-        {/* Add modal — light overlay, header, close button, tidy footer */}
+        {/* Add modal */}
         {addOpen && (
           <div className="fixed inset-0 z-50 bg-black/20 flex items-start justify-center p-4">
             <div className="mt-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
-              {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
                 <h3 className="text-base font-semibold text-slate-900">Add Patient Volume</h3>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAddOpen(false)}>
@@ -357,7 +400,6 @@ export default function PatientVolumePage() {
                 </Button>
               </div>
 
-              {/* Body */}
               <div className="px-5 py-4">
                 <form onSubmit={handleSave} className="space-y-4">
                   <div className="space-y-2">
@@ -399,7 +441,6 @@ export default function PatientVolumePage() {
                     />
                   </div>
 
-                  {/* Footer */}
                   <div className="flex items-center justify-between pt-4 border-t border-slate-200">
                     <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
                       Cancel
