@@ -58,7 +58,6 @@ const ALLOWED_EXACT = new Set<string>([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
-
 const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
 
 function isAllowedOrigin(origin?: string): boolean {
@@ -109,14 +108,12 @@ const MONTHS = [
 ];
 
 function parseReportPathToYearMonth(path: string): { year: number; month: number } | null {
-  // numeric: 2025-09.pdf   or /reports/2025-09.pdf
   const m1 = path.match(/(^|\/)(\d{4})-(\d{2})\.pdf$/i);
   if (m1) {
     const year = +m1[2];
     const month = +m1[3];
     if (year >= 2000 && month >= 1 && month <= 12) return { year, month };
   }
-  // friendly: _September_2025_
   const m2 = path.match(
     /_(January|February|March|April|May|June|July|August|September|October|November|December)_(\d{4})_/i
   );
@@ -183,30 +180,21 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const sessionCookie = (req as any).cookies?.user_session;
       if (sessionCookie) {
-        try {
-          userSession = JSON.parse(sessionCookie);
-        } catch {}
+        try { userSession = JSON.parse(sessionCookie); } catch {}
       }
-
       if (!userSession) {
         const header = req.headers["x-session-token"];
         if (header) {
-          try {
-            userSession = JSON.parse(header as string);
-          } catch {}
+          try { userSession = JSON.parse(header as string); } catch {}
         }
       }
-
-      if (!userSession) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
+      if (!userSession) return res.status(401).json({ error: "Authentication required" });
 
       const user = await storage.getUser(userSession.id);
       if (!user || user.status === "inactive") {
         res.clearCookie("user_session");
         return res.status(401).json({ error: "Session invalid" });
       }
-
       req.user = {
         id: user.id,
         username: user.username,
@@ -214,7 +202,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         location: user.location,
         fullName: user.fullName,
       };
-
       next();
     } catch (err) {
       console.error("Auth middleware error:", err);
@@ -231,7 +218,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password are required" });
       }
-
       const user = await storage.getUserByUsername(String(username).toLowerCase());
       if (!user || user.password !== password) {
         return res.status(401).json({ error: "Invalid credentials" });
@@ -239,7 +225,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (user.status === "inactive") {
         return res.status(401).json({ error: "Account is deactivated" });
       }
-
       await storage.updateUser(user.id, { lastLogin: new Date() });
 
       const userSession = {
@@ -249,16 +234,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         location: user.location,
         fullName: user.fullName,
       };
-
       const isProd = process.env.NODE_ENV === "production";
       res.cookie("user_session", JSON.stringify(userSession), {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "none",
-        path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 30,
+        httpOnly: true, secure: isProd, sameSite: "none", path: "/", maxAge: 1000 * 60 * 60 * 24 * 30,
       });
-
       res.json(userSession);
     } catch (error) {
       console.error("Login error:", error);
@@ -280,34 +259,18 @@ export async function registerRoutes(app: Express): Promise<void> {
         const user = await storage.getUser(session.id);
         if (user && user.status !== "inactive") {
           return {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            location: user.location,
-            fullName: user.fullName,
+            id: user.id, username: user.username, email: user.email,
+            role: user.role, location: user.location, fullName: user.fullName,
             defaultCurrency: user.defaultCurrency,
-            emailNotifications: user.emailNotifications,
-            reportAlerts: user.reportAlerts,
+            emailNotifications: user.emailNotifications, reportAlerts: user.reportAlerts,
           };
         }
         return null;
       };
-
       const cookieRaw = (req as any).cookies?.user_session;
-      if (cookieRaw) {
-        try {
-          const u = await tryResolve(cookieRaw);
-          if (u) return res.json(u);
-        } catch {}
-      }
+      if (cookieRaw) { try { const u = await tryResolve(cookieRaw); if (u) return res.json(u); } catch {} }
       const header = req.headers["x-session-token"];
-      if (header) {
-        try {
-          const u = await tryResolve(header as string);
-          if (u) return res.json(u);
-        } catch {}
-      }
+      if (header) { try { const u = await tryResolve(header as string); if (u) return res.json(u); } catch {} }
       res.status(401).json({ error: "Authentication required" });
     } catch (error) {
       console.error("Auth check error:", error);
@@ -324,16 +287,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (String(newPassword).length < 8) {
         return res.status(400).json({ error: "New password must be at least 8 characters long" });
       }
-
       const me = await storage.getUser(req.user!.id);
       if (!me) return res.status(404).json({ error: "User not found" });
       if (me.password !== currentPassword) {
         return res.status(400).json({ error: "Current password is incorrect" });
       }
-
       const updatedUser = await storage.updateUser(req.user!.id, { password: newPassword });
       if (!updatedUser) return res.status(500).json({ error: "Failed to update password" });
-
       res.json({ success: true, message: "Password updated successfully" });
     } catch (error) {
       console.error("Error changing password:", error);
@@ -360,8 +320,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
       const { id } = req.params;
       const updates = { ...req.body };
-      delete (updates as any).id;
-      delete (updates as any).password;
+      delete (updates as any).id; delete (updates as any).password;
       const updatedUser = await storage.updateUser(id, updates);
       res.json(updatedUser);
     } catch (error: any) {
@@ -385,13 +344,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!newPassword) return res.status(400).json({ error: "New password is required" });
       if (String(newPassword).length < 8)
         return res.status(400).json({ error: "Password must be at least 8 characters" });
-
       const existing = await storage.getUser(userId);
       if (!existing) return res.status(404).json({ error: "User not found" });
-
       const updatedUser = await storage.updateUser(userId, { password: newPassword });
       if (!updatedUser) return res.status(500).json({ error: "Failed to update password" });
-
       res.json({ success: true, message: "Password reset successfully" });
     } catch (error) {
       console.error("Error resetting password:", error);
@@ -402,26 +358,17 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/users", requireAuth, async (req, res) => {
     try {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
-
       const { username, email, fullName, role, password, permissions } = req.body;
       const location = "clinic";
       if (!username || !email || !fullName || !role) {
-        return res
-          .status(400)
-          .json({ error: "Missing required fields: username, email, fullName, role" });
+        return res.status(400).json({ error: "Missing required fields: username, email, fullName, role" });
       }
-
       const userData = {
-        username,
-        email,
-        fullName: fullName || "",
-        role,
-        location,
+        username, email, fullName: fullName || "", role, location,
         password: password || "defaultPassword123",
         permissions: JSON.stringify(permissions || []),
         status: "active" as const,
       };
-
       const user = await storage.createUser(userData);
       res.status(201).json(user);
     } catch (error: any) {
@@ -440,10 +387,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.delete("/api/users/:id", requireAuth, async (req, res) => {
     try {
       if (req.user!.role !== "admin") return res.status(403).json({ error: "Access denied" });
-
       const { id } = req.params;
       if (id === req.user!.id) return res.status(400).json({ error: "Cannot delete your own account" });
-
       await storage.deleteUser(id);
       res.json({ success: true });
     } catch (error) {
@@ -481,10 +426,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
       const page = parseInt((req.query.page as string) || "1", 10);
-      const limit = parseInt(
-        (req.query.limit as string) || (req.query.pageSize as string) || "50",
-        10
-      );
+      const limit = parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10);
       const offset = (page - 1) * limit;
 
       const startDate = parseYMD(req.query.startDate as string);
@@ -495,8 +437,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (endDate) filters.endDate = endDate;
 
       if (req.query.departmentId) filters.departmentId = String(req.query.departmentId);
-      if (req.query.insuranceProviderId)
-        filters.insuranceProviderId = String(req.query.insuranceProviderId);
+      if (req.query.insuranceProviderId) filters.insuranceProviderId = String(req.query.insuranceProviderId);
       if (req.query.currency) filters.currency = String(req.query.currency).toUpperCase();
       if (req.query.type) filters.type = String(req.query.type).toLowerCase();
       if (req.query.searchQuery) filters.searchQuery = String(req.query.searchQuery);
@@ -520,7 +461,6 @@ export async function registerRoutes(app: Express): Promise<void> {
           req.body.insuranceProviderId === "no-insurance" ? null : req.body.insuranceProviderId,
         syncStatus,
       };
-
       const validated = insertTransactionSchema.parse(bodyWithDate);
       const transaction = await storage.createTransaction(validated);
       res.status(201).json(transaction);
@@ -545,7 +485,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         insuranceProviderId: z.string().nullable().optional(),
         providerName: z.string().optional(),
       });
-
       const BulkSchema = z.object({
         date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
@@ -565,7 +504,6 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const deptById = new Map<string, any>(departments.map((d: any) => [d.id, d]));
       const deptByName = new Map<string, any>(departments.map((d: any) => [normKey(d.name), d]));
-
       const provById = new Map<string, any>(providers.map((p: any) => [p.id, p]));
       const provByName = new Map<string, any>(providers.map((p: any) => [normKey(p.name), p]));
 
@@ -673,7 +611,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         amount: z.any(),
         description: z.string().optional(),
       });
-
       const BulkSchema = z.object({
         date: z.string().optional(),
         currency: z.enum(["SSP", "USD"]).default("SSP"),
@@ -793,17 +730,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         start = f;
         endExclusive = t;
       } else {
-        return res
-          .status(400)
-          .json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
+        return res.status(400).json({ error: "Provide 'date' or 'from'&'to' (YYYY-MM-DD)" });
       }
 
       const rows = await storage.getTransactionsBetween(start!, endExclusive!, {
-        currency,
-        type,
-        departmentId,
-        insuranceProviderId,
-        limit: 2000,
+        currency, type, departmentId, insuranceProviderId, limit: 2000,
       });
 
       res.json({ count: rows.length, transactions: rows });
@@ -859,10 +790,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         data = await storage.getIncomeTrendsForDateRange(s, e);
       } else if (range === "last-3-months") {
         const endEx = new Date();
-        const start = addDaysUTC(
-          new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)),
-          0
-        );
+        const start = addDaysUTC(new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth() - 3, 1)), 0);
         data = await storage.getIncomeTrendsForDateRange(start, endEx);
       } else if (range === "year") {
         const s = new Date(Date.UTC(year, 0, 1));
@@ -871,7 +799,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       } else {
         data = await storage.getIncomeTrendsForMonth(year, month);
       }
-
       res.json(data);
     } catch (error) {
       console.error("Error fetching income trends for month:", error);
@@ -897,9 +824,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {
       const { limit } = req.query;
-      const reports = await storage.getMonthlyReports(
-        limit ? parseInt(limit as string, 10) : undefined
-      );
+      const reports = await storage.getMonthlyReports(limit ? parseInt(limit as string, 10) : undefined);
       res.json(reports);
     } catch (error) {
       console.error("Error fetching reports:", error);
@@ -926,14 +851,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       const month = parseInt(req.params.month, 10);
       const userId = req.user!.id;
 
-      const dashboardData = await storage.getDashboardData({
-        year,
-        month,
-        range: "current-month",
-      });
+      const dashboardData = await storage.getDashboardData({ year, month, range: "current-month" });
       const reportData = {
-        year,
-        month,
+        year, month,
         totalIncome: dashboardData.totalIncome,
         totalExpenses: dashboardData.totalExpenses,
         netIncome: dashboardData.netIncome,
@@ -943,7 +863,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         pdfPath: `/reports/${year}-${month.toString().padStart(2, "0")}.pdf`,
         generatedBy: userId,
       };
-
       const report = await storage.createMonthlyReport(reportData);
       res.status(201).json(report);
     } catch (error) {
@@ -952,7 +871,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // NOTE: keep last (single-segment path) — Modern Boardroom PDF
+  // NOTE: keep last (single-segment path) — Modern Boardroom PDF (no bars, no KPI separators)
   app.get("/api/reports/:path", requireAuth, async (req, res) => {
     try {
       const rawPath = req.params.path;
@@ -965,18 +884,11 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       const { year, month } = parsed;
 
-      // Must exist as a saved monthly report
       const report = await storage.getMonthlyReport(year, month);
       if (!report) return res.status(404).json({ error: "Report not found" });
 
-      // Fresh aggregates for the PDF
-      const dashboardData = await storage.getDashboardData({
-        year,
-        month,
-        range: "current-month",
-      });
+      const dashboardData = await storage.getDashboardData({ year, month, range: "current-month" });
 
-      // Lookups so we render names, not IDs
       const [departments, providers] = await Promise.all([
         storage.getDepartments(),
         storage.getInsuranceProviders(),
@@ -1007,40 +919,34 @@ export async function registerRoutes(app: Express): Promise<void> {
       const totalExpenses = toNumber(dashboardData?.totalExpenses);
       const netIncome     = toNumber(dashboardData?.netIncome ?? totalIncome - totalExpenses);
 
-      // ---------- Build the PDF (clean & modern; no subtitle) ----------
+      // ---------- Build the PDF (clean & modern) ----------
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", compress: true });
 
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
       const M = 48; // margin
-
-      // Brand colors
-      const brand = { r: 20, g: 83, b: 75 };
-      const accent = { r: 6, g: 95, b: 70 };
+      const brand = { r: 20, g: 83, b: 75 }; // deep green
 
       // Header band
       doc.setFillColor(brand.r, brand.g, brand.b);
       doc.rect(0, 0, pageW, 72, "F");
 
+      // Title (no product/subtitle)
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold"); doc.setFontSize(20);
       doc.text("Bahr El Ghazal Clinic — Monthly Financial Report", M, 36);
 
-      // Title (Month Year)
+      // Period label
       doc.setTextColor(17, 24, 39);
       doc.setFont("helvetica", "bold"); doc.setFontSize(16);
       doc.text(monthLabel(year, month), M, 108);
 
-      // ---------- KPI Cards ----------
+      // ---------- KPI Cards (no separators) ----------
       const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string) => {
         doc.setDrawColor(235);
-        doc.setFillColor(249, 250, 251); // subtle gray
-        doc.roundedRect(x, y, w, h, 10, 10, "FD");
-
-        // slim left stripe
-        doc.setFillColor(accent.r, accent.g, accent.b);
-        doc.roundedRect(x, y, 6, h, 10, 10, "F");
+        doc.setFillColor(249, 250, 251);
+        doc.roundedRect(x, y, w, h, 10, 10, "FD"); // clean card, no accent stripe
 
         doc.setTextColor(100, 116, 139);
         doc.setFont("helvetica", "normal"); doc.setFontSize(11);
@@ -1057,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       drawCard(M + 1 * (cardW + gap), cardY, cardW, cardH, "Total Expenses", `SSP ${fmt0(totalExpenses)}`);
       drawCard(M + 2 * (cardW + gap), cardY, cardW, cardH, "Net Income",     `SSP ${fmt0(netIncome)}`);
 
-      // ---------- Table helpers ----------
+      // ---------- Tables (no bars) ----------
       let y = cardY + cardH + 28;
 
       const ensurePage = (need = 160) => {
@@ -1083,17 +989,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         const sorted = [...pairs].sort((a, b) => b[1] - a[1]);
         const top = sorted.slice(0, n);
         const others = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
-        if (others > 0) top.push(["Other (long tail)", others]);
+        if (others > 0) top.push(["Other", others]);
         return top;
-      };
-
-      // horizontal bar next to numbers
-      const drawBar = (x: number, yMid: number, w: number, p: number) => {
-        const bw = Math.max(0, Math.min(1, p)) * w;
-        doc.setFillColor(229, 245, 238); // light brand tint
-        doc.rect(x, yMid - 4, w, 8, "F");
-        doc.setFillColor(20, 83, 75);
-        doc.rect(x, yMid - 4, bw, 8, "F");
       };
 
       const drawTable = (title: string, rows: Row[], currencyLabel = "SSP") => {
@@ -1114,13 +1011,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.text(`Amount (${currencyLabel})`, col2X - 10, y + 18, { align: "right" });
         y += headerH;
 
-        // Body
+        // Body (no bars, just clean numbers)
         doc.setFont("helvetica", "normal"); doc.setFontSize(11);
         let zebra = false;
 
         const top = rollupTopN(rows, 8);
-        const maxVal = Math.max(...top.map(([, v]) => v), 1);
-        const barMaxW = 120;
 
         top.forEach(([name, val]) => {
           ensurePage(rowH + 8);
@@ -1130,13 +1025,8 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
           zebra = !zebra;
 
-          // Name
           doc.setTextColor(31, 41, 55);
           doc.text(cap(name, 64), col1X + 10, y + 16);
-
-          // Bar + value on right
-          const barX = col2X - 10 - barMaxW - 8 - 60; // leave 60pt for value area
-          drawBar(barX, y + 13, barMaxW, val / maxVal);
 
           doc.setFont("helvetica", "bold");
           doc.setTextColor(17, 24, 39);
@@ -1145,7 +1035,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           y += rowH;
         });
 
-        // Section subtotal (professional wording)
+        // Subtotal
         const sectionTotal = top.reduce((s, [, v]) => s + v, 0);
         doc.setDrawColor(230); doc.line(M, y, pageW - M, y);
         y += 8;
@@ -1291,10 +1181,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           const months: any[] = [];
           for (let i = 0; i < 3; i++) {
             const d = new Date(year, month - 1 - i);
-            const mv = await storage.getPatientVolumeForMonth(
-              d.getFullYear(),
-              d.getMonth() + 1
-            );
+            const mv = await storage.getPatientVolumeForMonth(d.getFullYear(), d.getMonth() + 1);
             months.push(...mv);
           }
           volumes = months;
@@ -1310,12 +1197,8 @@ export async function registerRoutes(app: Express): Promise<void> {
           break;
         }
         case "custom": {
-          const s =
-            parseYMD(req.query.startDate as string) ||
-            new Date(Date.UTC(year, month - 1, 1));
-          const e =
-            parseYMD(req.query.endDate as string) ||
-            new Date(Date.UTC(year, month, 1));
+          const s = parseYMD(req.query.startDate as string) || new Date(Date.UTC(year, month - 1, 1));
+          const e = parseYMD(req.query.endDate as string) || new Date(Date.UTC(year, month, 1));
           volumes = await storage.getPatientVolumeByDateRange(s, e);
           break;
         }
@@ -1323,7 +1206,6 @@ export async function registerRoutes(app: Express): Promise<void> {
           volumes = await storage.getPatientVolumeForMonth(year, month);
         }
       }
-
       res.json(volumes);
     } catch (error) {
       console.error("Error getting patient volume for period:", error);
