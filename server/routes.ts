@@ -1280,7 +1280,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.setDrawColor(230); doc.line(M, y, pageW - M, y);
         y += 8;
         doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-        doc.text("Subtotal", col1X + 10, y + 16);
+        doc.text("Total", col1X + 10, y + 16);
         doc.text(fmt0(finalTotal), col2X - 10, y + 16, { align: "right" });
         y += rowH + 18;       // clear gap so next section never collides
         ensurePage(24);
