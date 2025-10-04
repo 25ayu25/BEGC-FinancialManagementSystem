@@ -9,6 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileText, Lock, Trash2, Calendar } from "lucide-react";
 
+/** Helper: month name from 1-based month */
+function monthName(month1Based: number) {
+  return [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ][month1Based - 1];
+}
+
+/** Helper: numeric report path that the API accepts (robust) */
+function numericPdfPath(year: number, month1Based: number) {
+  return `/reports/${year}-${String(month1Based).padStart(2, "0")}.pdf`;
+}
+
 export default function Reports() {
   const { toast } = useToast();
   const { data: reports, isLoading } = useQuery({
@@ -21,7 +34,7 @@ export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString());
 
   // Generate year options (current year and past 2 years)
-  const yearOptions = [];
+  const yearOptions: string[] = [];
   for (let i = 0; i < 3; i++) {
     yearOptions.push((currentDate.getFullYear() - i).toString());
   }
@@ -44,103 +57,81 @@ export default function Reports() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'approved': return 'default';
-      case 'locked': return 'secondary';
-      case 'draft': return 'outline';
-      default: return 'outline';
+      case "approved": return "default";
+      case "locked": return "secondary";
+      case "draft": return "outline";
+      default: return "outline";
     }
   };
 
   const generateReport = async (year: number, month: number) => {
     try {
-      const response = await api.post(`/api/reports/generate/${year}/${month}`);
-      
-      const result = response.data;
-      
-      // Refresh the reports list to show the newly generated report
+      await api.post(`/api/reports/generate/${year}/${month}`);
       await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
-      
       toast({
         title: "Report Generated",
-        description: `Monthly report for ${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} has been generated successfully.`
+        description: `Monthly report for ${new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })} has been generated successfully.`,
       });
     } catch (error: any) {
-      console.error('Error generating report:', error);
-      const errorMessage = error?.response?.status === 401 
-        ? "Please log in again to generate reports."
-        : "Failed to generate report. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      console.error("Error generating report:", error);
+      const errorMessage =
+        error?.response?.status === 401
+          ? "Please log in again to generate reports."
+          : "Failed to generate report. Please try again.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
 
+  /**
+   * Download a PDF from the API using axios so cookies/credentials are included.
+   * Expects a path like /reports/YYYY-MM.pdf (we prefix /api below).
+   */
   const downloadReport = async (pdfPath: string, filename: string) => {
     try {
-      console.log('Downloading report:', pdfPath, filename);
-      
-      // Use axios to download with proper authentication
-      const downloadUrl = `/api${pdfPath}`;
-      const response = await api.get(downloadUrl, {
-        responseType: 'blob' // Important for binary data
-      });
-      
-      // Create a blob URL and trigger download
+      const response = await api.get(`/api${pdfPath}`, { responseType: "blob" });
       const blob = response.data;
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Download Started",
-        description: "The monthly report PDF is being downloaded."
-      });
+      toast({ title: "Download Started", description: "The monthly report PDF is being downloaded." });
     } catch (error) {
-      console.error('Error downloading report:', error);
-      toast({
-        title: "Error",
-        description: "Failed to download report. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Error downloading report:", error);
+      toast({ title: "Error", description: "Failed to download report. Please try again.", variant: "destructive" });
     }
   };
 
+  /** Wrapper: always hit the numeric endpoint to avoid empty PDFs */
+  const handleDownloadReport = async (report: any) => {
+    const y = report.year as number;
+    const m = report.month as number;
+    const path = numericPdfPath(y, m);
+    const fname = `Bahr_El_Ghazal_${monthName(m)}_${y}_Report.pdf`;
+    return downloadReport(path, fname);
+  };
+
   const deleteReport = async (reportId: string) => {
-    if (!confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
+    if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) {
       return;
     }
-    
     try {
       await api.delete(`/api/reports/${reportId}`);
-      
-      // Refresh the reports list
       await queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
-      
-      toast({
-        title: "Report Deleted",
-        description: "The monthly report has been deleted successfully."
-      });
+      toast({ title: "Report Deleted", description: "The monthly report has been deleted successfully." });
     } catch (error) {
-      console.error('Error deleting report:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete report. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Error deleting report:", error);
+      toast({ title: "Error", description: "Failed to delete report. Please try again.", variant: "destructive" });
     }
   };
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <Header 
-        title="Monthly Reports" 
+      <Header
+        title="Monthly Reports"
         subtitle="Generate and manage monthly financial reports"
         actions={
           <div className="flex items-center space-x-3">
@@ -156,7 +147,7 @@ export default function Reports() {
                 ))}
               </SelectContent>
             </Select>
-            
+
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="w-24">
                 <SelectValue placeholder="Year" />
@@ -169,8 +160,8 @@ export default function Reports() {
                 ))}
               </SelectContent>
             </Select>
-            
-            <Button 
+
+            <Button
               onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
               data-testid="button-generate-report"
             >
@@ -198,8 +189,8 @@ export default function Reports() {
                 <p className="text-sm text-gray-400 mt-2">
                   Reports are automatically generated at month-end or you can generate them manually.
                 </p>
-                <Button 
-                  className="mt-4" 
+                <Button
+                  className="mt-4"
                   onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
                   data-testid="button-generate-first-report"
                 >
@@ -209,66 +200,65 @@ export default function Reports() {
               </div>
             ) : (
               <div className="space-y-4">
-                {(reports as any).map((report: any) => (
-                  <div 
-                    key={report.id} 
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    data-testid={`card-report-${report.id}`}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-blue-600" />
+                {(reports as any).map((report: any) => {
+                  const net = Number(report.netIncome ?? 0);
+                  const netLabel = isNaN(net) ? "0" : Math.round(net).toLocaleString();
+                  return (
+                    <div
+                      key={report.id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      data-testid={`card-report-${report.id}`}
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {new Date(report.year, report.month - 1).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                            })}{" "}
+                            Report
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            Net Income:{" "}
+                            <span className={`font-medium ${net >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              SSP {netLabel}
+                            </span>
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {new Date(report.year, report.month - 1).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long' 
-                          })} Report
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          Net Income: <span className={`font-medium ${parseFloat(report.netIncome) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            SSP {Math.round(parseFloat(report.netIncome)).toLocaleString()}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <Badge variant={getStatusColor(report.status)}>
-                        {report.status === 'locked' && <Lock className="h-3 w-3 mr-1" />}
-                        {report.status}
-                      </Badge>
-                      
-                      {report.pdfPath ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => downloadReport(report.pdfPath, `Bahr_El_Ghazal_${new Date(report.year, report.month - 1).toLocaleDateString('en-US', { month: 'long' })}_${report.year}_Report.pdf`)}
+
+                      <div className="flex items-center space-x-3">
+                        <Badge variant={getStatusColor(report.status)}>
+                          {report.status === "locked" && <Lock className="h-3 w-3 mr-1" />}
+                          {report.status}
+                        </Badge>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadReport(report)}
                           data-testid={`button-download-${report.id}`}
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download PDF
                         </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => generateReport(report.year, report.month)}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Generate PDF
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteReport(report.id)}
+                          data-testid={`button-delete-${report.id}`}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => deleteReport(report.id)}
-                        data-testid={`button-delete-${report.id}`}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
