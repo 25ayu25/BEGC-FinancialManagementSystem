@@ -1058,12 +1058,12 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Professionalize labels (known mappings; otherwise Title Case)
       const proLabel = (raw: string): string => {
         const s = String(raw || "");
-        const L = s.toLowerCase();
-
         const map: Array<[RegExp, string]> = [
           [/^lab tech\b.*payments?$/i, "Laboratory Staff Compensation"],
-          [/^radiographer\b.*payments?$/i, "Laboratory Staff Compensation"],
+          [/^laboratory tech(nician)?\b.*(pay|payroll|comp)/i, "Laboratory Staff Compensation"],
+          [/^radiographer\b.*(pay|payroll|comp|payments?)$/i, "Radiology Staff Compensation"],
           [/^doctor\b.*payments?$/i, "Physicians Compensation"],
+          [/^physicians?\b.*(fees|comp)/i, "Physicians Compensation"],
           [/^drugs?\b.*purchased$/i, "Pharmaceutical Purchases"],
           [/^lab\b.*reagents?$/i, "Laboratory Reagents"],
           [/^landlord$/i, "Facility Rent"],
@@ -1081,27 +1081,39 @@ export async function registerRoutes(app: Express): Promise<void> {
       const proPairs = (pairs: Array<[string, number]>) =>
         pairs.map(([name, val]) => [proLabel(name), val] as [string, number]);
 
-      const deptPairs = proPairs(
-        normalizePairs(
-          Array.isArray(dashboardData?.departmentBreakdown)
-            ? dashboardData?.departmentBreakdown
-            : toPairs(dashboardData?.departmentBreakdown || {}),
-          deptMap
+      // ---------- SORT: highest -> lowest with alpha tie-break ----------
+      const sortPairsDesc = (pairs: Array<[string, number]>) =>
+        pairs
+          .slice()
+          .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
+
+      const deptPairs = sortPairsDesc(
+        proPairs(
+          normalizePairs(
+            Array.isArray(dashboardData?.departmentBreakdown)
+              ? dashboardData?.departmentBreakdown
+              : toPairs(dashboardData?.departmentBreakdown || {}),
+            deptMap
+          )
         )
       );
-      const insPairs = proPairs(
-        normalizePairs(
-          Array.isArray(dashboardData?.insuranceBreakdown)
-            ? dashboardData?.insuranceBreakdown
-            : toPairs(dashboardData?.insuranceBreakdown || {}),
-          provMap
+      const insPairs = sortPairsDesc(
+        proPairs(
+          normalizePairs(
+            Array.isArray(dashboardData?.insuranceBreakdown)
+              ? dashboardData?.insuranceBreakdown
+              : toPairs(dashboardData?.insuranceBreakdown || {}),
+            provMap
+          )
         )
       );
-      const expPairs = proPairs(
-        normalizePairs(
-          Array.isArray(dashboardData?.expenseBreakdown)
-            ? dashboardData?.expenseBreakdown
-            : toPairs(dashboardData?.expenseBreakdown || {})
+      const expPairs = sortPairsDesc(
+        proPairs(
+          normalizePairs(
+            Array.isArray(dashboardData?.expenseBreakdown)
+              ? dashboardData?.expenseBreakdown
+              : toPairs(dashboardData?.expenseBreakdown || {})
+          )
         )
       );
 
@@ -1223,10 +1235,13 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const drawTable = (
         title: string,
-        rows: Row[],
+        rowsIn: Row[],
         currencyLabel = "SSP",
         targetTotal?: number
       ) => {
+        // Copy to avoid side effects
+        let rows = rowsIn.slice();
+
         if (!rows.length && !targetTotal) return;
 
         ensurePage(180);
@@ -1235,12 +1250,12 @@ export async function registerRoutes(app: Express): Promise<void> {
         const col1X = M, col2X = pageW - M;
         const headerH = 28, rowH = 24;
 
-        // Optional balancing to match KPI totals
+        // Optional balancing to match KPI totals — appended LAST (won't be sorted)
         const currentSum = rows.reduce((s, [, v]) => s + v, 0);
         if (typeof targetTotal === "number" && Number.isFinite(targetTotal)) {
           const diff = Math.round(targetTotal - currentSum);
           if (Math.abs(diff) >= 1) {
-            rows = [...rows, ["Other / Adjustments", diff]];
+            rows.push(["Other / Adjustments", diff]);
           }
         }
 
@@ -1257,7 +1272,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         doc.setFont("helvetica", "normal"); doc.setFontSize(11);
         let zebra = false;
 
-        rows.forEach(([name, val]) => {
+        rows.forEach(([name, val], idx) => {
           ensurePage(rowH + 6);
           if (zebra) {
             doc.setFillColor(250, 250, 250);
@@ -1286,9 +1301,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         ensurePage(24);
       };
 
+      // >>> Sorted tables (highest -> lowest)
       drawTable("Revenue by Department (SSP)",  deptPairs, "SSP");
       drawTable("Insurance Payers (USD)",       insPairs,  "USD");
-      drawTable("Operating Expenses",           expPairs,  "SSP", totalExpenses); // << exact parity here
+      drawTable("Operating Expenses",           expPairs,  "SSP", totalExpenses); // exact parity
 
       // Footer
       const totalPages = doc.getNumberOfPages();
