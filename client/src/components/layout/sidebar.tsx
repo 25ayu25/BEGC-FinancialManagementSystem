@@ -9,7 +9,8 @@ import {
   Users,
   Activity,
   X,
-  ShieldCheck,
+  ShieldCheck,   // main insurance ledger
+  ListChecks,    // providers sub-link
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
@@ -27,10 +28,9 @@ const navigation: NavItem[] = [
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
 
-  // NEW: Insurance sits right under Add Transaction
-  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
-  // Optional sub-link (indented) to manage provider list
-  { name: "Insurance Providers", href: "/insurance-providers", icon: ShieldCheck, sub: true },
+  // Insurance section (single main item + one indented sub-link)
+  { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
+  { name: "Insurance Providers", href: "/insurance-providers", icon: ListChecks, sub: true },
 
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
@@ -108,7 +108,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
           {navigation.map((item) => {
             const isActive = location === item.href;
-            // Sub-items get indentation + slightly smaller text
             const subClasses = item.sub ? "pl-10 text-sm" : "";
             return (
               <Link key={item.name} href={item.href}>
