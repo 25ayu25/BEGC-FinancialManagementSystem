@@ -28,7 +28,7 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate: string;
+  paymentDate: string;          // "YYYY-MM-DD" or ISO
   amount: number | string;
   currency: "USD" | "SSP";
   reference?: string | null;
@@ -40,12 +40,11 @@ type BalancesResponse = {
   providers: Array<{
     providerId: string;
     providerName: string;
-    claimed: number;  // billed
-    paid: number;     // collected
-    balance: number;  // billed - collected (+ adjustments if your API folds them in)
-    /** NEW (optional): opening/carry-forward balance that predates this system. */
-    openingBalance?: number;           // positive = owes clinic, negative = credit
-    openingBalanceAsOf?: string | null; // ISO date (e.g., "2023-01-01")
+    claimed: number;   // billed (in window)
+    paid: number;      // collected (in window)
+    balance: number;   // billed - collected (may exclude carry if API separated it)
+    openingBalance?: number;            // carry-forward prior to window (positive = owes clinic)
+    openingBalanceAsOf?: string | null; // ISO cutoff e.g. "2023-01-01"
   }>;
   claims: Array<
     Claim & {
@@ -65,14 +64,20 @@ const money = (n: number | string, currency: "USD" | "SSP" = "USD") =>
 const titleCase = (s: string) =>
   s.replace(/(^|_)([a-z])/g, (_, b, c) => (b ? " " : "") + c.toUpperCase());
 
-const PREFERRED_ORDER = [
-  "CIC",
-  "CIGNA",
-  "UAP",
-  "New Sudan",
-  "Nile International",
-  "Other",
-];
+const fmtDate = (raw?: string) => {
+  if (!raw) return "—";
+  // Treat "YYYY-MM-DD" as UTC midnight to avoid timezone backshift (1969 problem)
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00Z` : raw;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t) || t <= 0) return "—";
+  return new Date(t).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const PREFERRED_ORDER = ["CIC", "CIGNA", "UAP", "New Sudan", "Nile International", "Other"];
 const weightForName = (name: string) => {
   const idx = PREFERRED_ORDER.findIndex(
     (x) => x.toLowerCase() === name.toLowerCase()
@@ -249,6 +254,8 @@ export default function InsurancePage() {
   const [status, setStatus] = useState<string>("");
   const [year, setYear] = useState<number | "">("");
   const [month, setMonth] = useState<number | "">("");
+  const [fromDate, setFromDate] = useState<string>(""); // NEW
+  const [toDate, setToDate] = useState<string>("");     // NEW
 
   // modals & drawer
   const [showClaim, setShowClaim] = useState(false);
@@ -315,6 +322,8 @@ export default function InsurancePage() {
     if (status) params.set("status", status);
     if (year) params.set("year", String(year));
     if (month) params.set("month", String(month));
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
     api<Claim[]>(`/api/insurance-claims?${params.toString()}`)
       .then(setClaims)
       .catch((e: any) => {
@@ -324,12 +333,14 @@ export default function InsurancePage() {
       .finally(() => setLoadingClaims(false));
   };
 
-  useEffect(reloadClaims, [providerId, status, year, month]);
+  useEffect(reloadClaims, [providerId, status, year, month, fromDate, toDate]);
 
   const reloadBalances = () => {
     setLoadingBalances(true);
     const params = new URLSearchParams();
     if (providerId) params.set("providerId", providerId);
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
     api<BalancesResponse>(`/api/insurance-balances?${params.toString()}`)
       .then((data) => {
         data.providers.sort((a, b) => {
@@ -347,18 +358,20 @@ export default function InsurancePage() {
       .finally(() => setLoadingBalances(false));
   };
 
-  useEffect(reloadBalances, [providerId]);
+  useEffect(reloadBalances, [providerId, fromDate, toDate]);
 
   // load payments when drawer opens
   useEffect(() => {
     if (!detailProviderId) return;
     setLoadingPayments(true);
     const qs = new URLSearchParams({ providerId: detailProviderId });
+    if (fromDate) qs.set("from", fromDate);
+    if (toDate) qs.set("to", toDate);
     api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
       .then(setPayments)
       .catch(() => setPayments([]))
       .finally(() => setLoadingPayments(false));
-  }, [detailProviderId]);
+  }, [detailProviderId, fromDate, toDate]);
 
   // open claims for selected provider when recording a payment
   const openClaims = useMemo(
@@ -456,6 +469,8 @@ export default function InsurancePage() {
       reloadBalances();
       if (detailProviderId) {
         const qs = new URLSearchParams({ providerId: detailProviderId });
+        if (fromDate) qs.set("from", fromDate);
+        if (toDate) qs.set("to", toDate);
         setLoadingPayments(true);
         api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
           .then(setPayments)
@@ -470,7 +485,7 @@ export default function InsurancePage() {
   function hydratePaymentForm(p: Payment) {
     setPProviderId(p.providerId);
     setPClaimId(p.claimId || "");
-    setPDate(p.paymentDate.slice(0, 10));
+    setPDate((p.paymentDate || "").slice(0, 10));
     setPAmount(String(p.amount));
     setPCurrency(p.currency);
     setPRef(p.reference || "");
@@ -504,6 +519,8 @@ export default function InsurancePage() {
       reloadBalances();
       if (detailProviderId) {
         const qs = new URLSearchParams({ providerId: detailProviderId });
+        if (fromDate) qs.set("from", fromDate);
+        if (toDate) qs.set("to", toDate);
         setLoadingPayments(true);
         api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
           .then(setPayments)
@@ -522,6 +539,8 @@ export default function InsurancePage() {
       reloadBalances();
       if (detailProviderId) {
         const qs = new URLSearchParams({ providerId: detailProviderId });
+        if (fromDate) qs.set("from", fromDate);
+        if (toDate) qs.set("to", toDate);
         setLoadingPayments(true);
         api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
           .then(setPayments)
@@ -612,8 +631,8 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Filters (non-sticky now to avoid overlap on narrow layouts) */}
-      <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* Filters (wrapped to avoid overlap) */}
+      <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 md:grid-cols-6 gap-3">
         <select
           value={providerId}
           onChange={(e) => setProviderId(e.target.value)}
@@ -644,23 +663,76 @@ export default function InsurancePage() {
           type="number"
           placeholder="Year"
           value={year}
-          onChange={(e) =>
-            setYear(e.target.value ? Number(e.target.value) : "")
-          }
+          onChange={(e) => setYear(e.target.value ? Number(e.target.value) : "")}
           className="border rounded-lg p-2"
         />
         <input
           type="number"
           placeholder="Month (1-12)"
           value={month}
-          onChange={(e) =>
-            setMonth(e.target.value ? Number(e.target.value) : "")
-          }
+          onChange={(e) => setMonth(e.target.value ? Number(e.target.value) : "")}
           className="border rounded-lg p-2"
         />
+
+        {/* NEW: From / To */}
+        <input
+          type="date"
+          placeholder="From"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="border rounded-lg p-2"
+        />
+        <input
+          type="date"
+          placeholder="To"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="border rounded-lg p-2"
+        />
+
+        {/* Quick picks */}
+        <div className="md:col-span-6 flex flex-wrap items-center gap-2">
+          <button
+            className="text-xs px-2 py-1 border rounded"
+            onClick={() => {
+              const y = new Date().getUTCFullYear();
+              setFromDate(`${y}-01-01`);
+              setToDate(new Date().toISOString().slice(0, 10));
+            }}
+          >
+            YTD
+          </button>
+          {["2022","2023","2024","2025"].map((y) => (
+            <button
+              key={y}
+              className="text-xs px-2 py-1 border rounded"
+              onClick={() => {
+                setFromDate(`${y}-01-01`);
+                setToDate(`${y}-12-31`);
+              }}
+            >
+              Year {y}
+            </button>
+          ))}
+          {(fromDate || toDate || year || month || status || providerId) && (
+            <button
+              className="text-xs px-2 py-1 border rounded ml-auto"
+              onClick={() => {
+                setProviderId("");
+                setStatus("");
+                setYear("");
+                setMonth("");
+                setFromDate("");
+                setToDate("");
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Summary row (now 4 cards including Carry Forward) */}
+      {/* Summary row (4 cards including Carry Forward) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Billed</div>
@@ -680,13 +752,13 @@ export default function InsurancePage() {
             className={`mt-1 text-xl font-semibold ${
               summary.carry < 0 ? "text-emerald-700" : "text-slate-900"
             }`}
-            title="Opening balance (pre-system) rolled into outstanding"
+            title="Opening balance (pre-window) rolled into outstanding"
           >
             {summary.carry < 0
               ? `Credit ${money(Math.abs(summary.carry), "USD")}`
               : money(summary.carry, "USD")}
           </div>
-          <div className="text-xs text-slate-500 mt-1">Before current tracking</div>
+          <div className="text-xs text-slate-500 mt-1">Before current window</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
@@ -803,10 +875,11 @@ export default function InsurancePage() {
                       <Skeleton className="h-4 w-28" />
                       <Skeleton className="h-4 w-20" />
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <div className="mt-2 grid grid-cols-3 md:grid-cols-4 gap-2 text-xs">
                       <Skeleton className="h-10 w-full" />
                       <Skeleton className="h-10 w-full" />
                       <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full hidden md:block" />
                     </div>
                   </div>
                 ))}
@@ -833,7 +906,7 @@ export default function InsurancePage() {
                     </button>
                   </div>
 
-                  <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+                  <div className="mt-2 grid grid-cols-3 md:grid-cols-4 gap-2 text-xs">
                     <div className="bg-slate-50 rounded p-2">
                       <div className="text-slate-500">Billed</div>
                       <div className="font-semibold">{money(row.claimed, "USD")}</div>
@@ -847,8 +920,20 @@ export default function InsurancePage() {
                       <div className={`font-semibold ${carry < 0 ? "text-emerald-700" : ""}`}>
                         {carry < 0 ? `Credit ${money(Math.abs(carry), "USD")}` : money(carry, "USD")}
                       </div>
-                      {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {new Date(asOf).toLocaleDateString()}</div>}
+                      {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {fmtDate(asOf)}</div>}
                     </div>
+                    <div className="bg-slate-50 rounded p-2 hidden md:block">
+                      <div className="text-slate-500">Outstanding</div>
+                      <div className={`font-semibold ${outstandingWithCarry < 0 ? "text-emerald-700" : ""}`}>
+                        {outstandingWithCarry < 0
+                          ? `Credit ${money(Math.abs(outstandingWithCarry), "USD")}`
+                          : money(outstandingWithCarry, "USD")}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* On small screens show Outstanding below */}
+                  <div className="mt-2 md:hidden text-xs">
                     <div className="bg-slate-50 rounded p-2">
                       <div className="text-slate-500">Outstanding</div>
                       <div className={`font-semibold ${outstandingWithCarry < 0 ? "text-emerald-700" : ""}`}>
@@ -910,7 +995,7 @@ export default function InsurancePage() {
                         <div className={`font-semibold ${carry < 0 ? "text-emerald-700" : ""}`}>
                           {carry < 0 ? `Credit ${money(Math.abs(carry), "USD")}` : money(carry, "USD")}
                         </div>
-                        {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {new Date(asOf).toLocaleDateString()}</div>}
+                        {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {fmtDate(asOf)}</div>}
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Outstanding</div>
@@ -1029,11 +1114,7 @@ export default function InsurancePage() {
                         <div className="text-sm">
                           <div className="font-medium">{money(p.amount, p.currency)}</div>
                           <div className="text-xs text-slate-500">
-                            {new Date(p.paymentDate).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            {fmtDate(p.paymentDate)}
                             {claim
                               ? ` • ${new Date(
                                   claim.periodYear,
