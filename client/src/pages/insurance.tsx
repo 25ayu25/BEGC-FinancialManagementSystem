@@ -210,7 +210,7 @@ export default function InsurancePage() {
 
   const [authError, setAuthError] = useState(false);
 
-  // Add-Claim form
+  // Add-Claim form (period fields are kept internally but no longer shown)
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cStart, setCStart] = useState<string>(() => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
   const [cEnd, setCEnd] = useState<string>(() => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
@@ -464,6 +464,7 @@ export default function InsurancePage() {
             onClick={() => {
               setEditingClaimId("");
               setCProviderId(providerId || "");
+              // keep internal month defaults; no longer shown
               setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
               setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
               setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
@@ -804,14 +805,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Period Start</label>
-                  <input type="date" className="border rounded-lg p-2 w-full" value={cStart} onChange={(e) => setCStart(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Period End</label>
-                  <input type="date" className="border rounded-lg p-2 w-full" value={cEnd} onChange={(e) => setCEnd(e.target.value)} />
-                </div>
+                {/* Period Start/End removed from UI by request */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={cAmount} onChange={(e) => setCAmount(e.target.value)} />
