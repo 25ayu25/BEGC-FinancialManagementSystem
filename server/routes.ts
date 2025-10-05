@@ -838,6 +838,43 @@ export async function registerRoutes(app: Express): Promise<void> {
     notes: z.string().optional(),
   });
 
+  /** DELETE a claim (place after your PATCH /api/insurance-claims/:id) */
+app.delete("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+  try {
+    await storage.deleteInsuranceClaim(req.params.id);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+/** List payments (put this near your POST /api/insurance-payments) */
+app.get("/api/insurance-payments", requireAuth, async (req, res, next) => {
+  try {
+    const rows = await storage.listInsurancePayments({
+      providerId: req.query.providerId as string | undefined,
+      claimId: req.query.claimId as string | undefined,
+    });
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+/** Edit a payment */
+app.patch("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
+  try {
+    const patch = PaymentPatch.parse(req.body);
+    const row = await storage.updateInsurancePayment(req.params.id, patch);
+    if (!row) return res.status(404).json({ error: "Not found" });
+    res.json(row);
+  } catch (err) { next(err); }
+});
+
+/** Delete a payment */
+app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
+  try {
+    await storage.deleteInsurancePayment(req.params.id);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
   /** Create a monthly claim (does not touch revenue) */
   app.post("/api/insurance-claims", requireAuth, async (req, res, next) => {
     try {
