@@ -3,15 +3,21 @@ import React, { useEffect, useMemo, useState } from "react";
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
 
-type ClaimStatus = "submitted" | "partially_paid" | "paid";
+/** We’ll keep the full union so older rows still render, but only offer 3 in the filter */
+type ClaimStatus =
+  | "submitted"
+  | "partially_paid"
+  | "paid"
+  | "rejected"
+  | "written_off";
 
 type Claim = {
   id: string;
   providerId: string;
   periodYear: number;
   periodMonth: number;
-  periodStart: string; // ISO yyyy-mm-dd
-  periodEnd: string;   // ISO yyyy-mm-dd
+  periodStart: string; // ISO
+  periodEnd: string;   // ISO
   currency: "USD" | "SSP";
   claimedAmount: number | string;
   status: ClaimStatus;
@@ -23,7 +29,7 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate: string; // ISO yyyy-mm-dd or full ISO
+  paymentDate: string; // ISO
   amount: number | string;
   currency: "USD" | "SSP";
   reference?: string | null;
@@ -35,17 +41,17 @@ type BalancesResponse = {
   providers: Array<{
     providerId: string;
     providerName: string;
-    claimed: number;   // all-time billed (server)
-    paid: number;      // all-time collected (server)
-    balance: number;   // all-time outstanding (server)
-    openingBalance?: number;            // carry fwd for this provider (optional)
-    openingBalanceAsOf?: string | null; // ISO date (optional)
+    claimed: number;  // all-time billed
+    paid: number;     // all-time collected
+    balance: number;  // all-time billed-collected (server’s view)
+    openingBalance?: number;            // optional: carry from pre-system
+    openingBalanceAsOf?: string | null; // ISO
   }>;
   claims: Array<
     Claim & {
       providerName: string;
-      paidToDate: number; // all-time, server-calculated
-      balance: number;    // all-time for the claim
+      paidToDate: number;
+      balance: number;
     }
   >;
 };
@@ -59,25 +65,49 @@ const money = (n: number | string, currency: "USD" | "SSP" = "USD") =>
 const titleCase = (s: string) =>
   s.replace(/(^|_)([a-z])/g, (_, b, c) => (b ? " " : "") + c.toUpperCase());
 
-const PREFERRED_ORDER = ["CIC", "CIGNA", "UAP", "New Sudan", "Nile International", "Other"];
+const PREFERRED_ORDER = [
+  "CIC",
+  "CIGNA",
+  "UAP",
+  "New Sudan",
+  "Nile International",
+  "Other",
+];
 const weightForName = (name: string) => {
-  const idx = PREFERRED_ORDER.findIndex((x) => x.toLowerCase() === name.toLowerCase());
-  return idx >= 0 ? idx : 100;
+  const idx = PREFERRED_ORDER.findIndex(
+    (x) => x.toLowerCase() === name.toLowerCase()
+  );
+  return idx >= 0 ? idx : 100; // others go after preferred
 };
 
-/** API base from Vite env/Netlify, fallback same-origin. */
+/** date helpers (UTC-safe) */
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const startOfMonthUTC = (y: number, m0: number) =>
+  new Date(Date.UTC(y, m0, 1));
+const endOfMonthUTC = (y: number, m0: number) =>
+  new Date(Date.UTC(y, m0 + 1, 0));
+const parseISO = (s?: string | null) => {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+};
+const within = (d: Date, from?: Date | null, to?: Date | null) => {
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
+};
+
+/** API base */
 const RAW_BASE =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) ||
   (typeof window !== "undefined" && (window as any).__API_URL__) ||
   "";
-
-function toUrl(path: string) {
+const toUrl = (path: string) => {
   if (/^https?:\/\//i.test(path)) return path;
   const base = String(RAW_BASE || "").replace(/\/+$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
-}
-
+};
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   headers.set("content-type", "application/json");
@@ -85,7 +115,11 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const backup = localStorage.getItem("user_session_backup");
     if (backup) headers.set("x-session-token", backup);
   }
-  const res = await fetch(toUrl(path), { credentials: "include", ...init, headers });
+  const res = await fetch(toUrl(path), {
+    credentials: "include",
+    ...init,
+    headers,
+  });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     const err = new Error(txt || res.statusText || `HTTP ${res.status}`);
@@ -95,54 +129,27 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-/* date utils (robust parsing) */
-const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-const toISODate = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-function parseISOish(value?: string | null): Date | null {
-  if (!value) return null;
-  // Accept 'YYYY-MM-DD' or full ISO
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (m) {
-    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
-    return isNaN(d.getTime()) ? null : d;
-  }
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function monthRangeFromDateStr(dateStr: string) {
-  const d = parseISOish(dateStr) || new Date();
-  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
-  return { start: toISODate(start), end: toISODate(end), year: start.getUTCFullYear(), month: start.getUTCMonth() + 1 };
-}
-
-function inWindow(dateISO: string, from?: string, to?: string) {
-  if (!from && !to) return true;
-  const d = parseISOish(dateISO);
-  if (!d) return false;
-  const val = toISODate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())));
-  if (from && val < from) return false;
-  if (to && val > to) return false;
-  return true;
-}
-
 /* ----------------------------- UI bits --------------------------- */
 function StatusChip({ status }: { status: ClaimStatus }) {
   const styles: Record<ClaimStatus, string> = {
     submitted: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
     partially_paid: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
     paid: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    rejected: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
+    written_off: "bg-slate-50 text-slate-600 ring-1 ring-slate-200",
   };
   const titles: Record<ClaimStatus, string> = {
     submitted: "Claim sent to provider, waiting for payment.",
     partially_paid: "Provider paid part of this claim.",
     paid: "Provider has fully paid this claim.",
+    rejected: "Provider rejected this claim.",
+    written_off: "We chose not to pursue this claim.",
   };
   return (
-    <span title={titles[status]} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
+    <span
+      title={titles[status]}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}
+    >
       {titleCase(status)}
     </span>
   );
@@ -152,17 +159,23 @@ function HelpPopover() {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-slate-600">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="px-3 py-2 rounded-lg border text-slate-600 hover:bg-slate-50"
+        title="What do these numbers mean?"
+      >
         ⓘ Help
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
-          <div className="font-medium mb-1">How to read this page</div>
+        <div className="absolute right-0 z-20 mt-2 w-96 rounded-xl border bg-white p-3 text-sm shadow-lg">
+          <div className="font-medium mb-1">How totals are calculated</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Billed</strong>: claims submitted in the selected window.</li>
-            <li><strong>Collected</strong>: payments received in the window.</li>
-            <li><strong>Carry Forward</strong>: balance from before the window (if provided by API).</li>
-            <li><strong>Outstanding</strong>: <em>Billed − Collected + Carry</em>.</li>
+            <li><strong>Window</strong> comes from the chips (All time / YTD / Year / Custom).</li>
+            <li><strong>Billed</strong> = claims whose <em>period start</em> falls inside the window.</li>
+            <li><strong>Collected</strong> = payments with <em>payment date</em> inside the window.</li>
+            <li><strong>Carry Forward</strong> = opening balance + (all billed <em>before</em> the window) − (all collected <em>before</em> the window).</li>
+            <li><strong>Outstanding</strong> = Billed − Collected + Carry.</li>
           </ul>
           <div className="text-right mt-2">
             <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
@@ -177,6 +190,7 @@ function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-slate-200/70 ${className}`} />;
 }
 
+/* CSS-only donut: paid% of billed (CR if credit) */
 function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number; }) {
   const pct = billed > 0 ? Math.min(100, Math.max(0, Math.round((paid / billed) * 100))) : 0;
   const label = balance < 0 ? "CR" : `${pct}%`;
@@ -184,11 +198,14 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
   return (
     <div className="relative h-10 w-10 shrink-0">
       <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }} />
-      <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">{label}</div>
+      <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
+        {label}
+      </div>
     </div>
   );
 }
 
+/* CSV export for the visible claims */
 function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   const byId = new Map(providers.map((p) => [p.id, p.name]));
   const header = ["Provider","Year","Month","Currency","Billed","Status","Notes"].join(",");
@@ -213,56 +230,63 @@ function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
 }
 
 /* ------------------------------ Page ----------------------------- */
-type WindowPreset = "all" | "ytd" | "y2025" | "y2024" | "y2023" | "y2022" | "custom";
 
 export default function InsurancePage() {
-  // data
+  /* ---------------- data ---------------- */
   const [providers, setProviders] = useState<Provider[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);         // details drawer (provider)
-  const [windowPayments, setWindowPayments] = useState<Payment[]>([]); // for summary + cards
-  const [loadingPayments, setLoadingPayments] = useState(false);
-  const [loadingWindowPayments, setLoadingWindowPayments] = useState(false);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]); // cache all; filter locally
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [loadingBalances, setLoadingBalances] = useState(false);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [authError, setAuthError] = useState(false);
 
-  // filters
+  /* ---------------- filters ---------------- */
   const [providerId, setProviderId] = useState<string>("");
-  const [status, setStatus] = useState<string>(""); // submitted / partially_paid / paid
-  const [preset, setPreset] = useState<WindowPreset>("all");
-  const [from, setFrom] = useState<string>(""); // ISO yyyy-mm-dd
-  const [to, setTo] = useState<string>("");
+  const [status, setStatus] = useState<string>("");
 
-  // modals & drawer
+  // date window: from, to (inclusive). undefined = All time
+  const today = new Date();
+  const jan1 = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+  const [from, setFrom] = useState<Date | null>(null);
+  const [to, setTo] = useState<Date | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
+
+  const setAllTime = () => { setFrom(null); setTo(null); setCustomOpen(false); };
+  const setYTD = () => { setFrom(jan1); setTo(today); setCustomOpen(false); };
+  const setYear = (year: number) => {
+    setFrom(new Date(Date.UTC(year, 0, 1)));
+    setTo(new Date(Date.UTC(year, 11, 31)));
+    setCustomOpen(false);
+  };
+
+  /* ---------------- modals ---------------- */
   const [showClaim, setShowClaim] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<string>("");
 
-  // editing states
+  /* ---------------- editing states ---------------- */
   const [editingClaimId, setEditingClaimId] = useState<string>("");
   const [editingPaymentId, setEditingPaymentId] = useState<string>("");
 
-  // auth hint
-  const [authError, setAuthError] = useState(false);
-
-  // claim form (simplified)
+  /* ---------------- form: claim (simplified) ---------------- */
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cCurrency, setCCurrency] = useState<"USD" | "SSP">("USD");
-  const [cClaimDate, setCClaimDate] = useState<string>(() => toISODate(new Date())); // single date
+  const [cClaimDate, setCClaimDate] = useState<string>(() => ymd(new Date()));
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
-  // payment form
+  /* ---------------- form: payment ---------------- */
   const [pProviderId, setPProviderId] = useState<string>("");
   const [pClaimId, setPClaimId] = useState<string>("");
-  const [pDate, setPDate] = useState<string>(() => toISODate(new Date()));
+  const [pDate, setPDate] = useState<string>(() => ymd(new Date()));
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
   const [pRef, setPRef] = useState<string>("");
   const [pNotes, setPNotes] = useState<string>("");
 
-  /* --------------------------- effects --------------------------- */
+  /* ---------------- effects: load data ---------------- */
   useEffect(() => {
     api<Provider[]>("/api/insurance-providers")
       .then((rows) => {
@@ -275,71 +299,28 @@ export default function InsurancePage() {
         });
         setProviders(act);
       })
-      .catch((e: any) => {
-        console.error("providers", e);
-        if (e?.status === 401) setAuthError(true);
-      });
+      .catch((e: any) => { console.error("providers", e); if (e?.status === 401) setAuthError(true); });
   }, []);
 
-  // apply window preset
-  useEffect(() => {
-    const now = new Date();
-    const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-    const startOfThisYear = toISODate(startOfYear);
-    const endOfThisYear = toISODate(new Date(Date.UTC(now.getUTCFullYear(), 11, 31)));
-
-    const setYear = (y: number) => {
-      setFrom(`${y}-01-01`);
-      setTo(`${y}-12-31`);
-    };
-
-    if (preset === "all") {
-      setFrom("");
-      setTo("");
-    } else if (preset === "ytd") {
-      setFrom(startOfThisYear);
-      setTo(toISODate(now));
-    } else if (preset === "y2025") setYear(2025);
-    else if (preset === "y2024") setYear(2024);
-    else if (preset === "y2023") setYear(2023);
-    else if (preset === "y2022") setYear(2022);
-    else if (preset === "custom") {
-      // keep user-entered from/to
-      if (!from && !to) {
-        setFrom(startOfThisYear);
-        setTo(endOfThisYear);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset]);
-
-  // load claims (pass window to API if supported; also filter locally)
   const reloadClaims = () => {
     setLoadingClaims(true);
     const params = new URLSearchParams();
     if (providerId) params.set("providerId", providerId);
     if (status) params.set("status", status);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-
+    // If API supports from/to, send them (harmless if ignored)
+    if (from) params.set("from", ymd(from));
+    if (to) params.set("to", ymd(to));
     api<Claim[]>(`/api/insurance-claims?${params.toString()}`)
       .then(setClaims)
-      .catch((e: any) => {
-        console.error("claims", e);
-        if (e?.status === 401) setAuthError(true);
-      })
+      .catch((e: any) => { console.error("claims", e); if (e?.status === 401) setAuthError(true); })
       .finally(() => setLoadingClaims(false));
   };
-  useEffect(reloadClaims, [providerId, status, from, to]);
+  useEffect(reloadClaims, [providerId, status, from?.getTime(), to?.getTime()]);
 
-  // load balances (server may ignore window; we still compute window figures on the client)
   const reloadBalances = () => {
     setLoadingBalances(true);
     const params = new URLSearchParams();
     if (providerId) params.set("providerId", providerId);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-
     api<BalancesResponse>(`/api/insurance-balances?${params.toString()}`)
       .then((data) => {
         data.providers.sort((a, b) => {
@@ -350,72 +331,100 @@ export default function InsurancePage() {
         });
         setBalances(data);
       })
-      .catch((e: any) => {
-        console.error("balances", e);
-        if (e?.status === 401) setAuthError(true);
-      })
+      .catch((e: any) => { console.error("balances", e); if (e?.status === 401) setAuthError(true); })
       .finally(() => setLoadingBalances(false));
   };
-  useEffect(reloadBalances, [providerId, from, to]);
+  useEffect(reloadBalances, [providerId]);
 
-  // load payments for current window (for summary & provider tiles)
-  useEffect(() => {
-    setLoadingWindowPayments(true);
-    const qs = new URLSearchParams();
-    if (providerId) qs.set("providerId", providerId);
-    if (from) qs.set("from", from);
-    if (to) qs.set("to", to);
+  // Cache all payments (used for windowed totals). We’ll filter locally by provider & date.
+  const reloadAllPayments = () => {
+    setLoadingPayments(true);
+    const params = new URLSearchParams();
+    if (providerId) params.set("providerId", providerId); // optional
+    // also pass from/to if server supports; harmless if ignored
+    if (from) params.set("from", ymd(from));
+    if (to) params.set("to", ymd(to));
+    api<Payment[]>(`/api/insurance-payments?${params.toString()}`)
+      .then(setAllPayments)
+      .catch((e) => { console.warn("payments", e); setAllPayments([]); })
+      .finally(() => setLoadingPayments(false));
+  };
+  useEffect(reloadAllPayments, [providerId, from?.getTime(), to?.getTime()]);
 
-    api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-      .then(setWindowPayments)
-      .catch(() => setWindowPayments([]))
-      .finally(() => setLoadingWindowPayments(false));
-  }, [providerId, from, to]);
-
-  // drawer: load full payment history for that provider (we’ll still show only in-window)
+  // payments for provider drawer
+  const [drawerPayments, setDrawerPayments] = useState<Payment[]>([]);
   useEffect(() => {
     if (!detailProviderId) return;
-    setLoadingPayments(true);
     const qs = new URLSearchParams({ providerId: detailProviderId });
     api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-      .then(setPayments)
-      .catch(() => setPayments([]))
-      .finally(() => setLoadingPayments(false));
+      .then(setDrawerPayments)
+      .catch(() => setDrawerPayments([]));
   }, [detailProviderId]);
 
-  // visible claims (enforce window on client too)
-  const visibleClaims = useMemo(() => {
-    const byProvider = providerId ? (c: Claim) => c.providerId === providerId : () => true;
-    const byStatus = status ? (c: Claim) => c.status === (status as ClaimStatus) : () => true;
-    const byWindow = (c: Claim) => (!from && !to) || inWindow(c.periodStart, from, to);
-    return (balances?.claims ?? claims).filter((c) => byProvider(c) && byStatus(c) && byWindow(c));
-  }, [balances, claims, providerId, status, from, to]);
+  /* ---------------- derived: visible rows & totals ---------------- */
 
-  // group window payments by provider
-  const windowPaymentsByProvider = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const p of windowPayments) {
-      if (!inWindow(p.paymentDate, from, to)) continue;
-      if (providerId && p.providerId !== providerId) continue;
-      map.set(p.providerId, (map.get(p.providerId) || 0) + Number(p.amount || 0));
-    }
-    return map;
-  }, [windowPayments, from, to, providerId]);
+  // Narrow claims to provider filter (if any) and window
+  const visibleClaims: Claim[] = useMemo(() => {
+    const f = claims.filter((c) => (providerId ? c.providerId === providerId : true));
+    if (!from && !to) return f;
+    return f.filter((c) => {
+      const ps = parseISO(c.periodStart);
+      return !!(ps && within(ps, from, to));
+    });
+  }, [claims, providerId, from?.getTime(), to?.getTime()]);
 
-  // summary cards (window)
+  // Claims strictly BEFORE the window (to compute carry)
+  const claimsBeforeWindow = useMemo(() => {
+    if (!from) return [] as Claim[];
+    return claims.filter((c) => {
+      if (providerId && c.providerId !== providerId) return false;
+      const ps = parseISO(c.periodStart);
+      return !!(ps && ps < from);
+    });
+  }, [claims, providerId, from?.getTime()]);
+
+  // Payments in window / before window
+  const paymentsInWindow = useMemo(() => {
+    const rows = allPayments.filter((p) => (providerId ? p.providerId === providerId : true));
+    if (!from && !to) return rows;
+    return rows.filter((p) => {
+      const d = parseISO(p.paymentDate);
+      return !!(d && within(d, from, to));
+    });
+  }, [allPayments, providerId, from?.getTime(), to?.getTime()]);
+
+  const paymentsBeforeWindow = useMemo(() => {
+    if (!from) return [] as Payment[];
+    return allPayments.filter((p) => {
+      if (providerId && p.providerId !== providerId) return false;
+      const d = parseISO(p.paymentDate);
+      return !!(d && d < from);
+    });
+  }, [allPayments, providerId, from?.getTime()]);
+
+  // Summary cards (windowed)
   const summary = useMemo(() => {
-    const billed = visibleClaims.reduce((a, c) => a + Number(c.claimedAmount || 0), 0);
-    const collected = windowPayments.reduce((a, p) => {
-      if (!inWindow(p.paymentDate, from, to)) return a;
-      if (providerId && p.providerId !== providerId) return a;
-      return a + Number(p.amount || 0);
-    }, 0);
-    const carry = (balances?.providers ?? [])
-      .filter((r) => (providerId ? r.providerId === providerId : true))
-      .reduce((a, r) => a + Number(r.openingBalance || 0), 0);
+    const billed = visibleClaims.reduce((a, r) => a + Number(r.claimedAmount || 0), 0);
+    const collected = paymentsInWindow.reduce((a, r) => a + Number(r.amount || 0), 0);
+
+    // carry: openingBalance + billedBefore - paidBefore
+    const op = balances?.providers ?? [];
+    const carrierRows = providerId ? op.filter((r) => r.providerId === providerId) : op;
+    const opening = carrierRows.reduce((a, r) => a + Number(r.openingBalance || 0), 0);
+    const billedBefore = claimsBeforeWindow.reduce((a, r) => a + Number(r.claimedAmount || 0), 0);
+    const paidBefore = paymentsBeforeWindow.reduce((a, r) => a + Number(r.amount || 0), 0);
+    const carry = opening + billedBefore - paidBefore;
+
     const outstanding = billed - collected + carry;
     return { billed, collected, carry, outstanding };
-  }, [visibleClaims, windowPayments, balances, providerId, from, to]);
+  }, [
+    visibleClaims,
+    paymentsInWindow,
+    balances,
+    providerId,
+    claimsBeforeWindow,
+    paymentsBeforeWindow,
+  ]);
 
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === providerId) || null,
@@ -423,32 +432,50 @@ export default function InsurancePage() {
   );
 
   const providerClaimsForDrawer = useMemo(() => {
-    const pid = detailProviderId || providerId || "";
-    return visibleClaims
-      .filter((c) => (!pid ? true : c.providerId === pid))
+    if (!balances) return [];
+    const pid = detailProviderId || providerId;
+    return balances.claims
+      .filter((c) => (pid ? c.providerId === pid : true))
       .sort((a, b) =>
-        a.periodYear !== b.periodYear ? b.periodYear - a.periodYear : b.periodMonth - a.periodMonth
+        a.periodYear !== b.periodYear
+          ? b.periodYear - a.periodYear
+          : b.periodMonth - a.periodMonth
       );
-  }, [visibleClaims, detailProviderId, providerId]);
+  }, [balances, detailProviderId, providerId]);
 
-  /* ------------------------ create / edit claim ------------------------ */
+  // open claims for linking a payment
+  const openClaims = useMemo(
+    () =>
+      claims.filter(
+        (c) => c.status !== "paid" && (!pProviderId || c.providerId === pProviderId)
+      ),
+    [claims, pProviderId]
+  );
+
+  /* ------------------------ submit/delete claim ------------------------ */
   function hydrateClaimForm(c: Claim) {
     setCProviderId(c.providerId);
     setCCurrency(c.currency);
-    setCClaimDate(c.periodStart.slice(0, 10));
+    // choose the period start as the “claim date” for editing simplicity
+    setCClaimDate(ymd(parseISO(c.periodStart) || new Date()));
     setCAmount(String(c.claimedAmount));
     setCNotes(c.notes || "");
   }
 
   async function submitClaim() {
-    // derive month range + Y/M for the API from single claim date
-    const { start, end, year, month } = monthRangeFromDateStr(cClaimDate);
+    // Derive month boundaries from the single claim date (UTC-safe)
+    const d = parseISO(cClaimDate) || new Date();
+    const y = d.getUTCFullYear();
+    const m0 = d.getUTCMonth();
+    const periodStart = startOfMonthUTC(y, m0);
+    const periodEnd = endOfMonthUTC(y, m0);
+
     const body = {
       providerId: cProviderId || providerId,
-      periodYear: year,
-      periodMonth: month,
-      periodStart: start,
-      periodEnd: end,
+      periodYear: y,
+      periodMonth: m0 + 1,
+      periodStart: ymd(periodStart),
+      periodEnd: ymd(periodEnd),
       currency: cCurrency,
       claimedAmount: Number(cAmount),
       notes: cNotes || undefined,
@@ -460,7 +487,10 @@ export default function InsurancePage() {
           body: JSON.stringify(body),
         });
       } else {
-        await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
+        await api<Claim>("/api/insurance-claims", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
       }
       setShowClaim(false);
       setEditingClaimId("");
@@ -478,23 +508,16 @@ export default function InsurancePage() {
       await api(`/api/insurance-claims/${id}`, { method: "DELETE" });
       reloadClaims();
       reloadBalances();
-      if (detailProviderId) {
-        setLoadingPayments(true);
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
     } catch (e: any) {
       alert(`Failed to delete claim: ${e.message || e}`);
     }
   }
 
-  /* ----------------------- create / edit payment ----------------------- */
+  /* ----------------------- submit/delete payment ----------------------- */
   function hydratePaymentForm(p: Payment) {
     setPProviderId(p.providerId);
     setPClaimId(p.claimId || "");
-    setPDate((parseISOish(p.paymentDate) ? p.paymentDate : (p.createdAt || toISODate(new Date()))).slice(0,10));
+    setPDate(ymd(parseISO(p.paymentDate) || new Date()));
     setPAmount(String(p.amount));
     setPCurrency(p.currency);
     setPRef(p.reference || "");
@@ -525,24 +548,8 @@ export default function InsurancePage() {
       }
       setShowPayment(false);
       setEditingPaymentId("");
+      reloadAllPayments();
       reloadBalances();
-      // refresh window payments + drawer
-      setLoadingWindowPayments(true);
-      const qs2 = new URLSearchParams();
-      if (providerId) qs2.set("providerId", providerId);
-      if (from) qs2.set("from", from);
-      if (to) qs2.set("to", to);
-      api<Payment[]>(`/api/insurance-payments?${qs2.toString()}`)
-        .then(setWindowPayments)
-        .finally(() => setLoadingWindowPayments(false));
-
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
       alert("Payment saved");
     } catch (e: any) {
       alert(`Failed to save payment: ${e.message || e}`);
@@ -553,40 +560,17 @@ export default function InsurancePage() {
     if (!confirm("Delete this payment? This cannot be undone.")) return;
     try {
       await api(`/api/insurance-payments/${id}`, { method: "DELETE" });
+      reloadAllPayments();
       reloadBalances();
-      setLoadingWindowPayments(true);
-      const qs2 = new URLSearchParams();
-      if (providerId) qs2.set("providerId", providerId);
-      if (from) qs2.set("from", from);
-      if (to) qs2.set("to", to);
-      api<Payment[]>(`/api/insurance-payments?${qs2.toString()}`)
-        .then(setWindowPayments)
-        .finally(() => setLoadingWindowPayments(false));
-
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
     } catch (e: any) {
       alert(`Failed to delete payment: ${e.message || e}`);
     }
   }
 
   /* ----------------------------- UI ----------------------------- */
-  const clearFilters = () => {
-    setProviderId("");
-    setStatus("");
-    setPreset("all");
-    setFrom("");
-    setTo("");
-  };
-
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
-      {/* Header + actions */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Insurance Management</h1>
         <div className="flex items-center gap-3">
@@ -595,12 +579,12 @@ export default function InsurancePage() {
               setEditingClaimId("");
               setCProviderId(providerId || "");
               setCCurrency("USD");
-              setCClaimDate(toISODate(new Date()));
+              setCClaimDate(ymd(new Date()));
               setCAmount("0");
               setCNotes("");
               setShowClaim(true);
             }}
-            className="px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+            className="px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-black"
           >
             + Add Claim
           </button>
@@ -610,14 +594,14 @@ export default function InsurancePage() {
               setEditingPaymentId("");
               setPProviderId(providerId || "");
               setPClaimId("");
-              setPDate(toISODate(new Date()));
+              setPDate(ymd(new Date()));
               setPAmount("0");
               setPCurrency("USD");
               setPRef("");
               setPNotes("");
               setShowPayment(true);
             }}
-            className="px-3 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-600"
+            className="px-3 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800"
           >
             Record Payment
           </button>
@@ -640,17 +624,26 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Filters / window */}
-      <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 gap-3">
+      {/* Filters */}
+      <div className="rounded-xl border p-3 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
+          <select
+            value={providerId}
+            onChange={(e) => setProviderId(e.target.value)}
+            className="border rounded-lg p-2"
+          >
             <option value="">All providers</option>
             {providers.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
 
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg p-2">
+          {/* trimmed status list */}
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="border rounded-lg p-2"
+          >
             <option value="">Any status</option>
             <option value="submitted">Submitted</option>
             <option value="partially_paid">Partially paid</option>
@@ -658,42 +651,50 @@ export default function InsurancePage() {
           </select>
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center">
-          {[
-            { id: "all", label: "All time" },
-            { id: "ytd", label: "YTD" },
-            { id: "y2025", label: "Year 2025" },
-            { id: "y2024", label: "Year 2024" },
-            { id: "y2023", label: "Year 2023" },
-            { id: "y2022", label: "Year 2022" },
-          ].map((chip) => (
-            <button
-              key={chip.id}
-              className={`px-3 py-1.5 rounded-full border ${preset === chip.id ? "bg-slate-900 text-white border-slate-900" : "hover:bg-slate-50"}`}
-              onClick={() => setPreset(chip.id as WindowPreset)}
-            >
-              {chip.label}
-            </button>
-          ))}
-
+        {/* window chips */}
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <button onClick={setAllTime} className={`px-3 py-1.5 rounded-full border ${!from && !to ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>All time</button>
+          <button onClick={setYTD} className={`px-3 py-1.5 rounded-full border ${from?.getUTCFullYear()===today.getUTCFullYear() && from?.getUTCMonth()===0 && !to ? "" : ""} ${from && to && from.getUTCFullYear()===today.getUTCFullYear() && from.getUTCMonth()===0 && ymd(to)===ymd(today) ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>YTD</button>
+          {[0,1,2,3].map((off) => {
+            const y = today.getUTCFullYear() - off;
+            const active = !!(from && to && ymd(from)===ymd(new Date(Date.UTC(y,0,1))) && ymd(to)===ymd(new Date(Date.UTC(y,11,31))));
+            return (
+              <button key={y} onClick={() => setYear(y)} className={`px-3 py-1.5 rounded-full border ${active ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>
+                Year {y}
+              </button>
+            );
+          })}
           <button
-            className={`px-3 py-1.5 rounded-full border ${preset === "custom" ? "bg-slate-900 text-white border-slate-900" : "hover:bg-slate-50"}`}
-            onClick={() => setPreset("custom")}
+            onClick={() => setCustomOpen((v) => !v)}
+            className={`px-3 py-1.5 rounded-full border ${customOpen ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}
           >
             Custom
           </button>
 
           <div className="ml-auto">
-            <button onClick={clearFilters} className="px-3 py-1.5 rounded-lg border hover:bg-slate-50">
+            <button
+              onClick={() => { setProviderId(""); setStatus(""); setAllTime(); }}
+              className="px-3 py-1.5 rounded-lg border hover:bg-slate-50"
+            >
               Clear filters
             </button>
           </div>
         </div>
 
-        {preset === "custom" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded-lg p-2" />
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded-lg p-2" />
+        {customOpen && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+            <input
+              type="date"
+              value={from ? ymd(from) : ""}
+              onChange={(e) => setFrom(e.target.value ? new Date(`${e.target.value}T00:00:00.000Z`) : null)}
+              className="border rounded-lg p-2"
+            />
+            <input
+              type="date"
+              value={to ? ymd(to) : ""}
+              onChange={(e) => setTo(e.target.value ? new Date(`${e.target.value}T23:59:59.999Z`) : null)}
+              className="border rounded-lg p-2"
+            />
           </div>
         )}
       </div>
@@ -707,9 +708,7 @@ export default function InsurancePage() {
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Collected</div>
-          <div className="mt-1 text-xl font-semibold">
-            {loadingWindowPayments ? "…" : money(summary.collected, "USD")}
-          </div>
+          <div className="mt-1 text-xl font-semibold">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
@@ -721,24 +720,20 @@ export default function InsurancePage() {
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
-          <div className={`mt-1 text-xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : "text-slate-900"}`}>
-            {summary.outstanding < 0
-              ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
-              : money(summary.outstanding, "USD")}
+          <div className={`mt-1 text-xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : "text-slate-900"}`} title="Billed − Collected + Carry">
+            {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
           </div>
           <div className="text-xs text-slate-500 mt-1">Billed − Collected + Carry</div>
         </div>
       </div>
 
-      {/* Layout */}
+      {/* Layout: left = claims table, right = balances */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Claims Table */}
         <div className="lg:col-span-2 bg-white rounded-xl border">
           <div className="px-4 py-3 border-b flex items-center justify-between">
             <div className="font-medium">Claims</div>
-            <div className="text-sm text-slate-500">
-              {visibleClaims.length} {visibleClaims.length === 1 ? "item" : "items"}
-            </div>
+            <div className="text-sm text-slate-500">{visibleClaims.length} {visibleClaims.length === 1 ? "item" : "items"}</div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -769,11 +764,15 @@ export default function InsurancePage() {
                           <button
                             className="text-xs px-2 py-1 rounded-md border"
                             onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}
-                          >Edit</button>
+                          >
+                            Edit
+                          </button>
                           <button
                             className="text-xs px-2 py-1 rounded-md border text-rose-700"
                             onClick={() => deleteClaim(c.id)}
-                          >Delete</button>
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -804,7 +803,7 @@ export default function InsurancePage() {
           </div>
         </div>
 
-        {/* Provider Balances */}
+        {/* Provider Balances (all-time view; quick health check) */}
         <div className="bg-white rounded-xl border">
           <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
           <div className="p-4 space-y-3">
@@ -816,8 +815,7 @@ export default function InsurancePage() {
                       <Skeleton className="h-4 w-28" />
                       <Skeleton className="h-4 w-20" />
                     </div>
-                    <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
-                      <Skeleton className="h-10 w-full" />
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                       <Skeleton className="h-10 w-full" />
                       <Skeleton className="h-10 w-full" />
                       <Skeleton className="h-10 w-full" />
@@ -828,18 +826,13 @@ export default function InsurancePage() {
             )}
 
             {!loadingBalances && balances?.providers.map((row) => {
-              const billedWin = visibleClaims
-                .filter((c) => c.providerId === row.providerId)
-                .reduce((a, c) => a + Number(c.claimedAmount || 0), 0);
-              const collectedWin = windowPaymentsByProvider.get(row.providerId) || 0;
               const carry = Number(row.openingBalance || 0);
-              const outstandingWithCarry = billedWin - collectedWin + carry;
-
+              const outstandingWithCarry = (row.claimed || 0) - (row.paid || 0) + carry;
               return (
                 <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <ProgressRing billed={billedWin} paid={collectedWin} balance={outstandingWithCarry} />
+                      <ProgressRing billed={row.claimed} paid={row.paid} balance={outstandingWithCarry} />
                       <div className="font-medium">{row.providerName}</div>
                     </div>
                     <button
@@ -853,20 +846,17 @@ export default function InsurancePage() {
                   <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
                     <div className="bg-slate-50 rounded p-2">
                       <div className="text-slate-500">Billed</div>
-                      <div className="font-semibold">{money(billedWin, "USD")}</div>
+                      <div className="font-semibold">{money(row.claimed, "USD")}</div>
                     </div>
                     <div className="bg-slate-50 rounded p-2">
                       <div className="text-slate-500">Collected</div>
-                      <div className="font-semibold">{money(collectedWin, "USD")}</div>
+                      <div className="font-semibold">{money(row.paid, "USD")}</div>
                     </div>
                     <div className="bg-slate-50 rounded p-2">
                       <div className="text-slate-500">Carry Fwd</div>
                       <div className={`font-semibold ${carry < 0 ? "text-emerald-700" : ""}`}>
                         {carry < 0 ? `Credit ${money(Math.abs(carry), "USD")}` : money(carry, "USD")}
                       </div>
-                      {row.openingBalanceAsOf && (
-                        <div className="text-[10px] text-slate-500 mt-0.5">as of {new Date(row.openingBalanceAsOf).toLocaleDateString()}</div>
-                      )}
                     </div>
                     <div className="bg-slate-50 rounded p-2">
                       <div className="text-slate-500">Outstanding</div>
@@ -901,34 +891,29 @@ export default function InsurancePage() {
             </div>
 
             <div className="p-4 overflow-y-auto space-y-6">
-              {/* Provider totals */}
+              {/* Provider totals (all-time quick view) */}
               <div className="grid grid-cols-4 gap-3">
                 {(() => {
-                  const pid = detailProviderId;
-                  const billedWin = visibleClaims.filter((c) => c.providerId === pid)
-                    .reduce((a, c) => a + Number(c.claimedAmount || 0), 0);
-                  const collectedWin = windowPaymentsByProvider.get(pid) || 0;
-                  const prov = balances?.providers.find((r) => r.providerId === pid) || { openingBalance: 0 };
+                  const prov =
+                    balances?.providers.find((r) => r.providerId === detailProviderId) ||
+                    { claimed: 0, paid: 0, balance: 0 };
                   const carry = Number((prov as any).openingBalance || 0);
-                  const asOf = (prov as any).openingBalanceAsOf || null;
-                  const outWithCarry = billedWin - collectedWin + carry;
-
+                  const outWithCarry = (prov.claimed || 0) - (prov.paid || 0) + carry;
                   return (
                     <>
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Billed</div>
-                        <div className="font-semibold">{money(billedWin, "USD")}</div>
+                        <div className="font-semibold">{money(prov.claimed, "USD")}</div>
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Collected</div>
-                        <div className="font-semibold">{money(collectedWin, "USD")}</div>
+                        <div className="font-semibold">{money(prov.paid, "USD")}</div>
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Carry Forward</div>
                         <div className={`font-semibold ${carry < 0 ? "text-emerald-700" : ""}`}>
                           {carry < 0 ? `Credit ${money(Math.abs(carry), "USD")}` : money(carry, "USD")}
                         </div>
-                        {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {new Date(asOf).toLocaleDateString()}</div>}
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Outstanding</div>
@@ -941,14 +926,14 @@ export default function InsurancePage() {
                 })()}
               </div>
 
-              {/* Claims ledger */}
+              {/* Claims ledger (all-time list) */}
               <div>
-                <div className="mb-2 font-medium">Claims (in window)</div>
-                {providerClaimsForDrawer.filter(c => c.providerId === detailProviderId).length === 0 && (
-                  <div className="text-sm text-slate-500">No claims for this provider in this window.</div>
+                <div className="mb-2 font-medium">Claims</div>
+                {providerClaimsForDrawer.length === 0 && (
+                  <div className="text-sm text-slate-500">No claims for this provider.</div>
                 )}
                 <div className="divide-y border rounded-lg">
-                  {providerClaimsForDrawer.filter(c => c.providerId === detailProviderId).map((c) => {
+                  {providerClaimsForDrawer.map((c) => {
                     const pct =
                       Number(c.claimedAmount) > 0
                         ? Math.min(100, Math.round((Number(c.paidToDate) / Number(c.claimedAmount)) * 100))
@@ -964,8 +949,13 @@ export default function InsurancePage() {
                             <button
                               className="text-xs px-2 py-1 rounded-md border"
                               onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}
-                            >Edit</button>
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="text-xs px-2 py-1 rounded-md border text-rose-700"
+                              onClick={() => deleteClaim(c.id)}
+                            >
                               Delete
                             </button>
                           </div>
@@ -977,7 +967,7 @@ export default function InsurancePage() {
                             <div className="font-semibold">{money(c.claimedAmount, c.currency)}</div>
                           </div>
                           <div className="bg-slate-50 rounded p-2">
-                            <div className="text-slate-500">Collected (to date)</div>
+                            <div className="text-slate-500">Collected</div>
                             <div className="font-semibold">{money(c.paidToDate, c.currency)}</div>
                           </div>
                           <div className="bg-slate-50 rounded p-2">
@@ -986,7 +976,6 @@ export default function InsurancePage() {
                           </div>
                         </div>
 
-                        {/* progress bar */}
                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded">
                           <div className="h-1.5 bg-emerald-500 rounded" style={{ width: `${pct}%` }} title={`${pct}% collected`} />
                         </div>
@@ -1006,43 +995,42 @@ export default function InsurancePage() {
                 </div>
               </div>
 
-              {/* Payments history (in window) */}
+              {/* Payments history (all-time for provider) */}
               <div>
-                <div className="mb-2 font-medium">Payments (in window)</div>
-                {loadingPayments && <div className="text-sm text-slate-500">Loading…</div>}
-                {!loadingPayments &&
-                  payments.filter((p) => p.providerId === detailProviderId && inWindow(p.paymentDate, from, to)).length === 0 && (
-                  <div className="text-sm text-slate-500">No payments recorded in this window.</div>
-                )}
+                <div className="mb-2 font-medium">Payments (history)</div>
+                {drawerPayments.length === 0 && <div className="text-sm text-slate-500">No payments recorded.</div>}
                 <div className="divide-y border rounded-lg">
-                  {payments
-                    .filter((p) => p.providerId === detailProviderId && inWindow(p.paymentDate, from, to))
-                    .map((p) => {
-                      const claim = balances?.claims.find((c) => c.id === p.claimId);
-                      const dd = parseISOish(p.paymentDate) || parseISOish(p.createdAt) || new Date();
-                      return (
-                        <div key={p.id} className="p-3 flex items-center justify-between">
-                          <div className="text-sm">
-                            <div className="font-medium">{money(p.amount, p.currency)}</div>
-                            <div className="text-xs text-slate-500">
-                              {dd.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                              {claim
-                                ? ` • ${new Date(claim.periodYear, claim.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })}`
-                                : ""}
-                              {p.reference ? ` • Ref: ${p.reference}` : ""}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingPaymentId(p.id); hydratePaymentForm(p); setShowPayment(true); }}>
-                              Edit
-                            </button>
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>
-                              Delete
-                            </button>
+                  {drawerPayments.map((p) => {
+                    const claim = balances?.claims.find((c) => c.id === p.claimId);
+                    const dt = parseISO(p.paymentDate);
+                    const dateStr = dt ? dt.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—";
+                    return (
+                      <div key={p.id} className="p-3 flex items-center justify-between">
+                        <div className="text-sm">
+                          <div className="font-medium">{money(p.amount, p.currency)}</div>
+                          <div className="text-xs text-slate-500">
+                            {dateStr}
+                            {claim ? ` • ${new Date(claim.periodYear, claim.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })}` : ""}
+                            {p.reference ? ` • Ref: ${p.reference}` : ""}
                           </div>
                         </div>
-                      );
-                    })}
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="text-xs px-2 py-1 rounded-md border"
+                            onClick={() => { setEditingPaymentId(p.id); hydratePaymentForm(p); setShowPayment(true); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="text-xs px-2 py-1 rounded-md border text-rose-700"
+                            onClick={() => deletePayment(p.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1064,7 +1052,7 @@ export default function InsurancePage() {
                   <label className="block text-xs text-slate-500 mb-1">Provider</label>
                   <select className="border rounded-lg p-2 w-full" value={cProviderId} onChange={(e) => setCProviderId(e.target.value)}>
                     <option value="">Select…</option>
-                    {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                    {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1078,13 +1066,13 @@ export default function InsurancePage() {
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Claim Date (when sent)</label>
                   <input type="date" className="border rounded-lg p-2 w-full" value={cClaimDate} onChange={(e) => setCClaimDate(e.target.value)} />
-                  <div className="text-[11px] text-slate-500 mt-1">We’ll use this month for the claim period automatically.</div>
                 </div>
 
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={cAmount} onChange={(e) => setCAmount(e.target.value)} />
                 </div>
+
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
                   <textarea className="border rounded-lg p-2 w-full" rows={2} value={cNotes} onChange={(e) => setCNotes(e.target.value)} />
@@ -1115,20 +1103,18 @@ export default function InsurancePage() {
                   <label className="block text-xs text-slate-500 mb-1">Provider</label>
                   <select className="border rounded-lg p-2 w-full" value={pProviderId} onChange={(e) => setPProviderId(e.target.value)}>
                     <option value="">Select…</option>
-                    {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                    {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Link to Claim (optional)</label>
                   <select className="border rounded-lg p-2 w-full" value={pClaimId} onChange={(e) => setPClaimId(e.target.value)}>
                     <option value="">— None —</option>
-                    {visibleClaims
-                      .filter((c) => !pProviderId || c.providerId === pProviderId)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })} — {money(c.claimedAmount, c.currency)}
-                        </option>
-                      ))}
+                    {openClaims.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })} — {money(c.claimedAmount, c.currency)}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1143,6 +1129,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
+
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Amount Received</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
