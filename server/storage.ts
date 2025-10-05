@@ -230,6 +230,7 @@ export interface IStorage {
     Array<
       InsuranceClaim & {
         providerName: string;
+        billedAmount: number;   // 👈 NEW alias for clarity
         paidToDate: number;
         balance: number;
       }
@@ -237,7 +238,12 @@ export interface IStorage {
   >;
 
   getInsuranceClaim(id: string): Promise<
-    (InsuranceClaim & { providerName: string; paidToDate: number; balance: number }) | undefined
+    (InsuranceClaim & {
+      providerName: string;
+      billedAmount: number;
+      paidToDate: number;
+      balance: number;
+    }) | undefined
   >;
 
   updateInsuranceClaim(id: string, updates: Partial<InsuranceClaim>): Promise<InsuranceClaim | undefined>;
@@ -249,9 +255,17 @@ export interface IStorage {
   getInsuranceBalances(filters?: {
     providerId?: string;
   }): Promise<{
-    providers: Array<{ providerId: string; providerName: string; claimed: number; paid: number; balance: number }>;
+    providers: Array<{
+      providerId: string;
+      providerName: string;
+      claimed: number;
+      paid: number;
+      balance: number;
+      outstanding: number;   // 👈 NEW
+      credit: number;        // 👈 NEW
+    }>;
     claims: Array<
-      InsuranceClaim & { providerName: string; paidToDate: number; balance: number }
+      InsuranceClaim & { providerName: string; billedAmount: number; paidToDate: number; balance: number }
     >;
   }>;
 }
@@ -882,7 +896,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  // List claims with paid-to-date and balance
+  // List claims with paid-to-date and balance (adds billedAmount alias)
   async listInsuranceClaims(filters?: {
     providerId?: string;
     year?: number;
@@ -898,7 +912,6 @@ export class DatabaseStorage implements IStorage {
     const paidSub = db
       .select({
         claimId: insurancePayments.claimId,
-        // ✅ alias the raw SUM so it can be referenced from the outer query
         paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`.as("paid"),
       })
       .from(insurancePayments)
@@ -916,13 +929,13 @@ export class DatabaseStorage implements IStorage {
         periodStart: insuranceClaims.periodStart,
         periodEnd: insuranceClaims.periodEnd,
         currency: insuranceClaims.currency,
-        claimedAmount: insuranceClaims.claimedAmount,
+        claimedAmount: insuranceClaims.claimedAmount,     // legacy
+        billedAmount: insuranceClaims.claimedAmount,      // 👈 clearer alias for UI
         status: insuranceClaims.status,
         notes: insuranceClaims.notes,
         createdBy: insuranceClaims.createdBy,
         createdAt: insuranceClaims.createdAt,
         updatedAt: insuranceClaims.updatedAt,
-        // ✅ reference subquery fields as paidSub.paid
         paidToDate: sql<number>`COALESCE(${paidSub.paid}, 0)`,
         balance: sql<number>`(${insuranceClaims.claimedAmount} - COALESCE(${paidSub.paid}, 0))`,
       })
@@ -942,6 +955,7 @@ export class DatabaseStorage implements IStorage {
     return rows.map((r: any) => ({
       ...r,
       claimedAmount: Number(r.claimedAmount),
+      billedAmount: Number(r.billedAmount),
       paidToDate: Number(r.paidToDate),
       balance: Number(r.balance),
     }));
@@ -973,12 +987,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  // Provider + claim balances
+  // Provider + claim balances (active providers only; add outstanding/credit)
   async getInsuranceBalances(filters?: { providerId?: string }) {
     const claimsAgg = db
       .select({
         providerId: insuranceClaims.providerId,
-        // ✅ alias the SUM so outer query can reference claimsAgg.claimed
         claimed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}), 0)`.as("claimed"),
       })
       .from(insuranceClaims)
@@ -988,7 +1001,6 @@ export class DatabaseStorage implements IStorage {
     const payAgg = db
       .select({
         providerId: insurancePayments.providerId,
-        // ✅ alias the SUM so outer query can reference payAgg.paid
         paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`.as("paid"),
       })
       .from(insurancePayments)
@@ -1002,25 +1014,45 @@ export class DatabaseStorage implements IStorage {
         claimed: sql<number>`COALESCE(${claimsAgg.claimed}, 0)`,
         paid: sql<number>`COALESCE(${payAgg.paid}, 0)`,
         balance: sql<number>`COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0)`,
+        // NEW: split the sign into non-negative fields for cleaner UI
+        outstanding: sql<number>`
+          CASE
+            WHEN (COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0)) > 0
+            THEN (COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0))
+            ELSE 0
+          END
+        `,
+        credit: sql<number>`
+          CASE
+            WHEN (COALESCE(${payAgg.paid}, 0) - COALESCE(${claimsAgg.claimed}, 0)) > 0
+            THEN (COALESCE(${payAgg.paid}, 0) - COALESCE(${claimsAgg.claimed}, 0))
+            ELSE 0
+          END
+        `,
       })
       .from(insuranceProviders)
       .leftJoin(claimsAgg, eq(claimsAgg.providerId, insuranceProviders.id))
       .leftJoin(payAgg, eq(payAgg.providerId, insuranceProviders.id));
 
-    if (filters?.providerId) provQ = provQ.where(eq(insuranceProviders.id, filters.providerId));
+    // only active providers (and optional provider filter)
+    const provConds: any[] = [eq(insuranceProviders.isActive, true)];
+    if (filters?.providerId) provConds.push(eq(insuranceProviders.id, filters.providerId));
+    provQ = provQ.where(and(...provConds));
 
     const providers = (await provQ.orderBy(insuranceProviders.name)).map((r) => ({
       ...r,
       claimed: Number(r.claimed),
       paid: Number(r.paid),
       balance: Number(r.balance),
+      outstanding: Number(r.outstanding),
+      credit: Number(r.credit),
     }));
 
     const claims = await this.listInsuranceClaims({
       providerId: filters?.providerId,
     });
 
-    return { providers, claims };
+    return { providers, claims: claims as any };
   }
 }
 
