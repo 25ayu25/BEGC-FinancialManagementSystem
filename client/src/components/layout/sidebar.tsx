@@ -9,6 +9,7 @@ import {
   Users,
   Activity,
   X,
+  ShieldCheck, // ⬅️ NEW
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
@@ -21,6 +22,8 @@ const navigation = [
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
+  // ⬇️ NEW: Insurance management page
+  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
 ];
 
 interface SidebarProps {
