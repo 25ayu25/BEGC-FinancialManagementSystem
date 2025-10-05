@@ -1,32 +1,31 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "@/lib/queryClient";
 
 /**
- * Guards a page that requires authentication.
- * - If /api/auth/user returns 401, redirect to /login and preserve where we came from.
- * - Works with cookie OR the x-session-token fallback (which our axios instance sends).
+ * Redirect to /login whenever an API response returns 401.
+ * Works even in incognito because the first failing request triggers the redirect.
+ * Cleans itself up when the component unmounts.
  */
 export function useRequireAuth() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        await api.get("/api/auth/user"); // success if cookie or x-session-token is valid
-      } catch (err: any) {
-        if (!cancelled && err?.response?.status === 401) {
-          const next = encodeURIComponent(location.pathname + location.search);
-          navigate(`/login?next=${next}`, { replace: true });
+    const id = api.interceptors.response.use(
+      (res) => res,
+      (error) => {
+        const status = error?.response?.status;
+        if (status === 401) {
+          const next = encodeURIComponent(
+            `${window.location.pathname}${window.location.search}`
+          );
+          // Use replace so back button doesn't come back to a broken page
+          window.location.replace(`/login?next=${next}`);
+          return; // stop promise chain; navigation will take over
         }
+        return Promise.reject(error);
       }
-    })();
+    );
 
     return () => {
-      cancelled = true;
+      api.interceptors.response.eject(id);
     };
-  }, [navigate, location]);
+  }, []);
 }
