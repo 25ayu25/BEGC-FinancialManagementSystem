@@ -55,13 +55,23 @@ const RAW_ALLOWED = (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "
 
 const ALLOWED_EXACT = new Set<string>([
   ...RAW_ALLOWED,
+  // local dev
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  // your custom domains (add any others you use)
+  "https://finance.bahrelghazalclinic.com",
+  "https://www.bahrelghazalclinic.com",
 ]);
 
-const ALLOWED_SUFFIXES = [".netlify.app", ".vercel.app", ".onrender.com"];
+// allow popular hosting suffixes + your domain suffix
+const ALLOWED_SUFFIXES = [
+  ".netlify.app",
+  ".vercel.app",
+  ".onrender.com",
+  ".bahrelghazalclinic.com", // <-- IMPORTANT
+];
 
 function isAllowedOrigin(origin?: string): boolean {
   if (!origin) return false;
@@ -86,21 +96,6 @@ function applyCors(_req: Request, res: Response) {
     "Content-Type, Authorization, X-Requested-With, X-Session-Token, x-session-token"
   );
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-}
-
-/* Extend Express Request to include user */
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        username: string;
-        role: string;
-        location: string;
-        fullName: string;
-      };
-    }
-  }
 }
 
 /* ------------------------------ Report helpers ------------------------------ */
