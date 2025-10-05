@@ -42,7 +42,10 @@ type BalancesResponse = {
     providerName: string;
     claimed: number;  // billed
     paid: number;     // collected
-    balance: number;  // outstanding (can be negative = credit)
+    balance: number;  // billed - collected (+ adjustments if your API folds them in)
+    /** NEW (optional): opening/carry-forward balance that predates this system. */
+    openingBalance?: number;           // positive = owes clinic, negative = credit
+    openingBalanceAsOf?: string | null; // ISO date (e.g., "2023-01-01")
   }>;
   claims: Array<
     Claim & {
@@ -91,18 +94,17 @@ function toUrl(path: string) {
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  // Start with any headers passed by the caller
   const headers = new Headers(init?.headers || {});
   headers.set("content-type", "application/json");
 
-  // Safari/Incognito fallback: send backup session token if present
+  // Safari/Incognito fallback
   if (typeof window !== "undefined") {
     const backup = localStorage.getItem("user_session_backup");
     if (backup) headers.set("x-session-token", backup);
   }
 
   const res = await fetch(toUrl(path), {
-    credentials: "include",  // still try cookies first
+    credentials: "include",
     ...init,
     headers,
   });
@@ -156,15 +158,16 @@ function HelpPopover() {
         ℹ️ Help
       </button>
       {open && (
-        <div className="absolute z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li><strong>Billed</strong>: total amount we invoiced the provider.</li>
             <li><strong>Collected</strong>: money received from the provider.</li>
             <li>
-              <strong>Outstanding</strong>: amount still owed (<em>Billed − Collected</em>).
-              If negative, it’s a <strong>credit</strong> in our favor.
+              <strong>Outstanding</strong>: <em>Billed − Collected + Carry&nbsp;Forward</em>.
+              If negative, it’s a <strong>credit</strong>.
             </li>
+            <li><strong>Carry Forward</strong>: balance from earlier periods (e.g., 2023).</li>
           </ul>
           <div className="text-right mt-2">
             <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
@@ -175,13 +178,20 @@ function HelpPopover() {
   );
 }
 
-/* ---------- modern UI helpers ---------- */
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-slate-200/70 ${className}`} />;
 }
 
 /* CSS-only donut: paid% of billed (shows CR for credit) */
-function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number }) {
+function ProgressRing({
+  billed,
+  paid,
+  balance,
+}: {
+  billed: number;
+  paid: number;
+  balance: number;
+}) {
   const pct = billed > 0 ? Math.min(100, Math.max(0, Math.round((paid / billed) * 100))) : 0;
   const label = balance < 0 ? "CR" : `${pct}%`;
   const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6); // full ring if credit
@@ -283,7 +293,6 @@ export default function InsurancePage() {
   useEffect(() => {
     api<Provider[]>("/api/insurance-providers")
       .then((rows) => {
-        // active only + preferred order
         const act = rows.filter((p) => p.isActive);
         act.sort((a, b) => {
           const wa = weightForName(a.name);
@@ -323,7 +332,6 @@ export default function InsurancePage() {
     if (providerId) params.set("providerId", providerId);
     api<BalancesResponse>(`/api/insurance-balances?${params.toString()}`)
       .then((data) => {
-        // sort providers for the cards
         data.providers.sort((a, b) => {
           const wa = weightForName(a.providerName);
           const wb = weightForName(b.providerName);
@@ -363,16 +371,19 @@ export default function InsurancePage() {
     [claims, pProviderId]
   );
 
-  // summary cards data (for current provider filter or all)
+  // summary cards (now include carry-forward if provided by API)
   const summary = useMemo(() => {
     const provRows = balances?.providers ?? [];
     const filtered = providerId
       ? provRows.filter((r) => r.providerId === providerId)
       : provRows;
+
     const billed = filtered.reduce((a, r) => a + Number(r.claimed || 0), 0);
     const collected = filtered.reduce((a, r) => a + Number(r.paid || 0), 0);
-    const outstanding = filtered.reduce((a, r) => a + Number(r.balance || 0), 0);
-    return { billed, collected, outstanding };
+    const carry = filtered.reduce((a, r) => a + Number((r as any).openingBalance || 0), 0);
+    const outstanding = billed - collected + carry;
+
+    return { billed, collected, carry, outstanding };
   }, [balances, providerId]);
 
   const selectedProvider = useMemo(
@@ -443,7 +454,6 @@ export default function InsurancePage() {
       await api(`/api/insurance-claims/${id}`, { method: "DELETE" });
       reloadClaims();
       reloadBalances();
-      // if drawer open, also refresh inside
       if (detailProviderId) {
         const qs = new URLSearchParams({ providerId: detailProviderId });
         setLoadingPayments(true);
@@ -492,7 +502,6 @@ export default function InsurancePage() {
       setShowPayment(false);
       setEditingPaymentId("");
       reloadBalances();
-      // refresh payments list if drawer open
       if (detailProviderId) {
         const qs = new URLSearchParams({ providerId: detailProviderId });
         setLoadingPayments(true);
@@ -526,10 +535,67 @@ export default function InsurancePage() {
   /* ----------------------------- UI ----------------------------- */
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
+      {/* Header + actions (buttons reordered) */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Insurance Management</h1>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setEditingClaimId("");
+              setCProviderId(providerId || "");
+              setCYear(new Date().getUTCFullYear());
+              setCMonth(new Date().getUTCMonth() + 1);
+              setCStart(
+                new Date(
+                  Date.UTC(
+                    new Date().getUTCFullYear(),
+                    new Date().getUTCMonth(),
+                    1
+                  )
+                )
+                  .toISOString()
+                  .slice(0, 10)
+              );
+              setCEnd(
+                new Date(
+                  Date.UTC(
+                    new Date().getUTCFullYear(),
+                    new Date().getUTCMonth() + 1,
+                    0
+                  )
+                )
+                  .toISOString()
+                  .slice(0, 10)
+              );
+              setCCurrency("USD");
+              setCAmount("0");
+              setCNotes("");
+              setShowClaim(true);
+            }}
+            className="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            + Add Claim
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingPaymentId("");
+              setPProviderId(providerId || "");
+              setPClaimId("");
+              setPDate(new Date().toISOString().slice(0, 10));
+              setPAmount("0");
+              setPCurrency("USD");
+              setPRef("");
+              setPNotes("");
+              setShowPayment(true);
+            }}
+            className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            Record Payment
+          </button>
+
           <HelpPopover />
+
           <button
             onClick={() => exportClaimsCsv(claims, providers)}
             className="px-3 py-2 rounded-lg border hover:bg-slate-50"
@@ -537,61 +603,6 @@ export default function InsurancePage() {
           >
             Export CSV
           </button>
-          <div className="space-x-2">
-            <button
-              onClick={() => {
-                setEditingClaimId("");
-                setCProviderId(providerId || "");
-                setCYear(new Date().getUTCFullYear());
-                setCMonth(new Date().getUTCMonth() + 1);
-                setCStart(
-                  new Date(
-                    Date.UTC(
-                      new Date().getUTCFullYear(),
-                      new Date().getUTCMonth(),
-                      1
-                    )
-                  )
-                    .toISOString()
-                    .slice(0, 10)
-                );
-                setCEnd(
-                  new Date(
-                    Date.UTC(
-                      new Date().getUTCFullYear(),
-                      new Date().getUTCMonth() + 1,
-                      0
-                    )
-                  )
-                    .toISOString()
-                    .slice(0, 10)
-                );
-                setCCurrency("USD");
-                setCAmount("0");
-                setCNotes("");
-                setShowClaim(true);
-              }}
-              className="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              + Add Claim
-            </button>
-            <button
-              onClick={() => {
-                setEditingPaymentId("");
-                setPProviderId(providerId || "");
-                setPClaimId("");
-                setPDate(new Date().toISOString().slice(0, 10));
-                setPAmount("0");
-                setPCurrency("USD");
-                setPRef("");
-                setPNotes("");
-                setShowPayment(true);
-              }}
-              className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
-            >
-              Record Payment
-            </button>
-          </div>
         </div>
       </div>
 
@@ -601,8 +612,8 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Filters (sticky) */}
-      <div className="sticky top-0 z-20 bg-white/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur rounded-xl border p-3 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* Filters (non-sticky now to avoid overlap on narrow layouts) */}
+      <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <select
           value={providerId}
           onChange={(e) => setProviderId(e.target.value)}
@@ -649,33 +660,47 @@ export default function InsurancePage() {
         />
       </div>
 
-      {/* Summary row (glassy cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <div className="rounded-2xl border bg-white/70 backdrop-blur transition-shadow hover:shadow-md p-4">
+      {/* Summary row (now 4 cards including Carry Forward) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+        <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Billed</div>
           <div className="mt-1 text-xl font-semibold">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">
             {selectedProvider ? selectedProvider.name : "All providers"}
           </div>
         </div>
-        <div className="rounded-2xl border bg-white/70 backdrop-blur transition-shadow hover:shadow-md p-4">
+        <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Collected</div>
           <div className="mt-1 text-xl font-semibold">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received</div>
         </div>
-        <div className="rounded-2xl border bg-white/70 backdrop-blur transition-shadow hover:shadow-md p-4">
+        <div className="rounded-2xl border bg-white p-4">
+          <div className="text-slate-500 text-sm">Carry Forward</div>
+          <div
+            className={`mt-1 text-xl font-semibold ${
+              summary.carry < 0 ? "text-emerald-700" : "text-slate-900"
+            }`}
+            title="Opening balance (pre-system) rolled into outstanding"
+          >
+            {summary.carry < 0
+              ? `Credit ${money(Math.abs(summary.carry), "USD")}`
+              : money(summary.carry, "USD")}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">Before current tracking</div>
+        </div>
+        <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
           <div
             className={`mt-1 text-xl font-semibold ${
               summary.outstanding < 0 ? "text-emerald-700" : "text-slate-900"
             }`}
-            title={summary.outstanding < 0 ? "We have a credit with provider" : "Amount still owed"}
+            title="Billed − Collected + Carry Forward"
           >
             {summary.outstanding < 0
               ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
               : money(summary.outstanding, "USD")}
           </div>
-          <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
+          <div className="text-xs text-slate-500 mt-1">Billed − Collected + Carry</div>
         </div>
       </div>
 
@@ -691,7 +716,7 @@ export default function InsurancePage() {
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600 sticky top-[68px] z-10">
+              <thead className="bg-slate-50 text-slate-600">
                 <tr>
                   <th className="text-left p-3">Provider</th>
                   <th className="text-left p-3">Period</th>
@@ -739,6 +764,7 @@ export default function InsurancePage() {
                     </tr>
                   );
                 })}
+
                 {loadingClaims &&
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={`sk-${i}`}>
@@ -750,6 +776,7 @@ export default function InsurancePage() {
                       <td className="p-3 text-right"><Skeleton className="h-8 w-24 ml-auto" /></td>
                     </tr>
                   ))}
+
                 {!loadingClaims && claims.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-6 text-center text-slate-500">
@@ -786,40 +813,55 @@ export default function InsurancePage() {
               </>
             )}
 
-            {!loadingBalances && balances?.providers.map((row) => (
-              <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white/70">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <ProgressRing billed={row.claimed} paid={row.paid} balance={row.balance} />
-                    <div className="font-medium">{row.providerName}</div>
+            {!loadingBalances && balances?.providers.map((row) => {
+              const carry = Number((row as any).openingBalance || 0);
+              const asOf = (row as any).openingBalanceAsOf || null;
+              const outstandingWithCarry = (row.claimed || 0) - (row.paid || 0) + carry;
+
+              return (
+                <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <ProgressRing billed={row.claimed} paid={row.paid} balance={outstandingWithCarry} />
+                      <div className="font-medium">{row.providerName}</div>
+                    </div>
+                    <button
+                      onClick={() => setDetailProviderId(row.providerId)}
+                      className="text-sm text-indigo-600 hover:underline"
+                    >
+                      View details
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setDetailProviderId(row.providerId)}
-                    className="text-sm text-indigo-600 hover:underline"
-                  >
-                    View details
-                  </button>
-                </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-slate-50 rounded p-2">
-                    <div className="text-slate-500">Billed</div>
-                    <div className="font-semibold">{money(row.claimed, "USD")}</div>
-                  </div>
-                  <div className="bg-slate-50 rounded p-2">
-                    <div className="text-slate-500">Collected</div>
-                    <div className="font-semibold">{money(row.paid, "USD")}</div>
-                  </div>
-                  <div className="bg-slate-50 rounded p-2">
-                    <div className="text-slate-500">Outstanding</div>
-                    <div className={`font-semibold ${row.balance < 0 ? "text-emerald-700" : ""}`}>
-                      {row.balance < 0
-                        ? `Credit ${money(Math.abs(row.balance), "USD")}`
-                        : money(row.balance, "USD")}
+
+                  <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+                    <div className="bg-slate-50 rounded p-2">
+                      <div className="text-slate-500">Billed</div>
+                      <div className="font-semibold">{money(row.claimed, "USD")}</div>
+                    </div>
+                    <div className="bg-slate-50 rounded p-2">
+                      <div className="text-slate-500">Collected</div>
+                      <div className="font-semibold">{money(row.paid, "USD")}</div>
+                    </div>
+                    <div className="bg-slate-50 rounded p-2">
+                      <div className="text-slate-500">Carry Fwd</div>
+                      <div className={`font-semibold ${carry < 0 ? "text-emerald-700" : ""}`}>
+                        {carry < 0 ? `Credit ${money(Math.abs(carry), "USD")}` : money(carry, "USD")}
+                      </div>
+                      {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {new Date(asOf).toLocaleDateString()}</div>}
+                    </div>
+                    <div className="bg-slate-50 rounded p-2">
+                      <div className="text-slate-500">Outstanding</div>
+                      <div className={`font-semibold ${outstandingWithCarry < 0 ? "text-emerald-700" : ""}`}>
+                        {outstandingWithCarry < 0
+                          ? `Credit ${money(Math.abs(outstandingWithCarry), "USD")}`
+                          : money(outstandingWithCarry, "USD")}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+
             {!loadingBalances && balances && balances.providers.length === 0 && (
               <div className="text-slate-500">No balances yet.</div>
             )}
@@ -844,11 +886,15 @@ export default function InsurancePage() {
 
             <div className="p-4 overflow-y-auto space-y-6">
               {/* Provider totals */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 {(() => {
                   const prov =
                     balances?.providers.find((r) => r.providerId === detailProviderId) ||
                     { claimed: 0, paid: 0, balance: 0 };
+                  const carry = Number((prov as any).openingBalance || 0);
+                  const asOf = (prov as any).openingBalanceAsOf || null;
+                  const outWithCarry = (prov.claimed || 0) - (prov.paid || 0) + carry;
+
                   return (
                     <>
                       <div className="rounded-lg border p-3">
@@ -860,11 +906,16 @@ export default function InsurancePage() {
                         <div className="font-semibold">{money(prov.paid, "USD")}</div>
                       </div>
                       <div className="rounded-lg border p-3">
+                        <div className="text-xs text-slate-500">Carry Forward</div>
+                        <div className={`font-semibold ${carry < 0 ? "text-emerald-700" : ""}`}>
+                          {carry < 0 ? `Credit ${money(Math.abs(carry), "USD")}` : money(carry, "USD")}
+                        </div>
+                        {asOf && <div className="text-[10px] text-slate-500 mt-0.5">as of {new Date(asOf).toLocaleDateString()}</div>}
+                      </div>
+                      <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Outstanding</div>
-                        <div className={`font-semibold ${prov.balance < 0 ? "text-emerald-700" : ""}`}>
-                          {prov.balance < 0
-                            ? `Credit ${money(Math.abs(prov.balance), "USD")}`
-                            : money(prov.balance, "USD")}
+                        <div className={`font-semibold ${outWithCarry < 0 ? "text-emerald-700" : ""}`}>
+                          {outWithCarry < 0 ? `Credit ${money(Math.abs(outWithCarry), "USD")}` : money(outWithCarry, "USD")}
                         </div>
                       </div>
                     </>
