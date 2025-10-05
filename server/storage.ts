@@ -310,6 +310,40 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
+    async listInsurancePayments(filters?: { providerId?: string; claimId?: string }) {
+    const conds: any[] = [];
+    if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
+    if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
+    let q = db.select().from(insurancePayments);
+    if (conds.length) q = q.where(and(...conds));
+    return await q.orderBy(desc(insurancePayments.paymentDate), desc(insurancePayments.createdAt));
+  }
+
+  async updateInsurancePayment(
+    id: string,
+    updates: Partial<InsurancePayment>
+  ): Promise<InsurancePayment | undefined> {
+    const [row] = await db
+      .update(insurancePayments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(insurancePayments.id, id))
+      .returning();
+    return row || undefined;
+  }
+
+  async deleteInsurancePayment(id: string): Promise<void> {
+    await db.delete(insurancePayments).where(eq(insurancePayments.id, id));
+  }
+
+  async deleteInsuranceClaim(id: string): Promise<void> {
+    // keep provider-level payment totals intact, just unlink payments from the claim
+    await db
+      .update(insurancePayments)
+      .set({ claimId: null, updatedAt: new Date() })
+      .where(eq(insurancePayments.claimId, id));
+    await db.delete(insuranceClaims).where(eq(insuranceClaims.id, id));
+  }
+
   /* Departments & Providers */
   async getDepartments(): Promise<Department[]> {
     return await db.select().from(departments).where(eq(departments.isActive, true));
