@@ -9,21 +9,33 @@ import {
   Users,
   Activity,
   X,
-  ShieldCheck, // ⬅️ NEW
+  ShieldCheck,
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
 
-const navigation = [
+// allow optional "sub" to render an indented sub-item
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ComponentType<any>;
+  sub?: boolean;
+};
+
+const navigation: NavItem[] = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
+
+  // NEW: Insurance sits right under Add Transaction
+  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
+  // Optional sub-link (indented) to manage provider list
+  { name: "Insurance Providers", href: "/insurance-providers", icon: ShieldCheck, sub: true },
+
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
-  // ⬇️ NEW: Insurance management page
-  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
 ];
 
 interface SidebarProps {
@@ -96,11 +108,14 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
           {navigation.map((item) => {
             const isActive = location === item.href;
+            // Sub-items get indentation + slightly smaller text
+            const subClasses = item.sub ? "pl-10 text-sm" : "";
             return (
               <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
+                    subClasses,
                     isActive
                       ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
                       : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
