@@ -175,6 +175,53 @@ function HelpPopover() {
   );
 }
 
+/* ---------- modern UI helpers ---------- */
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-slate-200/70 ${className}`} />;
+}
+
+/* CSS-only donut: paid% of billed (shows CR for credit) */
+function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number }) {
+  const pct = billed > 0 ? Math.min(100, Math.max(0, Math.round((paid / billed) * 100))) : 0;
+  const label = balance < 0 ? "CR" : `${pct}%`;
+  const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6); // full ring if credit
+  return (
+    <div className="relative h-10 w-10 shrink-0">
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }}
+      />
+      <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* CSV export for claims table */
+function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
+  const byId = new Map(providers.map((p) => [p.id, p.name]));
+  const header = ["Provider","Year","Month","Currency","Billed","Status","Notes"].join(",");
+  const body = rows.map((c) =>
+    [
+      (byId.get(c.providerId) || c.providerId).replace(/,/g, " "),
+      c.periodYear,
+      c.periodMonth,
+      c.currency,
+      Number(c.claimedAmount),
+      c.status,
+      (c.notes || "").replace(/[\r\n,]+/g, " "),
+    ].join(",")
+  );
+  const csv = [header, ...body].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "insurance-claims.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 /* ------------------------------ Page ----------------------------- */
 
 export default function InsurancePage() {
@@ -184,6 +231,8 @@ export default function InsurancePage() {
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [loadingClaims, setLoadingClaims] = useState(false);
+  const [loadingBalances, setLoadingBalances] = useState(false);
 
   // filters
   const [providerId, setProviderId] = useState<string>("");
@@ -251,6 +300,7 @@ export default function InsurancePage() {
   }, []);
 
   const reloadClaims = () => {
+    setLoadingClaims(true);
     const params = new URLSearchParams();
     if (providerId) params.set("providerId", providerId);
     if (status) params.set("status", status);
@@ -261,12 +311,14 @@ export default function InsurancePage() {
       .catch((e: any) => {
         console.error("claims", e);
         if (e?.status === 401) setAuthError(true);
-      });
+      })
+      .finally(() => setLoadingClaims(false));
   };
 
   useEffect(reloadClaims, [providerId, status, year, month]);
 
   const reloadBalances = () => {
+    setLoadingBalances(true);
     const params = new URLSearchParams();
     if (providerId) params.set("providerId", providerId);
     api<BalancesResponse>(`/api/insurance-balances?${params.toString()}`)
@@ -283,7 +335,8 @@ export default function InsurancePage() {
       .catch((e: any) => {
         console.error("balances", e);
         if (e?.status === 401) setAuthError(true);
-      });
+      })
+      .finally(() => setLoadingBalances(false));
   };
 
   useEffect(reloadBalances, [providerId]);
@@ -475,8 +528,15 @@ export default function InsurancePage() {
     <div className="p-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Insurance Management</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <HelpPopover />
+          <button
+            onClick={() => exportClaimsCsv(claims, providers)}
+            className="px-3 py-2 rounded-lg border hover:bg-slate-50"
+            title="Download current table as CSV"
+          >
+            Export CSV
+          </button>
           <div className="space-x-2">
             <button
               onClick={() => {
@@ -541,8 +601,8 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+      {/* Filters (sticky) */}
+      <div className="sticky top-0 z-20 bg-white/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur rounded-xl border p-3 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <select
           value={providerId}
           onChange={(e) => setProviderId(e.target.value)}
@@ -589,21 +649,21 @@ export default function InsurancePage() {
         />
       </div>
 
-      {/* Summary row */}
+      {/* Summary row (glassy cards) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <div className="rounded-xl border bg-white p-4">
+        <div className="rounded-2xl border bg-white/70 backdrop-blur transition-shadow hover:shadow-md p-4">
           <div className="text-slate-500 text-sm">Billed</div>
           <div className="mt-1 text-xl font-semibold">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">
             {selectedProvider ? selectedProvider.name : "All providers"}
           </div>
         </div>
-        <div className="rounded-xl border bg-white p-4">
+        <div className="rounded-2xl border bg-white/70 backdrop-blur transition-shadow hover:shadow-md p-4">
           <div className="text-slate-500 text-sm">Collected</div>
           <div className="mt-1 text-xl font-semibold">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received</div>
         </div>
-        <div className="rounded-xl border bg-white p-4">
+        <div className="rounded-2xl border bg-white/70 backdrop-blur transition-shadow hover:shadow-md p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
           <div
             className={`mt-1 text-xl font-semibold ${
@@ -631,7 +691,7 @@ export default function InsurancePage() {
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600">
+              <thead className="bg-slate-50 text-slate-600 sticky top-[68px] z-10">
                 <tr>
                   <th className="text-left p-3">Provider</th>
                   <th className="text-left p-3">Period</th>
@@ -641,11 +701,11 @@ export default function InsurancePage() {
                   <th className="text-right p-3 w-40">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {claims.map((c) => {
                   const prov = providers.find((p) => p.id === c.providerId);
                   return (
-                    <tr key={c.id} className="border-t">
+                    <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="p-3">{prov?.name || c.providerId}</td>
                       <td className="p-3">
                         {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", {
@@ -679,7 +739,18 @@ export default function InsurancePage() {
                     </tr>
                   );
                 })}
-                {claims.length === 0 && (
+                {loadingClaims &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`sk-${i}`}>
+                      <td className="p-3"><Skeleton className="h-4 w-28" /></td>
+                      <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                      <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                      <td className="p-3"><Skeleton className="h-5 w-20 rounded-full" /></td>
+                      <td className="p-3"><Skeleton className="h-4 w-24" /></td>
+                      <td className="p-3 text-right"><Skeleton className="h-8 w-24 ml-auto" /></td>
+                    </tr>
+                  ))}
+                {!loadingClaims && claims.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-6 text-center text-slate-500">
                       {providerId
@@ -697,11 +768,31 @@ export default function InsurancePage() {
         <div className="bg-white rounded-xl border">
           <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
           <div className="p-4 space-y-3">
-            {!balances && <div className="text-slate-500">Loading…</div>}
-            {balances?.providers.map((row) => (
-              <div key={row.providerId} className="border rounded-lg p-3">
+            {loadingBalances && (
+              <>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {!loadingBalances && balances?.providers.map((row) => (
+              <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white/70">
                 <div className="flex items-center justify-between">
-                  <div className="font-medium">{row.providerName}</div>
+                  <div className="flex items-center gap-3">
+                    <ProgressRing billed={row.claimed} paid={row.paid} balance={row.balance} />
+                    <div className="font-medium">{row.providerName}</div>
+                  </div>
                   <button
                     onClick={() => setDetailProviderId(row.providerId)}
                     className="text-sm text-indigo-600 hover:underline"
@@ -729,7 +820,7 @@ export default function InsurancePage() {
                 </div>
               </div>
             ))}
-            {balances && balances.providers.length === 0 && (
+            {!loadingBalances && balances && balances.providers.length === 0 && (
               <div className="text-slate-500">No balances yet.</div>
             )}
           </div>
