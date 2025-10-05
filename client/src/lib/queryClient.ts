@@ -1,44 +1,79 @@
+// client/src/lib/queryClient.ts
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import axios from 'axios';
+import axios from "axios";
+import { API_BASE_URL } from "./constants";
 
-// Development vs Production API URL
-const baseURL =
-  import.meta.env.VITE_API_URL ??
-  (import.meta.env.DEV ? "http://localhost:5000" : "https://bgc-financialmanagementsystem.onrender.com");
+/* ---------------- Base URL & axios instance ---------------- */
 
-console.info("[CFG] API base URL =", baseURL); // <-- leaves a breadcrumb in DevTools
+const baseURL = API_BASE_URL;
+console.info("[CFG] API base URL =", baseURL);
 
-// Create axios instance with credentials
 export const api = axios.create({
   baseURL,
-  withCredentials: true,  // send cookies cross-site
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true, // send HttpOnly cookie when allowed
+  headers: { "Content-Type": "application/json" },
 });
 
-// Add Safari fallback token to all requests
+/* ---------------- Session backup (for Safari/3rd-party cookie blocks) ---------------- */
+
+const BACKUP_KEY = "user_session_backup";
+
+function readBackup(): string | null {
+  try {
+    return localStorage.getItem(BACKUP_KEY);
+  } catch {
+    return null;
+  }
+}
+function writeBackup(payload: any) {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(payload));
+  } catch {}
+}
+function clearBackup() {
+  try {
+    localStorage.removeItem(BACKUP_KEY);
+  } catch {}
+}
+
+/* Attach backup token (if present) to every request */
 api.interceptors.request.use((config) => {
-  const sessionBackup = localStorage.getItem('user_session_backup');
+  const sessionBackup = readBackup();
   if (sessionBackup) {
-    config.headers['x-session-token'] = sessionBackup;
+    (config.headers ??= {});
+    (config.headers as any)["x-session-token"] = sessionBackup;
   }
   return config;
 });
 
+/* On successful login, persist backup; on 401, clear backup */
+api.interceptors.response.use(
+  (response) => {
+    const url = response.config?.url || "";
+    if (response.status >= 200 && response.status < 300 && url.includes("/api/auth/login")) {
+      // Server returns the session payload; keep a JSON backup client-side.
+      writeBackup(response.data);
+    }
+    return response;
+  },
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      clearBackup();
+    }
+    return Promise.reject(error);
+  }
+);
+
+/* ---------------- fetch-like wrapper (kept) ---------------- */
+
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown
 ): Promise<Response> {
   try {
-    const response = await api.request({
-      method,
-      url,
-      data,
-    });
-    
-    // Convert axios response to fetch Response format for compatibility
+    const response = await api.request({ method, url, data });
     return {
       ok: response.status >= 200 && response.status < 300,
       status: response.status,
@@ -47,24 +82,34 @@ export async function apiRequest(
       text: async () => JSON.stringify(response.data),
     } as Response;
   } catch (error: any) {
-    throw new Error(`${error.response?.status || 500}: ${error.response?.data?.error || error.message}`);
+    throw new Error(
+      `${error.response?.status || 500}: ${error.response?.data?.error || error.message}`
+    );
   }
 }
 
+/* ---------------- Default query fn + client (kept, with small 401 helper) ---------------- */
+
 type UnauthorizedBehavior = "returnNull" | "throw";
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      const response = await api.get(queryKey.join("/"));
+      const path = queryKey.join("/");
+      const response = await api.get(path.startsWith("/") ? path : `/${path}`);
       return response.data;
     } catch (error: any) {
       if (unauthorizedBehavior === "returnNull" && error.response?.status === 401) {
-        return null;
+        // make sure we don't keep sending a stale header
+        clearBackup();
+        return null as T;
       }
-      throw new Error(`${error.response?.status || 500}: ${error.response?.data?.error || error.message}`);
+      throw new Error(
+        `${error.response?.status || 500}: ${error.response?.data?.error || error.message}`
+      );
     }
   };
 
