@@ -529,7 +529,7 @@ export class DatabaseStorage implements IStorage {
     if (range === "custom" && customStartDate && customEndDate) {
       startDate = new Date(customStartDate);
       const endCandidate = new Date(customEndDate);
-      endDateExclusive = toEndExclusive(endCandidate)!;
+      endDateExclusive = toEndExclusive(endCandidate)!; // bump if date-only
     } else {
       switch (range) {
         case "current-month":
@@ -557,6 +557,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // One pass fetch
     const txData = await db
       .select()
       .from(transactions)
@@ -565,17 +566,27 @@ export class DatabaseStorage implements IStorage {
     const sum = (arr: typeof txData, pred: (t: Transaction) => boolean) =>
       arr.filter(pred).reduce((a, t) => a + Number(t.amount || 0), 0);
 
-    const totalIncomeSSP = sum(txData, (t) => t.type === "income" && t.currency === "SSP");
+    const totalIncomeSSP = sum(
+      txData,
+      (t) => t.type === "income" && t.currency === "SSP"
+    );
 
-    // USD tile is insurance income only
+    // USD tile is "Insurance (USD)" ⇒ only USD rows with a provider
     const totalIncomeUSD = sum(
       txData,
       (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId
     );
 
-    const totalExpenseSSP = sum(txData, (t) => t.type === "expense" && t.currency === "SSP");
-    const totalExpenseUSD = sum(txData, (t) => t.type === "expense" && t.currency === "USD");
+    const totalExpenseSSP = sum(
+      txData,
+      (t) => t.type === "expense" && t.currency === "SSP"
+    );
+    const totalExpenseUSD = sum(
+      txData,
+      (t) => t.type === "expense" && t.currency === "USD"
+    );
 
+    // Department breakdown (SSP income only)
     const departmentBreakdown: Record<string, string> = {};
     for (const t of txData) {
       if (t.type !== "income" || t.currency !== "SSP" || !t.departmentId) continue;
@@ -613,23 +624,33 @@ export class DatabaseStorage implements IStorage {
       .from(patientVolume)
       .where(and(gte(patientVolume.date, startDate), lt(patientVolume.date, endDateExclusive)));
 
-    const totalPatients = patientVolumeData.reduce((s, pv) => s + (pv.patientCount || 0), 0);
+    const totalPatients = patientVolumeData.reduce(
+      (s, pv) => s + (pv.patientCount || 0),
+      0
+    );
 
     const recentTransactions = txData
       .slice()
       .sort((a, b) => (a.date > b.date ? -1 : 1))
       .slice(0, 10);
 
+    const totalIncomeSSPStr = totalIncomeSSP.toString();
+    const totalIncomeUSDStr = totalIncomeUSD.toString();
+    const totalExpensesSSPStr = totalExpenseSSP.toString();
+    const totalExpensesUSDStr = totalExpenseUSD.toString();
+    const netIncomeSSPStr = (totalIncomeSSP - totalExpenseSSP).toString();
+    const netIncomeUSDStr = (totalIncomeUSD - totalExpenseUSD).toString();
+
     return {
-      totalIncome: totalIncomeSSP.toString(),
-      totalIncomeSSP: totalIncomeSSP.toString(),
-      totalIncomeUSD: totalIncomeUSD.toString(),
-      totalExpenses: totalExpenseSSP.toString(),
-      totalExpensesSSP: totalExpenseSSP.toString(),
-      totalExpensesUSD: totalExpenseUSD.toString(),
-      netIncome: (totalIncomeSSP - totalExpenseSSP).toString(),
-      netIncomeSSP: (totalIncomeSSP - totalExpenseSSP).toString(),
-      netIncomeUSD: (totalIncomeUSD - totalExpenseUSD).toString(),
+      totalIncome: totalIncomeSSPStr, // legacy (SSP)
+      totalIncomeSSP: totalIncomeSSPStr,
+      totalIncomeUSD: totalIncomeUSDStr, // insurance USD only
+      totalExpenses: totalExpensesSSPStr, // legacy (SSP)
+      totalExpensesSSP: totalExpensesSSPStr,
+      totalExpensesUSD: totalExpensesUSDStr,
+      netIncome: netIncomeSSPStr, // legacy (SSP)
+      netIncomeSSP: netIncomeSSPStr,
+      netIncomeUSD: netIncomeUSDStr,
       departmentBreakdown,
       insuranceBreakdown,
       expenseBreakdown,
@@ -667,7 +688,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`DATE(${transactions.date})`)
       .orderBy(sql`DATE(${transactions.date})`);
 
-    // Fill missing dates for chart
+    // Fill missing dates
     const result: Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }> = [];
     const cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
     const endDay = new Date(Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth(), endEx.getUTCDate()));
@@ -877,7 +898,8 @@ export class DatabaseStorage implements IStorage {
     const paidSub = db
       .select({
         claimId: insurancePayments.claimId,
-        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`,
+        // ✅ alias the raw SUM so it can be referenced from the outer query
+        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`.as("paid"),
       })
       .from(insurancePayments)
       .where(sql`${insurancePayments.claimId} IS NOT NULL`)
@@ -900,7 +922,7 @@ export class DatabaseStorage implements IStorage {
         createdBy: insuranceClaims.createdBy,
         createdAt: insuranceClaims.createdAt,
         updatedAt: insuranceClaims.updatedAt,
-        // ✅ correct alias usage:
+        // ✅ reference subquery fields as paidSub.paid
         paidToDate: sql<number>`COALESCE(${paidSub.paid}, 0)`,
         balance: sql<number>`(${insuranceClaims.claimedAmount} - COALESCE(${paidSub.paid}, 0))`,
       })
@@ -956,7 +978,8 @@ export class DatabaseStorage implements IStorage {
     const claimsAgg = db
       .select({
         providerId: insuranceClaims.providerId,
-        claimed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}), 0)`,
+        // ✅ alias the SUM so outer query can reference claimsAgg.claimed
+        claimed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}), 0)`.as("claimed"),
       })
       .from(insuranceClaims)
       .groupBy(insuranceClaims.providerId)
@@ -965,7 +988,8 @@ export class DatabaseStorage implements IStorage {
     const payAgg = db
       .select({
         providerId: insurancePayments.providerId,
-        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`,
+        // ✅ alias the SUM so outer query can reference payAgg.paid
+        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`.as("paid"),
       })
       .from(insurancePayments)
       .groupBy(insurancePayments.providerId)
@@ -975,7 +999,6 @@ export class DatabaseStorage implements IStorage {
       .select({
         providerId: insuranceProviders.id,
         providerName: insuranceProviders.name,
-        // ✅ correct alias usage:
         claimed: sql<number>`COALESCE(${claimsAgg.claimed}, 0)`,
         paid: sql<number>`COALESCE(${payAgg.paid}, 0)`,
         balance: sql<number>`COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0)`,
