@@ -805,96 +805,125 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ error: "Failed to fetch detailed transactions" });
     }
   });
-    /* --------------------------------------------------------------- */
+      /* --------------------------------------------------------------- */
   /* Insurance Management                                            */
   /* --------------------------------------------------------------- */
+
+  // Helper to accept the new window (start/end) and still support old year/month
+  const getDateWindow = (q: any) => {
+    const start = (q.start as string) || (q.startDate as string) || undefined;
+    const end   = (q.end   as string) || (q.endDate   as string) || undefined;
+    if (start && end) return { start, end };
+
+    const year  = q.year ? Number(q.year) : undefined;
+    const month = q.month ? Number(q.month) : undefined;
+    if (year && !month) return { start: `${year}-01-01`, end: `${year}-12-31` };
+    if (year && month) {
+      const mm = String(month).padStart(2, "0");
+      const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(last).padStart(2,"0")}` };
+    }
+    return { start: undefined, end: undefined };
+  };
 
   // Zod request schemas
   const ClaimCreate = z.object({
     providerId: z.string().min(1),
-    periodYear: z.number().int(),
-    periodMonth: z.number().int().min(1).max(12),
-    periodStart: z.string().min(8), // "YYYY-MM-DD" or ISO
-    periodEnd: z.string().min(8),
+    // UI now sends only dates; server derives year/month for DB
+    periodStart: z.string().min(8),  // YYYY-MM-DD
+    periodEnd:   z.string().min(8),
     currency: z.enum(["USD", "SSP"]).default("USD"),
     claimedAmount: z.number().nonnegative(),
-    status: z.enum(["submitted","partially_paid","paid","rejected","written_off"]).optional(),
+    status: z.enum(["submitted","partially_paid","paid"]).default("submitted"),
     notes: z.string().optional(),
   });
 
   const ClaimPatch = z.object({
     claimedAmount: z.number().nonnegative().optional(),
-    status: z.enum(["submitted","partially_paid","paid","rejected","written_off"]).optional(),
+    status: z.enum(["submitted","partially_paid","paid"]).optional(),
     notes: z.string().optional(),
   });
 
   const PaymentCreate = z.object({
     providerId: z.string().min(1),
-    claimId: z.string().min(1).optional(),  // can credit a specific claim or leave null
-    paymentDate: z.string().min(8),          // "YYYY-MM-DD" or ISO
+    claimId: z.string().min(1).optional(),  // can link to a claim or leave null
+    paymentDate: z.string().min(8),         // YYYY-MM-DD
     amount: z.number().positive(),
     currency: z.enum(["USD","SSP"]).default("USD"),
     reference: z.string().optional(),
     notes: z.string().optional(),
   });
 
-  /** DELETE a claim (place after your PATCH /api/insurance-claims/:id) */
-app.delete("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
-  try {
-    await storage.deleteInsuranceClaim(req.params.id);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
+  // ✅ this was missing before
+  const PaymentPatch = PaymentCreate.partial();
 
-/** List payments (put this near your POST /api/insurance-payments) */
-app.get("/api/insurance-payments", requireAuth, async (req, res, next) => {
-  try {
-    const rows = await storage.listInsurancePayments({
-      providerId: req.query.providerId as string | undefined,
-      claimId: req.query.claimId as string | undefined,
-    });
-    res.json(rows);
-  } catch (err) { next(err); }
-});
+  /** Delete a claim */
+  app.delete("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+    try { await storage.deleteInsuranceClaim(req.params.id); res.json({ success: true }); }
+    catch (err) { next(err); }
+  });
 
-/** Edit a payment */
-app.patch("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
-  try {
-    const patch = PaymentPatch.parse(req.body);
-    const row = await storage.updateInsurancePayment(req.params.id, patch);
-    if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(row);
-  } catch (err) { next(err); }
-});
+  /** List payments (now supports date window) */
+  app.get("/api/insurance-payments", requireAuth, async (req, res, next) => {
+    try {
+      const { start, end } = getDateWindow(req.query);
+      const rows = await storage.listInsurancePayments({
+        providerId: req.query.providerId as string | undefined,
+        claimId: req.query.claimId as string | undefined,
+        start, end,
+      });
+      res.json(rows);
+    } catch (err) { next(err); }
+  });
 
-/** Delete a payment */
-app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
-  try {
-    await storage.deleteInsurancePayment(req.params.id);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
+  /** Edit a payment */
+  app.patch("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
+    try {
+      const patch = PaymentPatch.parse(req.body);
+      const row = await storage.updateInsurancePayment(req.params.id, patch);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
 
-  /** Create a monthly claim (does not touch revenue) */
+  /** Delete a payment */
+  app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
+    try { await storage.deleteInsurancePayment(req.params.id); res.json({ success: true }); }
+    catch (err) { next(err); }
+  });
+
+  /** Create a claim — derives year/month from periodStart */
   app.post("/api/insurance-claims", requireAuth, async (req, res, next) => {
     try {
       const input = ClaimCreate.parse(req.body);
+      const d = new Date(input.periodStart + "T00:00:00Z");
+      const periodYear = d.getUTCFullYear();
+      const periodMonth = d.getUTCMonth() + 1;
+
       const row = await storage.createInsuranceClaim({
-        ...input,
+        providerId: input.providerId,
+        periodYear,
+        periodMonth,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        currency: input.currency,
+        claimedAmount: input.claimedAmount,
+        status: input.status,
+        notes: input.notes,
         createdBy: req.user?.id ?? null,
       });
       res.json(row);
     } catch (err) { next(err); }
   });
 
-  /** List claims (?providerId=&year=&month=&status=) */
+  /** List claims (now understands window) */
   app.get("/api/insurance-claims", requireAuth, async (req, res, next) => {
     try {
+      const { start, end } = getDateWindow(req.query);
       const rows = await storage.listInsuranceClaims({
         providerId: req.query.providerId as string | undefined,
-        year: req.query.year ? Number(req.query.year) : undefined,
-        month: req.query.month ? Number(req.query.month) : undefined,
         status: req.query.status as string | undefined,
+        start, end,
       });
       res.json(rows);
     } catch (err) { next(err); }
@@ -919,7 +948,7 @@ app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) =>
     } catch (err) { next(err); }
   });
 
-  /** Record a payment (collections). Not mirrored to transactions. */
+  /** Record a payment */
   app.post("/api/insurance-payments", requireAuth, async (req, res, next) => {
     try {
       const input = PaymentCreate.parse(req.body);
@@ -931,11 +960,13 @@ app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) =>
     } catch (err) { next(err); }
   });
 
-  /** Provider + per-claim balances */
+  /** Provider + per-claim balances (now supports window) */
   app.get("/api/insurance-balances", requireAuth, async (req, res, next) => {
     try {
+      const { start, end } = getDateWindow(req.query);
       const data = await storage.getInsuranceBalances({
         providerId: req.query.providerId as string | undefined,
+        start, end,
       });
       res.json(data);
     } catch (err) { next(err); }
