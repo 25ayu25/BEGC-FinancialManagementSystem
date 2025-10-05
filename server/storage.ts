@@ -64,6 +64,19 @@ function nextMonthUTC(y: number, m1_12: number) {
   return m1_12 === 12 ? new Date(Date.UTC(y + 1, 0, 1)) : new Date(Date.UTC(y, m1_12, 1));
 }
 
+/* ---------- preferred provider order (CIC, CIGNA, UAP, New Sudan, Nile International, Other) ---------- */
+const providerOrderExpr = sql`
+  CASE
+    WHEN ${insuranceProviders.name} ILIKE 'CIC' THEN 1
+    WHEN ${insuranceProviders.name} ILIKE 'CIGNA' THEN 2
+    WHEN ${insuranceProviders.name} ILIKE 'UAP' THEN 3
+    WHEN ${insuranceProviders.name} ILIKE 'NEW SUDAN' THEN 4
+    WHEN ${insuranceProviders.name} ILIKE 'NILE INTERNATIONAL' THEN 5
+    WHEN ${insuranceProviders.name} ILIKE 'OTHER' THEN 6
+    ELSE 999
+  END
+`;
+
 /* ---------- storage interface ---------- */
 
 export interface IStorage {
@@ -373,9 +386,16 @@ export class DatabaseStorage implements IStorage {
     const [newDepartment] = await db.insert(departments).values(department).returning();
     return newDepartment;
   }
+
+  // ✅ Ordered by preferred list
   async getInsuranceProviders(): Promise<InsuranceProvider[]> {
-    return await db.select().from(insuranceProviders).where(eq(insuranceProviders.isActive, true));
+    return await db
+      .select()
+      .from(insuranceProviders)
+      .where(eq(insuranceProviders.isActive, true))
+      .orderBy(providerOrderExpr, insuranceProviders.name);
   }
+
   async createInsuranceProvider(provider: InsertInsuranceProvider): Promise<InsuranceProvider> {
     const [newProvider] = await db.insert(insuranceProviders).values(provider).returning();
     return newProvider;
@@ -1076,7 +1096,7 @@ export class DatabaseStorage implements IStorage {
       .select({ id: insuranceProviders.id, name: insuranceProviders.name })
       .from(insuranceProviders)
       .where(and(...provConds))
-      .orderBy(insuranceProviders.name);
+      .orderBy(providerOrderExpr, insuranceProviders.name); // ✅ preferred order
 
     // Billed inside window
     const billedConds: any[] = [];
