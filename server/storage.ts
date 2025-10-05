@@ -217,7 +217,10 @@ export interface IStorage {
 
   /* -------- NEW: Insurance Management -------- */
 
-  createInsuranceClaim(claim: InsertInsuranceClaim): Promise<InsuranceClaim>;
+  createInsuranceClaim(
+    claim: InsertInsuranceClaim & { createdBy?: string | null }
+  ): Promise<InsuranceClaim>;
+
   listInsuranceClaims(filters?: {
     providerId?: string;
     year?: number;
@@ -232,12 +235,16 @@ export interface IStorage {
       }
     >
   >;
+
   getInsuranceClaim(id: string): Promise<
     (InsuranceClaim & { providerName: string; paidToDate: number; balance: number }) | undefined
   >;
+
   updateInsuranceClaim(id: string, updates: Partial<InsuranceClaim>): Promise<InsuranceClaim | undefined>;
 
-  createInsurancePayment(payment: InsertInsurancePayment): Promise<InsurancePayment>;
+  createInsurancePayment(
+    payment: InsertInsurancePayment & { createdBy?: string | null }
+  ): Promise<InsurancePayment>;
 
   getInsuranceBalances(filters?: {
     providerId?: string;
@@ -863,10 +870,18 @@ export class DatabaseStorage implements IStorage {
 
   /* ---------------- Insurance Management (new) ---------------- */
 
-  // Create a monthly claim
-  async createInsuranceClaim(claim: InsertInsuranceClaim): Promise<InsuranceClaim> {
-    const [row] = await db.insert(insuranceClaims).values(claim).returning();
-    return row;
+  // Create a monthly claim (coerce dates; allow createdBy passthrough)
+  async createInsuranceClaim(
+    claim: InsertInsuranceClaim & { createdBy?: string | null }
+  ): Promise<InsuranceClaim> {
+    const row: InsertInsuranceClaim = {
+      ...claim,
+      periodStart: new Date(claim.periodStart as any),
+      periodEnd: new Date(claim.periodEnd as any),
+      // keep claimedAmount as provided; Drizzle pg numeric accepts number | string
+    };
+    const [created] = await db.insert(insuranceClaims).values(row).returning();
+    return created;
   }
 
   // List claims with paid-to-date and balance
@@ -943,10 +958,16 @@ export class DatabaseStorage implements IStorage {
     return row || undefined;
   }
 
-  // Record a payment (cash collection) – not mirrored to transactions
-  async createInsurancePayment(payment: InsertInsurancePayment): Promise<InsurancePayment> {
-    const [row] = await db.insert(insurancePayments).values(payment).returning();
-    return row;
+  // Record a payment (collections) – coerce date; allow createdBy passthrough
+  async createInsurancePayment(
+    payment: InsertInsurancePayment & { createdBy?: string | null }
+  ): Promise<InsurancePayment> {
+    const row: InsertInsurancePayment = {
+      ...payment,
+      paymentDate: new Date(payment.paymentDate as any),
+    };
+    const [created] = await db.insert(insurancePayments).values(row).returning();
+    return created;
   }
 
   // Provider + claim balances
