@@ -91,11 +91,22 @@ function toUrl(path: string) {
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  // Start with any headers passed by the caller
+  const headers = new Headers(init?.headers || {});
+  headers.set("content-type", "application/json");
+
+  // Safari/Incognito fallback: send backup session token if present
+  if (typeof window !== "undefined") {
+    const backup = localStorage.getItem("user_session_backup");
+    if (backup) headers.set("x-session-token", backup);
+  }
+
   const res = await fetch(toUrl(path), {
-    credentials: "include",
-    headers: { "content-type": "application/json" },
+    credentials: "include",  // still try cookies first
     ...init,
+    headers,
   });
+
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     const err = new Error(txt || res.statusText || `HTTP ${res.status}`);
