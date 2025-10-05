@@ -54,8 +54,22 @@ type BalancesResponse = {
 const fmt = (n: number | string, currency = "USD") =>
   `${currency} ${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
+/** API base comes from Netlify env -> Vite -> client. Fallback = same-origin. */
+const RAW_BASE =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) ||
+  (typeof window !== "undefined" && (window as any).__API_URL__) ||
+  "";
+
+/** Join helper: handles empty base, trailing/leading slashes, and absolute URLs */
+function toUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = String(RAW_BASE || "").replace(/\/+$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(toUrl(path), {
     credentials: "include",
     headers: { "content-type": "application/json" },
     ...init,
@@ -114,9 +128,9 @@ export default function InsurancePage() {
 
   /* --------------------------- effects --------------------------- */
   useEffect(() => {
-    api<Provider[]>("/api/insurance-providers").then(setProviders).catch((e) =>
-      console.error("providers", e)
-    );
+    api<Provider[]>("/api/insurance-providers")
+      .then(setProviders)
+      .catch((e) => console.error("providers", e));
   }, []);
 
   const reloadClaims = () => {
@@ -125,9 +139,9 @@ export default function InsurancePage() {
     if (status) params.set("status", status);
     if (year) params.set("year", String(year));
     if (month) params.set("month", String(month));
-    api<Claim[]>(`/api/insurance-claims?${params.toString()}`).then(setClaims).catch((e) =>
-      console.error("claims", e)
-    );
+    api<Claim[]>(`/api/insurance-claims?${params.toString()}`)
+      .then(setClaims)
+      .catch((e) => console.error("claims", e));
   };
 
   useEffect(reloadClaims, [providerId, status, year, month]);
