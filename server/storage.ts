@@ -74,6 +74,12 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
 
+    // Insurance payments & claim maintenance
+  listInsurancePayments(filters?: { providerId?: string; claimId?: string }): Promise<InsurancePayment[]>;
+  updateInsurancePayment(id: string, updates: Partial<InsurancePayment>): Promise<InsurancePayment | undefined>;
+  deleteInsurancePayment(id: string): Promise<void>;
+  deleteInsuranceClaim(id: string): Promise<void>;
+
   // Departments
   getDepartments(): Promise<Department[]>;
   createDepartment(department: InsertDepartment): Promise<Department>;
