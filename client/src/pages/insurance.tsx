@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -143,9 +142,9 @@ export default function InsurancePage() {
 
   useEffect(reloadBalances, [providerId]);
 
-  // derive per-provider select for payment modal (only provider with open balance optional)
+  // claims for selected provider when recording a payment
   const openClaims = useMemo(
-    () => claims.filter((c) => c.status !== "paid" && c.providerId === (pProviderId || c.providerId)),
+    () => claims.filter((c) => c.status !== "paid" && (!pProviderId || c.providerId === pProviderId)),
     [claims, pProviderId]
   );
 
@@ -328,16 +327,12 @@ export default function InsurancePage() {
               <div key={row.providerId} className="border rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <div className="font-medium">{row.providerName}</div>
-                  <Link
-                    to="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setProviderId(row.providerId);
-                    }}
+                  <button
+                    onClick={() => setProviderId(row.providerId)}
                     className="text-sm text-indigo-600 hover:underline"
                   >
                     View details
-                  </Link>
+                  </button>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                   <div className="bg-slate-50 rounded p-2">
@@ -450,16 +445,14 @@ export default function InsurancePage() {
                   <label className="block text-xs text-slate-500 mb-1">Link to Claim (optional)</label>
                   <select className="border rounded-lg p-2 w-full" value={pClaimId} onChange={(e) => setPClaimId(e.target.value)}>
                     <option value="">— None —</option>
-                    {claims
-                      .filter((c) => !providerId || c.providerId === (pProviderId || providerId))
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })} — {fmt(c.claimedAmount, c.currency)}
-                        </option>
-                      ))}
+                    {openClaims.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", {
+                          month: "short",
+                          year: "numeric",
+                        })} — {fmt(c.claimedAmount, c.currency)}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
