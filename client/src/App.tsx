@@ -23,6 +23,9 @@ import { useLocation } from "wouter";
 // ⬇️ NEW: bring in the global date filter provider
 import { DateFilterProvider } from "@/context/date-filter-context";
 
+// ⬇️ NEW: Insurance page
+import Insurance from "@/pages/insurance";
+
 function Router() {
   return (
     <Switch>
@@ -78,6 +81,8 @@ function Router() {
                   <Route path="/reports" component={Reports} />
                   <Route path="/patient-volume" component={PatientVolume} />
                   <Route path="/insurance-providers" component={InsuranceProviders} />
+                  {/* ⬇️ NEW: Insurance management route */}
+                  <Route path="/insurance" component={Insurance} />
                   <Route path="/settings" component={Settings} />
                   <Route path="/security" component={Security} />
                   <Route path="/users" component={UserManagement} />
