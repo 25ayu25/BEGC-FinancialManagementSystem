@@ -1,3 +1,4 @@
+// server/storage.ts
 import {
   users,
   departments,
@@ -74,8 +75,13 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
 
-    // Insurance payments & claim maintenance
-  listInsurancePayments(filters?: { providerId?: string; claimId?: string }): Promise<InsurancePayment[]>;
+  // Insurance payments & claim maintenance
+  listInsurancePayments(filters?: {
+    providerId?: string;
+    claimId?: string;
+    start?: string; // YYYY-MM-DD inclusive
+    end?: string;   // YYYY-MM-DD inclusive (converted to exclusive)
+  }): Promise<InsurancePayment[]>;
   updateInsurancePayment(id: string, updates: Partial<InsurancePayment>): Promise<InsurancePayment | undefined>;
   deleteInsurancePayment(id: string): Promise<void>;
   deleteInsuranceClaim(id: string): Promise<void>;
@@ -229,14 +235,16 @@ export interface IStorage {
 
   listInsuranceClaims(filters?: {
     providerId?: string;
-    year?: number;
-    month?: number;
     status?: string;
+    start?: string; // YYYY-MM-DD inclusive
+    end?: string;   // YYYY-MM-DD inclusive (converted to exclusive)
+    year?: number;  // legacy fallback
+    month?: number; // legacy fallback
   }): Promise<
     Array<
       InsuranceClaim & {
         providerName: string;
-        billedAmount: number;   // 👈 NEW alias for clarity
+        billedAmount: number;   // alias of claimedAmount
         paidToDate: number;
         balance: number;
       }
@@ -260,6 +268,8 @@ export interface IStorage {
 
   getInsuranceBalances(filters?: {
     providerId?: string;
+    start?: string; // YYYY-MM-DD inclusive
+    end?: string;   // YYYY-MM-DD inclusive (converted to exclusive)
   }): Promise<{
     providers: Array<{
       providerId: string;
@@ -267,8 +277,8 @@ export interface IStorage {
       claimed: number;
       paid: number;
       balance: number;
-      outstanding: number;   // 👈 NEW
-      credit: number;        // 👈 NEW
+      outstanding: number;   // non-negative
+      credit: number;        // non-negative
     }>;
     claims: Array<
       InsuranceClaim & { providerName: string; billedAmount: number; paidToDate: number; balance: number }
@@ -310,10 +320,21 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-    async listInsurancePayments(filters?: { providerId?: string; claimId?: string }) {
+  /* ---------------- Insurance payments maintenance ---------------- */
+
+  async listInsurancePayments(filters?: {
+    providerId?: string;
+    claimId?: string;
+    start?: string;
+    end?: string;
+  }) {
     const conds: any[] = [];
     if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
     if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
+    if (filters?.start) conds.push(gte(insurancePayments.paymentDate, new Date(filters.start)));
+    if (filters?.end)
+      conds.push(lt(insurancePayments.paymentDate, toEndExclusive(new Date(filters.end))!));
+
     let q = db.select().from(insurancePayments);
     if (conds.length) q = q.where(and(...conds));
     return await q.orderBy(desc(insurancePayments.paymentDate), desc(insurancePayments.createdAt));
@@ -923,14 +944,19 @@ export class DatabaseStorage implements IStorage {
 
   /* ---------------- Insurance Management (new) ---------------- */
 
-  // Create a monthly claim (coerce dates; allow createdBy passthrough)
+  // Create a monthly claim (coerce dates; derive periodYear/periodMonth if not provided)
   async createInsuranceClaim(
     claim: InsertInsuranceClaim & { createdBy?: string | null }
   ): Promise<InsuranceClaim> {
+    const start = new Date(claim.periodStart as any);
+    const end = new Date(claim.periodEnd as any);
+
     const row: InsertInsuranceClaim = {
       ...claim,
-      periodStart: new Date(claim.periodStart as any),
-      periodEnd: new Date(claim.periodEnd as any),
+      periodYear: claim.periodYear ?? start.getUTCFullYear(),
+      periodMonth: claim.periodMonth ?? start.getUTCMonth() + 1,
+      periodStart: start,
+      periodEnd: end,
     };
     const [created] = await db.insert(insuranceClaims).values(row).returning();
     return created;
@@ -939,15 +965,26 @@ export class DatabaseStorage implements IStorage {
   // List claims with paid-to-date and balance (adds billedAmount alias)
   async listInsuranceClaims(filters?: {
     providerId?: string;
+    status?: string;
+    start?: string;
+    end?: string;
     year?: number;
     month?: number;
-    status?: string;
   }) {
     const whereConds: any[] = [];
     if (filters?.providerId) whereConds.push(eq(insuranceClaims.providerId, filters.providerId));
-    if (filters?.year) whereConds.push(eq(insuranceClaims.periodYear, filters.year));
-    if (filters?.month) whereConds.push(eq(insuranceClaims.periodMonth, filters.month));
     if (filters?.status) whereConds.push(eq(insuranceClaims.status, filters.status));
+
+    // Preferred: window [start, end)
+    if (filters?.start) whereConds.push(gte(insuranceClaims.periodStart, new Date(filters.start)));
+    if (filters?.end)
+      whereConds.push(lt(insuranceClaims.periodEnd, toEndExclusive(new Date(filters.end))!));
+
+    // Backward compat if no window was provided
+    if (!filters?.start && !filters?.end) {
+      if (filters?.year) whereConds.push(eq(insuranceClaims.periodYear, filters.year));
+      if (filters?.month) whereConds.push(eq(insuranceClaims.periodMonth, filters.month));
+    }
 
     const paidSub = db
       .select({
@@ -970,7 +1007,7 @@ export class DatabaseStorage implements IStorage {
         periodEnd: insuranceClaims.periodEnd,
         currency: insuranceClaims.currency,
         claimedAmount: insuranceClaims.claimedAmount,     // legacy
-        billedAmount: insuranceClaims.claimedAmount,      // 👈 clearer alias for UI
+        billedAmount: insuranceClaims.claimedAmount,      // alias for UI
         status: insuranceClaims.status,
         notes: insuranceClaims.notes,
         createdBy: insuranceClaims.createdBy,
@@ -987,8 +1024,7 @@ export class DatabaseStorage implements IStorage {
 
     const rows = await q
       .orderBy(
-        desc(insuranceClaims.periodYear),
-        desc(insuranceClaims.periodMonth),
+        desc(insuranceClaims.periodStart),
         desc(insuranceClaims.createdAt)
       );
 
@@ -1028,68 +1064,101 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Provider + claim balances (active providers only; add outstanding/credit)
-  async getInsuranceBalances(filters?: { providerId?: string }) {
-    const claimsAgg = db
+  async getInsuranceBalances(filters?: { providerId?: string; start?: string; end?: string }) {
+    const { providerId, start, end } = filters || {};
+    const startDate = start ? new Date(start) : undefined;
+    const endEx     = end   ? toEndExclusive(new Date(end))! : undefined;
+
+    // Active providers (optional filter)
+    const provConds: any[] = [eq(insuranceProviders.isActive, true)];
+    if (providerId) provConds.push(eq(insuranceProviders.id, providerId));
+    const provs = await db
+      .select({ id: insuranceProviders.id, name: insuranceProviders.name })
+      .from(insuranceProviders)
+      .where(and(...provConds))
+      .orderBy(insuranceProviders.name);
+
+    // Billed inside window
+    const billedConds: any[] = [];
+    if (providerId) billedConds.push(eq(insuranceClaims.providerId, providerId));
+    if (startDate) billedConds.push(gte(insuranceClaims.periodStart, startDate));
+    if (endEx)     billedConds.push(lt(insuranceClaims.periodEnd, endEx));
+    const billedRows = await db
       .select({
         providerId: insuranceClaims.providerId,
-        claimed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}), 0)`.as("claimed"),
+        billed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}),0)`,
       })
       .from(insuranceClaims)
-      .groupBy(insuranceClaims.providerId)
-      .as("cagg");
+      .where(billedConds.length ? and(...billedConds) : undefined as any)
+      .groupBy(insuranceClaims.providerId);
+    const billedMap = new Map(billedRows.map(r => [r.providerId, Number(r.billed)]));
 
-    const payAgg = db
+    // Paid inside window
+    const paidConds: any[] = [];
+    if (providerId) paidConds.push(eq(insurancePayments.providerId, providerId));
+    if (startDate)  paidConds.push(gte(insurancePayments.paymentDate, startDate));
+    if (endEx)      paidConds.push(lt(insurancePayments.paymentDate, endEx));
+    const paidRows = await db
       .select({
         providerId: insurancePayments.providerId,
-        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}), 0)`.as("paid"),
+        paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}),0)`,
       })
       .from(insurancePayments)
-      .groupBy(insurancePayments.providerId)
-      .as("pagg");
+      .where(paidConds.length ? and(...paidConds) : undefined as any)
+      .groupBy(insurancePayments.providerId);
+    const paidMap = new Map(paidRows.map(r => [r.providerId, Number(r.paid)]));
 
-    let provQ = db
-      .select({
-        providerId: insuranceProviders.id,
-        providerName: insuranceProviders.name,
-        claimed: sql<number>`COALESCE(${claimsAgg.claimed}, 0)`,
-        paid: sql<number>`COALESCE(${payAgg.paid}, 0)`,
-        balance: sql<number>`COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0)`,
-        // NEW: split the sign into non-negative fields for cleaner UI
-        outstanding: sql<number>`
-          CASE
-            WHEN (COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0)) > 0
-            THEN (COALESCE(${claimsAgg.claimed}, 0) - COALESCE(${payAgg.paid}, 0))
-            ELSE 0
-          END
-        `,
-        credit: sql<number>`
-          CASE
-            WHEN (COALESCE(${payAgg.paid}, 0) - COALESCE(${claimsAgg.claimed}, 0)) > 0
-            THEN (COALESCE(${payAgg.paid}, 0) - COALESCE(${claimsAgg.claimed}, 0))
-            ELSE 0
-          END
-        `,
-      })
-      .from(insuranceProviders)
-      .leftJoin(claimsAgg, eq(claimsAgg.providerId, insuranceProviders.id))
-      .leftJoin(payAgg, eq(payAgg.providerId, insuranceProviders.id));
+    // Carry forward BEFORE start: claims < start  minus  payments < start
+    const carryMap = new Map<string, number>();
+    if (startDate) {
+      const beforeClaimConds: any[] = [lt(insuranceClaims.periodStart, startDate)];
+      if (providerId) beforeClaimConds.push(eq(insuranceClaims.providerId, providerId));
+      const beforeClaims = await db
+        .select({
+          providerId: insuranceClaims.providerId,
+          total: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}),0)`,
+        })
+        .from(insuranceClaims)
+        .where(and(...beforeClaimConds))
+        .groupBy(insuranceClaims.providerId);
 
-    // only active providers (and optional provider filter)
-    const provConds: any[] = [eq(insuranceProviders.isActive, true)];
-    if (filters?.providerId) provConds.push(eq(insuranceProviders.id, filters.providerId));
-    provQ = provQ.where(and(...provConds));
+      const beforePayConds: any[] = [lt(insurancePayments.paymentDate, startDate)];
+      if (providerId) beforePayConds.push(eq(insurancePayments.providerId, providerId));
+      const beforePays = await db
+        .select({
+          providerId: insurancePayments.providerId,
+          total: sql<number>`COALESCE(SUM(${insurancePayments.amount}),0)`,
+        })
+        .from(insurancePayments)
+        .where(and(...beforePayConds))
+        .groupBy(insurancePayments.providerId);
 
-    const providers = (await provQ.orderBy(insuranceProviders.name)).map((r) => ({
-      ...r,
-      claimed: Number(r.claimed),
-      paid: Number(r.paid),
-      balance: Number(r.balance),
-      outstanding: Number(r.outstanding),
-      credit: Number(r.credit),
-    }));
+      beforeClaims.forEach(r => carryMap.set(r.providerId, Number(r.total)));
+      beforePays.forEach(r => carryMap.set(r.providerId, (carryMap.get(r.providerId) || 0) - Number(r.total)));
+    }
 
+    // Claims detail within the same window (for the table)
     const claims = await this.listInsuranceClaims({
-      providerId: filters?.providerId,
+      providerId,
+      start,
+      end,
+    });
+
+    // Build provider summaries
+    const providers = provs.map(p => {
+      const billed = billedMap.get(p.id) || 0;
+      const collected = paidMap.get(p.id) || 0;
+      const carryForward = carryMap.get(p.id) || 0;
+      const outstandingRaw = billed - collected + carryForward;
+      return {
+        providerId: p.id,
+        providerName: p.name,
+        claimed: billed,
+        paid: collected,
+        balance: outstandingRaw,
+        outstanding: outstandingRaw > 0 ? outstandingRaw : 0,
+        credit: outstandingRaw < 0 ? -outstandingRaw : 0,
+      };
     });
 
     return { providers, claims: claims as any };
