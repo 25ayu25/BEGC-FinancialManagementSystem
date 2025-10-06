@@ -168,7 +168,7 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
 function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   const byId = new Map(providers.map((p) => [p.id, p.name]));
   const header = ["Provider","Year","Month","Currency","Billed","Status","Notes"].join(",");
-  the const body = rows.map((c) =>
+  const body = rows.map((c) =>
     [
       (byId.get(c.providerId) || c.providerId).replace(/,/g, " "),
       c.periodYear,
@@ -280,6 +280,23 @@ export default function InsurancePage() {
     };
   }, []);
 
+  // measure filters height to offset sticky summary on desktop
+  const filtersRef = useRef<HTMLDivElement | null>(null);
+  const [filtersH, setFiltersH] = useState(0);
+  useEffect(() => {
+    const el = filtersRef.current;
+    if (!el) return;
+    const update = () => setFiltersH(el.getBoundingClientRect().height || 0);
+    update();
+    const ro = (typeof ResizeObserver !== "undefined") ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   /* --------------------------- date helpers --------------------------- */
   function setPresetWindow(p: WindowPreset) {
     setPreset(p);
@@ -304,7 +321,6 @@ export default function InsurancePage() {
       yearOf(y);
       return;
     }
-    // custom -> keep manual start/end
   }
 
   /* --------------------------- effects --------------------------- */
@@ -386,7 +402,6 @@ export default function InsurancePage() {
       );
   }, [balances, detailProviderId, providerId]);
 
-  // keep provider order consistent on balances list too
   const orderedBalanceProviders = useMemo(
     () =>
       (balances?.providers ?? [])
@@ -395,9 +410,7 @@ export default function InsurancePage() {
     [balances]
   );
 
-  /* ----------------------------- UI bits ----------------------------- */
-
-  // summary cards (original sizing)
+  /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -426,12 +439,13 @@ export default function InsurancePage() {
     );
   }
 
+  /* ----------------------------- UI ----------------------------- */
   return (
     <div className="max-w-[1200px] mx-auto">
-      {/* Sticky header (title + actions) */}
+      {/* Sticky header with actions */}
       <div
         ref={headerRef}
-        className={`sticky top-0 z-30 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}
+        className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
       >
         <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold">Insurance Management</h1>
@@ -471,7 +485,7 @@ export default function InsurancePage() {
             <HelpPopover />
           </div>
 
-          {/* Mobile actions: dropdown */}
+          {/* Mobile actions */}
           <div className="md:hidden relative" ref={actionsRef}>
             <button
               onClick={() => setShowActions((v) => !v)}
@@ -524,7 +538,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Auth message (non-sticky) */}
+      {/* Auth notice (non-sticky) */}
       <div className="p-4 sm:p-6">
         {authError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -533,14 +547,14 @@ export default function InsurancePage() {
         )}
       </div>
 
-      {/* Sticky FILTERS for mobile; Sticky FILTERS+SUMMARY for desktop */}
+      {/* STICKY FILTERS (mobile & desktop) */}
       <div
-        className={`sticky z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}
+        ref={filtersRef}
+        className={`sticky z-20 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
         style={{ top: headerH }}
       >
         <div className="p-4 sm:p-6 pt-3">
-          {/* Filters */}
-          <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 gap-3">
+          <div className="rounded-xl border p-3 mb-0 grid grid-cols-1 gap-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
                 <option value="">All providers</option>
@@ -556,7 +570,7 @@ export default function InsurancePage() {
             </div>
 
             {/* window chips */}
-            <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-2">
               {[
                 { id: "all", label: "All time" },
                 { id: "ytd", label: "YTD" },
@@ -587,17 +601,22 @@ export default function InsurancePage() {
               </div>
             </div>
           </div>
-
-          {/* SUMMARY: stick here only on desktop */}
-          <div className="hidden md:block">
-            <SummaryCards />
-          </div>
         </div>
       </div>
 
-      {/* SUMMARY for mobile (non-sticky so content isn't obscured) */}
+      {/* SUMMARY (mobile: non-sticky) */}
       <div className="md:hidden p-4 sm:p-6 pt-3">
         <SummaryCards />
+      </div>
+
+      {/* SUMMARY (desktop: sticky under filters) */}
+      <div
+        className={`hidden md:block sticky z-10 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
+        style={{ top: headerH + filtersH }}
+      >
+        <div className="p-4 sm:p-6 pt-3">
+          <SummaryCards />
+        </div>
       </div>
 
       {/* Main content */}
@@ -651,7 +670,7 @@ export default function InsurancePage() {
             </div>
           </div>
 
-          {/* Provider balances */}
+          {/* Provider balances (ordered) */}
           <div className="bg-white rounded-xl border">
             <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
             <div className="p-4 space-y-3">
