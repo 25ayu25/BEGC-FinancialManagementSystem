@@ -168,7 +168,7 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
 function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   const byId = new Map(providers.map((p) => [p.id, p.name]));
   const header = ["Provider","Year","Month","Currency","Billed","Status","Notes"].join(",");
-  const body = rows.map((c) =>
+  the const body = rows.map((c) =>
     [
       (byId.get(c.providerId) || c.providerId).replace(/,/g, " "),
       c.periodYear,
@@ -395,117 +395,40 @@ export default function InsurancePage() {
     [balances]
   );
 
-  /* ------------------------ create / delete claim ------------------------ */
-  function hydrateClaimForm(c: Claim) {
-    setCProviderId(c.providerId);
-    setCStart(c.periodStart.slice(0,10));
-    setCEnd(c.periodEnd.slice(0,10));
-    setCCurrency(c.currency);
-    setCAmount(String(c.claimedAmount));
-    setCNotes(c.notes || "");
+  /* ----------------------------- UI bits ----------------------------- */
+
+  // summary cards (original sizing)
+  function SummaryCards() {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-2xl border bg-white p-4">
+          <div className="text-slate-500 text-sm">Billed</div>
+          <div className="mt-1 text-[22px] font-semibold">{money(summary.billed, "USD")}</div>
+          <div className="text-xs text-slate-500 mt-1">
+            {selectedProvider ? selectedProvider.name : "All providers"}
+          </div>
+        </div>
+        <div className="rounded-2xl border bg-white p-4">
+          <div className="text-slate-500 text-sm">Collected</div>
+          <div className="mt-1 text-[22px] font-semibold">{money(summary.collected, "USD")}</div>
+          <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
+        </div>
+        <div className="rounded-2xl border bg-white p-4">
+          <div className="text-slate-500 text-sm">Outstanding</div>
+          <div className={`mt-1 text-[22px] font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
+            {summary.outstanding < 0
+              ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
+              : money(summary.outstanding, "USD")}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
+        </div>
+      </div>
+    );
   }
 
-  async function submitClaim() {
-    const body = {
-      providerId: cProviderId || providerId,
-      periodStart: cStart, // hidden, defaults to current month
-      periodEnd: cEnd,     // hidden, defaults to current month
-      currency: cCurrency,
-      claimedAmount: Number(cAmount),
-      notes: cNotes || undefined,
-    };
-    try {
-      await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
-      setShowClaim(false);
-      setEditingClaimId("");
-      reloadClaims();
-      reloadBalances();
-      alert("Claim saved");
-    } catch (e: any) {
-      alert(`Failed to save claim: ${e.message || e}`);
-    }
-  }
-
-  async function deleteClaim(id: string) {
-    if (!confirm("Delete this claim? This cannot be undone.")) return;
-    try {
-      await api(`/api/insurance-claims/${id}`, { method: "DELETE" });
-      reloadClaims();
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-    } catch (e: any) {
-      alert(`Failed to delete claim: ${e.message || e}`);
-    }
-  }
-
-  /* ----------------------- create / delete payment ----------------------- */
-  function hydratePaymentForm(p: Payment) {
-    setPProviderId(p.providerId);
-    setPDate((p.paymentDate || "").slice(0,10));
-    setPAmount(String(p.amount));
-    setPCurrency(p.currency);
-    setPNotes(p.notes || "");
-  }
-
-  async function submitPayment() {
-    const body = {
-      providerId: pProviderId || providerId,
-      paymentDate: pDate || undefined,
-      amount: Number(pAmount),
-      currency: pCurrency,
-      notes: pNotes || undefined,
-    };
-    try {
-      await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
-      setShowPayment(false);
-      setEditingPaymentId("");
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-      alert("Payment saved");
-    } catch (e: any) {
-      alert(`Failed to save payment: ${e.message || e}`);
-    }
-  }
-
-  async function deletePayment(id: string) {
-    if (!confirm("Delete this payment? This cannot be undone.")) return;
-    try {
-      await api(`/api/insurance-payments/${id}`, { method: "DELETE" });
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-    } catch (e: any) {
-      alert(`Failed to delete payment: ${e.message || e}`);
-    }
-  }
-
-  function clearFilters() {
-    setProviderId("");
-    setStatus("");
-    setPresetWindow("all");
-  }
-
-  /* ----------------------------- UI ----------------------------- */
   return (
     <div className="max-w-[1200px] mx-auto">
-      {/* Sticky header with shadow only after scroll */}
+      {/* Sticky header (title + actions) */}
       <div
         ref={headerRef}
         className={`sticky top-0 z-30 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}
@@ -601,7 +524,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Non-sticky notices */}
+      {/* Auth message (non-sticky) */}
       <div className="p-4 sm:p-6">
         {authError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -610,7 +533,7 @@ export default function InsurancePage() {
         )}
       </div>
 
-      {/* STICKY: Filters + Summary (sticks under the top header) */}
+      {/* Sticky FILTERS for mobile; Sticky FILTERS+SUMMARY for desktop */}
       <div
         className={`sticky z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}
         style={{ top: headerH }}
@@ -632,7 +555,7 @@ export default function InsurancePage() {
               </select>
             </div>
 
-            {/* window chips — horizontal scroll on mobile */}
+            {/* window chips */}
             <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {[
                 { id: "all", label: "All time" },
@@ -665,30 +588,19 @@ export default function InsurancePage() {
             </div>
           </div>
 
-          {/* Summary — emphasized numbers */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-2xl border bg-white p-4">
-              <div className="text-slate-500 text-xs">Billed</div>
-              <div className="mt-1 text-3xl md:text-4xl font-bold tracking-tight">{money(summary.billed, "USD")}</div>
-              <div className="text-xs text-slate-500 mt-1">{selectedProvider ? selectedProvider.name : "All providers"}</div>
-            </div>
-            <div className="rounded-2xl border bg-white p-4">
-              <div className="text-slate-500 text-xs">Collected</div>
-              <div className="mt-1 text-3xl md:text-4xl font-bold tracking-tight">{money(summary.collected, "USD")}</div>
-              <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
-            </div>
-            <div className="rounded-2xl border bg-white p-4">
-              <div className="text-slate-500 text-xs">Outstanding</div>
-              <div className={`mt-1 text-3xl md:text-4xl font-bold tracking-tight ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
-                {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
-            </div>
+          {/* SUMMARY: stick here only on desktop */}
+          <div className="hidden md:block">
+            <SummaryCards />
           </div>
         </div>
       </div>
 
-      {/* Main content (scrolls under the sticky blocks) */}
+      {/* SUMMARY for mobile (non-sticky so content isn't obscured) */}
+      <div className="md:hidden p-4 sm:p-6 pt-3">
+        <SummaryCards />
+      </div>
+
+      {/* Main content */}
       <div className="p-4 sm:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Claims table */}
@@ -739,7 +651,7 @@ export default function InsurancePage() {
             </div>
           </div>
 
-          {/* Provider balances (ordered) */}
+          {/* Provider balances */}
           <div className="bg-white rounded-xl border">
             <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
             <div className="p-4 space-y-3">
