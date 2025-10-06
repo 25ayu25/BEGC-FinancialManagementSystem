@@ -26,7 +26,6 @@ type Payment = {
   paymentDate: string; // ISO
   amount: number | string;
   currency: "USD" | "SSP";
-  reference?: string | null;
   notes?: string | null;
   createdAt?: string;
 };
@@ -37,7 +36,6 @@ type BalancesResponse = {
     providerName: string;
     claimed: number;   // billed in window
     paid: number;      // collected in window
-    // server may also send these; keep optional to be tolerant
     balance?: number;
     outstanding?: number;
     credit?: number;
@@ -150,7 +148,7 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
   const label = balance < 0 ? "CR" : `${pct}%`;
   const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6);
   return (
-    <div className="relative h-10 w-10 shrink-0">
+    <div className="relative h-10 w-10 shrink-0" title={`${pct}% paid`}>
       <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }} />
       <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
         {label}
@@ -199,7 +197,7 @@ export default function InsurancePage() {
   const [providerId, setProviderId] = useState<string>("");
   const [status, setStatus] = useState<string>(""); // "", submitted, partially_paid, paid
 
-  // default window = current year (2025)
+  // default window = current year
   const currentYear = new Date().getUTCFullYear();
   const [preset, setPreset] = useState<WindowPreset>(("year-" + currentYear) as WindowPreset);
   const [start, setStart] = useState<string>(() => new Date(Date.UTC(currentYear, 0, 1)).toISOString().slice(0,10));
@@ -216,7 +214,7 @@ export default function InsurancePage() {
 
   const [authError, setAuthError] = useState(false);
 
-  // Add-Claim form (period fields are hidden but still sent)
+  // Add-Claim form (period fields hidden but still sent)
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cStart, setCStart] = useState<string>(() =>
     new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10)
@@ -228,13 +226,11 @@ export default function InsurancePage() {
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
-  // Payment form
+  // Payment form (Link-to-Claim & Reference removed)
   const [pProviderId, setPProviderId] = useState<string>("");
-  const [pClaimId, setPClaimId] = useState<string>("");
   const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
-  const [pRef, setPRef] = useState<string>("");
   const [pNotes, setPNotes] = useState<string>("");
 
   /* --------------------------- date helpers --------------------------- */
@@ -317,11 +313,6 @@ export default function InsurancePage() {
       .catch(() => setPayments([]))
       .finally(() => setLoadingPayments(false));
   }, [detailProviderId]);
-
-  const openClaims = useMemo(
-    () => claims.filter((c) => c.status !== "paid" && (!pProviderId || c.providerId === pProviderId)),
-    [claims, pProviderId]
-  );
 
   // summary: NO carry forward; Outstanding = Billed - Collected
   const summary = useMemo(() => {
@@ -413,22 +404,18 @@ export default function InsurancePage() {
   /* ----------------------- create / edit payment ----------------------- */
   function hydratePaymentForm(p: Payment) {
     setPProviderId(p.providerId);
-    setPClaimId(p.claimId || "");
     setPDate((p.paymentDate || "").slice(0,10)); // avoids 1969 epoch
     setPAmount(String(p.amount));
     setPCurrency(p.currency);
-    setPRef(p.reference || "");
     setPNotes(p.notes || "");
   }
 
   async function submitPayment() {
     const body = {
       providerId: pProviderId || providerId,
-      claimId: pClaimId || undefined,
       paymentDate: pDate,
       amount: Number(pAmount),
       currency: pCurrency,
-      reference: pRef || undefined,
       notes: pNotes || undefined,
     };
     try {
@@ -483,6 +470,7 @@ export default function InsurancePage() {
         <h1 className="text-2xl font-semibold">Insurance Management</h1>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => {
               setEditingClaimId("");
               setCProviderId(providerId || "");
@@ -497,12 +485,12 @@ export default function InsurancePage() {
           </button>
 
           <button
+            type="button"
             onClick={() => {
               setEditingPaymentId("");
               setPProviderId(providerId || "");
-              setPClaimId("");
               setPDate(new Date().toISOString().slice(0, 10));
-              setPAmount("0"); setPCurrency("USD"); setPRef(""); setPNotes("");
+              setPAmount("0"); setPCurrency("USD"); setPNotes("");
               setShowPayment(true);
             }}
             className="px-3 py-2 rounded-lg bg-slate-800 text-white"
@@ -510,7 +498,7 @@ export default function InsurancePage() {
             Record Payment
           </button>
 
-          <button onClick={() => exportClaimsCsv(claims, providers)} className="px-3 py-2 rounded-lg border hover:bg-slate-50">
+          <button type="button" onClick={() => exportClaimsCsv(claims, providers)} className="px-3 py-2 rounded-lg border hover:bg-slate-50">
             Export CSV
           </button>
 
@@ -553,6 +541,7 @@ export default function InsurancePage() {
           ].map((chip) => (
             <button
               key={chip.id}
+              type="button"
               onClick={() => setPresetWindow(chip.id as WindowPreset)}
               className={`px-3 py-1.5 rounded-full border ${preset === chip.id ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}
             >
@@ -566,7 +555,7 @@ export default function InsurancePage() {
             </>
           )}
           <div className="ml-auto">
-            <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
+            <button type="button" onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
           </div>
         </div>
       </div>
@@ -575,17 +564,17 @@ export default function InsurancePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Billed</div>
-          <div className="mt-1 text-xl font-semibold">{money(summary.billed, "USD")}</div>
+          <div className="mt-1 text-2xl md:text-3xl font-semibold">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">{selectedProvider ? selectedProvider.name : "All providers"}</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Collected</div>
-          <div className="mt-1 text-xl font-semibold">{money(summary.collected, "USD")}</div>
+          <div className="mt-1 text-2xl md:text-3xl font-semibold">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
-          <div className={`mt-1 text-xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
+          <div className={`mt-1 text-2xl md:text-3xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
             {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
           </div>
           <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
@@ -626,11 +615,11 @@ export default function InsurancePage() {
                       <td className="p-3">{c.notes || ""}</td>
                       <td className="p-3 text-right">
                         <div className="inline-flex gap-2">
-                          <button className="text-xs px-2 py-1 rounded-md border"
+                          <button type="button" className="text-xs px-2 py-1 rounded-md border"
                                   onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}>
                             Edit
                           </button>
-                          <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
+                          <button type="button" className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
                             Delete
                           </button>
                         </div>
@@ -660,7 +649,7 @@ export default function InsurancePage() {
                       <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
                       <div className="font-medium">{row.providerName}</div>
                     </div>
-                    <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
+                    <button type="button" onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
                       View details
                     </button>
                   </div>
@@ -689,7 +678,7 @@ export default function InsurancePage() {
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl border-l z-50 flex flex-col">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">{providers.find((p) => p.id === detailProviderId)?.name || "Provider"}: details</div>
-              <button className="text-slate-500" onClick={() => setDetailProviderId("")}>✕</button>
+              <button type="button" className="text-slate-500" onClick={() => setDetailProviderId("")}>✕</button>
             </div>
 
             <div className="p-4 overflow-y-auto space-y-6">
@@ -723,8 +712,8 @@ export default function InsurancePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            <button className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}>Edit</button>
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
+                            <button type="button" className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}>Edit</button>
+                            <button type="button" className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
                           </div>
                         </div>
 
@@ -740,12 +729,18 @@ export default function InsurancePage() {
 
                         <div className="mt-2 flex items-center justify-between">
                           <div className="text-xs text-slate-500">{c.notes || ""}</div>
-                          <button className="text-xs px-2 py-1 rounded-md bg-slate-800 text-white" onClick={() => {
-                            setPProviderId(c.providerId);
-                            setPClaimId(c.id);
-                            setEditingPaymentId("");
-                            setShowPayment(true);
-                          }}>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 rounded-md bg-slate-800 text-white"
+                            onClick={() => {
+                              setEditingPaymentId("");
+                              setPProviderId(c.providerId);
+                              setPDate(new Date().toISOString().slice(0, 10));
+                              setPAmount("0");
+                              setPCurrency("USD");
+                              setPNotes("");
+                              setShowPayment(true);
+                            }}>
                             Record payment
                           </button>
                         </div>
@@ -770,12 +765,11 @@ export default function InsurancePage() {
                           <div className="text-xs text-slate-500">
                             {new Date(p.paymentDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                             {claim ? ` • ${new Date(claim.periodYear, claim.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })}` : ""}
-                            {p.reference ? ` • Ref: ${p.reference}` : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingPaymentId(p.id); hydratePaymentForm(p); setShowPayment(true); }}>Edit</button>
-                          <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
+                          <button type="button" className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingPaymentId(p.id); hydratePaymentForm(p); setShowPayment(true); }}>Edit</button>
+                          <button type="button" className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
                         </div>
                       </div>
                     );
@@ -793,7 +787,7 @@ export default function InsurancePage() {
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">{editingClaimId ? "Edit Claim" : "Add Claim"}</div>
-              <button className="text-slate-500" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>✕</button>
+              <button type="button" className="text-slate-500" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -823,8 +817,8 @@ export default function InsurancePage() {
               </div>
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>
+              <button type="button" className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>Cancel</button>
+              <button type="button" className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>
                 {editingClaimId ? "Save Changes" : "Save Claim"}
               </button>
             </div>
@@ -832,13 +826,13 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Add/Edit Payment */}
+      {/* Add/Edit Payment (no Link-to-Claim, no Reference) */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">{editingPaymentId ? "Edit Payment" : "Record Payment"}</div>
-              <button className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>✕</button>
+              <button type="button" className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -847,17 +841,6 @@ export default function InsurancePage() {
                   <select className="border rounded-lg p-2 w-full" value={pProviderId} onChange={(e) => setPProviderId(e.target.value)}>
                     <option value="">Select…</option>
                     {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Link to Claim (optional)</label>
-                  <select className="border rounded-lg p-2 w-full" value={pClaimId} onChange={(e) => setPClaimId(e.target.value)}>
-                    <option value="">— None —</option>
-                    {openClaims.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })} — {money(c.claimedAmount, c.currency)}
-                      </option>
-                    ))}
                   </select>
                 </div>
                 <div>
@@ -875,19 +858,15 @@ export default function InsurancePage() {
                   <label className="block text-xs text-slate-500 mb-1">Amount Received</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Reference (optional)</label>
-                  <input className="border rounded-lg p-2 w-full" value={pRef} onChange={(e) => setPRef(e.target.value)} />
-                </div>
-                <div>
+                <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
                   <input className="border rounded-lg p-2 w-full" value={pNotes} onChange={(e) => setPNotes(e.target.value)} />
                 </div>
               </div>
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>
+              <button type="button" className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
+              <button type="button" className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>
                 {editingPaymentId ? "Save Changes" : "Record Payment"}
               </button>
             </div>
