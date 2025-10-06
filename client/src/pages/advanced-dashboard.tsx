@@ -25,7 +25,7 @@ import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-/* ================== number formatting helpers ================== */
+/* ================== number helpers ================== */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const fmtUSD = (v: number) => {
@@ -33,12 +33,8 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== helper: normalize range ================== */
-function computeRangeParams(
-  timeRange: string,
-  selectedYear: number | null,
-  selectedMonth: number | null
-) {
+/* ================== range helper ================== */
+function computeRangeParams(timeRange: string, selectedYear: number | null, selectedMonth: number | null) {
   const today = new Date();
   const fallbackY = today.getFullYear();
   const fallbackM = today.getMonth() + 1;
@@ -83,10 +79,7 @@ function InsuranceProvidersUSD({
     if (!breakdown) return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
       return breakdown
-        .map((r) => ({
-          name: String(r.name ?? r.provider ?? "Unknown"),
-          amount: Number(r.amount ?? r.total ?? 0),
-        }))
+        .map((r) => ({ name: String(r.name ?? r.provider ?? "Unknown"), amount: Number(r.amount ?? r.total ?? 0) }))
         .filter((r) => r.amount > 0);
     }
     return Object.entries(breakdown)
@@ -98,10 +91,7 @@ function InsuranceProvidersUSD({
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
 
-  const palette = [
-    "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
-    "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
-  ];
+  const palette = ["#00A3A3", "#4F46E5", "#F59E0B", "#EF4444", "#10B981", "#8B5CF6", "#EA580C", "#06B6D4"];
 
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
@@ -138,9 +128,7 @@ function InsuranceProvidersUSD({
                       <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
                       <span className="text-sm text-slate-700">{item.name}</span>
                     </div>
-                    <div className="text-xs font-medium text-slate-600">
-                      USD {fmtUSD(item.amount)}
-                    </div>
+                    <div className="text-xs font-medium text-slate-600">USD {fmtUSD(item.amount)}</div>
                   </div>
                   <div className="h-2 rounded bg-slate-100 overflow-hidden">
                     <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
@@ -165,7 +153,6 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // Normalize the range for API/links
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
     timeRange, selectedYear ?? null, selectedMonth ?? null
   );
@@ -174,9 +161,9 @@ export default function AdvancedDashboard() {
     range: "current-month" | "last-month" | "last-3-months" | "year" | "month-select" | "custom"
   ) => setTimeRange(range);
 
-  // Sticky header measurements + shadow
+  /* ---- Sticky offsets & shadow ---- */
   const headerRef = useRef<HTMLDivElement | null>(null);
-  const [headerH, setHeaderH] = useState(64);
+  const [headerH, setHeaderH] = useState(64); // measured page header height (title + date)
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -194,32 +181,12 @@ export default function AdvancedDashboard() {
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     ro?.observe(el);
     window.addEventListener("resize", update, { passive: true });
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener("resize", update);
-    };
+    return () => { ro?.disconnect(); window.removeEventListener("resize", update); };
   }, []);
 
-  const now = new Date();
-  const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
-  const months = [
-    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
-    { label: "April", value: 4 }, { label: "May", value: 5 }, { label: "June", value: 6 },
-    { label: "July", value: 7 }, { label: "August", value: 8 }, { label: "September", value: 9 },
-    { label: "October", value: 10 }, { label: "November", value: 11 }, { label: "December", value: 12 },
-  ];
-
-  // ---------- queries ----------
+  /* ---- queries ---- */
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: [
-      "/api/dashboard",
-      yearToSend,
-      monthToSend,
-      rangeToSend,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
-    ],
+    queryKey: ["/api/dashboard", yearToSend, monthToSend, rangeToSend, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let url = `/api/dashboard?year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
@@ -233,14 +200,7 @@ export default function AdvancedDashboard() {
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
   const { data: rawIncome } = useQuery({
-    queryKey: [
-      "/api/income-trends",
-      yearToSend,
-      monthToSend,
-      rangeToSend,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
-    ],
+    queryKey: ["/api/income-trends", yearToSend, monthToSend, rangeToSend, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let url = `/api/income-trends/${yearToSend}/${monthToSend}?range=${rangeToSend}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
@@ -251,7 +211,7 @@ export default function AdvancedDashboard() {
     },
   });
 
-  // ---------- build income series ----------
+  /* ---- build income series (unchanged) ---- */
   let incomeSeries: Array<{ day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string; }> = [];
   if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
     incomeSeries = rawIncome.map((r: any, i: number) => ({
@@ -285,14 +245,12 @@ export default function AdvancedDashboard() {
     }
   }
 
-  // ---------- totals ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
 
-  // loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -304,7 +262,7 @@ export default function AdvancedDashboard() {
     );
   }
 
-  /* ------- shared KPI grid (used for both mobile & desktop) ------- */
+  /* ------- shared KPI grid ------- */
   const KpiGrid = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
       {/* Total Revenue */}
@@ -316,17 +274,15 @@ export default function AdvancedDashboard() {
               <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                 SSP {nf0.format(Math.round(sspRevenue))}
               </p>
-              <div className="flex items-center mt-1">
-                {dashboardData?.changes?.incomeChangeSSP !== undefined && (
-                  <span className={`text-xs font-medium ${
-                    dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
-                    dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                  }`}>
-                    {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
-                    {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
-                  </span>
-                )}
-              </div>
+              {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                <span className={`text-xs font-medium ${
+                  dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
+                  dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                }`}>
+                  {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
+                  {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                </span>
+              )}
             </div>
             <div className="bg-emerald-50 p-1.5 rounded-lg">
               {dashboardData?.changes?.incomeChangeSSP !== undefined &&
@@ -339,10 +295,8 @@ export default function AdvancedDashboard() {
       </Card>
 
       {/* Total Expenses */}
-      <Card
-        className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-        onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown"
-      >
+      <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+        onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
         <CardContent className="p-4 sm:p-3">
           <div className="flex items-center justify-between">
             <div>
@@ -350,17 +304,15 @@ export default function AdvancedDashboard() {
               <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                 SSP {nf0.format(Math.round(totalExpenses))}
               </p>
-              <div className="flex items-center mt-1">
-                {dashboardData?.changes?.expenseChangeSSP !== undefined && (
-                  <span className={`text-xs font-medium ${
-                    dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
-                    dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
-                  }`}>
-                    {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
-                    {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
-                  </span>
-                )}
-              </div>
+              {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                <span className={`text-xs font-medium ${
+                  dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
+                  dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                }`}>
+                  {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
+                  {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                </span>
+              )}
             </div>
             <div className="bg-red-50 p-1.5 rounded-lg">
               {dashboardData?.changes?.expenseChangeSSP !== undefined &&
@@ -381,17 +333,15 @@ export default function AdvancedDashboard() {
               <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                 SSP {nf0.format(Math.round(sspRevenue - totalExpenses))}
               </p>
-              <div className="flex items-center mt-1">
-                {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
-                  <span className={`text-xs font-medium ${
-                    dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
-                    dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                  }`}>
-                    {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
-                    {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
-                  </span>
-                )}
-              </div>
+              {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                <span className={`text-xs font-medium ${
+                  dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                  dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                }`}>
+                  {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
+                  {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                </span>
+              )}
             </div>
             <div className="bg-blue-50 p-1.5 rounded-lg">
               <DollarSign className="h-4 w-4 text-blue-600" />
@@ -400,7 +350,7 @@ export default function AdvancedDashboard() {
         </CardContent>
       </Card>
 
-      {/* Insurance (USD) quick nav */}
+      {/* Insurance (USD) */}
       <Link href={`/insurance-providers?range=${rangeToSend}${
         timeRange === "custom" && customStartDate && customEndDate
           ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
@@ -414,17 +364,15 @@ export default function AdvancedDashboard() {
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                   USD {fmtUSD(Math.round(usdIncome))}
                 </p>
-                <div className="flex items-center mt-1">
-                  {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
-                    <span className={`text-xs font-medium ${
-                      dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
-                      dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
-                    }`}>
-                      {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
-                      {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                    </span>
-                  ) : null}
-                </div>
+                {dashboardData?.changes?.incomeChangeUSD !== undefined && (
+                  <span className={`text-xs font-medium ${
+                    dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
+                    dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                  }`}>
+                    {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
+                    {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                  </span>
+                )}
               </div>
               <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
             </div>
@@ -432,7 +380,7 @@ export default function AdvancedDashboard() {
         </Card>
       </Link>
 
-      {/* Patient Volume */}
+      {/* Patients */}
       <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
         <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
           <CardContent className="p-4 sm:p-3">
@@ -442,9 +390,7 @@ export default function AdvancedDashboard() {
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                   {(dashboardData?.totalPatients || 0).toLocaleString()}
                 </p>
-                <div className="flex items-center mt-1">
-                  <span className="text-xs font-medium text-teal-600">Current period</span>
-                </div>
+                <span className="text-xs font-medium text-teal-600">Current period</span>
               </div>
               <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
             </div>
@@ -456,10 +402,11 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="bg-white dark:bg-slate-900">
-      {/* ===== Sticky header: Title + Date filters (mobile & desktop) ===== */}
+      {/* Sticky header (Title + Date) — offset under global topbar */}
       <div
         ref={headerRef}
-        className={`sticky top-0 z-30 bg-white dark:bg-slate-900 ${scrolled ? "border-b shadow-sm" : ""}`}
+        className={`sticky z-30 bg-white dark:bg-slate-900 ${scrolled ? "shadow-sm" : ""}`}
+        style={{ top: "var(--shell-top, 56px)" }}
       >
         <div className="p-6">
           <header className="mb-2">
@@ -473,7 +420,7 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
 
-              {/* RIGHT: range + optional pickers */}
+              {/* Date / Range controls */}
               <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
                 <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                   <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
@@ -493,11 +440,9 @@ export default function AdvancedDashboard() {
                       value={String(selectedYear)}
                       onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
                     >
-                      <SelectTrigger className="h-9 w-[120px]">
-                        <SelectValue placeholder="Year" />
-                      </SelectTrigger>
+                      <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
                       <SelectContent>
-                        {years.map((y) => (
+                        {[ (new Date()).getFullYear(), (new Date()).getFullYear()-1, (new Date()).getFullYear()-2 ].map((y) => (
                           <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                         ))}
                       </SelectContent>
@@ -505,14 +450,15 @@ export default function AdvancedDashboard() {
 
                     <Select
                       value={String(selectedMonth)}
-                      onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
+                      onValueChange={(val) => setSpecificMonth(selectedYear || (new Date()).getFullYear(), Number(val))}
                     >
-                      <SelectTrigger className="h-9 w-[140px]">
-                        <SelectValue placeholder="Month" />
-                      </SelectTrigger>
+                      <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Month" /></SelectTrigger>
                       <SelectContent>
-                        {months.map((m) => (
-                          <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                        {[
+                          "January","February","March","April","May","June",
+                          "July","August","September","October","November","December",
+                        ].map((m, i) => (
+                          <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -523,27 +469,18 @@ export default function AdvancedDashboard() {
                   <div className="flex items-center gap-2">
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
-                        >
+                        <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent
-                        side="bottom"
-                        align="start"
-                        sideOffset={12}
+                      <PopoverContent side="bottom" align="start" sideOffset={12}
                         className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                        style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                        avoidCollisions
-                        collisionPadding={15}
+                        style={{ zIndex: 50000, backgroundColor: "rgb(255,255,255)" }}
+                        avoidCollisions collisionPadding={15}
                       >
                         <DatePicker
-                          mode="single"
-                          numberOfMonths={1}
-                          showOutsideDays={false}
+                          mode="single" numberOfMonths={1} showOutsideDays={false}
                           selected={customStartDate ?? undefined}
                           onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
                           initialFocus
@@ -555,27 +492,18 @@ export default function AdvancedDashboard() {
 
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
-                        >
+                        <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent
-                        side="bottom"
-                        align="start"
-                        sideOffset={12}
+                      <PopoverContent side="bottom" align="start" sideOffset={12}
                         className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                        style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                        avoidCollisions
-                        collisionPadding={15}
+                        style={{ zIndex: 50000, backgroundColor: "rgb(255,255,255)" }}
+                        avoidCollisions collisionPadding={15}
                       >
                         <DatePicker
-                          mode="single"
-                          numberOfMonths={1}
-                          showOutsideDays={false}
+                          mode="single" numberOfMonths={1} showOutsideDays={false}
                           selected={customEndDate ?? undefined}
                           onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
                           initialFocus
@@ -595,20 +523,19 @@ export default function AdvancedDashboard() {
         <KpiGrid />
       </div>
 
-      {/* KPI cards: desktop (sticky under header) */}
+      {/* KPI cards: desktop (sticky under header) — offset by shell + header height */}
       <div
         className="hidden md:block sticky z-20 bg-white dark:bg-slate-900"
-        style={{ top: headerH }}
+        style={{ top: `calc(var(--shell-top, 56px) + ${headerH}px)` }}
       >
-        <div className="p-6 pt-4 border-b">
+        <div className={`p-6 pt-4 ${scrolled ? "shadow-sm" : ""}`}>
           <KpiGrid />
         </div>
       </div>
 
-      {/* ======= Main Content ======= */}
+      {/* Main Content */}
       <div className="p-6">
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-          {/* LEFT COLUMN: chart + quick actions */}
           <div className="space-y-6">
             <RevenueAnalyticsDaily
               timeRange={rangeToSend}
@@ -618,7 +545,6 @@ export default function AdvancedDashboard() {
               customEndDate={customEndDate ?? undefined}
             />
 
-            {/* Quick Actions */}
             <Card className="border border-slate-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -664,7 +590,6 @@ export default function AdvancedDashboard() {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: departments + providers + system status */}
           <div className="space-y-6">
             <DepartmentsPanel
               departments={Array.isArray(departments) ? (departments as any[]) : []}
@@ -710,7 +635,6 @@ export default function AdvancedDashboard() {
           </div>
         </div>
 
-        {/* Expenses drawer */}
         <ExpensesDrawer
           open={openExpenses}
           onOpenChange={setOpenExpenses}
