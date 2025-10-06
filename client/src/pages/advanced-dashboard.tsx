@@ -1,7 +1,7 @@
 // client/src/pages/advanced-dashboard.tsx
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 
@@ -306,16 +306,34 @@ export default function AdvancedDashboard() {
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
 
+  // ======= Scroll shadow handling (works with the <main> scroller) =======
+  const headerRef = useRef<HTMLElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const header = headerRef.current;
+    if (!scroller || !header) return;
+    const setShadow = () => header.setAttribute("data-scrolled", scroller.scrollTop > 6 ? "true" : "false");
+    setShadow();
+    scroller.addEventListener("scroll", setShadow, { passive: true });
+    return () => scroller.removeEventListener("scroll", setShadow);
+  }, []);
+
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Sticky, modern header with mobile-safe padding */}
+      {/* Sticky, modern header with mobile-safe padding + scroll-activated shadow */}
       <header
+        ref={headerRef}
+        role="banner"
         className="
           sticky top-0 z-50
           bg-white/80 dark:bg-slate-900/70
           backdrop-blur-md supports-[backdrop-filter]:bg-white/60
           shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)]
           dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]
+          transition-shadow
+          data-[scrolled=true]:shadow-[inset_0_-1px_0_rgba(15,23,42,0.06),_0_2px_8px_rgba(15,23,42,0.08)]
+          dark:data-[scrolled=true]:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18),_0_2px_8px_rgba(148,163,184,0.18)]
         "
       >
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
@@ -332,7 +350,9 @@ export default function AdvancedDashboard() {
             {/* RIGHT: range + (optional) month/year or custom dates) */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-10 w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full sm:w-[160px] rounded-xl border-slate-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="current-month">Current Month</SelectItem>
                   <SelectItem value="last-month">Last Month</SelectItem>
@@ -349,7 +369,7 @@ export default function AdvancedDashboard() {
                     value={String(selectedYear)}
                     onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[120px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[120px] rounded-xl border-slate-200 text-sm">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -363,7 +383,7 @@ export default function AdvancedDashboard() {
                     value={String(selectedMonth)}
                     onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[140px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[140px] rounded-xl border-slate-200 text-sm">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -381,7 +401,10 @@ export default function AdvancedDashboard() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn("h-10 w-full sm:w-auto justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                        className={cn(
+                          "h-10 w-full sm:w-auto rounded-xl justify-start text-left font-normal",
+                          !customStartDate && "text-muted-foreground"
+                        )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
@@ -413,7 +436,10 @@ export default function AdvancedDashboard() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn("h-10 w-full sm:w-auto justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                        className={cn(
+                          "h-10 w-full sm:w-auto rounded-xl justify-start text-left font-normal",
+                          !customEndDate && "text-muted-foreground"
+                        )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
@@ -446,7 +472,7 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Scrollable content */}
-      <main className="min-h-0 overflow-y-auto [overscroll-behavior:contain]">
+      <main ref={scrollerRef} className="min-h-0 overflow-y-auto [overscroll-behavior:contain]">
         <div className="px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-4 md:pt-6 dashboard-content">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
