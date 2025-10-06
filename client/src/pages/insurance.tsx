@@ -26,6 +26,8 @@ type Payment = {
   paymentDate: string; // ISO
   amount: number | string;
   currency: "USD" | "SSP";
+  // reference intentionally not in the form anymore, but may exist historically
+  reference?: string | null;
   notes?: string | null;
   createdAt?: string;
 };
@@ -94,10 +96,11 @@ const rank = (name: string) => {
 
 /* ----------------------------- UI bits --------------------------- */
 function StatusChip({ status }: { status: ClaimStatus }) {
+  // slightly richer tones for clarity
   const styles: Record<ClaimStatus, string> = {
-    submitted: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-    partially_paid: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
-    paid: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    submitted: "bg-amber-50 text-amber-700 ring-1 ring-amber-300",
+    partially_paid: "bg-sky-50 text-sky-700 ring-1 ring-sky-300",
+    paid: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300",
   };
   const titles: Record<ClaimStatus, string> = {
     submitted: "Claim sent to provider, waiting for payment.",
@@ -135,7 +138,7 @@ function HelpPopover() {
             <li><strong>Outstanding</strong>: Billed − Collected.</li>
           </ul>
           <div className="text-right mt-2">
-            <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
+            <button type="button" className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
           </div>
         </div>
       )}
@@ -145,13 +148,16 @@ function HelpPopover() {
 
 function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number }) {
   const pct = billed > 0 ? Math.min(100, Math.max(0, Math.round((paid / billed) * 100))) : 0;
-  const label = balance < 0 ? "CR" : `${pct}%`;
   const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6);
+  // bolder ring; clearer label via title prop
   return (
-    <div className="relative h-10 w-10 shrink-0" title={`${pct}% paid`}>
-      <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }} />
+    <div className="relative h-10 w-10 shrink-0" title={`${pct}% Paid`}>
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{ background: `conic-gradient(#059669 ${sweep}deg, #e2e8f0 0deg)` }} // emerald-600 / slate-200
+      />
       <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
-        {label}
+        {pct}%
       </div>
     </div>
   );
@@ -195,7 +201,7 @@ export default function InsurancePage() {
 
   // filters
   const [providerId, setProviderId] = useState<string>("");
-  const [status, setStatus] = useState<string>(""); // "", submitted, partially_paid, paid
+  const [status, setStatus] = useState<string>("");
 
   // default window = current year
   const currentYear = new Date().getUTCFullYear();
@@ -214,7 +220,7 @@ export default function InsurancePage() {
 
   const [authError, setAuthError] = useState(false);
 
-  // Add-Claim form (period fields hidden but still sent)
+  // Add-Claim form (period fields are hidden but still sent)
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cStart, setCStart] = useState<string>(() =>
     new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10)
@@ -226,7 +232,7 @@ export default function InsurancePage() {
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
-  // Payment form (Link-to-Claim & Reference removed)
+  // Payment form (no link-to-claim, no reference)
   const [pProviderId, setPProviderId] = useState<string>("");
   const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
@@ -404,7 +410,7 @@ export default function InsurancePage() {
   /* ----------------------- create / edit payment ----------------------- */
   function hydratePaymentForm(p: Payment) {
     setPProviderId(p.providerId);
-    setPDate((p.paymentDate || "").slice(0,10)); // avoids 1969 epoch
+    setPDate((p.paymentDate || "").slice(0,10));
     setPAmount(String(p.amount));
     setPCurrency(p.currency);
     setPNotes(p.notes || "");
@@ -471,10 +477,10 @@ export default function InsurancePage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
               setEditingClaimId("");
               setCProviderId(providerId || "");
-              // hidden month defaults
               setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
               setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
               setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
@@ -486,7 +492,8 @@ export default function InsurancePage() {
 
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
               setEditingPaymentId("");
               setPProviderId(providerId || "");
               setPDate(new Date().toISOString().slice(0, 10));
@@ -560,21 +567,21 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Summary (NO Carry Forward) */}
+      {/* Summary — keep original look, only a slight bump on numbers */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Billed</div>
-          <div className="mt-1 text-2xl md:text-3xl font-semibold">{money(summary.billed, "USD")}</div>
+          <div className="mt-1 font-semibold text-[1.15rem] md:text-xl">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">{selectedProvider ? selectedProvider.name : "All providers"}</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Collected</div>
-          <div className="mt-1 text-2xl md:text-3xl font-semibold">{money(summary.collected, "USD")}</div>
+          <div className="mt-1 font-semibold text-[1.15rem] md:text-xl">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
-          <div className={`mt-1 text-2xl md:text-3xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
+          <div className={`mt-1 font-semibold text-[1.15rem] md:text-xl ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
             {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
           </div>
           <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
@@ -615,11 +622,18 @@ export default function InsurancePage() {
                       <td className="p-3">{c.notes || ""}</td>
                       <td className="p-3 text-right">
                         <div className="inline-flex gap-2">
-                          <button type="button" className="text-xs px-2 py-1 rounded-md border"
-                                  onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 rounded-md border"
+                            onClick={(e) => { e.preventDefault(); setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}
+                          >
                             Edit
                           </button>
-                          <button type="button" className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 rounded-md border text-rose-700"
+                            onClick={(e) => { e.preventDefault(); deleteClaim(c.id); }}
+                          >
                             Delete
                           </button>
                         </div>
@@ -642,14 +656,22 @@ export default function InsurancePage() {
             {!balances && <div className="text-slate-500">Loading…</div>}
             {orderedBalanceProviders.map((row) => {
               const outstanding = (row.claimed || 0) - (row.paid || 0);
+              const pct = row.claimed > 0 ? Math.round((row.paid / row.claimed) * 100) : 0;
               return (
                 <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
-                      <div className="font-medium">{row.providerName}</div>
+                      <div>
+                        <div className="font-medium">{row.providerName}</div>
+                        <div className="text-[11px] text-emerald-700 font-medium leading-tight">{pct}% Paid</div>
+                      </div>
                     </div>
-                    <button type="button" onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); setDetailProviderId(row.providerId); }}
+                      className="text-sm text-indigo-600 hover:underline"
+                    >
                       View details
                     </button>
                   </div>
@@ -682,22 +704,27 @@ export default function InsurancePage() {
             </div>
 
             <div className="p-4 overflow-y-auto space-y-6">
-              {/* Totals in current window (NO carry) */}
+              {/* Totals in current window */}
               <div className="grid grid-cols-3 gap-3">
                 {(() => {
                   const prov = balances?.providers.find((r) => r.providerId === detailProviderId) || { claimed: 0, paid: 0 };
                   const outstanding = (prov.claimed || 0) - (prov.paid || 0);
+                  const pct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
                   return (
                     <>
                       <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Billed</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
                       <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Collected</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
-                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Outstanding</div><div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div></div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xs text-slate-500">Outstanding</div>
+                        <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
+                        <div className="text-[11px] text-emerald-700 font-medium mt-1">{pct}% Paid</div>
+                      </div>
                     </>
                   );
                 })()}
               </div>
 
-              {/* Claims ledger (all-time list from balances.claims) */}
+              {/* Claims ledger */}
               <div>
                 <div className="mb-2 font-medium">Claims</div>
                 {providerClaimsForDrawer.length === 0 && <div className="text-sm text-slate-500">No claims for this provider.</div>}
@@ -712,8 +739,20 @@ export default function InsurancePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            <button type="button" className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}>Edit</button>
-                            <button type="button" className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
+                            <button
+                              type="button"
+                              className="text-xs px-2 py-1 rounded-md border"
+                              onClick={(e) => { e.preventDefault(); setEditingClaimId(c.id); hydrateClaimForm(c); setShowClaim(true); }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="text-xs px-2 py-1 rounded-md border text-rose-700"
+                              onClick={(e) => { e.preventDefault(); deleteClaim(c.id); }}
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
 
@@ -724,7 +763,7 @@ export default function InsurancePage() {
                         </div>
 
                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded">
-                          <div className="h-1.5 bg-emerald-500 rounded" style={{ width: `${pct}%` }} title={`${pct}% collected`} />
+                          <div className="h-1.5 bg-emerald-600 rounded" style={{ width: `${pct}%` }} title={`${pct}% Paid`} />
                         </div>
 
                         <div className="mt-2 flex items-center justify-between">
@@ -732,7 +771,9 @@ export default function InsurancePage() {
                           <button
                             type="button"
                             className="text-xs px-2 py-1 rounded-md bg-slate-800 text-white"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.preventDefault();
+                              // no claim linking in the form anymore; just open the payment dialog prefilled with provider
                               setEditingPaymentId("");
                               setPProviderId(c.providerId);
                               setPDate(new Date().toISOString().slice(0, 10));
@@ -750,7 +791,7 @@ export default function InsurancePage() {
                 </div>
               </div>
 
-              {/* Payments history (all-time) */}
+              {/* Payments history */}
               <div>
                 <div className="mb-2 font-medium">Payments (history)</div>
                 {loadingPayments && <div className="text-sm text-slate-500">Loading…</div>}
@@ -765,11 +806,24 @@ export default function InsurancePage() {
                           <div className="text-xs text-slate-500">
                             {new Date(p.paymentDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                             {claim ? ` • ${new Date(claim.periodYear, claim.periodMonth - 1).toLocaleString("en-US", { month: "short", year: "numeric" })}` : ""}
+                            {p.reference ? ` • Ref: ${p.reference}` : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button type="button" className="text-xs px-2 py-1 rounded-md border" onClick={() => { setEditingPaymentId(p.id); hydratePaymentForm(p); setShowPayment(true); }}>Edit</button>
-                          <button type="button" className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 rounded-md border"
+                            onClick={(e) => { e.preventDefault(); setEditingPaymentId(p.id); hydratePaymentForm(p); setShowPayment(true); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 rounded-md border text-rose-700"
+                            onClick={(e) => { e.preventDefault(); deletePayment(p.id); }}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     );
@@ -781,7 +835,7 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Add/Edit Claim (Period fields hidden) */}
+      {/* Add/Edit Claim */}
       {showClaim && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
@@ -805,7 +859,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
-                {/* Period Start/End intentionally hidden */}
+                {/* Period fields hidden but still sent */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={cAmount} onChange={(e) => setCAmount(e.target.value)} />
@@ -826,7 +880,7 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Add/Edit Payment (no Link-to-Claim, no Reference) */}
+      {/* Add/Edit Payment (no claim link, no reference) */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
