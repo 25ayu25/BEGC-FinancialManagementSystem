@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -23,9 +23,10 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate: string; // ISO
+  paymentDate?: string | null; // ISO (optional from legacy rows)
   amount: number | string;
   currency: "USD" | "SSP";
+  reference?: string | null;
   notes?: string | null;
   createdAt?: string | null;
 };
@@ -36,6 +37,9 @@ type BalancesResponse = {
     providerName: string;
     claimed: number;   // billed in window
     paid: number;      // collected in window
+    balance?: number;
+    outstanding?: number;
+    credit?: number;
   }>;
   claims: Array<
     Claim & {
@@ -52,6 +56,13 @@ const money = (n: number | string, currency: "USD" | "SSP" = "USD") =>
 
 const titleCase = (s: string) =>
   s.replace(/(^|_)([a-z])/g, (_, b, c) => (b ? " " : "") + c.toUpperCase());
+
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "—";
+  return new Date(t).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+};
 
 const RAW_BASE =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) ||
@@ -82,13 +93,6 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-function formatDateSafe(iso?: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-}
-
 /* ----------------------------- provider order ----------------------------- */
 const PROVIDER_ORDER = ["CIC", "CIGNA", "UAP", "New Sudan", "Nile International", "Other"];
 const rank = (name: string) => {
@@ -98,7 +102,6 @@ const rank = (name: string) => {
 
 /* ----------------------------- UI bits --------------------------- */
 function StatusChip({ status }: { status: ClaimStatus }) {
-  // clearer colors by state
   const styles: Record<ClaimStatus, string> = {
     submitted: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
     partially_paid: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
@@ -129,10 +132,10 @@ function HelpPopover() {
         className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
         title="What do these numbers mean?"
       >
-        ℹ︎ Help
+        ︎Help
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li><strong>Billed</strong>: claims in the current window.</li>
@@ -150,15 +153,13 @@ function HelpPopover() {
 
 function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number }) {
   const pct = billed > 0 ? Math.min(100, Math.max(0, Math.round((paid / billed) * 100))) : 0;
+  const label = balance < 0 ? "CR" : `${pct}%`;
   const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6);
   return (
     <div className="relative h-10 w-10 shrink-0">
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{ background: `conic-gradient(#0ea5e9 ${sweep}deg, #e5e7eb 0deg)` }} // bolder hue
-      />
+      <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }} />
       <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
-        {pct}%
+        {label}
       </div>
     </div>
   );
@@ -202,26 +203,39 @@ export default function InsurancePage() {
 
   // filters
   const [providerId, setProviderId] = useState<string>("");
-  const [status, setStatus] = useState<string>(""); // "", submitted, partially_paid, paid
+  const [status, setStatus] = useState<string>("");
 
-  // default window: current year
+  // default window = current year
   const currentYear = new Date().getUTCFullYear();
   const [preset, setPreset] = useState<WindowPreset>(("year-" + currentYear) as WindowPreset);
   const [start, setStart] = useState<string>(() => new Date(Date.UTC(currentYear, 0, 1)).toISOString().slice(0,10));
-  const [end,   setEnd]   = useState<string>(() => new Date(Date.UTC(currentYear, 11, 31)).toISOString().slice(0,10));
+  const [end, setEnd] = useState<string>(() => new Date(Date.UTC(currentYear, 11, 31)).toISOString().slice(0,10));
 
   // modals & drawer
   const [showClaim, setShowClaim] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<string>("");
 
-  // editing (Edit disabled for now)
-  const [editingClaimId, setEditingClaimId] = useState<string>("");
-  const [editingPaymentId, setEditingPaymentId] = useState<string>("");
+  // editing (disabled currently)
+  const [_editingClaimId, setEditingClaimId] = useState<string>("");
+  const [_editingPaymentId, setEditingPaymentId] = useState<string>("");
 
   const [authError, setAuthError] = useState(false);
 
-  // Add-Claim (period kept hidden, defaults to current month)
+  // Top actions (mobile dropdown)
+  const [showActions, setShowActions] = useState(false);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!actionsRef.current) return;
+      if (!actionsRef.current.contains(e.target as Node)) setShowActions(false);
+    };
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
+  // Add-Claim form (period hidden but sent)
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cStart, setCStart] = useState<string>(() =>
     new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10)
@@ -233,13 +247,21 @@ export default function InsurancePage() {
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
-  // Payment form
+  // Payment form (link/ref removed)
   const [pProviderId, setPProviderId] = useState<string>("");
-  const [pClaimId, setPClaimId] = useState<string>(""); // hidden; auto-filled when launched from a claim
   const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
   const [pNotes, setPNotes] = useState<string>("");
+
+  // sticky header shadow only after scroll
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   /* --------------------------- date helpers --------------------------- */
   function setPresetWindow(p: WindowPreset) {
@@ -311,7 +333,7 @@ export default function InsurancePage() {
   useEffect(reloadClaims, [providerId, status, start, end]);
   useEffect(reloadBalances, [providerId, start, end]);
 
-  // open drawer -> load full payment history (no window)
+  // when opening provider drawer, show full payment history (no window)
   useEffect(() => {
     if (!detailProviderId) return;
     setLoadingPayments(true);
@@ -322,12 +344,7 @@ export default function InsurancePage() {
       .finally(() => setLoadingPayments(false));
   }, [detailProviderId]);
 
-  const openClaims = useMemo(
-    () => claims.filter((c) => c.status !== "paid" && (!pProviderId || c.providerId === pProviderId)),
-    [claims, pProviderId]
-  );
-
-  // summary (no carry): Outstanding = Billed - Collected
+  // NO carry forward; Outstanding = Billed - Collected
   const summary = useMemo(() => {
     const provRows = balances?.providers ?? [];
     const filtered = providerId ? provRows.filter((r) => r.providerId === providerId) : provRows;
@@ -352,6 +369,7 @@ export default function InsurancePage() {
       );
   }, [balances, detailProviderId, providerId]);
 
+  // keep provider order consistent on balances list too
   const orderedBalanceProviders = useMemo(
     () =>
       (balances?.providers ?? [])
@@ -373,18 +391,14 @@ export default function InsurancePage() {
   async function submitClaim() {
     const body = {
       providerId: cProviderId || providerId,
-      periodStart: cStart,
-      periodEnd: cEnd,
+      periodStart: cStart, // hidden, defaults to current month
+      periodEnd: cEnd,     // hidden, defaults to current month
       currency: cCurrency,
       claimedAmount: Number(cAmount),
       notes: cNotes || undefined,
     };
     try {
-      if (editingClaimId) {
-        await api<Claim>(`/api/insurance-claims/${editingClaimId}`, { method: "PATCH", body: JSON.stringify(body) });
-      } else {
-        await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
-      }
+      await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
       setShowClaim(false);
       setEditingClaimId("");
       reloadClaims();
@@ -416,7 +430,6 @@ export default function InsurancePage() {
   /* ----------------------- create / delete payment ----------------------- */
   function hydratePaymentForm(p: Payment) {
     setPProviderId(p.providerId);
-    setPClaimId(p.claimId || "");
     setPDate((p.paymentDate || "").slice(0,10));
     setPAmount(String(p.amount));
     setPCurrency(p.currency);
@@ -426,19 +439,13 @@ export default function InsurancePage() {
   async function submitPayment() {
     const body = {
       providerId: pProviderId || providerId,
-      // claimId hidden: included only when launched from a specific claim
-      ...(pClaimId ? { claimId: pClaimId } : {}),
-      paymentDate: pDate,
+      paymentDate: pDate || undefined,
       amount: Number(pAmount),
       currency: pCurrency,
       notes: pNotes || undefined,
     };
     try {
-      if (editingPaymentId) {
-        await api<Payment>(`/api/insurance-payments/${editingPaymentId}`, { method: "PATCH", body: JSON.stringify(body) });
-      } else {
-        await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
-      }
+      await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
       setShowPayment(false);
       setEditingPaymentId("");
       reloadBalances();
@@ -478,51 +485,16 @@ export default function InsurancePage() {
     setPresetWindow("all");
   }
 
-  /* ------------------------ mobile scroll lock ------------------------ */
-  const modalOpen = showClaim || showPayment || !!detailProviderId;
-  useEffect(() => {
-    const body = document.body;
-    const html = document.documentElement;
-
-    if (!modalOpen) {
-      html.style.overflow = "";
-      if (body.style.position === "fixed") {
-        const y = body.style.top ? parseInt(body.style.top, 10) : 0;
-        body.style.position = "";
-        body.style.top = "";
-        body.style.width = "";
-        window.scrollTo(0, -y);
-      }
-      return;
-    }
-
-    const scrollY = window.scrollY;
-    html.style.overflow = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.width = "100%";
-
-    return () => {
-      html.style.overflow = "";
-      if (body.style.position === "fixed") {
-        const y = body.style.top ? parseInt(body.style.top, 10) : 0;
-        body.style.position = "";
-        body.style.top = "";
-        body.style.width = "";
-        window.scrollTo(0, -y);
-      }
-    };
-  }, [modalOpen]);
-
   /* ----------------------------- UI ----------------------------- */
   return (
-    <div className="p-6 max-w-[1200px] mx-auto overflow-x-hidden">
-      {/* Sticky top bar with actions */}
-      <div className="sticky top-0 z-30 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="flex items-center justify-between py-2">
+    <div className="max-w-[1200px] mx-auto">
+      {/* Sticky header with shadow only after scroll (no pre-scroll line) */}
+      <div className={`sticky top-0 z-30 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}>
+        <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold">Insurance Management</h1>
-          <div className="flex items-center gap-2">
-            {/* toned down buttons to match Export CSV */}
+
+          {/* Desktop actions */}
+          <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => {
                 setEditingClaimId("");
@@ -540,7 +512,6 @@ export default function InsurancePage() {
               onClick={() => {
                 setEditingPaymentId("");
                 setPProviderId(providerId || "");
-                setPClaimId("");
                 setPDate(new Date().toISOString().slice(0, 10));
                 setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
@@ -556,181 +527,238 @@ export default function InsurancePage() {
 
             <HelpPopover />
           </div>
-        </div>
-      </div>
 
-      {authError && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Authentication required. If you’re in Incognito/Private mode, allow third-party cookies or sign in again.
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 gap-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
-            <option value="">All providers</option>
-            {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-          </select>
-
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg p-2">
-            <option value="">Any status</option>
-            <option value="submitted">Submitted</option>
-            <option value="partially_paid">Partially paid</option>
-            <option value="paid">Paid</option>
-          </select>
-        </div>
-
-        {/* window chips (neutral active style) */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {[
-            { id: "all", label: "All time" },
-            { id: "ytd", label: "YTD" },
-            { id: `year-${currentYear}`, label: `Year ${currentYear}` },
-            { id: "year-2024", label: "Year 2024" },
-            { id: "year-2023", label: "Year 2023" },
-            { id: "year-2022", label: "Year 2022" },
-            { id: "custom", label: "Custom" },
-          ].map((chip) => (
+          {/* Mobile actions: dropdown */}
+          <div className="md:hidden relative" ref={actionsRef}>
             <button
-              key={chip.id}
-              onClick={() => setPresetWindow(chip.id as WindowPreset)}
-              className={`px-3 py-1.5 rounded-full border transition-colors ${
-                preset === chip.id
-                  ? "bg-slate-200 text-slate-900 border-slate-300"
-                  : "hover:bg-slate-50"
-              }`}
+              onClick={() => setShowActions((v) => !v)}
+              className="px-3 py-2 rounded-lg border hover:bg-slate-50"
+              aria-expanded={showActions}
             >
-              {chip.label}
+              Actions ▾
             </button>
-          ))}
-          {preset === "custom" && (
-            <>
-              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded-lg p-2" />
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded-lg p-2" />
-            </>
-          )}
-          <div className="ml-auto">
-            <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="text-slate-500 text-sm">Billed</div>
-          <div className="mt-1 text-2xl font-semibold">{money(summary.billed, "USD")}</div>
-          <div className="text-xs text-slate-500 mt-1">{selectedProvider ? selectedProvider.name : "All providers"}</div>
-        </div>
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="text-slate-500 text-sm">Collected</div>
-          <div className="mt-1 text-2xl font-semibold">{money(summary.collected, "USD")}</div>
-          <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
-        </div>
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="text-slate-500 text-sm">Outstanding</div>
-          <div className={`mt-1 text-2xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
-            {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
-        </div>
-      </div>
-
-      {/* Layout: left table, right balances */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Claims table */}
-        <div className="lg:col-span-2 bg-white rounded-xl border">
-          <div className="px-4 py-3 border-b flex items-center justify-between">
-            <div className="font-medium">Claims</div>
-            <div className="text-sm text-slate-500">{claims.length} {claims.length === 1 ? "item" : "items"}</div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10">
-                <tr>
-                  <th className="text-left p-3">Provider</th>
-                  <th className="text-left p-3">Period</th>
-                  <th className="text-left p-3">Billed</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-left p-3">Notes</th>
-                  <th className="text-right p-3 w-40">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {claims.map((c) => {
-                  const prov = providers.find((p) => p.id === c.providerId);
-                  return (
-                    <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3">{prov?.name || c.providerId}</td>
-                      <td className="p-3">
-                        {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
-                      </td>
-                      <td className="p-3">{money(c.claimedAmount, c.currency)}</td>
-                      <td className="p-3"><StatusChip status={c.status} /></td>
-                      <td className="p-3">{c.notes || ""}</td>
-                      <td className="p-3 text-right">
-                        <div className="inline-flex gap-2">
-                          {/* Edit intentionally disabled for now */}
-                          <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {!loadingClaims && claims.length === 0 && (
-                  <tr><td colSpan={6} className="p-6 text-center text-slate-500">No claims in this window.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Provider balances */}
-        <div className="bg-white rounded-xl border">
-          <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
-          <div className="p-4 space-y-3">
-            {!balances && <div className="text-slate-500">Loading…</div>}
-            {orderedBalanceProviders.map((row) => {
-              const outstanding = (row.claimed || 0) - (row.paid || 0);
-              const pct = row.claimed > 0 ? Math.round((row.paid / row.claimed) * 100) : 0;
-              return (
-                <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
-                      <div>
-                        <div className="font-medium">{row.providerName}</div>
-                        <div className="text-xs text-emerald-700">{pct}% Paid</div>
-                      </div>
-                    </div>
-                    <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
-                      View details
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
-                    <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
-                    <div className="bg-slate-50 rounded p-2">
-                      <div className="text-slate-500">Outstanding</div>
-                      <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
-                        {outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}
-                      </div>
-                    </div>
-                  </div>
+            {showActions && (
+              <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-white shadow-lg p-1 z-40">
+                <button
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
+                  onClick={() => {
+                    setShowActions(false);
+                    setEditingClaimId("");
+                    setCProviderId(providerId || "");
+                    setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
+                    setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
+                    setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
+                  }}
+                >
+                  + Add Claim
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
+                  onClick={() => {
+                    setShowActions(false);
+                    setEditingPaymentId("");
+                    setPProviderId(providerId || "");
+                    setPDate(new Date().toISOString().slice(0, 10));
+                    setPAmount("0"); setPCurrency("USD"); setPNotes("");
+                    setShowPayment(true);
+                  }}
+                >
+                  Record Payment
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
+                  onClick={() => { setShowActions(false); exportClaimsCsv(claims, providers); }}
+                >
+                  Export CSV
+                </button>
+                <div className="border-t my-1" />
+                <div className="px-3 py-2">
+                  <HelpPopover />
                 </div>
-              );
-            })}
-            {balances && orderedBalanceProviders.length === 0 && <div className="text-slate-500">No balances yet.</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Non-sticky notices */}
+      <div className="p-4 sm:p-6">
+        {authError && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Authentication required. If you’re in Incognito/Private mode, allow third-party cookies or sign in again.
+          </div>
+        )}
+      </div>
+
+      {/* STICKY FILTERS + SUMMARY */}
+      <div className={`sticky top-14 md:top-16 z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}>
+        <div className="p-4 sm:p-6 pt-3">
+          {/* Filters */}
+          <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
+                <option value="">All providers</option>
+                {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+              </select>
+
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg p-2">
+                <option value="">Any status</option>
+                <option value="submitted">Submitted</option>
+                <option value="partially_paid">Partially paid</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+
+            {/* window chips — horizontal scroll on mobile */}
+            <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {[
+                { id: "all", label: "All time" },
+                { id: "ytd", label: "YTD" },
+                { id: `year-${currentYear}`, label: `Year ${currentYear}` },
+                { id: `year-${currentYear-1}`, label: `Year ${currentYear-1}` },
+                { id: `year-${currentYear-2}`, label: `Year ${currentYear-2}` },
+                { id: `year-${currentYear-3}`, label: `Year ${currentYear-3}` },
+                { id: "custom", label: "Custom" },
+              ].map((chip) => (
+                <button
+                  key={chip.id}
+                  onClick={() => setPresetWindow(chip.id as WindowPreset)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full border focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 transition-colors ${
+                    preset === chip.id ? "bg-slate-100 text-slate-900 border-slate-300" : "hover:bg-slate-50"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+              {preset === "custom" && (
+                <div className="ml-2 flex items-center gap-2">
+                  <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded-lg p-2" />
+                  <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded-lg p-2" />
+                </div>
+              )}
+              <div className="ml-auto">
+                <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary with emphasized numbers */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-2xl border bg-white p-4">
+              <div className="text-slate-500 text-xs">Billed</div>
+              <div className="mt-1 text-3xl md:text-4xl font-bold tracking-tight">{money(summary.billed, "USD")}</div>
+              <div className="text-xs text-slate-500 mt-1">{selectedProvider ? selectedProvider.name : "All providers"}</div>
+            </div>
+            <div className="rounded-2xl border bg-white p-4">
+              <div className="text-slate-500 text-xs">Collected</div>
+              <div className="mt-1 text-3xl md:text-4xl font-bold tracking-tight">{money(summary.collected, "USD")}</div>
+              <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
+            </div>
+            <div className="rounded-2xl border bg-white p-4">
+              <div className="text-slate-500 text-xs">Outstanding</div>
+              <div className={`mt-1 text-3xl md:text-4xl font-bold tracking-tight ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
+                {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
+              </div>
+              <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="p-4 sm:p-6">
+        {/* Layout: left table, right balances */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Claims table */}
+          <div className="lg:col-span-2 bg-white rounded-xl border">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div className="font-medium">Claims</div>
+              <div className="text-sm text-slate-500">{claims.length} {claims.length === 1 ? "item" : "items"}</div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="text-left p-3">Provider</th>
+                    <th className="text-left p-3">Period</th>
+                    <th className="text-left p-3">Billed</th>
+                    <th className="text-left p-3">Status</th>
+                    <th className="text-left p-3">Notes</th>
+                    <th className="text-right p-3 w-32">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {claims.map((c) => {
+                    const prov = providers.find((p) => p.id === c.providerId);
+                    return (
+                      <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="p-3">{prov?.name || c.providerId}</td>
+                        <td className="p-3">
+                          {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
+                        </td>
+                        <td className="p-3">{money(c.claimedAmount, c.currency)}</td>
+                        <td className="p-3"><StatusChip status={c.status} /></td>
+                        <td className="p-3">{c.notes || ""}</td>
+                        <td className="p-3 text-right">
+                          <div className="inline-flex gap-2">
+                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!loadingClaims && claims.length === 0 && (
+                    <tr><td colSpan={6} className="p-6 text-center text-slate-500">No claims in this window.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Provider balances (ordered) */}
+          <div className="bg-white rounded-xl border">
+            <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
+            <div className="p-4 space-y-3">
+              {!balances && <div className="text-slate-500">Loading…</div>}
+              {orderedBalanceProviders.map((row) => {
+                const outstanding = (row.claimed || 0) - (row.paid || 0);
+                const paidPct = row.claimed > 0 ? Math.round((row.paid / row.claimed) * 100) : 0;
+                return (
+                  <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
+                        <div className="font-medium">{row.providerName}</div>
+                      </div>
+                      <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
+                        View details
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Outstanding</div>
+                        <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
+                          {outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {balances && orderedBalanceProviders.length === 0 && <div className="text-slate-500">No balances yet.</div>}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Drawer */}
       {detailProviderId && (
-        <div className="fixed inset-0 z-40 overscroll-none">
+        <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl border-l z-50 flex flex-col">
             <div className="px-4 py-3 border-b flex items-center justify-between">
@@ -744,7 +772,7 @@ export default function InsurancePage() {
                 {(() => {
                   const prov = balances?.providers.find((r) => r.providerId === detailProviderId) || { claimed: 0, paid: 0 };
                   const outstanding = (prov.claimed || 0) - (prov.paid || 0);
-                  const pct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
+                  const paidPct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
                   return (
                     <>
                       <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Billed</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
@@ -752,7 +780,7 @@ export default function InsurancePage() {
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Outstanding</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
-                        <div className="text-xs text-emerald-700 mt-1">{pct}% Paid</div>
+                        <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                       </div>
                     </>
                   );
@@ -774,7 +802,6 @@ export default function InsurancePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            {/* Edit hidden for now */}
                             <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
                           </div>
                         </div>
@@ -791,15 +818,12 @@ export default function InsurancePage() {
 
                         <div className="mt-2 flex items-center justify-between">
                           <div className="text-xs text-slate-500">{c.notes || ""}</div>
-                          <button
-                            className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50"
-                            onClick={() => {
-                              setPProviderId(c.providerId);
-                              setPClaimId(c.id); // hidden auto-link
-                              setEditingPaymentId("");
-                              setShowPayment(true);
-                            }}
-                          >
+                          <button className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50" onClick={() => {
+                            setPProviderId(c.providerId);
+                            setPDate(new Date().toISOString().slice(0,10));
+                            setEditingPaymentId("");
+                            setShowPayment(true);
+                          }}>
                             Record payment
                           </button>
                         </div>
@@ -809,31 +833,26 @@ export default function InsurancePage() {
                 </div>
               </div>
 
-              {/* Payments history */}
+              {/* Payments history (all-time) */}
               <div>
                 <div className="mb-2 font-medium">Payments (history)</div>
                 {loadingPayments && <div className="text-sm text-slate-500">Loading…</div>}
                 {!loadingPayments && payments.length === 0 && <div className="text-sm text-slate-500">No payments recorded.</div>}
                 <div className="divide-y border rounded-lg">
-                  {payments.map((p) => {
-                    const payDate = formatDateSafe(p.paymentDate);
-                    const entered = formatDateSafe(p.createdAt);
-                    return (
-                      <div key={p.id} className="p-3 flex items-center justify-between">
-                        <div className="text-sm">
-                          <div className="font-medium">{money(p.amount, p.currency)}</div>
-                          <div className="text-xs text-slate-500">
-                            {payDate ? payDate : "Payment date —"}
-                            {entered ? ` • Entered on ${entered}` : ""}
-                          </div>
+                  {payments.map((p) => (
+                    <div key={p.id} className="p-3 flex items-center justify-between">
+                      <div className="text-sm">
+                        <div className="font-medium">{money(p.amount, p.currency)}</div>
+                        <div className="text-xs text-slate-500">
+                          Paid: {fmtDate(p.paymentDate)} • Entered: {fmtDate(p.createdAt)}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {/* Edit hidden for now */}
-                          <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
-                        </div>
+                        {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2">
+                        <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -841,12 +860,12 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Add/Edit Claim */}
+      {/* Add Claim */}
       {showClaim && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4 overscroll-none">
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-medium">{editingClaimId ? "Edit Claim" : "Add Claim"}</div>
+              <div className="font-medium">Add Claim</div>
               <button className="text-slate-500" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>✕</button>
             </div>
             <div className="p-4 space-y-3">
@@ -865,7 +884,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
-                {/* Period fields hidden (kept in state) */}
+                {/* Period hidden but used */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={cAmount} onChange={(e) => setCAmount(e.target.value)} />
@@ -878,20 +897,18 @@ export default function InsurancePage() {
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>
-                {editingClaimId ? "Save Changes" : "Save Claim"}
-              </button>
+              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>Save Claim</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add/Edit Payment (no Link-to-Claim field; no Reference field) */}
+      {/* Record Payment */}
       {showPayment && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4 overscroll-none">
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-medium">{editingPaymentId ? "Edit Payment" : "Record Payment"}</div>
+              <div className="font-medium">Record Payment</div>
               <button className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>✕</button>
             </div>
             <div className="p-4 space-y-3">
@@ -914,7 +931,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs text-slate-500 mb-1">Amount Received</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
                 </div>
@@ -926,9 +943,7 @@ export default function InsurancePage() {
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>
-                {editingPaymentId ? "Save Changes" : "Record Payment"}
-              </button>
+              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>Record Payment</button>
             </div>
           </div>
         </div>
