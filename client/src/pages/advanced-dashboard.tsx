@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 
@@ -35,6 +35,10 @@ const fmtUSD = (v: number) => {
 };
 
 /* ================== helper: normalize range ================== */
+/**
+ * Map the UI timeRange + selection into what we actually send to the API.
+ * For "last-month" and "month-select" we send range="current-month" with explicit year/month.
+ */
 function computeRangeParams(
   timeRange: string,
   selectedYear: number | null,
@@ -99,7 +103,10 @@ function InsuranceProvidersUSD({
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
 
-  const palette = ["#00A3A3","#4F46E5","#F59E0B","#EF4444","#10B981","#8B5CF6","#EA580C","#06B6D4"];
+  const palette = [
+    "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
+    "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
+  ];
 
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
@@ -163,32 +170,37 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // sticky: show shadow after scroll
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Normalize the range for API/links
+  // Normalize the range for API/links (key fix for "Last Month")
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
     timeRange, selectedYear ?? null, selectedMonth ?? null
   );
 
   const handleTimeRangeChange = (
-    range: "current-month" | "last-month" | "last-3-months" | "year" | "month-select" | "custom"
+    range:
+      | "current-month"
+      | "last-month"
+      | "last-3-months"
+      | "year"
+      | "month-select"
+      | "custom"
   ) => setTimeRange(range);
 
   const now = new Date();
   const thisYear = now.getFullYear();
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
   const months = [
-    { label: "January", value: 1 },{ label: "February", value: 2 },{ label: "March", value: 3 },
-    { label: "April", value: 4 },{ label: "May", value: 5 },{ label: "June", value: 6 },
-    { label: "July", value: 7 },{ label: "August", value: 8 },{ label: "September", value: 9 },
-    { label: "October", value: 10 },{ label: "November", value: 11 },{ label: "December", value: 12 },
+    { label: "January", value: 1 },
+    { label: "February", value: 2 },
+    { label: "March", value: 3 },
+    { label: "April", value: 4 },
+    { label: "May", value: 5 },
+    { label: "June", value: 6 },
+    { label: "July", value: 7 },
+    { label: "August", value: 8 },
+    { label: "September", value: 9 },
+    { label: "October", value: 10 },
+    { label: "November", value: 11 },
+    { label: "December", value: 12 },
   ];
 
   // ---------- queries ----------
@@ -233,7 +245,9 @@ export default function AdvancedDashboard() {
   });
 
   // ---------- build income series ----------
-  let incomeSeries: Array<{ day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string; }> = [];
+  let incomeSeries: Array<{
+    day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
+  }> = [];
   if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
     incomeSeries = rawIncome.map((r: any, i: number) => ({
       day: i + 1,
@@ -296,409 +310,398 @@ export default function AdvancedDashboard() {
   const sspNetIncome = sspRevenue - totalExpenses;
 
   return (
-    <div className="bg-white dark:bg-slate-900 dashboard-content">
-      {/* ===== Sticky: Title + Date filters + KPI cards ===== */}
-      <div className={`sticky top-0 z-30 bg-white dark:bg-slate-900 ${scrolled ? "border-b shadow-sm" : ""}`}>
-        <div className="p-6">
-          {/* Header + date filters */}
-          <header className="mb-4">
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
-              <div>
-                <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
-                  Executive Dashboard
-                </h1>
-                <div className="mt-1 flex items-center gap-4">
-                  <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
-                </div>
-              </div>
+    <div className="bg-white dark:bg-slate-900 p-6 dashboard-content">
+      {/* Header + date filters */}
+      <header className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
+          <div>
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+              Executive Dashboard
+            </h1>
+            <div className="mt-1 flex items-center gap-4">
+              <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
+            </div>
+          </div>
 
-              {/* RIGHT: range + (optional) month/year or custom dates */}
-              <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-                <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                  <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+          {/* RIGHT: range + (optional) month/year or custom dates */}
+          <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current-month">Current Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="month-select">Select Month…</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {timeRange === "month-select" && (
+              <>
+                <Select
+                  value={String(selectedYear)}
+                  onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
+                >
+                  <SelectTrigger className="h-9 w-[120px]">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="current-month">Current Month</SelectItem>
-                    <SelectItem value="last-month">Last Month</SelectItem>
-                    <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                    <SelectItem value="year">This Year</SelectItem>
-                    <SelectItem value="month-select">Select Month…</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
-                {timeRange === "month-select" && (
-                  <>
-                    <Select
-                      value={String(selectedYear)}
-                      onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
+                <Select
+                  value={String(selectedMonth)}
+                  onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
+                >
+                  <SelectTrigger className="h-9 w-[140px]">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {timeRange === "custom" && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
                     >
-                      <SelectTrigger className="h-9 w-[120px]">
-                        <SelectValue placeholder="Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {years.map((y) => (
-                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customStartDate}
+                      onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
 
-                    <Select
-                      value={String(selectedMonth)}
-                      onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
+                <span aria-hidden className="text-muted-foreground">to</span>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
                     >
-                      <SelectTrigger className="h-9 w-[140px]">
-                        <SelectValue placeholder="Month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {months.map((m) => (
-                          <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={12}
+                    className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
+                    style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                    avoidCollisions
+                    collisionPadding={15}
+                  >
+                    <DatePicker
+                      mode="single"
+                      numberOfMonths={1}
+                      showOutsideDays={false}
+                      selected={customEndDate}
+                      onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
 
-                {timeRange === "custom" && (
-                  <div className="flex items-center gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        side="bottom"
-                        align="start"
-                        sideOffset={12}
-                        className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                        style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                        avoidCollisions
-                        collisionPadding={15}
-                      >
-                        <DatePicker
-                          mode="single"
-                          numberOfMonths={1}
-                          showOutsideDays={false}
-                          selected={customStartDate}
-                          onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-
-                    <span aria-hidden className="text-muted-foreground">to</span>
-
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        side="bottom"
-                        align="start"
-                        sideOffset={12}
-                        className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                        style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                        avoidCollisions
-                        collisionPadding={15}
-                      >
-                        <DatePicker
-                          mode="single"
-                          numberOfMonths={1}
-                          showOutsideDays={false}
-                          selected={customEndDate}
-                          onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
+        {/* Total Revenue */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-emerald-50 p-1.5 rounded-lg">
+                {dashboardData?.changes?.incomeChangeSSP !== undefined &&
+                dashboardData.changes.incomeChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
               </div>
             </div>
-          </header>
+          </CardContent>
+        </Card>
 
-          {/* KPI Cards (kept inside sticky) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
-            {/* Total Revenue */}
-            <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.incomeChangeSSP !== undefined && (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
-                          dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.incomeChangeSSP !== undefined &&
-                    dashboardData.changes.incomeChangeSSP < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-red-600" />
-                    ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
+        {/* Total Expenses */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
+                      dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-red-50 p-1.5 rounded-lg">
+                {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+                dashboardData.changes.expenseChangeSSP < 0 ? (
+                  <TrendingDown className="h-4 w-4 text-emerald-600" />
+                ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Net Income */}
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Net Income</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                      dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
+                      {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-blue-50 p-1.5 rounded-lg">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Insurance (USD) quick nav */}
+        <Link href={`/insurance-providers?range=${rangeToSend}${
+          timeRange === "custom" && customStartDate && customEndDate
+            ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+            : `&year=${yearToSend}&month=${monthToSend}`
+        }`}>
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-4 sm:p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                      <span className={`text-xs font-medium ${
+                        dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
+                        dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                      }`}>
+                        {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
+                        {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-purple-600">
+                        {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
+                          ? "1 provider" : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
+                      </span>
+                    )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-            {/* Total Expenses */}
-            <Card
-              className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => setOpenExpenses(true)}
-              title="Click to view expense breakdown"
-            >
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.expenseChangeSSP !== undefined && (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
-                          dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-red-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                    dashboardData.changes.expenseChangeSSP < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-emerald-600" />
-                    ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+        {/* Patient Volume */}
+        <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
+          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-4 sm:p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-xs font-medium">Total Patients</p>
+                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    {(dashboardData?.totalPatients || 0).toLocaleString()}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    <span className="text-xs font-medium text-teal-600">Current period</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Net Income */}
-            <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
-                          dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 p-1.5 rounded-lg">
-                    <DollarSign className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Insurance (USD) quick nav */}
-            <Link href={`/insurance-providers?range=${rangeToSend}${
-              timeRange === "custom" && customStartDate && customEndDate
-                ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-                : `&year=${yearToSend}&month=${monthToSend}`
-            }`}>
-              <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-4 sm:p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                      <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                        USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
-                      </p>
-                      <div className="flex items-center mt-1">
-                        {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
-                          <span className={`text-xs font-medium ${
-                            dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
-                            dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
-                          }`}>
-                            {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
-                            {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-purple-600">
-                            {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
-                              ? "1 provider" : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Patient Volume */}
-            <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
-              <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-4 sm:p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-600 text-xs font-medium">Total Patients</p>
-                      <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                        {(dashboardData?.totalPatients || 0).toLocaleString()}
-                      </p>
-                      <div className="flex items-center mt-1">
-                        <span className="text-xs font-medium text-teal-600">Current period</span>
-                      </div>
-                    </div>
-                    <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        </div>
+                <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
-      {/* ===== End Sticky ===== */}
 
-      {/* ======= Main Content ======= */}
-      <div className="p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-          {/* LEFT COLUMN: chart + quick actions */}
-          <div className="space-y-6">
-            <RevenueAnalyticsDaily
-              timeRange={rangeToSend}
-              selectedYear={yearToSend}
-              selectedMonth={monthToSend}
-              customStartDate={customStartDate ?? undefined}
-              customEndDate={customEndDate ?? undefined}
-            />
+      {/* ======= Main Content: Two-column layout to eliminate gaps ======= */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+        {/* LEFT COLUMN: chart + quick actions */}
+        <div className="space-y-6">
+          <RevenueAnalyticsDaily
+            timeRange={rangeToSend}
+            selectedYear={yearToSend}
+            selectedMonth={monthToSend}
+            customStartDate={customStartDate ?? undefined}
+            customEndDate={customEndDate ?? undefined}
+          />
 
-            {/* Quick Actions */}
-            <Card className="border border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <a href="/transactions" className="block">
-                    <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium text-slate-900">Add Transaction</span>
-                        <span className="text-xs text-slate-500">Record new income or expense</span>
-                      </div>
-                    </Button>
-                  </a>
-                  <a href="/patient-volume" className="block">
-                    <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium text-slate-900">Patient Volume</span>
-                        <span className="text-xs text-slate-500">Update patient count</span>
-                      </div>
-                    </Button>
-                  </a>
-                  <a href="/reports" className="block">
-                    <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium text-slate-900">Monthly Reports</span>
-                        <span className="text-xs text-slate-500">View generated reports</span>
-                      </div>
-                    </Button>
-                  </a>
-                  <a href="/users" className="block">
-                    <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium text-slate-900">User Management</span>
-                        <span className="text-xs text-slate-500">Manage user accounts</span>
-                      </div>
-                    </Button>
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="space-y-6">
-            <DepartmentsPanel
-              departments={Array.isArray(departments) ? (departments as any[]) : []}
-              departmentBreakdown={dashboardData?.departmentBreakdown}
-              totalSSP={sspRevenue}
-            />
-
-            <InsuranceProvidersUSD
-              breakdown={dashboardData?.insuranceBreakdown}
-              totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
-              timeRange={rangeToSend}
-              selectedYear={yearToSend}
-              selectedMonth={monthToSend}
-              customStartDate={customStartDate ?? undefined}
-              customEndDate={customEndDate ?? undefined}
-            />
-
-            <Card className="border border-slate-200 shadow-sm self-start">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Database</span>
-                    <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Last Sync</span>
-                    <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
-                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Active Users</span>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Quick Actions */}
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <a href="/transactions" className="block">
+                  <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium text-slate-900">Add Transaction</span>
+                      <span className="text-xs text-slate-500">Record new income or expense</span>
+                    </div>
+                  </Button>
+                </a>
+                <a href="/patient-volume" className="block">
+                  <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium text-slate-900">Patient Volume</span>
+                      <span className="text-xs text-slate-500">Update patient count</span>
+                    </div>
+                  </Button>
+                </a>
+                <a href="/reports" className="block">
+                  <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium text-slate-900">Monthly Reports</span>
+                      <span className="text-xs text-slate-500">View generated reports</span>
+                    </div>
+                  </Button>
+                </a>
+                <a href="/users" className="block">
+                  <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium text-slate-900">User Management</span>
+                      <span className="text-xs text-slate-500">Manage user accounts</span>
+                    </div>
+                  </Button>
+                </a>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Expenses drawer */}
-        <ExpensesDrawer
-          open={openExpenses}
-          onOpenChange={setOpenExpenses}
-          periodLabel={periodLabel}
-          expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
-          totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
-          onViewFullReport={() => { window.location.href = "/reports"; }}
-        />
+        {/* RIGHT COLUMN: departments + providers + system status */}
+        <div className="space-y-6">
+          <DepartmentsPanel
+            departments={Array.isArray(departments) ? (departments as any[]) : []}
+            departmentBreakdown={dashboardData?.departmentBreakdown}
+            totalSSP={sspRevenue}
+          />
+
+          <InsuranceProvidersUSD
+            breakdown={dashboardData?.insuranceBreakdown}
+            totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
+            timeRange={rangeToSend}
+            selectedYear={yearToSend}
+            selectedMonth={monthToSend}
+            customStartDate={customStartDate ?? undefined}
+            customEndDate={customEndDate ?? undefined}
+          />
+
+          <Card className="border border-slate-200 shadow-sm self-start">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Database</span>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Last Sync</span>
+                  <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+                    {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Active Users</span>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Expenses drawer */}
+      <ExpensesDrawer
+        open={openExpenses}
+        onOpenChange={setOpenExpenses}
+        periodLabel={periodLabel}
+        expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
+        totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
+        onViewFullReport={() => { window.location.href = "/reports"; }}
+      />
     </div>
   );
 }
