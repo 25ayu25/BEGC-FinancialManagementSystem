@@ -1,3 +1,4 @@
+// client/src/pages/advanced-dashboard.tsx
 'use client';
 
 import { useState, useMemo } from "react";
@@ -259,7 +260,7 @@ export default function AdvancedDashboard() {
     }));
   } else {
     const y = yearToSend!;
-       const m = monthToSend!;
+    const m = monthToSend!;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
@@ -310,10 +311,17 @@ export default function AdvancedDashboard() {
   const sspNetIncome = sspRevenue - totalExpenses;
 
   return (
-    /* ========= Full-height grid: sticky header + scrollable content ========= */
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/80 backdrop-blur border-b">
+      {/* Sticky, modern header */}
+      <header
+        className="
+          sticky top-0 z-50
+          bg-white/80 dark:bg-slate-900/70
+          backdrop-blur-md supports-[backdrop-filter]:bg-white/60
+          shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)]
+          dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]
+        "
+      >
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
             <div>
@@ -325,7 +333,7 @@ export default function AdvancedDashboard() {
               </div>
             </div>
 
-            {/* RIGHT: range + (optional) month/year or custom dates) */}
+            {/* RIGHT: range + (optional) month/year or custom dates */}
             <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                 <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
@@ -478,8 +486,11 @@ export default function AdvancedDashboard() {
             </Card>
 
             {/* Total Expenses */}
-            <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
+            <Card
+              className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => setOpenExpenses(true)}
+              title="Click to view expense breakdown"
+            >
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
@@ -595,7 +606,7 @@ export default function AdvancedDashboard() {
             </Link>
           </div>
 
-          {/* ======= Main Content: Two-column layout to eliminate gaps ======= */}
+          {/* ======= Main Content: Two-column layout ======= */}
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
             {/* LEFT COLUMN: chart + quick actions */}
             <div className="space-y-6">
