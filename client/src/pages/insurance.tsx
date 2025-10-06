@@ -23,7 +23,7 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate?: string | null; // ISO (optional from legacy rows)
+  paymentDate?: string | null; // ISO
   amount: number | string;
   currency: "USD" | "SSP";
   reference?: string | null;
@@ -247,7 +247,7 @@ export default function InsurancePage() {
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
-  // Payment form (link/ref removed)
+  // Payment form
   const [pProviderId, setPProviderId] = useState<string>("");
   const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
@@ -409,6 +409,95 @@ export default function InsurancePage() {
         .sort((a, b) => rank(a.providerName) - rank(b.providerName) || a.providerName.localeCompare(b.providerName)),
     [balances]
   );
+
+  /* ------------------------ create/delete helpers ------------------------ */
+  async function submitClaim() {
+    const body = {
+      providerId: cProviderId || providerId,
+      periodStart: cStart,
+      periodEnd: cEnd,
+      currency: cCurrency,
+      claimedAmount: Number(cAmount),
+      notes: cNotes || undefined,
+    };
+    try {
+      await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
+      setShowClaim(false);
+      setEditingClaimId("");
+      reloadClaims();
+      reloadBalances();
+      alert("Claim saved");
+    } catch (e: any) {
+      alert(`Failed to save claim: ${e.message || e}`);
+    }
+  }
+
+  async function deleteClaim(id: string) {
+    if (!confirm("Delete this claim? This cannot be undone.")) return;
+    try {
+      await api(`/api/insurance-claims/${id}`, { method: "DELETE" });
+      reloadClaims();
+      reloadBalances();
+      if (detailProviderId) {
+        const qs = new URLSearchParams({ providerId: detailProviderId });
+        setLoadingPayments(true);
+        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+          .then(setPayments)
+          .finally(() => setLoadingPayments(false));
+      }
+    } catch (e: any) {
+      alert(`Failed to delete claim: ${e.message || e}`);
+    }
+  }
+
+  async function submitPayment() {
+    const body = {
+      providerId: pProviderId || providerId,
+      paymentDate: pDate || undefined,
+      amount: Number(pAmount),
+      currency: pCurrency,
+      notes: pNotes || undefined,
+    };
+    try {
+      await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
+      setShowPayment(false);
+      setEditingPaymentId("");
+      reloadBalances();
+      if (detailProviderId) {
+        const qs = new URLSearchParams({ providerId: detailProviderId });
+        setLoadingPayments(true);
+        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+          .then(setPayments)
+          .finally(() => setLoadingPayments(false));
+      }
+      alert("Payment saved");
+    } catch (e: any) {
+      alert(`Failed to save payment: ${e.message || e}`);
+    }
+  }
+
+  async function deletePayment(id: string) {
+    if (!confirm("Delete this payment? This cannot be undone.")) return;
+    try {
+      await api(`/api/insurance-payments/${id}`, { method: "DELETE" });
+      reloadBalances();
+      if (detailProviderId) {
+        const qs = new URLSearchParams({ providerId: detailProviderId });
+        setLoadingPayments(true);
+        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+          .then(setPayments)
+          .finally(() => setLoadingPayments(false));
+      }
+    } catch (e: any) {
+      alert(`Failed to delete payment: ${e.message || e}`);
+    }
+  }
+
+  function clearFilters() {
+    setProviderId("");
+    setStatus("");
+    setPresetWindow("all");
+  }
 
   /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
@@ -670,7 +759,7 @@ export default function InsurancePage() {
             </div>
           </div>
 
-          {/* Provider balances (ordered) */}
+          {/* Provider balances */}
           <div className="bg-white rounded-xl border">
             <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
             <div className="p-4 space-y-3">
@@ -837,7 +926,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
-                {/* Period hidden but used */}
+                {/* Amount */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={cAmount} onChange={(e) => setCAmount(e.target.value)} />
