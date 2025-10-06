@@ -1,4 +1,3 @@
-// client/src/pages/insurance.tsx
 import React, { useEffect, useMemo, useState } from "react";
 
 /* ----------------------------- types ----------------------------- */
@@ -23,13 +22,11 @@ type Claim = {
 type Payment = {
   id: string;
   providerId: string;
-  claimId?: string | null;
-  paymentDate: string | null; // ISO or null
+  paymentDate: string; // ISO (may be empty/null on legacy rows)
   amount: number | string;
   currency: "USD" | "SSP";
-  reference?: string | null;
   notes?: string | null;
-  createdAt?: string | null; // when staff recorded it
+  createdAt?: string;  // when staff entered the record
 };
 
 type BalancesResponse = {
@@ -82,13 +79,6 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw err;
   }
   return res.json();
-}
-
-function safeFmtDate(d: string | null | undefined) {
-  if (!d) return "—";
-  const t = Date.parse(d);
-  if (!Number.isFinite(t)) return "—";
-  return new Date(t).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
 /* ----------------------------- provider order ----------------------------- */
@@ -149,19 +139,20 @@ function HelpPopover() {
   );
 }
 
-function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number }) {
+/** Bolder progress with clear inside label */
+function ProgressRing({ billed, paid }: { billed: number; paid: number }) {
   const pct = billed > 0 ? Math.min(100, Math.max(0, Math.round((paid / billed) * 100))) : 0;
-  const label = balance < 0 ? "CR" : `${pct}%`;
-  const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6);
+  const sweep = Math.round(pct * 3.6);
   return (
-    <div className="relative h-10 w-10 shrink-0">
-      {/* bolder emerald and faint track */}
+    <div className="relative h-12 w-12 shrink-0">
       <div
         className="absolute inset-0 rounded-full"
         style={{ background: `conic-gradient(#059669 ${sweep}deg, #e5e7eb 0deg)` }}
+        aria-hidden
       />
-      <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
-        {label}
+      <div className="absolute inset-[4px] rounded-full bg-white" />
+      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-700">
+        {pct}%
       </div>
     </div>
   );
@@ -218,13 +209,13 @@ export default function InsurancePage() {
   const [showPayment, setShowPayment] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<string>("");
 
-  // editing (Edit actions removed; keep ID just to reuse modal header text if needed)
+  // editing (kept for future; Edit UI removed for now)
   const [editingClaimId, setEditingClaimId] = useState<string>("");
   const [editingPaymentId, setEditingPaymentId] = useState<string>("");
 
   const [authError, setAuthError] = useState(false);
 
-  // Add-Claim form (period fields hidden but still sent as current month)
+  // Add-Claim form (period hidden but sent)
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cStart, setCStart] = useState<string>(() =>
     new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10)
@@ -236,7 +227,7 @@ export default function InsurancePage() {
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
-  // Payment form (link-to-claim & reference removed)
+  // Payment form (simplified)
   const [pProviderId, setPProviderId] = useState<string>("");
   const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
@@ -363,16 +354,7 @@ export default function InsurancePage() {
     [balances]
   );
 
-  /* ------------------------ create / edit claim ------------------------ */
-  function hydrateClaimForm(c: Claim) {
-    setCProviderId(c.providerId);
-    setCStart(c.periodStart.slice(0,10));
-    setCEnd(c.periodEnd.slice(0,10));
-    setCCurrency(c.currency);
-    setCAmount(String(c.claimedAmount));
-    setCNotes(c.notes || "");
-  }
-
+  /* ------------------------ create / delete claim ------------------------ */
   async function submitClaim() {
     const body = {
       providerId: cProviderId || providerId,
@@ -416,11 +398,11 @@ export default function InsurancePage() {
     }
   }
 
-  /* ----------------------- create / edit payment ----------------------- */
+  /* ----------------------- create / delete payment ----------------------- */
   async function submitPayment() {
     const body = {
       providerId: pProviderId || providerId,
-      paymentDate: pDate || undefined,
+      paymentDate: pDate,
       amount: Number(pAmount),
       currency: pCurrency,
       notes: pNotes || undefined,
@@ -473,116 +455,119 @@ export default function InsurancePage() {
   /* ----------------------------- UI ----------------------------- */
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">Insurance Management</h1>
-        <div className="flex items-center gap-2">
-          {/* toned down buttons to match Export CSV */}
-          <button
-            onClick={() => {
-              setEditingClaimId("");
-              setCProviderId(providerId || "");
-              setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
-              setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
-              setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
-            }}
-            className="px-3 py-2 rounded-lg border hover:bg-slate-50"
-          >
-            + Add Claim
-          </button>
-
-          <button
-            onClick={() => {
-              setEditingPaymentId("");
-              setPProviderId(providerId || "");
-              setPDate(new Date().toISOString().slice(0, 10));
-              setPAmount("0"); setPCurrency("USD"); setPNotes("");
-              setShowPayment(true);
-            }}
-            className="px-3 py-2 rounded-lg border hover:bg-slate-50"
-          >
-            Record Payment
-          </button>
-
-          <button onClick={() => exportClaimsCsv(claims, providers)} className="px-3 py-2 rounded-lg border hover:bg-slate-50">
-            Export CSV
-          </button>
-
-          <HelpPopover />
-        </div>
-      </div>
-
-      {authError && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Authentication required. If you’re in Incognito/Private mode, allow third-party cookies or sign in again.
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 gap-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
-            <option value="">All providers</option>
-            {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-          </select>
-
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg p-2">
-            <option value="">Any status</option>
-            <option value="submitted">Submitted</option>
-            <option value="partially_paid">Partially paid</option>
-            <option value="paid">Paid</option>
-          </select>
-        </div>
-
-        {/* window chips (neutral active state) */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {[
-            { id: "all", label: "All time" },
-            { id: "ytd", label: "YTD" },
-            { id: `year-${currentYear}`, label: `Year ${currentYear}` },
-            { id: `year-${currentYear-1}`, label: `Year ${currentYear-1}` },
-            { id: `year-${currentYear-2}`, label: `Year ${currentYear-2}` },
-            { id: `year-${currentYear-3}`, label: `Year ${currentYear-3}` },
-            { id: "custom", label: "Custom" },
-          ].map((chip) => (
+      {/* Sticky header: title + actions + filters */}
+      <div className="sticky top-0 z-30 -mx-6 px-6 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b">
+        <div className="flex items-center justify-between py-4">
+          <h1 className="text-2xl font-semibold">Insurance Management</h1>
+          <div className="flex items-center gap-2">
             <button
-              key={chip.id}
-              onClick={() => setPresetWindow(chip.id as WindowPreset)}
-              className={`px-3 py-1.5 rounded-full border ${
-                preset === chip.id
-                  ? "bg-slate-900/10 text-slate-900 border-slate-300"
-                  : "hover:bg-slate-50"
-              }`}
+              onClick={() => {
+                setEditingClaimId("");
+                setCProviderId(providerId || "");
+                setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
+                setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
+                setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
+              }}
+              className="px-3 py-2 rounded-lg border"
             >
-              {chip.label}
+              + Add Claim
             </button>
-          ))}
-          {preset === "custom" && (
-            <>
-              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded-lg p-2" />
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded-lg p-2" />
-            </>
-          )}
-          <div className="ml-auto">
-            <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
+
+            <button
+              onClick={() => {
+                setEditingPaymentId("");
+                setPProviderId(providerId || "");
+                setPDate(new Date().toISOString().slice(0, 10));
+                setPAmount("0"); setPCurrency("USD"); setPNotes("");
+                setShowPayment(true);
+              }}
+              className="px-3 py-2 rounded-lg border"
+            >
+              Record Payment
+            </button>
+
+            <button onClick={() => exportClaimsCsv(claims, providers)} className="px-3 py-2 rounded-lg border">
+              Export CSV
+            </button>
+
+            <HelpPopover />
+          </div>
+        </div>
+
+        {authError && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Authentication required. If you’re in Incognito/Private mode, allow third-party cookies or sign in again.
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="rounded-xl border p-3 mb-0 grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
+              <option value="">All providers</option>
+              {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+            </select>
+
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg p-2">
+              <option value="">Any status</option>
+              <option value="submitted">Submitted</option>
+              <option value="partially_paid">Partially paid</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+
+          {/* window chips (neutral active) */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {[
+              { id: "all", label: "All time" },
+              { id: "ytd", label: "YTD" },
+              { id: "year-2025", label: "Year 2025" },
+              { id: "year-2024", label: "Year 2024" },
+              { id: "year-2023", label: "Year 2023" },
+              { id: "year-2022", label: "Year 2022" },
+              { id: "custom", label: "Custom" },
+            ].map((chip) => {
+              const active = preset === (chip.id as WindowPreset);
+              return (
+                <button
+                  key={chip.id}
+                  onClick={() => setPresetWindow(chip.id as WindowPreset)}
+                  className={`px-3 py-1.5 rounded-full border transition-colors ${
+                    active ? "bg-slate-100 text-slate-900 ring-1 ring-slate-300" : "hover:bg-slate-50"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+            {preset === "custom" && (
+              <>
+                <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded-lg p-2" />
+                <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded-lg p-2" />
+              </>
+            )}
+            <div className="ml-auto">
+              <button onClick={clearFilters} className="px-3 py-2 rounded-lg border">Clear filters</button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Summary (slightly larger numbers) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+      {/* Summary (NO Carry Forward) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 mt-4">
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Billed</div>
-          <div className="mt-1 text-2xl font-semibold">{money(summary.billed, "USD")}</div>
+          <div className="mt-1 text-[22px] md:text-2xl font-semibold leading-tight">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">{selectedProvider ? selectedProvider.name : "All providers"}</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Collected</div>
-          <div className="mt-1 text-2xl font-semibold">{money(summary.collected, "USD")}</div>
+          <div className="mt-1 text-[22px] md:text-2xl font-semibold leading-tight">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <div className="text-slate-500 text-sm">Outstanding</div>
-          <div className={`mt-1 text-2xl font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
+          <div className={`mt-1 text-[22px] md:text-2xl font-semibold leading-tight ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
             {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
           </div>
           <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
@@ -603,10 +588,10 @@ export default function InsurancePage() {
                 <tr>
                   <th className="text-left p-3">Provider</th>
                   <th className="text-left p-3">Period</th>
-                  <th className="text-left p-3">Billed</th>
+                  <th className="text-right p-3">Billed</th>
                   <th className="text-left p-3">Status</th>
                   <th className="text-left p-3">Notes</th>
-                  <th className="text-right p-3 w-32">Actions</th>
+                  <th className="text-right p-3 w-40">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -618,15 +603,13 @@ export default function InsurancePage() {
                       <td className="p-3">
                         {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
                       </td>
-                      <td className="p-3">{money(c.claimedAmount, c.currency)}</td>
+                      <td className="p-3 text-right">{money(c.claimedAmount, c.currency)}</td>
                       <td className="p-3"><StatusChip status={c.status} /></td>
                       <td className="p-3">{c.notes || ""}</td>
                       <td className="p-3 text-right">
                         <div className="inline-flex gap-2">
-                          <button
-                            className="text-xs px-2 py-1 rounded-md border text-rose-700"
-                            onClick={() => deleteClaim(c.id)}
-                          >
+                          {/* Edit intentionally removed for now */}
+                          <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
                             Delete
                           </button>
                         </div>
@@ -654,10 +637,10 @@ export default function InsurancePage() {
                 <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
+                      <ProgressRing billed={row.claimed} paid={row.paid} />
                       <div>
                         <div className="font-medium">{row.providerName}</div>
-                        <div className={`text-xs ${pct > 0 ? "text-emerald-700" : "text-slate-400"}`}>{pct}% Paid</div>
+                        <div className="text-xs text-emerald-700">{pct}% Paid</div>
                       </div>
                     </div>
                     <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
@@ -698,7 +681,7 @@ export default function InsurancePage() {
                 {(() => {
                   const prov = balances?.providers.find((r) => r.providerId === detailProviderId) || { claimed: 0, paid: 0 };
                   const outstanding = (prov.claimed || 0) - (prov.paid || 0);
-                  const pct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
+                  const pct = prov.claimed > 0 ? Math.round(((prov.paid || 0) / (prov.claimed || 1)) * 100) : 0;
                   return (
                     <>
                       <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Billed</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
@@ -706,7 +689,7 @@ export default function InsurancePage() {
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Outstanding</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
-                        <div className={`text-xs mt-1 ${pct > 0 ? "text-emerald-700" : "text-slate-400"}`}>{pct}% Paid</div>
+                        <div className="text-xs text-emerald-700 mt-1">{pct}% Paid</div>
                       </div>
                     </>
                   );
@@ -728,12 +711,8 @@ export default function InsurancePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            <button
-                              className="text-xs px-2 py-1 rounded-md border text-rose-700"
-                              onClick={() => deleteClaim(c.id)}
-                            >
-                              Delete
-                            </button>
+                            {/* Edit intentionally removed */}
+                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
                           </div>
                         </div>
 
@@ -750,10 +729,12 @@ export default function InsurancePage() {
                         <div className="mt-2 flex items-center justify-between">
                           <div className="text-xs text-slate-500">{c.notes || ""}</div>
                           <button
-                            className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50"
+                            className="text-xs px-2 py-1 rounded-md border"
                             onClick={() => {
-                              setPProviderId(c.providerId);
                               setEditingPaymentId("");
+                              setPProviderId(c.providerId);
+                              setPDate(new Date().toISOString().slice(0, 10));
+                              setPAmount("0"); setPCurrency("USD"); setPNotes("");
                               setShowPayment(true);
                             }}
                           >
@@ -773,17 +754,25 @@ export default function InsurancePage() {
                 {!loadingPayments && payments.length === 0 && <div className="text-sm text-slate-500">No payments recorded.</div>}
                 <div className="divide-y border rounded-lg">
                   {payments.map((p) => {
+                    // Show friendly dates, avoid 1969 when missing
+                    const paidText =
+                      p.paymentDate && !isNaN(new Date(p.paymentDate).getTime())
+                        ? new Date(p.paymentDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                        : "—";
+                    const enteredText =
+                      p.createdAt && !isNaN(new Date(p.createdAt).getTime())
+                        ? new Date(p.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                        : "";
                     return (
                       <div key={p.id} className="p-3 flex items-center justify-between">
                         <div className="text-sm">
                           <div className="font-medium">{money(p.amount, p.currency)}</div>
                           <div className="text-xs text-slate-500">
-                            Paid: {safeFmtDate(p.paymentDate)}
-                            {p.createdAt ? ` • Entered: ${safeFmtDate(p.createdAt)}` : ""}
-                            {p.notes ? ` • ${p.notes}` : ""}
+                            Paid: {paidText}{enteredText ? ` • Entered: ${enteredText}` : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {/* Edit intentionally removed */}
                           <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
                         </div>
                       </div>
@@ -833,7 +822,7 @@ export default function InsurancePage() {
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg border bg-slate-900 text-white hover:opacity-90" onClick={submitClaim}>
+              <button className="px-3 py-2 rounded-lg border bg-white" onClick={submitClaim}>
                 {editingClaimId ? "Save Changes" : "Save Claim"}
               </button>
             </div>
@@ -841,7 +830,7 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Record Payment (simplified) */}
+      {/* Add/Edit Payment (simplified) */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
@@ -869,7 +858,7 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs text-slate-500 mb-1">Amount Received</label>
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
                 </div>
@@ -881,7 +870,7 @@ export default function InsurancePage() {
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg border bg-slate-800 text-white hover:opacity-90" onClick={submitPayment}>
+              <button className="px-3 py-2 rounded-lg border bg-white" onClick={submitPayment}>
                 {editingPaymentId ? "Save Changes" : "Record Payment"}
               </button>
             </div>
