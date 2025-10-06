@@ -36,10 +36,6 @@ const fmtUSD = (v: number) => {
 };
 
 /* ================== helper: normalize range ================== */
-/**
- * Map the UI timeRange + selection into what we actually send to the API.
- * For "last-month" and "month-select" we send range="current-month" with explicit year/month.
- */
 function computeRangeParams(
   timeRange: string,
   selectedYear: number | null,
@@ -312,7 +308,7 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Sticky, modern header */}
+      {/* Sticky, modern header with mobile-safe padding */}
       <header
         className="
           sticky top-0 z-50
@@ -322,10 +318,10 @@ export default function AdvancedDashboard() {
           dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]
         "
       >
-        <div className="p-6">
+        <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
             <div>
-              <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+              <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
                 Executive Dashboard
               </h1>
               <div className="mt-1 flex items-center gap-4">
@@ -333,10 +329,10 @@ export default function AdvancedDashboard() {
               </div>
             </div>
 
-            {/* RIGHT: range + (optional) month/year or custom dates */}
-            <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
+            {/* RIGHT: range + (optional) month/year or custom dates) */}
+            <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="current-month">Current Month</SelectItem>
                   <SelectItem value="last-month">Last Month</SelectItem>
@@ -353,7 +349,7 @@ export default function AdvancedDashboard() {
                     value={String(selectedYear)}
                     onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
                   >
-                    <SelectTrigger className="h-9 w-[120px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[120px]">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -367,7 +363,7 @@ export default function AdvancedDashboard() {
                     value={String(selectedMonth)}
                     onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
                   >
-                    <SelectTrigger className="h-9 w-[140px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[140px]">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -380,12 +376,12 @@ export default function AdvancedDashboard() {
               )}
 
               {timeRange === "custom" && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full sm:w-auto">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                        className={cn("h-10 w-full sm:w-auto justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
@@ -411,13 +407,13 @@ export default function AdvancedDashboard() {
                     </PopoverContent>
                   </Popover>
 
-                  <span aria-hidden className="text-muted-foreground">to</span>
+                  <span aria-hidden className="text-center sm:text-left text-muted-foreground">to</span>
 
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                        className={cn("h-10 w-full sm:w-auto justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
@@ -450,8 +446,8 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* Scrollable content */}
-      <main className="min-h-0 overflow-y-auto">
-        <div className="p-6 dashboard-content">
+      <main className="min-h-0 overflow-y-auto [overscroll-behavior:contain]">
+        <div className="px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-4 md:pt-6 dashboard-content">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
             {/* Total Revenue */}
