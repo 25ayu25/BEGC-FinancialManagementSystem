@@ -263,6 +263,23 @@ export default function InsurancePage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // measure top sticky header height for offset
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerH, setHeaderH] = useState(64);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const update = () => setHeaderH(el.getBoundingClientRect().height || 64);
+    update();
+    const ro = (typeof ResizeObserver !== "undefined") ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   /* --------------------------- date helpers --------------------------- */
   function setPresetWindow(p: WindowPreset) {
     setPreset(p);
@@ -488,8 +505,11 @@ export default function InsurancePage() {
   /* ----------------------------- UI ----------------------------- */
   return (
     <div className="max-w-[1200px] mx-auto">
-      {/* Sticky header with shadow only after scroll (no pre-scroll line) */}
-      <div className={`sticky top-0 z-30 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}>
+      {/* Sticky header with shadow only after scroll */}
+      <div
+        ref={headerRef}
+        className={`sticky top-0 z-30 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}
+      >
         <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold">Insurance Management</h1>
 
@@ -590,8 +610,11 @@ export default function InsurancePage() {
         )}
       </div>
 
-      {/* STICKY FILTERS + SUMMARY */}
-      <div className={`sticky top-14 md:top-16 z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}>
+      {/* STICKY: Filters + Summary (sticks under the top header) */}
+      <div
+        className={`sticky z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 ${scrolled ? "border-b shadow-sm" : ""}`}
+        style={{ top: headerH }}
+      >
         <div className="p-4 sm:p-6 pt-3">
           {/* Filters */}
           <div className="rounded-xl border p-3 mb-4 grid grid-cols-1 gap-3">
@@ -642,7 +665,7 @@ export default function InsurancePage() {
             </div>
           </div>
 
-          {/* Summary with emphasized numbers */}
+          {/* Summary — emphasized numbers */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-2xl border bg-white p-4">
               <div className="text-slate-500 text-xs">Billed</div>
@@ -665,9 +688,8 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content (scrolls under the sticky blocks) */}
       <div className="p-4 sm:p-6">
-        {/* Layout: left table, right balances */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Claims table */}
           <div className="lg:col-span-2 bg-white rounded-xl border">
