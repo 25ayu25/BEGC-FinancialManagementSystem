@@ -174,7 +174,7 @@ export default function AdvancedDashboard() {
     range: "current-month" | "last-month" | "last-3-months" | "year" | "month-select" | "custom"
   ) => setTimeRange(range);
 
-  // Sticky: measure header height and add shadow after scroll
+  // Sticky header measurements + shadow
   const headerRef = useRef<HTMLDivElement | null>(null);
   const [headerH, setHeaderH] = useState(64);
   const [scrolled, setScrolled] = useState(false);
@@ -251,7 +251,7 @@ export default function AdvancedDashboard() {
     },
   });
 
-  // ---------- build income series (unchanged) ----------
+  // ---------- build income series ----------
   let incomeSeries: Array<{ day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string; }> = [];
   if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
     incomeSeries = rawIncome.map((r: any, i: number) => ({
@@ -285,8 +285,11 @@ export default function AdvancedDashboard() {
     }
   }
 
+  // ---------- totals ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
 
   // loading
@@ -300,6 +303,156 @@ export default function AdvancedDashboard() {
       </div>
     );
   }
+
+  /* ------- shared KPI grid (used for both mobile & desktop) ------- */
+  const KpiGrid = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
+      {/* Total Revenue */}
+      <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+        <CardContent className="p-4 sm:p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
+              <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                SSP {nf0.format(Math.round(sspRevenue))}
+              </p>
+              <div className="flex items-center mt-1">
+                {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                  <span className={`text-xs font-medium ${
+                    dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
+                    dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                  }`}>
+                    {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
+                    {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="bg-emerald-50 p-1.5 rounded-lg">
+              {dashboardData?.changes?.incomeChangeSSP !== undefined &&
+              dashboardData.changes.incomeChangeSSP < 0 ? (
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Total Expenses */}
+      <Card
+        className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
+        onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown"
+      >
+        <CardContent className="p-4 sm:p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
+              <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                SSP {nf0.format(Math.round(totalExpenses))}
+              </p>
+              <div className="flex items-center mt-1">
+                {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                  <span className={`text-xs font-medium ${
+                    dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
+                    dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                  }`}>
+                    {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
+                    {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="bg-red-50 p-1.5 rounded-lg">
+              {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+              dashboardData.changes.expenseChangeSSP < 0 ? (
+                <TrendingDown className="h-4 w-4 text-emerald-600" />
+              ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Net Income */}
+      <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+        <CardContent className="p-4 sm:p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-600 text-xs font-medium">Net Income</p>
+              <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                SSP {nf0.format(Math.round(sspRevenue - totalExpenses))}
+              </p>
+              <div className="flex items-center mt-1">
+                {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                  <span className={`text-xs font-medium ${
+                    dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                    dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                  }`}>
+                    {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
+                    {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="bg-blue-50 p-1.5 rounded-lg">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Insurance (USD) quick nav */}
+      <Link href={`/insurance-providers?range=${rangeToSend}${
+        timeRange === "custom" && customStartDate && customEndDate
+          ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+          : `&year=${yearToSend}&month=${monthToSend}`
+      }`}>
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  USD {fmtUSD(Math.round(usdIncome))}
+                </p>
+                <div className="flex items-center mt-1">
+                  {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                    <span className={`text-xs font-medium ${
+                      dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
+                      dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                    }`}>
+                      {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
+                      {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Patient Volume */}
+      <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
+          <CardContent className="p-4 sm:p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Total Patients</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  {(dashboardData?.totalPatients || 0).toLocaleString()}
+                </p>
+                <div className="flex items-center mt-1">
+                  <span className="text-xs font-medium text-teal-600">Current period</span>
+                </div>
+              </div>
+              <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    </div>
+  );
 
   return (
     <div className="bg-white dark:bg-slate-900">
@@ -320,6 +473,7 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
 
+              {/* RIGHT: range + optional pickers */}
               <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
                 <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                   <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
@@ -343,7 +497,7 @@ export default function AdvancedDashboard() {
                         <SelectValue placeholder="Year" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[thisYear, thisYear - 1, thisYear - 2].map((y) => (
+                        {years.map((y) => (
                           <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                         ))}
                       </SelectContent>
@@ -357,11 +511,8 @@ export default function AdvancedDashboard() {
                         <SelectValue placeholder="Month" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[
-                          "January","February","March","April","May","June",
-                          "July","August","September","October","November","December",
-                        ].map((m, i) => (
-                          <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                        {months.map((m) => (
+                          <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -441,144 +592,7 @@ export default function AdvancedDashboard() {
 
       {/* KPI cards: mobile (non-sticky) */}
       <div className="md:hidden p-6 pt-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
-          {/* Total Revenue */}
-          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 sm:p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
-                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    SSP {nf0.format(Math.round(incomeSeries.reduce((s,d)=>s+d.amountSSP,0) || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
-                  </p>
-                  {dashboardData?.changes?.incomeChangeSSP !== undefined && (
-                    <span className={`text-xs font-medium ${
-                      dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
-                      dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                    }`}>
-                      {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
-                      {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
-                    </span>
-                  )}
-                </div>
-                <div className="bg-emerald-50 p-1.5 rounded-lg">
-                  {dashboardData?.changes?.incomeChangeSSP !== undefined &&
-                  dashboardData.changes.incomeChangeSSP < 0 ? (
-                    <TrendingDown className="h-4 w-4 text-red-600" />
-                  ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Total Expenses */}
-          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setOpenExpenses(true)} title="Click to view expense breakdown">
-            <CardContent className="p-4 sm:p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
-                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
-                  </p>
-                  {dashboardData?.changes?.expenseChangeSSP !== undefined && (
-                    <span className={`text-xs font-medium ${
-                      dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
-                      dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
-                    }`}>
-                      {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
-                      {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
-                    </span>
-                  )}
-                </div>
-                <div className="bg-red-50 p-1.5 rounded-lg">
-                  {dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                  dashboardData.changes.expenseChangeSSP < 0 ? (
-                    <TrendingDown className="h-4 w-4 text-emerald-600" />
-                  ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Net Income */}
-          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 sm:p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-xs font-medium">Net Income</p>
-                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    SSP {nf0.format(Math.round((incomeSeries.reduce((s,d)=>s+d.amountSSP,0) || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
-                  </p>
-                  {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
-                    <span className={`text-xs font-medium ${
-                      dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
-                      dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                    }`}>
-                      {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
-                      {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
-                    </span>
-                  )}
-                </div>
-                <div className="bg-blue-50 p-1.5 rounded-lg">
-                  <DollarSign className="h-4 w-4 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Insurance (USD) quick nav */}
-          <Link href={`/insurance-providers?range=${rangeToSend}${
-            timeRange === "custom" && customStartDate && customEndDate
-              ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-              : `&year=${yearToSend}&month=${monthToSend}`
-          }`}>
-            <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
-                          dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
-                          {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* Patients */}
-          <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
-            <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium">Total Patients</p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      {(dashboardData?.totalPatients || 0).toLocaleString()}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      <span className="text-xs font-medium text-teal-600">Current period</span>
-                    </div>
-                  </div>
-                  <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+        <KpiGrid />
       </div>
 
       {/* KPI cards: desktop (sticky under header) */}
@@ -587,17 +601,14 @@ export default function AdvancedDashboard() {
         style={{ top: headerH }}
       >
         <div className="p-6 pt-4 border-b">
-          {/* same grid as above */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
-            {/* repeat the five KPI cards exactly as in the mobile block above */}
-            {/* For brevity, you can keep the same JSX from the mobile grid here */}
-          </div>
+          <KpiGrid />
         </div>
       </div>
 
       {/* ======= Main Content ======= */}
       <div className="p-6">
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+          {/* LEFT COLUMN: chart + quick actions */}
           <div className="space-y-6">
             <RevenueAnalyticsDaily
               timeRange={rangeToSend}
@@ -607,6 +618,7 @@ export default function AdvancedDashboard() {
               customEndDate={customEndDate ?? undefined}
             />
 
+            {/* Quick Actions */}
             <Card className="border border-slate-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -652,6 +664,7 @@ export default function AdvancedDashboard() {
             </Card>
           </div>
 
+          {/* RIGHT COLUMN: departments + providers + system status */}
           <div className="space-y-6">
             <DepartmentsPanel
               departments={Array.isArray(departments) ? (departments as any[]) : []}
@@ -697,6 +710,7 @@ export default function AdvancedDashboard() {
           </div>
         </div>
 
+        {/* Expenses drawer */}
         <ExpensesDrawer
           open={openExpenses}
           onOpenChange={setOpenExpenses}
