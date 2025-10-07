@@ -178,54 +178,49 @@ export default function Transactions() {
   /* -------------------------------- UI ---------------------------------- */
 
   return (
-    // Lock the page to the viewport; only the <main> scrolls.
-    <div className="flex h-[100dvh] flex-col overflow-hidden">
-      {/* Sticky header with subtle divider & blur (great on iOS) */}
-      <div className="sticky top-0 z-40 border-b bg-white/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
-        <Header
-          title="Transaction Management"
-          subtitle="Add and manage daily income and expense transactions"
-          actions={
-            <TooltipProvider delayDuration={150}>
-              <div className="flex flex-wrap gap-2">
-                {/* Order: Daily Bulk Income → Bulk Expenses → Add Transaction */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" onClick={() => setShowBulkIncome(true)}>
-                      <CircleDollarSign className="h-4 w-4 mr-2" />
-                      Daily Bulk Income
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Enter today’s department totals and insurer daily totals.</TooltipContent>
-                </Tooltip>
+    <div className="flex-1 flex flex-col h-full">
+      <Header
+        title="Transaction Management"
+        subtitle="Add and manage daily income and expense transactions"
+        actions={
+          <TooltipProvider delayDuration={150}>
+            <div className="flex flex-wrap gap-2">
+              {/* Order: Daily Bulk Income → Bulk Expenses → Add Transaction */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => setShowBulkIncome(true)}>
+                    <CircleDollarSign className="h-4 w-4 mr-2" />
+                    Daily Bulk Income
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Enter today’s department totals and insurer daily totals.</TooltipContent>
+              </Tooltip>
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" onClick={() => setShowBulkExpense(true)}>
-                      <ReceiptText className="h-4 w-4 mr-2" />
-                      Bulk Expenses
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Record multiple expenses for the day in one go.</TooltipContent>
-                </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => setShowBulkExpense(true)}>
+                    <ReceiptText className="h-4 w-4 mr-2" />
+                    Bulk Expenses
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Record multiple expenses for the day in one go.</TooltipContent>
+              </Tooltip>
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Transaction
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Add a single income or expense entry.</TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
-          }
-        />
-      </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Transaction
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add a single income or expense entry.</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+        }
+      />
 
-      {/* Only this area scrolls. Extra bottom padding protects from iOS bottom bar. */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <main className="flex-1 overflow-y-auto p-6">
         <div className="space-y-6">
           <TransactionFilters
             onFilterChange={(filters) => {
@@ -300,76 +295,7 @@ export default function Transactions() {
                       </CollapsibleTrigger>
 
                       <CollapsibleContent className="mt-2">
-                        {/* Mobile list (cards) */}
-                        <div className="space-y-2 md:hidden">
-                          {m.transactions.map((t: any) => (
-                            <div key={t.id} className="rounded-lg border p-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="text-sm text-gray-600">
-                                    {formatUTCDate(t.date)}
-                                  </div>
-                                  <div className="mt-0.5 font-medium truncate">
-                                    {t.insuranceProviderName
-                                      ? `${t.insuranceProviderName} ${t.description || "Income"}`
-                                      : t.description || (t.type === "income" ? "Income" : "Expense")}
-                                  </div>
-                                  <div className="mt-2 flex items-center gap-2">
-                                    <Badge
-                                      variant={t.type === "income" ? "default" : "destructive"}
-                                    >
-                                      {t.type === "income"
-                                        ? t.departmentId
-                                          ? getDepartmentName(t.departmentId)
-                                          : "Income"
-                                        : t.expenseCategory || "Expense"}
-                                    </Badge>
-                                    <Badge
-                                      variant={t.syncStatus === "synced" ? "default" : "secondary"}
-                                    >
-                                      {t.syncStatus}
-                                    </Badge>
-                                  </div>
-                                </div>
-
-                                <div className="text-right shrink-0">
-                                  <div
-                                    className={`font-semibold ${
-                                      t.type === "income" ? "text-green-600" : "text-red-600"
-                                    }`}
-                                  >
-                                    {t.type === "income" ? "+" : "-"}
-                                    {t.currency} {Math.round(Number(t.amount)).toLocaleString()}
-                                  </div>
-
-                                  <div className="mt-2 flex justify-end gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
-                                      onClick={() => handleEditClick(t)}
-                                      aria-label="Edit"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                                      onClick={() => handleDeleteClick(t.id)}
-                                      aria-label="Delete"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Desktop table */}
-                        <div className="hidden md:block bg-white border rounded-lg overflow-hidden">
+                        <div className="bg-white border rounded-lg overflow-hidden">
                           <div className="overflow-x-auto">
                             <table className="w-full">
                               <thead className="bg-gray-50">
@@ -479,7 +405,7 @@ export default function Transactions() {
             </CardContent>
 
             {totalPages > 1 && (
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-6 py-4 border-t border-gray-200">
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
                 <div className="text-sm text-gray-500">
                   Showing {(currentPage - 1) * pageSize + 1} to{" "}
                   {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()}{" "}
