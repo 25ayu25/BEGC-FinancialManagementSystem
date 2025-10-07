@@ -33,6 +33,11 @@ const PaymentCreate = z.object({
 type Window = { start?: string; end?: string };
 const isIso = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
+/**
+ * Accepts either explicit ?start=YYYY-MM-DD&end=YYYY-MM-DD
+ * or legacy ?year=YYYY[&month=M].
+ * Returns ISO date strings (inclusive endpoints for caller logic).
+ */
 function getWindow(req: Request): Window {
   // NEW UI sends start & end for YTD/Year/Custom. “All time” sends none.
   const start = typeof req.query.start === "string" ? req.query.start : undefined;
@@ -55,13 +60,6 @@ function getWindow(req: Request): Window {
   return {};
 }
 
-function paramsIndex(startAt: number, list: unknown[]) {
-  // helper to generate $1, $2, ... starting from startAt
-  return list.map((_, i) => `$${startAt + i}`).join(", ");
-}
-
-/* ------------------------------ QUERIES ------------------------------ */
-
 async function query<T = any>(text: string, values: any[] = []): Promise<T[]> {
   const res = await pool.query(text, values);
   return res.rows as T[];
@@ -72,12 +70,18 @@ async function query<T = any>(text: string, values: any[] = []): Promise<T[]> {
 /**
  * GET /api/insurance-claims
  * Supports: ?providerId= & ?status= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
+ * NOTE: Uses OVERLAP logic for date filtering:
+ *   include if (period_start <= end) AND (period_end >= start)
  */
 router.get("/insurance-claims", async (req: Request, res: Response) => {
   try {
     const { start, end } = getWindow(req);
-    const providerId = (req.query.providerId as string) || "";
-    const status = (req.query.status as string) || "";
+
+    // Defensive provider handling: treat "all"/"none" as no filter
+    const rawProviderId = ((req.query.providerId as string) || "").trim();
+    const providerId = ["all", "none"].includes(rawProviderId.toLowerCase()) ? "" : rawProviderId;
+
+    const status = ((req.query.status as string) || "").trim();
 
     const where: string[] = [];
     const vals: any[] = [];
@@ -91,16 +95,26 @@ router.get("/insurance-claims", async (req: Request, res: Response) => {
       where.push(`c.status = $${vals.length}`);
     }
     if (start && end) {
+      // Push in order: start, end
       vals.push(start, end);
-      where.push(`c.period_start >= $${vals.length - 1} AND c.period_end <= $${vals.length}`);
+      // Overlap: (period_start <= end) AND (period_end >= start)
+      // Using the two values we just pushed: $len-1=start, $len=end
+      where.push(`(c.period_start <= $${vals.length}) AND (c.period_end >= $${vals.length - 1})`);
     }
 
     const sql = `
       SELECT
-        c.id, c.provider_id as "providerId", c.period_year as "periodYear",
-        c.period_month as "periodMonth", c.period_start as "periodStart",
-        c.period_end as "periodEnd", c.currency, c.claimed_amount as "claimedAmount",
-        c.status, c.notes, c.created_at as "createdAt"
+        c.id,
+        c.provider_id      AS "providerId",
+        c.period_year      AS "periodYear",
+        c.period_month     AS "periodMonth",
+        c.period_start     AS "periodStart",
+        c.period_end       AS "periodEnd",
+        c.currency,
+        c.claimed_amount   AS "claimedAmount",
+        c.status,
+        c.notes,
+        c.created_at       AS "createdAt"
       FROM insurance_claims c
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY c.period_start DESC, c.created_at DESC
@@ -117,11 +131,15 @@ router.get("/insurance-claims", async (req: Request, res: Response) => {
 /**
  * GET /api/insurance-payments
  * Supports: ?providerId= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
+ * NOTE: payments are point-in-time; inclusive [start, end] makes sense.
  */
 router.get("/insurance-payments", async (req: Request, res: Response) => {
   try {
     const { start, end } = getWindow(req);
-    const providerId = (req.query.providerId as string) || "";
+
+    // Defensive provider handling
+    const rawProviderId = ((req.query.providerId as string) || "").trim();
+    const providerId = ["all", "none"].includes(rawProviderId.toLowerCase()) ? "" : rawProviderId;
 
     const where: string[] = [];
     const vals: any[] = [];
@@ -137,9 +155,15 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
 
     const sql = `
       SELECT
-        p.id, p.provider_id as "providerId", p.claim_id as "claimId",
-        p.payment_date as "paymentDate", p.amount, p.currency,
-        p.reference, p.notes, p.created_at as "createdAt"
+        p.id,
+        p.provider_id   AS "providerId",
+        p.claim_id      AS "claimId",
+        p.payment_date  AS "paymentDate",
+        p.amount,
+        p.currency,
+        p.reference,
+        p.notes,
+        p.created_at    AS "createdAt"
       FROM insurance_payments p
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY p.payment_date DESC, p.created_at DESC
@@ -155,18 +179,26 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
 
 /**
  * GET /api/insurance-balances
- * Supports: ?providerId= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
+ * Supports: ?providerId= & ?status= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
  * Returns:
  *  {
  *    providers: [{ providerId, providerName, claimed, paid, balance, openingBalance, openingBalanceAsOf }],
  *    claims: [{...claim, providerName, paidToDate, balance }]
  *  }
+ *
+ * Uses overlap logic for claims within the window.
+ * Payments remain inclusive between start and end.
  */
 router.get("/insurance-balances", async (req: Request, res: Response) => {
   try {
     const { start, end } = getWindow(req);
-    const providerId = (req.query.providerId as string) || "";
 
+    const rawProviderId = ((req.query.providerId as string) || "").trim();
+    const providerId = ["all", "none"].includes(rawProviderId.toLowerCase()) ? "" : rawProviderId;
+
+    const status = ((req.query.status as string) || "").trim();
+
+    // ---- provider filter list (for names) ----
     const providerFilter: string[] = [];
     const providerVals: any[] = [];
 
@@ -175,7 +207,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
       providerFilter.push(`p.id = $${providerVals.length}`);
     }
 
-    // ---- per-provider aggregates within window ----
+    // ---- per-provider aggregates within window (BILLED) ----
     const withinWhere: string[] = [];
     const withinVals: any[] = [];
 
@@ -185,7 +217,12 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     }
     if (start && end) {
       withinVals.push(start, end);
-      withinWhere.push(`c.period_start >= $${withinVals.length - 1} AND c.period_end <= $${withinVals.length}`);
+      // Overlap for claim periods within window
+      withinWhere.push(`(c.period_start <= $${withinVals.length}) AND (c.period_end >= $${withinVals.length - 1})`);
+    }
+    if (status) {
+      withinVals.push(status);
+      withinWhere.push(`c.status = $${withinVals.length}`);
     }
 
     const withinBilledSql = `
@@ -196,6 +233,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     `;
     const billedRows = await query<{ provider_id: string; billed: string }>(withinBilledSql, withinVals);
 
+    // ---- per-provider aggregates within window (PAID) ----
     const withinPaidWhere: string[] = [];
     const withinPaidVals: any[] = [];
     if (providerId) {
@@ -204,6 +242,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     }
     if (start && end) {
       withinPaidVals.push(start, end);
+      // payments are point-in-time
       withinPaidWhere.push(`p.payment_date >= $${withinPaidVals.length - 1} AND p.payment_date <= $${withinPaidVals.length}`);
     }
 
@@ -255,7 +294,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     `;
     const providers = await query<{ id: string; name: string }>(providersSql, providerVals);
 
-    // index helpers
+    // Index helpers
     const billedMap = new Map(billedRows.map(r => [r.provider_id, Number(r.billed)]));
     const paidMap = new Map(paidRows.map(r => [r.provider_id, Number(r.paid)]));
     const openingMap = new Map(openingRows.map(r => [r.provider_id, Number(r.opening)]));
@@ -285,16 +324,29 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     }
     if (start && end) {
       claimsVals.push(start, end);
-      claimsWhere.push(`c.period_start >= $${claimsVals.length - 1} AND c.period_end <= $${claimsVals.length}`);
+      // Overlap for claims list
+      claimsWhere.push(`(c.period_start <= $${claimsVals.length}) AND (c.period_end >= $${claimsVals.length - 1})`);
+    }
+    if (status) {
+      claimsVals.push(status);
+      claimsWhere.push(`c.status = $${claimsVals.length}`);
     }
 
     const claimsSql = `
       SELECT
-        c.id, c.provider_id as "providerId", p.name as "providerName",
-        c.period_year as "periodYear", c.period_month as "periodMonth",
-        c.period_start as "periodStart", c.period_end as "periodEnd",
-        c.currency, c.claimed_amount as "claimedAmount", c.status, c.notes, c.created_at as "createdAt",
-        COALESCE(SUM(pp.amount),0) as "paidToDate"
+        c.id,
+        c.provider_id      AS "providerId",
+        p.name             AS "providerName",
+        c.period_year      AS "periodYear",
+        c.period_month     AS "periodMonth",
+        c.period_start     AS "periodStart",
+        c.period_end       AS "periodEnd",
+        c.currency,
+        c.claimed_amount   AS "claimedAmount",
+        c.status,
+        c.notes,
+        c.created_at       AS "createdAt",
+        COALESCE(SUM(pp.amount),0) AS "paidToDate"
       FROM insurance_claims c
       JOIN insurance_providers p ON p.id = c.provider_id
       LEFT JOIN insurance_payments pp ON pp.claim_id = c.id
