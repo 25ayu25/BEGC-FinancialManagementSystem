@@ -235,14 +235,9 @@ export default function InsurancePage() {
     return () => document.removeEventListener("click", onDocClick);
   }, []);
 
-  // Add-Claim form (period hidden but sent)
+  // ---- Add-Claim form (now with single Claim Date) ----
   const [cProviderId, setCProviderId] = useState<string>("");
-  const [cStart, setCStart] = useState<string>(() =>
-    new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10)
-  );
-  const [cEnd, setCEnd] = useState<string>(() =>
-    new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0)).toISOString().slice(0,10)
-  );
+  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10)); // user-picks a date
   const [cCurrency, setCCurrency] = useState<"USD" | "SSP">("USD");
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
@@ -321,6 +316,22 @@ export default function InsurancePage() {
       yearOf(y);
       return;
     }
+  }
+
+  // Convert a picked date (YYYY-MM-DD) into month start/end (UTC) ISO (YYYY-MM-DD)
+  function monthBoundsFromDateStr(dateStr?: string) {
+    let y: number, m: number;
+    if (dateStr && /^\d{4}-\d{2}/.test(dateStr)) {
+      y = Number(dateStr.slice(0, 4));
+      m = Number(dateStr.slice(5, 7));
+    } else {
+      const d = new Date();
+      y = d.getUTCFullYear();
+      m = d.getUTCMonth() + 1;
+    }
+    const startIso = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+    const endIso = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    return { startIso, endIso };
   }
 
   /* --------------------------- effects --------------------------- */
@@ -412,10 +423,11 @@ export default function InsurancePage() {
 
   /* ------------------------ create/delete helpers ------------------------ */
   async function submitClaim() {
+    const { startIso, endIso } = monthBoundsFromDateStr(cDate);
     const body = {
       providerId: cProviderId || providerId,
-      periodStart: cStart,
-      periodEnd: cEnd,
+      periodStart: startIso,
+      periodEnd: endIso,
       currency: cCurrency,
       claimedAmount: Number(cAmount),
       notes: cNotes || undefined,
@@ -424,6 +436,12 @@ export default function InsurancePage() {
       await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
       setShowClaim(false);
       setEditingClaimId("");
+      // reset form
+      setCProviderId("");
+      setCDate(new Date().toISOString().slice(0,10));
+      setCCurrency("USD");
+      setCAmount("0");
+      setCNotes("");
       reloadClaims();
       reloadBalances();
       alert("Claim saved");
@@ -462,6 +480,12 @@ export default function InsurancePage() {
       await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
       setShowPayment(false);
       setEditingPaymentId("");
+      // reset
+      setPProviderId("");
+      setPDate(new Date().toISOString().slice(0,10));
+      setPAmount("0");
+      setPCurrency("USD");
+      setPNotes("");
       reloadBalances();
       if (detailProviderId) {
         const qs = new URLSearchParams({ providerId: detailProviderId });
@@ -545,9 +569,11 @@ export default function InsurancePage() {
               onClick={() => {
                 setEditingClaimId("");
                 setCProviderId(providerId || "");
-                setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
-                setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
-                setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
+                setCDate(new Date().toISOString().slice(0,10)); // default to today
+                setCCurrency("USD");
+                setCAmount("0");
+                setCNotes("");
+                setShowClaim(true);
               }}
               className="px-3 py-2 rounded-lg border hover:bg-slate-50"
             >
@@ -591,9 +617,9 @@ export default function InsurancePage() {
                     setShowActions(false);
                     setEditingClaimId("");
                     setCProviderId(providerId || "");
-                    setCStart(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0,10));
-                    setCEnd(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth()+1, 0)).toISOString().slice(0,10));
-                    setCCurrency("USD"); setCAmount("0"); setCNotes(""); setShowClaim(true);
+                    setCDate(new Date().toISOString().slice(0,10));
+                    setCCurrency("USD"); setCAmount("0"); setCNotes("");
+                    setShowClaim(true);
                   }}
                 >
                   + Add Claim
@@ -926,6 +952,21 @@ export default function InsurancePage() {
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
+
+                {/* Claim Date (single date; backend period inferred from its month) */}
+                <div className="col-span-2">
+                  <label className="block text-xs text-slate-500 mb-1">Claim Date</label>
+                  <input
+                    type="date"
+                    className="border rounded-lg p-2 w-full"
+                    value={cDate}
+                    onChange={(e) => setCDate(e.target.value)}
+                  />
+                  <div className="text-[11px] text-slate-500 mt-1">
+                    We’ll bill this claim for the month of the selected date.
+                  </div>
+                </div>
+
                 {/* Amount */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
