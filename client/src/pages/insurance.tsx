@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { useInsuranceFilters } from "@/features/insurance/filters";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -12,7 +11,7 @@ type Claim = {
   periodYear: number;
   periodMonth: number;
   periodStart: string; // ISO
-  periodEnd: string; // ISO
+  periodEnd: string;   // ISO
   currency: "USD" | "SSP";
   claimedAmount: number | string;
   status: ClaimStatus;
@@ -36,8 +35,8 @@ type BalancesResponse = {
   providers: Array<{
     providerId: string;
     providerName: string;
-    claimed: number; // billed in window
-    paid: number; // collected in window
+    claimed: number;   // billed in window
+    paid: number;      // collected in window
     balance?: number;
     outstanding?: number;
     credit?: number;
@@ -62,11 +61,7 @@ const fmtDate = (iso?: string | null) => {
   if (!iso) return "—";
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return "—";
-  return new Date(t).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return new Date(t).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 };
 
 const RAW_BASE =
@@ -143,20 +138,12 @@ function HelpPopover() {
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li>
-              <strong>Billed</strong>: claims in the current window.
-            </li>
-            <li>
-              <strong>Collected</strong>: payments received in the window.
-            </li>
-            <li>
-              <strong>Outstanding</strong>: Billed − Collected.
-            </li>
+            <li><strong>Billed</strong>: claims in the current window.</li>
+            <li><strong>Collected</strong>: payments received in the window.</li>
+            <li><strong>Outstanding</strong>: Billed − Collected.</li>
           </ul>
           <div className="text-right mt-2">
-            <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>
-              Close
-            </button>
+            <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
           </div>
         </div>
       )}
@@ -170,10 +157,7 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
   const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6);
   return (
     <div className="relative h-10 w-10 shrink-0">
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }}
-      />
+      <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }} />
       <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
         {label}
       </div>
@@ -183,7 +167,7 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
 
 function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   const byId = new Map(providers.map((p) => [p.id, p.name]));
-  const header = ["Provider", "Year", "Month", "Currency", "Billed", "Status", "Notes"].join(",");
+  const header = ["Provider","Year","Month","Currency","Billed","Status","Notes"].join(",");
   const body = rows.map((c) =>
     [
       (byId.get(c.providerId) || c.providerId).replace(/,/g, " "),
@@ -205,26 +189,10 @@ function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
 }
 
 /* ------------------------------ Page ----------------------------- */
-type WindowPreset =
-  | "all"
-  | "ytd"
-  | "year-2025"
-  | "year-2024"
-  | "year-2023"
-  | "year-2022"
-  | "custom";
+type WindowPreset = "all" | "ytd" | "year-2025" | "year-2024" | "year-2023" | "year-2022" | "custom";
 
 export default function InsurancePage() {
-  /** -------------------- route-scoped filters -------------------- */
-  const { filters, setFilters } = useInsuranceFilters();
-  const providerId = filters.providerId || "";
-  const status = filters.status || "";
-
-  // NOTE: we keep a small local "preset" state only to render the chips’ active UI
-  const currentYear = new Date().getUTCFullYear();
-  const [preset, setPreset] = useState<WindowPreset>(("year-" + currentYear) as WindowPreset);
-
-  /** ------------------------------ data ------------------------------ */
+  // data
   const [providers, setProviders] = useState<Provider[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
@@ -232,7 +200,16 @@ export default function InsurancePage() {
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [loadingBalances, setLoadingBalances] = useState(false);
-  const [authError, setAuthError] = useState(false);
+
+  // filters
+  const [providerId, setProviderId] = useState<string>("");
+  const [status, setStatus] = useState<string>("");
+
+  // default window = current year
+  const currentYear = new Date().getUTCFullYear();
+  const [preset, setPreset] = useState<WindowPreset>(("year-" + currentYear) as WindowPreset);
+  const [start, setStart] = useState<string>(() => new Date(Date.UTC(currentYear, 0, 1)).toISOString().slice(0,10));
+  const [end, setEnd] = useState<string>(() => new Date(Date.UTC(currentYear, 11, 31)).toISOString().slice(0,10));
 
   // modals & drawer
   const [showClaim, setShowClaim] = useState(false);
@@ -242,6 +219,8 @@ export default function InsurancePage() {
   // editing (disabled currently)
   const [_editingClaimId, setEditingClaimId] = useState<string>("");
   const [_editingPaymentId, setEditingPaymentId] = useState<string>("");
+
+  const [authError, setAuthError] = useState(false);
 
   // Top actions (mobile dropdown)
   const [showActions, setShowActions] = useState(false);
@@ -258,14 +237,14 @@ export default function InsurancePage() {
 
   // ---- Add-Claim form (now with single Claim Date) ----
   const [cProviderId, setCProviderId] = useState<string>("");
-  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0, 10)); // user-picks a date
+  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10)); // user-picks a date
   const [cCurrency, setCCurrency] = useState<"USD" | "SSP">("USD");
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
 
   // Payment form
   const [pProviderId, setPProviderId] = useState<string>("");
-  const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
   const [pNotes, setPNotes] = useState<string>("");
@@ -287,7 +266,7 @@ export default function InsurancePage() {
     if (!el) return;
     const update = () => setHeaderH(el.getBoundingClientRect().height || 64);
     update();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    const ro = (typeof ResizeObserver !== "undefined") ? new ResizeObserver(update) : null;
     ro?.observe(el);
     window.addEventListener("resize", update, { passive: true });
     return () => {
@@ -304,7 +283,7 @@ export default function InsurancePage() {
     if (!el) return;
     const update = () => setFiltersH(el.getBoundingClientRect().height || 0);
     update();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    const ro = (typeof ResizeObserver !== "undefined") ? new ResizeObserver(update) : null;
     ro?.observe(el);
     window.addEventListener("resize", update, { passive: true });
     return () => {
@@ -314,7 +293,32 @@ export default function InsurancePage() {
   }, []);
 
   /* --------------------------- date helpers --------------------------- */
-  // Convert a picked date (YYYY-MM-DD) into month start/end (UTC) ISO (YYYY-MM-DD, inclusive end)
+  function setPresetWindow(p: WindowPreset) {
+    setPreset(p);
+    if (p === "all") {
+      setStart(""); setEnd("");
+      return;
+    }
+    const now = new Date();
+    const yearOf = (y: number) => {
+      const s = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0,10);
+      const e = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0,10);
+      setStart(s); setEnd(e);
+    };
+    if (p === "ytd") {
+      const y = now.getUTCFullYear();
+      setStart(new Date(Date.UTC(y,0,1)).toISOString().slice(0,10));
+      setEnd(new Date(Date.UTC(y,11,31)).toISOString().slice(0,10));
+      return;
+    }
+    if (p.startsWith("year-")) {
+      const y = Number(p.replace("year-",""));
+      yearOf(y);
+      return;
+    }
+  }
+
+  // Convert a picked date (YYYY-MM-DD) into month start/end (UTC) ISO (YYYY-MM-DD)
   function monthBoundsFromDateStr(dateStr?: string) {
     let y: number, m: number;
     if (dateStr && /^\d{4}-\d{2}/.test(dateStr)) {
@@ -330,86 +334,6 @@ export default function InsurancePage() {
     return { startIso, endIso };
   }
 
-  // Build {start,end} the backend expects, from route-scoped filters
-  function computeWindowFromFilters() {
-    // If day-level range present (custom), use it
-    if (filters.mode === "payment" && (filters.startDate || filters.endDate)) {
-      return {
-        start: filters.startDate || "",
-        end: filters.endDate || "",
-      };
-    }
-
-    // Month range (period / as-of)
-    const from = filters.fromMonth; // "YYYY-MM"
-    const to = filters.mode === "asof" ? filters.fromMonth : filters.toMonth || filters.fromMonth;
-
-    if (!from) return { start: "", end: "" }; // all-time (no params)
-
-    const yStart = Number(from.slice(0, 4));
-    const mStart = Number(from.slice(5, 7));
-    const start = new Date(Date.UTC(yStart, mStart - 1, 1)).toISOString().slice(0, 10);
-
-    const yEnd = Number(to!.slice(0, 4));
-    const mEnd = Number(to!.slice(5, 7));
-    // inclusive last day of 'to' month
-    const end = new Date(Date.UTC(yEnd, mEnd, 0)).toISOString().slice(0, 10);
-
-    return { start, end };
-  }
-
-  // Chip handler -> updates scoped filters
-  function setPresetWindow(p: WindowPreset) {
-    setPreset(p);
-
-    if (p === "all") {
-      setFilters({
-        mode: "period",
-        fromMonth: undefined,
-        toMonth: undefined,
-        startDate: "",
-        endDate: "",
-      });
-      return;
-    }
-
-    const now = new Date();
-    const y = now.getUTCFullYear();
-    const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-
-    if (p === "ytd") {
-      setFilters({
-        mode: "period",
-        fromMonth: `${y}-01`,
-        toMonth: `${y}-${mm}`,
-        startDate: "",
-        endDate: "",
-      });
-      return;
-    }
-
-    if (p.startsWith("year-")) {
-      const yy = Number(p.replace("year-", ""));
-      setFilters({
-        mode: "period",
-        fromMonth: `${yy}-01`,
-        toMonth: `${yy}-12`,
-        startDate: "",
-        endDate: "",
-      });
-      return;
-    }
-
-    if (p === "custom") {
-      // switch to day-level window; keep previous values if user had them
-      setFilters({
-        mode: "payment",
-        startDate: filters.startDate || "",
-        endDate: filters.endDate || "",
-      });
-    }
-  }
-
   /* --------------------------- effects --------------------------- */
   useEffect(() => {
     api<Provider[]>("/api/insurance-providers")
@@ -420,49 +344,38 @@ export default function InsurancePage() {
             .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name))
         )
       )
-      .catch((e: any) => {
-        console.error("providers", e);
-        if (e?.status === 401) setAuthError(true);
-      });
+      .catch((e: any) => { console.error("providers", e); if (e?.status === 401) setAuthError(true); });
   }, []);
 
-  function buildParams() {
-    const { start, end } = computeWindowFromFilters();
-    const qs = new URLSearchParams();
+  function windowParams(qs = new URLSearchParams()) {
     if (start) qs.set("start", start);
     if (end) qs.set("end", end);
-    if (providerId) qs.set("providerId", providerId);
-    if (status) qs.set("status", status);
     return qs;
   }
 
   const reloadClaims = () => {
     setLoadingClaims(true);
-    const params = buildParams();
+    const params = windowParams(new URLSearchParams());
+    if (providerId) params.set("providerId", providerId);
+    if (status) params.set("status", status);
     api<Claim[]>(`/api/insurance-claims?${params.toString()}`)
       .then(setClaims)
-      .catch((e: any) => {
-        console.error("claims", e);
-        if (e?.status === 401) setAuthError(true);
-      })
+      .catch((e: any) => { console.error("claims", e); if (e?.status === 401) setAuthError(true); })
       .finally(() => setLoadingClaims(false));
   };
 
   const reloadBalances = () => {
     setLoadingBalances(true);
-    const params = buildParams();
-    // (balances currently ignore status server-side; still refetch to stay time-synced)
+    const params = windowParams(new URLSearchParams());
+    if (providerId) params.set("providerId", providerId);
     api<BalancesResponse>(`/api/insurance-balances?${params.toString()}`)
       .then(setBalances)
-      .catch((e: any) => {
-        console.error("balances", e);
-        if (e?.status === 401) setAuthError(true);
-      })
+      .catch((e: any) => { console.error("balances", e); if (e?.status === 401) setAuthError(true); })
       .finally(() => setLoadingBalances(false));
   };
 
-  useEffect(reloadClaims, [providerId, status, filters.mode, filters.fromMonth, filters.toMonth, filters.startDate, filters.endDate]);
-  useEffect(reloadBalances, [providerId, filters.mode, filters.fromMonth, filters.toMonth, filters.startDate, filters.endDate]);
+  useEffect(reloadClaims, [providerId, status, start, end]);
+  useEffect(reloadBalances, [providerId, start, end]);
 
   // when opening provider drawer, show full payment history (no window)
   useEffect(() => {
@@ -504,11 +417,7 @@ export default function InsurancePage() {
     () =>
       (balances?.providers ?? [])
         .slice()
-        .sort(
-          (a, b) =>
-            rank(a.providerName) - rank(b.providerName) ||
-            a.providerName.localeCompare(b.providerName)
-        ),
+        .sort((a, b) => rank(a.providerName) - rank(b.providerName) || a.providerName.localeCompare(b.providerName)),
     [balances]
   );
 
@@ -529,7 +438,7 @@ export default function InsurancePage() {
       setEditingClaimId("");
       // reset form
       setCProviderId("");
-      setCDate(new Date().toISOString().slice(0, 10));
+      setCDate(new Date().toISOString().slice(0,10));
       setCCurrency("USD");
       setCAmount("0");
       setCNotes("");
@@ -573,7 +482,7 @@ export default function InsurancePage() {
       setEditingPaymentId("");
       // reset
       setPProviderId("");
-      setPDate(new Date().toISOString().slice(0, 10));
+      setPDate(new Date().toISOString().slice(0,10));
       setPAmount("0");
       setPCurrency("USD");
       setPNotes("");
@@ -609,16 +518,9 @@ export default function InsurancePage() {
   }
 
   function clearFilters() {
-    setFilters({
-      providerId: "",
-      status: "",
-      mode: "period",
-      fromMonth: undefined,
-      toMonth: undefined,
-      startDate: "",
-      endDate: "",
-    });
-    setPreset("all");
+    setProviderId("");
+    setStatus("");
+    setPresetWindow("all");
   }
 
   /* ----------------------------- UI helpers ----------------------------- */
@@ -654,7 +556,10 @@ export default function InsurancePage() {
   return (
     <div className="max-w-[1200px] mx-auto">
       {/* Sticky header with actions */}
-      <div ref={headerRef} className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}>
+      <div
+        ref={headerRef}
+        className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
+      >
         <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold">Insurance Management</h1>
 
@@ -664,7 +569,7 @@ export default function InsurancePage() {
               onClick={() => {
                 setEditingClaimId("");
                 setCProviderId(providerId || "");
-                setCDate(new Date().toISOString().slice(0, 10)); // default to today
+                setCDate(new Date().toISOString().slice(0,10)); // default to today
                 setCCurrency("USD");
                 setCAmount("0");
                 setCNotes("");
@@ -680,9 +585,7 @@ export default function InsurancePage() {
                 setEditingPaymentId("");
                 setPProviderId(providerId || "");
                 setPDate(new Date().toISOString().slice(0, 10));
-                setPAmount("0");
-                setPCurrency("USD");
-                setPNotes("");
+                setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
               }}
               className="px-3 py-2 rounded-lg border hover:bg-slate-50"
@@ -714,10 +617,8 @@ export default function InsurancePage() {
                     setShowActions(false);
                     setEditingClaimId("");
                     setCProviderId(providerId || "");
-                    setCDate(new Date().toISOString().slice(0, 10));
-                    setCCurrency("USD");
-                    setCAmount("0");
-                    setCNotes("");
+                    setCDate(new Date().toISOString().slice(0,10));
+                    setCCurrency("USD"); setCAmount("0"); setCNotes("");
                     setShowClaim(true);
                   }}
                 >
@@ -730,9 +631,7 @@ export default function InsurancePage() {
                     setEditingPaymentId("");
                     setPProviderId(providerId || "");
                     setPDate(new Date().toISOString().slice(0, 10));
-                    setPAmount("0");
-                    setPCurrency("USD");
-                    setPNotes("");
+                    setPAmount("0"); setPCurrency("USD"); setPNotes("");
                     setShowPayment(true);
                   }}
                 >
@@ -740,10 +639,7 @@ export default function InsurancePage() {
                 </button>
                 <button
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
-                  onClick={() => {
-                    setShowActions(false);
-                    exportClaimsCsv(claims, providers);
-                  }}
+                  onClick={() => { setShowActions(false); exportClaimsCsv(claims, providers); }}
                 >
                   Export CSV
                 </button>
@@ -767,28 +663,20 @@ export default function InsurancePage() {
       </div>
 
       {/* STICKY FILTERS (mobile & desktop) */}
-      <div ref={filtersRef} className={`sticky z-20 bg-white ${scrolled ? "border-b shadow-sm" : ""}`} style={{ top: headerH }}>
-        <div className="p-4 sm:px-6 pt-3">
+      <div
+        ref={filtersRef}
+        className={`sticky z-20 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
+        style={{ top: headerH }}
+      >
+        <div className="p-4 sm:p-6 pt-3">
           <div className="rounded-xl border p-3 mb-0 grid grid-cols-1 gap-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <select
-                value={providerId}
-                onChange={(e) => setFilters({ providerId: e.target.value })}
-                className="border rounded-lg p-2"
-              >
+              <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="border rounded-lg p-2">
                 <option value="">All providers</option>
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
+                {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
               </select>
 
-              <select
-                value={status}
-                onChange={(e) => setFilters({ status: e.target.value as any })}
-                className="border rounded-lg p-2"
-              >
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg p-2">
                 <option value="">Any status</option>
                 <option value="submitted">Submitted</option>
                 <option value="partially_paid">Partially paid</option>
@@ -802,9 +690,9 @@ export default function InsurancePage() {
                 { id: "all", label: "All time" },
                 { id: "ytd", label: "YTD" },
                 { id: `year-${currentYear}`, label: `Year ${currentYear}` },
-                { id: `year-${currentYear - 1}`, label: `Year ${currentYear - 1}` },
-                { id: `year-${currentYear - 2}`, label: `Year ${currentYear - 2}` },
-                { id: `year-${currentYear - 3}`, label: `Year ${currentYear - 3}` },
+                { id: `year-${currentYear-1}`, label: `Year ${currentYear-1}` },
+                { id: `year-${currentYear-2}`, label: `Year ${currentYear-2}` },
+                { id: `year-${currentYear-3}`, label: `Year ${currentYear-3}` },
                 { id: "custom", label: "Custom" },
               ].map((chip) => (
                 <button
@@ -819,24 +707,12 @@ export default function InsurancePage() {
               ))}
               {preset === "custom" && (
                 <div className="ml-2 flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={filters.startDate || ""}
-                    onChange={(e) => setFilters({ mode: "payment", startDate: e.target.value })}
-                    className="border rounded-lg p-2"
-                  />
-                  <input
-                    type="date"
-                    value={filters.endDate || ""}
-                    onChange={(e) => setFilters({ mode: "payment", endDate: e.target.value })}
-                    className="border rounded-lg p-2"
-                  />
+                  <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded-lg p-2" />
+                  <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded-lg p-2" />
                 </div>
               )}
               <div className="ml-auto">
-                <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">
-                  Clear filters
-                </button>
+                <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
               </div>
             </div>
           </div>
@@ -849,7 +725,10 @@ export default function InsurancePage() {
       </div>
 
       {/* SUMMARY (desktop: sticky under filters) */}
-      <div className={`hidden md:block sticky z-10 bg-white ${scrolled ? "border-b shadow-sm" : ""}`} style={{ top: headerH + filtersH }}>
+      <div
+        className={`hidden md:block sticky z-10 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
+        style={{ top: headerH + filtersH }}
+      >
         <div className="p-4 sm:p-6 pt-3">
           <SummaryCards />
         </div>
@@ -862,9 +741,7 @@ export default function InsurancePage() {
           <div className="lg:col-span-2 bg-white rounded-xl border">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">Claims</div>
-              <div className="text-sm text-slate-500">
-                {claims.length} {claims.length === 1 ? "item" : "items"}
-              </div>
+              <div className="text-sm text-slate-500">{claims.length} {claims.length === 1 ? "item" : "items"}</div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
@@ -885,15 +762,10 @@ export default function InsurancePage() {
                       <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3">{prov?.name || c.providerId}</td>
                         <td className="p-3">
-                          {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", {
-                            month: "long",
-                            year: "numeric",
-                          })}
+                          {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
                         </td>
                         <td className="p-3">{money(c.claimedAmount, c.currency)}</td>
-                        <td className="p-3">
-                          <StatusChip status={c.status} />
-                        </td>
+                        <td className="p-3"><StatusChip status={c.status} /></td>
                         <td className="p-3">{c.notes || ""}</td>
                         <td className="p-3 text-right">
                           <div className="inline-flex gap-2">
@@ -906,11 +778,7 @@ export default function InsurancePage() {
                     );
                   })}
                   {!loadingClaims && claims.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-500">
-                        No claims in this window.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={6} className="p-6 text-center text-slate-500">No claims in this window.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -938,20 +806,12 @@ export default function InsurancePage() {
                     </div>
                     <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-slate-50 rounded p-2">
-                        <div className="text-slate-500">Billed</div>
-                        <div className="font-semibold">{money(row.claimed, "USD")}</div>
-                      </div>
-                      <div className="bg-slate-50 rounded p-2">
-                        <div className="text-slate-500">Collected</div>
-                        <div className="font-semibold">{money(row.paid, "USD")}</div>
-                      </div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
                       <div className="bg-slate-50 rounded p-2">
                         <div className="text-slate-500">Outstanding</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
-                          {outstanding < 0
-                            ? `Credit ${money(Math.abs(outstanding), "USD")}`
-                            : money(outstanding, "USD")}
+                          {outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}
                         </div>
                       </div>
                     </div>
@@ -970,41 +830,24 @@ export default function InsurancePage() {
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl border-l z-50 flex flex-col">
             <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-medium">
-                {providers.find((p) => p.id === detailProviderId)?.name || "Provider"}: details
-              </div>
-              <button className="text-slate-500" onClick={() => setDetailProviderId("")}>
-                ✕
-              </button>
+              <div className="font-medium">{providers.find((p) => p.id === detailProviderId)?.name || "Provider"}: details</div>
+              <button className="text-slate-500" onClick={() => setDetailProviderId("")}>✕</button>
             </div>
 
             <div className="p-4 overflow-y-auto space-y-6">
               {/* Totals in current window */}
               <div className="grid grid-cols-3 gap-3">
                 {(() => {
-                  const prov = balances?.providers.find((r) => r.providerId === detailProviderId) || {
-                    claimed: 0,
-                    paid: 0,
-                  };
+                  const prov = balances?.providers.find((r) => r.providerId === detailProviderId) || { claimed: 0, paid: 0 };
                   const outstanding = (prov.claimed || 0) - (prov.paid || 0);
                   const paidPct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
                   return (
                     <>
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-slate-500">Billed</div>
-                        <div className="font-semibold">{money(prov.claimed, "USD")}</div>
-                      </div>
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-slate-500">Collected</div>
-                        <div className="font-semibold">{money(prov.paid, "USD")}</div>
-                      </div>
+                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Billed</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
+                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Collected</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-slate-500">Outstanding</div>
-                        <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
-                          {outstanding < 0
-                            ? `Credit ${money(Math.abs(outstanding), "USD")}`
-                            : money(outstanding, "USD")}
-                        </div>
+                        <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
                         <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                       </div>
                     </>
@@ -1015,66 +858,40 @@ export default function InsurancePage() {
               {/* Claims ledger */}
               <div>
                 <div className="mb-2 font-medium">Claims</div>
-                {providerClaimsForDrawer.length === 0 && (
-                  <div className="text-sm text-slate-500">No claims for this provider.</div>
-                )}
+                {providerClaimsForDrawer.length === 0 && <div className="text-sm text-slate-500">No claims for this provider.</div>}
                 <div className="divide-y border rounded-lg">
                   {providerClaimsForDrawer.map((c) => {
-                    const pct =
-                      Number(c.claimedAmount) > 0
-                        ? Math.min(100, Math.round((Number(c.paidToDate) / Number(c.claimedAmount)) * 100))
-                        : 0;
+                    const pct = Number(c.claimedAmount) > 0 ? Math.min(100, Math.round((Number(c.paidToDate) / Number(c.claimedAmount)) * 100)) : 0;
                     return (
                       <div key={c.id} className="p-3">
                         <div className="flex items-center justify-between">
                           <div className="font-medium">
-                            {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", {
-                              month: "long",
-                              year: "numeric",
-                            })}
+                            {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
-                              Delete
-                            </button>
+                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
                           </div>
                         </div>
 
                         <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                          <div className="bg-slate-50 rounded p-2">
-                            <div className="text-slate-500">Billed</div>
-                            <div className="font-semibold">{money(c.claimedAmount, c.currency)}</div>
-                          </div>
-                          <div className="bg-slate-50 rounded p-2">
-                            <div className="text-slate-500">Collected</div>
-                            <div className="font-semibold">{money(c.paidToDate, c.currency)}</div>
-                          </div>
-                          <div className="bg-slate-50 rounded p-2">
-                            <div className="text-slate-500">Outstanding</div>
-                            <div className="font-semibold">{money(c.balance, c.currency)}</div>
-                          </div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(c.claimedAmount, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(c.paidToDate, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Outstanding</div><div className="font-semibold">{money(c.balance, c.currency)}</div></div>
                         </div>
 
                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded">
-                          <div
-                            className="h-1.5 bg-emerald-500 rounded"
-                            style={{ width: `${pct}%` }}
-                            title={`${pct}% collected`}
-                          />
+                          <div className="h-1.5 bg-emerald-500 rounded" style={{ width: `${pct}%` }} title={`${pct}% collected`} />
                         </div>
 
                         <div className="mt-2 flex items-center justify-between">
                           <div className="text-xs text-slate-500">{c.notes || ""}</div>
-                          <button
-                            className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50"
-                            onClick={() => {
-                              setPProviderId(c.providerId);
-                              setPDate(new Date().toISOString().slice(0, 10));
-                              setEditingPaymentId("");
-                              setShowPayment(true);
-                            }}
-                          >
+                          <button className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50" onClick={() => {
+                            setPProviderId(c.providerId);
+                            setPDate(new Date().toISOString().slice(0,10));
+                            setEditingPaymentId("");
+                            setShowPayment(true);
+                          }}>
                             Record payment
                           </button>
                         </div>
@@ -1088,9 +905,7 @@ export default function InsurancePage() {
               <div>
                 <div className="mb-2 font-medium">Payments (history)</div>
                 {loadingPayments && <div className="text-sm text-slate-500">Loading…</div>}
-                {!loadingPayments && payments.length === 0 && (
-                  <div className="text-sm text-slate-500">No payments recorded.</div>
-                )}
+                {!loadingPayments && payments.length === 0 && <div className="text-sm text-slate-500">No payments recorded.</div>}
                 <div className="divide-y border rounded-lg">
                   {payments.map((p) => (
                     <div key={p.id} className="p-3 flex items-center justify-between">
@@ -1102,9 +917,7 @@ export default function InsurancePage() {
                         {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>
-                          Delete
-                        </button>
+                        <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
                       </div>
                     </div>
                   ))}
@@ -1121,34 +934,20 @@ export default function InsurancePage() {
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">Add Claim</div>
-              <button className="text-slate-500" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>
-                ✕
-              </button>
+              <button className="text-slate-500" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Provider</label>
-                  <select
-                    className="border rounded-lg p-2 w-full"
-                    value={cProviderId}
-                    onChange={(e) => setCProviderId(e.target.value)}
-                  >
+                  <select className="border rounded-lg p-2 w-full" value={cProviderId} onChange={(e) => setCProviderId(e.target.value)}>
                     <option value="">Select…</option>
-                    {providers.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
+                    {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Currency</label>
-                  <select
-                    className="border rounded-lg p-2 w-full"
-                    value={cCurrency}
-                    onChange={(e) => setCCurrency(e.target.value as any)}
-                  >
+                  <select className="border rounded-lg p-2 w-full" value={cCurrency} onChange={(e) => setCCurrency(e.target.value as any)}>
                     <option value="USD">USD</option>
                     <option value="SSP">SSP</option>
                   </select>
@@ -1171,32 +970,17 @@ export default function InsurancePage() {
                 {/* Amount */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Billed Amount</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="border rounded-lg p-2 w-full"
-                    value={cAmount}
-                    onChange={(e) => setCAmount(e.target.value)}
-                  />
+                  <input type="number" min="0" className="border rounded-lg p-2 w-full" value={cAmount} onChange={(e) => setCAmount(e.target.value)} />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
-                  <textarea
-                    className="border rounded-lg p-2 w-full"
-                    rows={2}
-                    value={cNotes}
-                    onChange={(e) => setCNotes(e.target.value)}
-                  />
+                  <textarea className="border rounded-lg p-2 w-full" rows={2} value={cNotes} onChange={(e) => setCNotes(e.target.value)} />
                 </div>
               </div>
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>
-                Cancel
-              </button>
-              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>
-                Save Claim
-              </button>
+              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>Cancel</button>
+              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>Save Claim</button>
             </div>
           </div>
         </div>
@@ -1208,74 +992,41 @@ export default function InsurancePage() {
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">Record Payment</div>
-              <button className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>
-                ✕
-              </button>
+              <button className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Provider</label>
-                  <select
-                    className="border rounded-lg p-2 w-full"
-                    value={pProviderId}
-                    onChange={(e) => setPProviderId(e.target.value)}
-                  >
+                  <select className="border rounded-lg p-2 w-full" value={pProviderId} onChange={(e) => setPProviderId(e.target.value)}>
                     <option value="">Select…</option>
-                    {providers.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
+                    {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Payment Date</label>
-                  <input
-                    type="date"
-                    className="border rounded-lg p-2 w-full"
-                    value={pDate}
-                    onChange={(e) => setPDate(e.target.value)}
-                  />
+                  <input type="date" className="border rounded-lg p-2 w-full" value={pDate} onChange={(e) => setPDate(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Currency</label>
-                  <select
-                    className="border rounded-lg p-2 w-full"
-                    value={pCurrency}
-                    onChange={(e) => setPCurrency(e.target.value as any)}
-                  >
+                  <select className="border rounded-lg p-2 w-full" value={pCurrency} onChange={(e) => setPCurrency(e.target.value as any)}>
                     <option value="USD">USD</option>
                     <option value="SSP">SSP</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Amount Received</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="border rounded-lg p-2 w-full"
-                    value={pAmount}
-                    onChange={(e) => setPAmount(e.target.value)}
-                  />
+                  <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
-                  <input
-                    className="border rounded-lg p-2 w-full"
-                    value={pNotes}
-                    onChange={(e) => setPNotes(e.target.value)}
-                  />
+                  <input className="border rounded-lg p-2 w-full" value={pNotes} onChange={(e) => setPNotes(e.target.value)} />
                 </div>
               </div>
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>
-                Cancel
-              </button>
-              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>
-                Record Payment
-              </button>
+              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
+              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>Record Payment</button>
             </div>
           </div>
         </div>
