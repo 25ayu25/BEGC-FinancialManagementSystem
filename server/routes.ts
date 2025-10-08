@@ -809,10 +809,13 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* Insurance Management                                            */
   /* --------------------------------------------------------------- */
 
-  // --- helpers local to insurance endpoints ---
+ // ===== BEGIN payments-based insurance helpers & endpoints =====
+
+// Month label helper
 const _shortMonth = (y: number, m: number) =>
   new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en-US", { month: "short" });
 
+// Inclusive month span helper
 function _monthsBetween(start: Date, endInclusive: Date) {
   const out: Array<{ y: number; m: number }> = [];
   const s = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
@@ -824,39 +827,38 @@ function _monthsBetween(start: Date, endInclusive: Date) {
 }
 
 /**
- * Insurance breakdown (USD) by provider name for a window.
- * Matches the dashboard logic: sum of USD "income" transactions with a non-null insuranceProviderId.
+ * Collections breakdown (USD) by provider from insurancePayments.
  * Supports:
  *   - ?start=YYYY-MM-DD&end=YYYY-MM-DD
- *   - or ?year=YYYY&month=MM (full month)
- *   - or ?year=YYYY (whole year)
+ *   - or ?year=YYYY&month=MM
+ *   - or ?year=YYYY
  */
 app.get("/api/insurance/breakdown", requireAuth, async (req, res, next) => {
   try {
-    const { start, end } = getDateWindow(req.query); // returns inclusive start/end strings
-    // Build a sensible default if nothing provided: use current year/month.
+    const { start, end } = getDateWindow(req.query); // inclusive dates as strings
     const today = new Date();
     const y = Number(req.query.year) || today.getUTCFullYear();
     const m = Number(req.query.month) || (today.getUTCMonth() + 1);
 
-    // Pull USD income rows in the requested window
-    const txs = await storage.getTransactions({
-      startDate: start ? new Date(start) : new Date(Date.UTC(y, (req.query.month ? m - 1 : 0), 1)),
-      endDate:   end   ? new Date(end)   : new Date(Date.UTC(y + (req.query.month ? 0 : 1), (req.query.month ? m : 0), 1)),
-      type: "income",
-      currency: "USD",
+    // Build default window if none provided
+    const defaultStart = `${y}-${String(req.query.month ? m : 1).padStart(2, "0")}-01`;
+    const defaultEnd   = req.query.month
+      ? (m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`)
+      : `${y + 1}-01-01`;
+
+    const payments = await storage.listInsurancePayments({
+      start: start ?? defaultStart,
+      end:   end   ?? defaultEnd,
     });
 
-    // Map providerId -> name
     const providers = await storage.getInsuranceProviders();
     const idToName = new Map(providers.map(p => [p.id, p.name]));
 
-    // Group by provider name; ignore rows without a provider
     const breakdown: Record<string, number> = {};
-    for (const t of txs) {
-      if (!t.insuranceProviderId) continue;
-      const name = idToName.get(t.insuranceProviderId) || "Unknown";
-      breakdown[name] = (breakdown[name] || 0) + Number(t.amount || 0);
+    for (const p of payments) {
+      if (p.currency !== "USD") continue; // USD collections only
+      const name = idToName.get(p.providerId) || "Unknown";
+      breakdown[name] = (breakdown[name] || 0) + Number(p.amount || 0);
     }
 
     const totalUSD = Object.values(breakdown).reduce((s, v) => s + v, 0);
@@ -867,9 +869,8 @@ app.get("/api/insurance/breakdown", requireAuth, async (req, res, next) => {
 });
 
 /**
- * Monthly insurance (USD) list used by the Insurance page.
- * Returns [{month: 'Jan', year: 2025, usd: 1234}, ...] across the selected window.
- * Internally asks getDashboardData for each month (so it stays in sync with the dashboard tile).
+ * Monthly collections (USD) built from insurancePayments, across a window.
+ * Returns [{month, year, usd}, ...]
  */
 app.get("/api/insurance/monthly", requireAuth, async (req, res) => {
   try {
@@ -906,12 +907,14 @@ app.get("/api/insurance/monthly", requireAuth, async (req, res) => {
     const data: Array<{ month: string; year: number; usd: number }> = [];
 
     for (const { y, m } of months) {
-      const dash = await storage.getDashboardData({
-        year: y,
-        month: m,
-        range: "current-month", // anchor to that ym
-      });
-      const usd = Math.round(Number(dash.totalIncomeUSD || 0));
+      const startISO = `${y}-${String(m).padStart(2, "0")}-01`;
+      const endISO   = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+
+      const payments = await storage.listInsurancePayments({ start: startISO, end: endISO });
+      const usd = Math.round(
+        payments.reduce((s, p) => s + (p.currency === "USD" ? Number(p.amount || 0) : 0), 0)
+      );
+
       data.push({ month: _shortMonth(y, m), year: y, usd });
     }
 
@@ -921,6 +924,8 @@ app.get("/api/insurance/monthly", requireAuth, async (req, res) => {
     res.status(200).json({ data: [] });
   }
 });
+
+// ===== END payments-based insurance helpers & endpoints =====
 
   // Zod request schemas
   const ClaimCreate = z.object({
