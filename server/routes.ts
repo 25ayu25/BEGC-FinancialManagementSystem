@@ -72,7 +72,7 @@ const ALLOWED_EXACT = new Set<string>([
 ]);
 
 // allow popular hosting suffixes + your domain suffix
-the ALLOWED_SUFFIXES = [
+const ALLOWED_SUFFIXES = [
   ".netlify.app",
   ".vercel.app",
   ".onrender.com",
