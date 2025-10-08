@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+// ⬇️ If your db.ts exports something else, adjust this import + query calls.
 import { pool } from "./db";
 
 const router = Router();
@@ -33,22 +34,33 @@ type Window = { start?: string; end?: string };
 const isIso = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 function getWindow(req: Request): Window {
+  // NEW UI sends start & end for YTD/Year/Custom. “All time” sends none.
   const start = typeof req.query.start === "string" ? req.query.start : undefined;
   const end = typeof req.query.end === "string" ? req.query.end : undefined;
+
   if (isIso(start) && isIso(end)) return { start, end };
 
-  // Back-compat: ?year=2025 or ?year=2025&month=10
+  // Backward-compat: ?year=2025 or ?year=2025&month=10
   const year = req.query.year ? Number(req.query.year) : undefined;
   const month = req.query.month ? Number(req.query.month) : undefined;
   if (year && !month) return { start: `${year}-01-01`, end: `${year}-12-31` };
   if (year && month) {
     const mm = String(month).padStart(2, "0");
+    // last day of month
     const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
     return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(last).padStart(2, "0")}` };
   }
 
+  // no window = all time
   return {};
 }
+
+function paramsIndex(startAt: number, list: unknown[]) {
+  // helper to generate $1, $2, ... starting from startAt
+  return list.map((_, i) => `$${startAt + i}`).join(", ");
+}
+
+/* ------------------------------ QUERIES ------------------------------ */
 
 async function query<T = any>(text: string, values: any[] = []): Promise<T[]> {
   const res = await pool.query(text, values);
@@ -60,7 +72,6 @@ async function query<T = any>(text: string, values: any[] = []): Promise<T[]> {
 /**
  * GET /api/insurance-claims
  * Supports: ?providerId= & ?status= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
- * NOTE: Window logic is now OVERLAP, not full containment.
  */
 router.get("/insurance-claims", async (req: Request, res: Response) => {
   try {
@@ -80,9 +91,8 @@ router.get("/insurance-claims", async (req: Request, res: Response) => {
       where.push(`c.status = $${vals.length}`);
     }
     if (start && end) {
-      // overlap: start <= period_end AND end >= period_start
       vals.push(start, end);
-      where.push(`$${vals.length - 1} <= c.period_end AND $${vals.length} >= c.period_start`);
+      where.push(`c.period_start >= $${vals.length - 1} AND c.period_end <= $${vals.length}`);
     }
 
     const sql = `
@@ -146,7 +156,11 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
 /**
  * GET /api/insurance-balances
  * Supports: ?providerId= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
- * Uses OVERLAP logic for claims inside the window.
+ * Returns:
+ *  {
+ *    providers: [{ providerId, providerName, claimed, paid, balance, openingBalance, openingBalanceAsOf }],
+ *    claims: [{...claim, providerName, paidToDate, balance }]
+ *  }
  */
 router.get("/insurance-balances", async (req: Request, res: Response) => {
   try {
@@ -155,21 +169,23 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
 
     const providerFilter: string[] = [];
     const providerVals: any[] = [];
+
     if (providerId) {
       providerVals.push(providerId);
       providerFilter.push(`p.id = $${providerVals.length}`);
     }
 
-    // ---- per-provider billed (claims) within window (OVERLAP) ----
+    // ---- per-provider aggregates within window ----
     const withinWhere: string[] = [];
     const withinVals: any[] = [];
+
     if (providerId) {
       withinVals.push(providerId);
       withinWhere.push(`c.provider_id = $${withinVals.length}`);
     }
     if (start && end) {
       withinVals.push(start, end);
-      withinWhere.push(`$${withinVals.length - 1} <= c.period_end AND $${withinVals.length} >= c.period_start`);
+      withinWhere.push(`c.period_start >= $${withinVals.length - 1} AND c.period_end <= $${withinVals.length}`);
     }
 
     const withinBilledSql = `
@@ -180,7 +196,6 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     `;
     const billedRows = await query<{ provider_id: string; billed: string }>(withinBilledSql, withinVals);
 
-    // ---- per-provider paid within window (inclusive between) ----
     const withinPaidWhere: string[] = [];
     const withinPaidVals: any[] = [];
     if (providerId) {
@@ -200,16 +215,17 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     `;
     const paidRows = await query<{ provider_id: string; paid: string }>(withinPaidSql, withinPaidVals);
 
-    // ---- opening balance (claims - payments before start) ----
+    // ---- opening balance (carry forward) before start ----
     let openingRows: { provider_id: string; opening: string }[] = [];
     if (start) {
       const openVals: any[] = [start];
+      const openProv = providerId ? "AND c.provider_id = $2" : "";
       if (providerId) openVals.push(providerId);
 
       const openClaimSql = `
         SELECT c.provider_id, COALESCE(SUM(c.claimed_amount),0) as opening_claimed
         FROM insurance_claims c
-        WHERE c.period_start < $1 ${providerId ? "AND c.provider_id = $2" : ""}
+        WHERE c.period_start < $1 ${openProv}
         GROUP BY c.provider_id
       `;
       const openPaySql = `
@@ -227,9 +243,11 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
       const map = new Map<string, number>();
       oc.forEach(r => map.set(r.provider_id, Number(r.opening_claimed)));
       op.forEach(r => map.set(r.provider_id, (map.get(r.provider_id) || 0) - Number(r.opening_paid)));
+
       openingRows = Array.from(map.entries()).map(([provider_id, opening]) => ({ provider_id, opening: String(opening) }));
     }
 
+    // ---- providers list to project names and zero-fill ----
     const providersSql = `
       SELECT p.id, p.name
       FROM insurance_providers p
@@ -237,6 +255,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     `;
     const providers = await query<{ id: string; name: string }>(providersSql, providerVals);
 
+    // index helpers
     const billedMap = new Map(billedRows.map(r => [r.provider_id, Number(r.billed)]));
     const paidMap = new Map(paidRows.map(r => [r.provider_id, Number(r.paid)]));
     const openingMap = new Map(openingRows.map(r => [r.provider_id, Number(r.opening)]));
@@ -257,7 +276,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
       };
     });
 
-    // ---- claims list inside window (OVERLAP) ----
+    // ---- individual claims within window (for drawer + table) ----
     const claimsWhere: string[] = [];
     const claimsVals: any[] = [];
     if (providerId) {
@@ -266,7 +285,7 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
     }
     if (start && end) {
       claimsVals.push(start, end);
-      claimsWhere.push(`$${claimsVals.length - 1} <= c.period_end AND $${claimsVals.length} >= c.period_start`);
+      claimsWhere.push(`c.period_start >= $${claimsVals.length - 1} AND c.period_end <= $${claimsVals.length}`);
     }
 
     const claimsSql = `
@@ -297,54 +316,10 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
 });
 
 /**
- * NEW: GET /api/insurance/breakdown
- * Returns USD payments grouped by provider for the given window.
- * Used by the Insurance Providers page for the donut & cards so it
- * matches the “Insurance (USD)” concept used on the dashboard.
- *
- * Response:
- *   { breakdown: { [providerName]: number }, totalUSD: number }
+ * POST /api/insurance-claims
+ * Body: { providerId, periodStart, periodEnd, currency, claimedAmount, notes? }
+ * Computes period_year/month server-side.
  */
-router.get("/insurance/breakdown", async (req: Request, res: Response) => {
-  try {
-    const { start, end } = getWindow(req);
-
-    const vals: any[] = [];
-    const where: string[] = [];
-
-    if (start && end) {
-      vals.push(start, end);
-      where.push(`p.payment_date >= $${vals.length - 1} AND p.payment_date <= $${vals.length}`);
-    }
-
-    // Only sum USD payments (you can widen this if needed)
-    const sql = `
-      SELECT pr.name AS name, COALESCE(SUM(p.amount),0) AS usd
-      FROM insurance_payments p
-      JOIN insurance_providers pr ON pr.id = p.provider_id
-      WHERE p.currency = 'USD' ${where.length ? "AND " + where.join(" AND ") : ""}
-      GROUP BY pr.name
-      ORDER BY usd DESC
-    `;
-
-    const rows = await query<{ name: string; usd: string }>(sql, vals);
-    const breakdown: Record<string, number> = {};
-    let total = 0;
-    for (const r of rows) {
-      const v = Number(r.usd) || 0;
-      total += v;
-      breakdown[r.name] = v;
-    }
-
-    res.json({ breakdown, totalUSD: total });
-  } catch (e: any) {
-    console.error("GET /insurance/breakdown", e);
-    res.status(500).json({ error: "Failed to compute insurance breakdown" });
-  }
-});
-
-/* --------------------------- MUTATION ROUTES --------------------------- */
-
 router.post("/insurance-claims", async (req: Request, res: Response) => {
   try {
     const data = ClaimCreate.parse(req.body);
@@ -379,11 +354,15 @@ router.post("/insurance-claims", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * PATCH /api/insurance-claims/:id
+ */
 router.patch("/insurance-claims/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const data = ClaimPatch.parse(req.body);
 
+    // Build dynamic patch
     const sets: string[] = [];
     const vals: any[] = [];
     const add = (col: string, val: any) => {
@@ -398,6 +377,7 @@ router.patch("/insurance-claims/:id", async (req: Request, res: Response) => {
     if (typeof data.claimedAmount === "number") add("claimed_amount", data.claimedAmount);
     if (typeof data.notes === "string") add("notes", data.notes);
 
+    // If periodStart changed, recompute year/month
     if (data.periodStart) {
       const d = new Date(data.periodStart + "T00:00:00Z");
       add("period_year", d.getUTCFullYear());
@@ -416,6 +396,9 @@ router.patch("/insurance-claims/:id", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/insurance-payments
+ */
 router.post("/insurance-payments", async (req: Request, res: Response) => {
   try {
     const data = PaymentCreate.parse(req.body);
@@ -442,6 +425,9 @@ router.post("/insurance-payments", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * PATCH /api/insurance-payments/:id
+ */
 router.patch("/insurance-payments/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
@@ -474,6 +460,9 @@ router.patch("/insurance-payments/:id", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE endpoints (used by the UI)
+ */
 router.delete("/insurance-claims/:id", async (req, res) => {
   try {
     await query(`DELETE FROM insurance_claims WHERE id = $1`, [req.params.id]);
