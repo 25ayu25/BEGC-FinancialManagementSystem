@@ -5,11 +5,17 @@ import {
   insertTransactionSchema,
   insertReceiptSchema,
   insertPatientVolumeSchema,
+  insurancePayments,
+  insuranceProviders,
 } from "@shared/schema";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+
+// NEW: drizzle/db imports for insurance monthly endpoint
+import { db } from "./db";
+import { and, gte, lt, sql } from "drizzle-orm";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -66,7 +72,7 @@ const ALLOWED_EXACT = new Set<string>([
 ]);
 
 // allow popular hosting suffixes + your domain suffix
-const ALLOWED_SUFFIXES = [
+the ALLOWED_SUFFIXES = [
   ".netlify.app",
   ".vercel.app",
   ".onrender.com",
@@ -805,7 +811,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ error: "Failed to fetch detailed transactions" });
     }
   });
-      /* --------------------------------------------------------------- */
+
+  /* --------------------------------------------------------------- */
   /* Insurance Management                                            */
   /* --------------------------------------------------------------- */
 
@@ -971,7 +978,99 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.json(data);
     } catch (err) { next(err); }
   });
-  
+
+  /** Insurance revenue breakdown (USD) by provider for a given period */
+  app.get("/api/insurance/breakdown", requireAuth, async (req, res, next) => {
+    try {
+      const { start, end } = getDateWindow(req.query); // inclusive Y-M-D strings
+      // Get payments in [start, end] (server treats end as inclusive day)
+      const payments = await storage.listInsurancePayments({ start, end });
+
+      // Map providerId -> name (include any provider that exists)
+      const allProviders = await db.select().from(insuranceProviders);
+      const nameById = new Map<string, string>(allProviders.map(p => [p.id, p.name]));
+
+      const breakdown: Record<string, number> = {};
+      for (const p of payments) {
+        if (!p.providerId) continue;
+        const name = nameById.get(p.providerId);
+        if (!name) continue;
+        breakdown[name] = (breakdown[name] || 0) + Number(p.amount || 0);
+      }
+
+      const totalUSD = Object.values(breakdown).reduce((s, v) => s + v, 0);
+      res.json({ breakdown, totalUSD });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /** Insurance monthly totals (USD collected per month across a selected range) */
+  app.get("/api/insurance/monthly", requireAuth, async (req, res, next) => {
+    try {
+      const year  = Number(req.query.year)  || new Date().getUTCFullYear();
+      const month = Number(req.query.month) || (new Date().getUTCMonth() + 1);
+      const range = String(req.query.range || "current-month");
+
+      const startDateStr = req.query.startDate as string | undefined;
+      const endDateStr   = req.query.endDate as string | undefined;
+
+      let startDate: Date;         // inclusive
+      let endDateExclusive: Date;  // exclusive
+
+      // Build [start, end)
+      if (range === "custom" && startDateStr && endDateStr) {
+        const s = new Date(`${startDateStr}T00:00:00Z`);
+        const e = new Date(`${endDateStr}T00:00:00Z`);
+        // bump to exclusive if it was midnight (treat UI end as inclusive)
+        const isUtcMidnight = (d: Date) =>
+          d.getUTCHours() === 0 && d.getUTCMinutes() === 0 &&
+          d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+        startDate = s;
+        endDateExclusive = isUtcMidnight(e)
+          ? new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate() + 1))
+          : e;
+      } else if (range === "last-3-months") {
+        const anchor = new Date(Date.UTC(year, month - 1, 1)); // first of anchor month
+        startDate = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 2, 1)); // 2 months before
+        endDateExclusive = new Date(Date.UTC(year, month, 1)); // first of next month
+      } else if (range === "year") {
+        startDate = new Date(Date.UTC(year, 0, 1));
+        endDateExclusive = new Date(Date.UTC(year + 1, 0, 1));
+      } else {
+        // "current-month" | "last-month" | "month-select" (treated as a single month)
+        startDate = new Date(Date.UTC(year, month - 1, 1));
+        endDateExclusive = new Date(Date.UTC(year, month, 1));
+      }
+
+      // Iterate months in [start, end)
+      const data: Array<{ month: string; year: number; usd: number }> = [];
+      for (
+        let d = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
+        d < endDateExclusive;
+        d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+      ) {
+        const y = d.getUTCFullYear();
+        const m = d.getUTCMonth() + 1;
+        const mStart = new Date(Date.UTC(y, m - 1, 1));
+        const mEnd   = new Date(Date.UTC(y, m, 1));
+        const [{ total }] = await db
+          .select({ total: sql<number>`COALESCE(SUM(${insurancePayments.amount}),0)` })
+          .from(insurancePayments)
+          .where(and(gte(insurancePayments.paymentDate, mStart), lt(insurancePayments.paymentDate, mEnd)));
+        data.push({
+          month: new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en-US", { month: "short" }),
+          year: y,
+          usd: Number(total || 0),
+        });
+      }
+
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   /* --------------------------------------------------------------- */
   /* Dashboard & Trends                                              */
   /* --------------------------------------------------------------- */
