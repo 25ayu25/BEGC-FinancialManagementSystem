@@ -809,123 +809,22 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* Insurance Management                                            */
   /* --------------------------------------------------------------- */
 
- // ===== BEGIN payments-based insurance helpers & endpoints =====
+  // Helper to accept the new window (start/end) and still support old year/month
+  const getDateWindow = (q: any) => {
+    const start = (q.start as string) || (q.startDate as string) || undefined;
+    const end   = (q.end   as string) || (q.endDate   as string) || undefined;
+    if (start && end) return { start, end };
 
-// Month label helper
-const _shortMonth = (y: number, m: number) =>
-  new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en-US", { month: "short" });
-
-// Inclusive month span helper
-function _monthsBetween(start: Date, endInclusive: Date) {
-  const out: Array<{ y: number; m: number }> = [];
-  const s = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
-  const e = new Date(Date.UTC(endInclusive.getUTCFullYear(), endInclusive.getUTCMonth(), 1));
-  for (let d = s; d <= e; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
-    out.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
-  }
-  return out;
-}
-
-/**
- * Collections breakdown (USD) by provider from insurancePayments.
- * Supports:
- *   - ?start=YYYY-MM-DD&end=YYYY-MM-DD
- *   - or ?year=YYYY&month=MM
- *   - or ?year=YYYY
- */
-app.get("/api/insurance/breakdown", requireAuth, async (req, res, next) => {
-  try {
-    const { start, end } = getDateWindow(req.query); // inclusive dates as strings
-    const today = new Date();
-    const y = Number(req.query.year) || today.getUTCFullYear();
-    const m = Number(req.query.month) || (today.getUTCMonth() + 1);
-
-    // Build default window if none provided
-    const defaultStart = `${y}-${String(req.query.month ? m : 1).padStart(2, "0")}-01`;
-    const defaultEnd   = req.query.month
-      ? (m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`)
-      : `${y + 1}-01-01`;
-
-    const payments = await storage.listInsurancePayments({
-      start: start ?? defaultStart,
-      end:   end   ?? defaultEnd,
-    });
-
-    const providers = await storage.getInsuranceProviders();
-    const idToName = new Map(providers.map(p => [p.id, p.name]));
-
-    const breakdown: Record<string, number> = {};
-    for (const p of payments) {
-      if (p.currency !== "USD") continue; // USD collections only
-      const name = idToName.get(p.providerId) || "Unknown";
-      breakdown[name] = (breakdown[name] || 0) + Number(p.amount || 0);
+    const year  = q.year ? Number(q.year) : undefined;
+    const month = q.month ? Number(q.month) : undefined;
+    if (year && !month) return { start: `${year}-01-01`, end: `${year}-12-31` };
+    if (year && month) {
+      const mm = String(month).padStart(2, "0");
+      const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(last).padStart(2,"0")}` };
     }
-
-    const totalUSD = Object.values(breakdown).reduce((s, v) => s + v, 0);
-    res.json({ breakdown, totalUSD });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * Monthly collections (USD) built from insurancePayments, across a window.
- * Returns [{month, year, usd}, ...]
- */
-app.get("/api/insurance/monthly", requireAuth, async (req, res) => {
-  try {
-    const range = String(req.query.range || "current-month");
-    const year  = Number(req.query.year)  || new Date().getUTCFullYear();
-    const month = Number(req.query.month) || (new Date().getUTCMonth() + 1);
-
-    let spanStart: Date;
-    let spanEndInclusive: Date;
-
-    if (range === "custom" && req.query.startDate && req.query.endDate) {
-      const s = new Date(String(req.query.startDate));
-      const e = new Date(String(req.query.endDate));
-      spanStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
-      spanEndInclusive = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), 1));
-    } else if (range === "year") {
-      spanStart = new Date(Date.UTC(year, 0, 1));
-      spanEndInclusive = new Date(Date.UTC(year, 11, 1));
-    } else if (range === "last-3-months") {
-      const anchor = new Date(Date.UTC(year, month - 1, 1));
-      spanEndInclusive = anchor;
-      spanStart = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 2, 1));
-    } else if (range === "last-month") {
-      const lm = new Date(Date.UTC(year, month - 2, 1));
-      spanStart = lm;
-      spanEndInclusive = lm;
-    } else { // "current-month" or "month-select"
-      const cur = new Date(Date.UTC(year, month - 1, 1));
-      spanStart = cur;
-      spanEndInclusive = cur;
-    }
-
-    const months = _monthsBetween(spanStart, spanEndInclusive);
-    const data: Array<{ month: string; year: number; usd: number }> = [];
-
-    for (const { y, m } of months) {
-      const startISO = `${y}-${String(m).padStart(2, "0")}-01`;
-      const endISO   = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-
-      const payments = await storage.listInsurancePayments({ start: startISO, end: endISO });
-      const usd = Math.round(
-        payments.reduce((s, p) => s + (p.currency === "USD" ? Number(p.amount || 0) : 0), 0)
-      );
-
-      data.push({ month: _shortMonth(y, m), year: y, usd });
-    }
-
-    res.json({ data });
-  } catch (e) {
-    console.error("insurance monthly error:", e);
-    res.status(200).json({ data: [] });
-  }
-});
-
-// ===== END payments-based insurance helpers & endpoints =====
+    return { start: undefined, end: undefined };
+  };
 
   // Zod request schemas
   const ClaimCreate = z.object({
