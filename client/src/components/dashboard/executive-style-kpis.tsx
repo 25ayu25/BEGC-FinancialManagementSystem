@@ -6,10 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 
-// ⬇️ NEW: bring in the global date filter + link builder
-import { useDateFilter } from "@/context/date-filter-context";
-import { buildInsuranceLink } from "@/lib/insurance-link";
-
 interface ExecutiveStyleKPIsProps {
   data?: {
     totalIncomeSSP: string;
@@ -44,17 +40,6 @@ export default function ExecutiveStyleKPIs({
 
   // Drawer state (shared component has transparent overlay)
   const [openExpenses, setOpenExpenses] = React.useState(false);
-
-  // ⬇️ NEW: read the current global date filter + build an accurate link
-  const { timeRange, selectedYear, selectedMonth, customStartDate, customEndDate } = useDateFilter();
-  const insuranceHref = buildInsuranceLink({
-    timeRange,
-    selectedYear,
-    selectedMonth,
-    customStartDate,
-    customEndDate,
-    basePath: "/insurance-providers",
-  });
 
   const openDrawer = () => setOpenExpenses(true);
   const kpiKeyHandler: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
@@ -197,7 +182,7 @@ export default function ExecutiveStyleKPIs({
         </Card>
 
         {/* Insurance Revenue */}
-        <Link href={insuranceHref}>
+        <Link href="/insurance-providers">
           <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
