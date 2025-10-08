@@ -9,12 +9,13 @@ import {
   Users,
   Activity,
   X,
-  ShieldCheck,   // Insurance (new, independent)
+  ShieldCheck,   // main insurance ledger
+  ListChecks,    // providers sub-link
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
 
-// allow optional "sub" to render an indented sub-item (kept for future use)
+// allow optional "sub" to render an indented sub-item
 type NavItem = {
   name: string;
   href: string;
@@ -27,8 +28,9 @@ const navigation: NavItem[] = [
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
 
-  // ✅ Single Insurance entry → new page with independent filters
-  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
+  // Insurance section (single main item + one indented sub-link)
+  { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
+  { name: "Insurance", href: "/insurance-providers", icon: ListChecks, sub: true },
 
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
