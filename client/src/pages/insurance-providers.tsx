@@ -106,46 +106,66 @@ export default function InsuranceProvidersPage() {
     }
   };
 
-  // Normalize to match the Executive Dashboard API contract.
-  // We always pass an explicit year+month; for "last-month" and "month-select"
-  // we use range=current-month so the server anchors to that month exactly.
+  // Normalize to keep UI behavior for compare text and monthly list
   const normalizedRange: TimeRange =
     timeRange === "month-select" || timeRange === "last-month"
       ? "current-month"
       : timeRange;
 
   /* ----------------------------- Queries ----------------------------- */
-  type DashboardResp = {
-    insuranceBreakdown?:
-      | Record<string, number>
-      | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
-    totalIncomeUSD?: string | number;
+
+  type BreakdownResp = {
+    breakdown: Record<string, number>;
+    totalUSD: number;
+  };
+
+  // Build URL for the selected period for /api/insurance/breakdown
+  const buildBreakdownUrl = () => {
+    // Custom range
+    if (timeRange === "custom" && customStartDate && customEndDate) {
+      const s = format(customStartDate, "yyyy-MM-dd");
+      const e = format(customEndDate, "yyyy-MM-dd");
+      return `/api/insurance/breakdown?start=${s}&end=${e}`;
+    }
+
+    // Whole year
+    if (timeRange === "year") {
+      return `/api/insurance/breakdown?year=${selectedYear}`;
+    }
+
+    // Last 3 months (inclusive, ending at selectedYear/selectedMonth)
+    if (timeRange === "last-3-months") {
+      const anchor = new Date(selectedYear, selectedMonth - 1, 1);
+      const start = new Date(anchor.getFullYear(), anchor.getMonth() - 2, 1);
+      const end   = new Date(selectedYear, selectedMonth, 0); // last day of anchor month
+      return `/api/insurance/breakdown?start=${format(start, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
+    }
+
+    // current-month, last-month, month-select → exact month
+    return `/api/insurance/breakdown?year=${selectedYear}&month=${selectedMonth}`;
   };
 
   // Current/selected period (source of truth for the donut/KPIs)
-  const { data: periodData } = useQuery({
+  const { data: periodBreakdown } = useQuery({
     queryKey: [
-      "/api/dashboard",
+      "/api/insurance/breakdown",
       selectedYear,
       selectedMonth,
-      normalizedRange,
+      timeRange,
       customStartDate?.toISOString(),
       customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (normalizedRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
-      }
+      const url = buildBreakdownUrl();
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load dashboard data");
-      return (await res.json()) as DashboardResp;
+      if (!res.ok) throw new Error("Failed to load insurance breakdown");
+      return (await res.json()) as BreakdownResp;
     },
   });
 
   // Comparison period (used for the % change text and provider cards)
-  const { data: comparisonData } = useQuery({
-    queryKey: ["/api/dashboard/compare", selectedYear, selectedMonth, normalizedRange],
+  const { data: comparisonBreakdown } = useQuery({
+    queryKey: ["/api/insurance/breakdown/compare", selectedYear, selectedMonth, timeRange],
     queryFn: async () => {
       if (!(normalizedRange === "current-month" || normalizedRange === "last-month")) return null;
 
@@ -153,24 +173,24 @@ export default function InsuranceProvidersPage() {
       let compMonth = selectedMonth;
 
       if (normalizedRange === "current-month") {
-        const lm = new Date(selectedYear, selectedMonth - 2); // previous month of the selected one
+        const lm = new Date(selectedYear, selectedMonth - 2); // previous month of selected one
         compYear = lm.getFullYear();
         compMonth = lm.getMonth() + 1;
       } else if (normalizedRange === "last-month") {
-        const today = new Date(); // compare last month to *current* month
+        const today = new Date(); // compare last month to current
         compYear = today.getFullYear();
         compMonth = today.getMonth() + 1;
       }
 
-      const url = `/api/dashboard?year=${compYear}&month=${compMonth}&range=current-month`;
+      const url = `/api/insurance/breakdown?year=${compYear}&month=${compMonth}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
-      return (await res.json()) as DashboardResp;
+      return (await res.json()) as BreakdownResp;
     },
     enabled: normalizedRange === "current-month" || normalizedRange === "last-month",
   });
 
-  // (Optional list) – if you keep the “by month” section
+  // (Optional list) – “by month” section
   const { data: monthlyInsurance } = useQuery({
     queryKey: [
       "/api/insurance/monthly",
@@ -190,41 +210,14 @@ export default function InsuranceProvidersPage() {
 
   /* ----------------------- Transform for UI ----------------------- */
 
-  // Normalize dashboard.insuranceBreakdown into a simple {name -> usd} record
+  // Simple { providerName -> USD } from /api/insurance/breakdown
   const insuranceBreakdown: Record<string, number> = useMemo(() => {
-    const raw = periodData?.insuranceBreakdown as any;
-    if (!raw) return {};
-    if (Array.isArray(raw)) {
-      const out: Record<string, number> = {};
-      for (const r of raw) {
-        const k = String(r?.name ?? r?.provider ?? "Unknown");
-        const v = Number(r?.amount ?? r?.total ?? 0);
-        if (v > 0) out[k] = (out[k] || 0) + v;
-      }
-      return out;
-    }
-    // object shape already
-    return Object.fromEntries(
-      Object.entries(raw).map(([k, v]) => [String(k), Number(v as number) || 0])
-    );
-  }, [periodData]);
+    return periodBreakdown?.breakdown ?? {};
+  }, [periodBreakdown]);
 
   const prevInsuranceBreakdown: Record<string, number> = useMemo(() => {
-    const raw = comparisonData?.insuranceBreakdown as any;
-    if (!raw) return {};
-    if (Array.isArray(raw)) {
-      const out: Record<string, number> = {};
-      for (const r of raw) {
-        const k = String(r?.name ?? r?.provider ?? "Unknown");
-        const v = Number(r?.amount ?? r?.total ?? 0);
-        if (v > 0) out[k] = (out[k] || 0) + v;
-      }
-      return out;
-    }
-    return Object.fromEntries(
-      Object.entries(raw).map(([k, v]) => [String(k), Number(v as number) || 0])
-    );
-  }, [comparisonData]);
+    return comparisonBreakdown?.breakdown ?? {};
+  }, [comparisonBreakdown]);
 
   const providers = useMemo(() => {
     const arr = Object.entries(insuranceBreakdown).map(([name, v]) => ({ name, usd: Number(v) || 0 }));
@@ -326,7 +319,7 @@ export default function InsuranceProvidersPage() {
                           <CalendarIcon className="mr-2 h-4 w-4" />{customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }} avoidCollisions collisionPadding={15}>
+                      <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w=[280px] w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }} avoidCollisions collisionPadding={15}>
                         <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customStartDate} onSelect={setCustomStartDate} initialFocus />
                       </PopoverContent>
                     </Popover>
@@ -337,7 +330,7 @@ export default function InsuranceProvidersPage() {
                           <CalendarIcon className="mr-2 h-4 w-4" />{customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }} avoidCollisions collisionPadding={15}>
+                      <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w=[280px] w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }} avoidCollisions collisionPadding={15}>
                         <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customEndDate} onSelect={setCustomEndDate} initialFocus />
                       </PopoverContent>
                     </Popover>
