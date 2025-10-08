@@ -106,53 +106,71 @@ export default function InsuranceProvidersPage() {
     }
   };
 
-  const normalizedRange = timeRange === "month-select" ? "current-month" : timeRange;
+  // Normalize to match the Executive Dashboard API contract.
+  // We always pass an explicit year+month; for "last-month" and "month-select"
+  // we use range=current-month so the server anchors to that month exactly.
+  const normalizedRange: TimeRange =
+    timeRange === "month-select" || timeRange === "last-month"
+      ? "current-month"
+      : timeRange;
 
   /* ----------------------------- Queries ----------------------------- */
-  // NEW: dedicated breakdown from payments (matches USD income)
-  const { data: breakdownData } = useQuery({
+  type DashboardResp = {
+    insuranceBreakdown?:
+      | Record<string, number>
+      | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
+    totalIncomeUSD?: string | number;
+  };
+
+  // Current/selected period (source of truth for the donut/KPIs)
+  const { data: periodData } = useQuery({
     queryKey: [
-      "/api/insurance/breakdown",
-      selectedYear, selectedMonth, normalizedRange,
-      customStartDate?.toISOString(), customEndDate?.toISOString(),
+      "/api/dashboard",
+      selectedYear,
+      selectedMonth,
+      normalizedRange,
+      customStartDate?.toISOString(),
+      customEndDate?.toISOString(),
     ],
     queryFn: async () => {
-      let url = `/api/insurance/breakdown?year=${selectedYear}&month=${selectedMonth}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url = `/api/insurance/breakdown?start=${format(customStartDate, "yyyy-MM-dd")}&end=${format(customEndDate, "yyyy-MM-dd")}`;
+      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
+      if (normalizedRange === "custom" && customStartDate && customEndDate) {
+        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch insurance breakdown");
-      return res.json() as Promise<{ breakdown: Record<string, number>, totalUSD: number }>;
+      if (!res.ok) throw new Error("Failed to load dashboard data");
+      return (await res.json()) as DashboardResp;
     },
   });
 
-  // For the small “vs Last Month/Current Month” delta
+  // Comparison period (used for the % change text and provider cards)
   const { data: comparisonData } = useQuery({
-    queryKey: ["/api/insurance/breakdown/compare", selectedYear, selectedMonth, normalizedRange],
+    queryKey: ["/api/dashboard/compare", selectedYear, selectedMonth, normalizedRange],
     queryFn: async () => {
+      if (!(normalizedRange === "current-month" || normalizedRange === "last-month")) return null;
+
       let compYear = selectedYear;
       let compMonth = selectedMonth;
 
       if (normalizedRange === "current-month") {
-        const lm = new Date(selectedYear, selectedMonth - 2);
-        compYear = lm.getFullYear(); compMonth = lm.getMonth() + 1;
+        const lm = new Date(selectedYear, selectedMonth - 2); // previous month of the selected one
+        compYear = lm.getFullYear();
+        compMonth = lm.getMonth() + 1;
       } else if (normalizedRange === "last-month") {
-        const today = new Date();
-        compYear = today.getFullYear(); compMonth = today.getMonth() + 1;
-      } else {
-        return null;
+        const today = new Date(); // compare last month to *current* month
+        compYear = today.getFullYear();
+        compMonth = today.getMonth() + 1;
       }
 
-      const url = `/api/insurance/breakdown?year=${compYear}&month=${compMonth}`;
+      const url = `/api/dashboard?year=${compYear}&month=${compMonth}&range=current-month`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
-      return res.json() as Promise<{ breakdown: Record<string, number>, totalUSD: number }>;
+      return (await res.json()) as DashboardResp;
     },
     enabled: normalizedRange === "current-month" || normalizedRange === "last-month",
   });
 
-  // (Optional list) – keep if you’re showing “by month” section
+  // (Optional list) – if you keep the “by month” section
   const { data: monthlyInsurance } = useQuery({
     queryKey: [
       "/api/insurance/monthly",
@@ -161,7 +179,7 @@ export default function InsuranceProvidersPage() {
     ],
     queryFn: async () => {
       let url = `/api/insurance/monthly?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
+      if (normalizedRange === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const res = await fetch(url, { credentials: "include" });
@@ -172,8 +190,41 @@ export default function InsuranceProvidersPage() {
 
   /* ----------------------- Transform for UI ----------------------- */
 
-  const insuranceBreakdown: Record<string, number> = breakdownData?.breakdown || {};
-  const prevInsuranceBreakdown: Record<string, number> = comparisonData?.breakdown || {};
+  // Normalize dashboard.insuranceBreakdown into a simple {name -> usd} record
+  const insuranceBreakdown: Record<string, number> = useMemo(() => {
+    const raw = periodData?.insuranceBreakdown as any;
+    if (!raw) return {};
+    if (Array.isArray(raw)) {
+      const out: Record<string, number> = {};
+      for (const r of raw) {
+        const k = String(r?.name ?? r?.provider ?? "Unknown");
+        const v = Number(r?.amount ?? r?.total ?? 0);
+        if (v > 0) out[k] = (out[k] || 0) + v;
+      }
+      return out;
+    }
+    // object shape already
+    return Object.fromEntries(
+      Object.entries(raw).map(([k, v]) => [String(k), Number(v as number) || 0])
+    );
+  }, [periodData]);
+
+  const prevInsuranceBreakdown: Record<string, number> = useMemo(() => {
+    const raw = comparisonData?.insuranceBreakdown as any;
+    if (!raw) return {};
+    if (Array.isArray(raw)) {
+      const out: Record<string, number> = {};
+      for (const r of raw) {
+        const k = String(r?.name ?? r?.provider ?? "Unknown");
+        const v = Number(r?.amount ?? r?.total ?? 0);
+        if (v > 0) out[k] = (out[k] || 0) + v;
+      }
+      return out;
+    }
+    return Object.fromEntries(
+      Object.entries(raw).map(([k, v]) => [String(k), Number(v as number) || 0])
+    );
+  }, [comparisonData]);
 
   const providers = useMemo(() => {
     const arr = Object.entries(insuranceBreakdown).map(([name, v]) => ({ name, usd: Number(v) || 0 }));
