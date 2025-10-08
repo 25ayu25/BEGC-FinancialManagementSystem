@@ -33,6 +33,19 @@ const toRGBA = (hex: string, alpha: number) => {
 };
 const MAX_SEGMENTS = 7;
 
+/**
+ * Auth header helper: sends the session in x-session-token for cross-site requests
+ * (Make sure you store `localStorage.setItem("user_session", JSON.stringify(session))` on login)
+ */
+const authHeaders = (): HeadersInit | undefined => {
+  try {
+    const s = localStorage.getItem("user_session");
+    return s ? { "x-session-token": s } : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /* --------------------------- Page Component --------------------------- */
 
 type TimeRange =
@@ -139,7 +152,10 @@ export default function InsuranceProvidersPage() {
         url = `/api/insurance/breakdown?year=${selectedYear}&month=${selectedMonth}`;
       }
 
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, {
+        credentials: "include",
+        headers: authHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch insurance breakdown");
       return res.json() as Promise<{ breakdown: Record<string, number>, totalUSD: number }>;
     },
@@ -165,7 +181,10 @@ export default function InsuranceProvidersPage() {
         compMonth = today.getMonth() + 1;
       }
 
-      const res = await fetch(`/api/insurance/breakdown?year=${compYear}&month=${compMonth}`, { credentials: "include" });
+      const res = await fetch(`/api/insurance/breakdown?year=${compYear}&month=${compMonth}`, {
+        credentials: "include",
+        headers: authHeaders(),
+      });
       if (!res.ok) return null;
       return (await res.json()) as { breakdown: Record<string, number>, totalUSD: number };
     },
@@ -184,7 +203,10 @@ export default function InsuranceProvidersPage() {
       if (timeRange === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${yyyymmdd(customStartDate)}&endDate=${yyyymmdd(customEndDate)}`;
       }
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, {
+        credentials: "include",
+        headers: authHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
       return res.json() as Promise<{ data: Array<{ month: string; year: number; usd: number }> }>;
     },
@@ -291,7 +313,7 @@ export default function InsuranceProvidersPage() {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("h-9 justify-start text-left font-normal w-full sm:w-auto", !customStartDate && "text-muted-foreground")}>
+                        <Button variant="outline" className={cn("h-9 justify-start text-left font-normal w/full sm:w-auto", !customStartDate && "text-muted-foreground")}>
                           <CalendarIcon className="mr-2 h-4 w-4" />{customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
                         </Button>
                       </PopoverTrigger>
@@ -302,7 +324,7 @@ export default function InsuranceProvidersPage() {
                     <span aria-hidden="true" className="text-muted-foreground mx-1 hidden sm:inline">to</span>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("h-9 justify-start text-left font-normal w-full sm:w-auto", !customEndDate && "text-muted-foreground")}>
+                        <Button variant="outline" className={cn("h-9 justify-start text-left font-normal w/full sm:w-auto", !customEndDate && "text-muted-foreground")}>
                           <CalendarIcon className="mr-2 h-4 w-4" />{customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
                         </Button>
                       </PopoverTrigger>
