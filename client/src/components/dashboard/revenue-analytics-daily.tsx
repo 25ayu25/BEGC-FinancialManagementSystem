@@ -1,4 +1,3 @@
-// client/src/components/dashboard/revenue-analytics-daily.tsx
 'use client';
 
 import { useMemo, useEffect, useState } from "react";
@@ -144,27 +143,12 @@ function buildNiceTicks(dataMax: number) {
   const max = step * 4;
   return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
-
-/**
- * Prefer the fixed "preferredMax" (to keep a consistent visual scale)
- * ONLY when the current data reaches a reasonable fraction of it.
- * Otherwise, fall back to a dynamic "nice" scale so small months
- * don't look tiny against a huge fixed max.
- *
- * @param dataMax      max value present in the series
- * @param preferredMax the fixed top value we'd like to use when possible
- * @param ratio        threshold ratio (default 60%)
- */
-function buildTicksPreferred(dataMax: number, preferredMax: number, ratio = 0.6) {
-  const maxVal = Number.isFinite(dataMax) ? dataMax : 0;
-  if (maxVal <= 0) return buildNiceTicks(0);
-
-  const usePreferred = maxVal >= preferredMax * ratio;
-  if (usePreferred) {
+function buildTicksPreferred(dataMax: number, preferredMax: number) {
+  if (dataMax <= preferredMax) {
     const step = preferredMax / 4;
     return { max: preferredMax, ticks: [0, step, step * 2, step * 3, preferredMax] };
   }
-  return buildNiceTicks(maxVal);
+  return buildNiceTicks(dataMax);
 }
 
 /* ------------------------ Mobile helper hook --------------------- */
@@ -435,10 +419,23 @@ export default function RevenueAnalyticsDaily({
 
   const dataMaxSSP = Math.max(0, ...(!wide ? sspDaily.map((d) => d.value) : sspMonthly.map((d) => d.value)));
   const dataMaxUSD = Math.max(0, ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value)));
-  const preferredSSPMax = 6_000_000;
-  const preferredUSDMax = 1_500;
-  const { max: yMaxSSP, ticks: ticksSSP } = buildTicksPreferred(dataMaxSSP, preferredSSPMax);
-  const { max: yMaxUSD, ticks: ticksUSD } = buildTicksPreferred(dataMaxUSD, preferredUSDMax);
+
+  // Daily: fixed baseline; Monthly/wide: dynamic
+  const preferredSSPMax = 4_500_000; // <- requested baseline
+  const preferredUSDMax = 1_250;     // <- requested baseline
+
+  const sspScale = !wide
+    ? buildTicksPreferred(dataMaxSSP, preferredSSPMax)
+    : buildNiceTicks(dataMaxSSP);
+
+  const usdScale = !wide
+    ? buildTicksPreferred(dataMaxUSD, preferredUSDMax)
+    : buildNiceTicks(dataMaxUSD);
+
+  const yMaxSSP = sspScale.max;
+  const ticksSSP = sspScale.ticks;
+  const yMaxUSD = usdScale.max;
+  const ticksUSD = usdScale.ticks;
 
   const headerLabel = !wide
     ? format(new Date(year, month - 1, 1), "MMM yyyy")
@@ -769,10 +766,10 @@ export default function RevenueAnalyticsDaily({
                   <td className="py-2">
                     {String((t.date ?? t.transactionDate ?? t.createdAt ?? t.postedAt) ?? "").slice(0, 10)}
                   </td>
-                    <td className="py-2">{displaySource(t)}</td>
-                    <td className="py-2">{t.currency}</td>
-                    <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
-                    <td className="py-2">{t.type}</td>
+                  <td className="py-2">{displaySource(t)}</td>
+                  <td className="py-2">{t.currency}</td>
+                  <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
+                  <td className="py-2">{t.type}</td>
                 </tr>
               ))}
             </tbody>
