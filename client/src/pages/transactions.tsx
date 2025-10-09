@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
@@ -43,24 +43,17 @@ import {
 /* ----------------------------- UTC helpers ----------------------------- */
 
 function formatUTCDate(iso: string) {
-  // Render as local string but pinned to UTC to avoid off-by-one day
   return new Date(iso).toLocaleDateString("en-US", { timeZone: "UTC" });
 }
-
 function monthKeyUTC(iso: string) {
   const d = new Date(iso);
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }
-
 function monthLabelUTC(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "long",
-    year: "numeric",
-  });
+  return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", year: "numeric" });
 }
 
 export default function Transactions() {
@@ -77,6 +70,28 @@ export default function Transactions() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  /* ------- Body scroll lock when any modal/dialog is open (mobile fix) --- */
+  useEffect(() => {
+    const anyOpen =
+      showAddModal || showEditModal || showBulkIncome || showBulkExpense || deleteDialogOpen;
+
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+
+    if (anyOpen) {
+      // prevent background scroll
+      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = "hidden";
+      // avoid layout shift on desktop
+      if (scrollBarWidth > 0) document.body.style.paddingRight = `${scrollBarWidth}px`;
+    }
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+    };
+  }, [showAddModal, showEditModal, showBulkIncome, showBulkExpense, deleteDialogOpen]);
 
   const deleteTransactionMutation = useMutation({
     mutationFn: async (transactionId: string) => {
@@ -102,11 +117,9 @@ export default function Transactions() {
     setTransactionToDelete(transactionId);
     setDeleteDialogOpen(true);
   };
-
   const handleDeleteConfirm = () => {
     if (transactionToDelete) deleteTransactionMutation.mutate(transactionToDelete);
   };
-
   const handleEditClick = (transaction: any) => {
     setTransactionToEdit(transaction);
     setShowEditModal(true);
@@ -117,9 +130,7 @@ export default function Transactions() {
   const queryParams = new URLSearchParams({
     page: String(currentPage),
     limit: String(pageSize),
-    ...Object.fromEntries(
-      Object.entries(appliedFilters).filter(([, v]) => v !== undefined && v !== "")
-    ),
+    ...Object.fromEntries(Object.entries(appliedFilters).filter(([, v]) => v !== undefined && v !== "")),
   });
 
   const { data: transactionData, isLoading } = useQuery({
@@ -178,14 +189,13 @@ export default function Transactions() {
   /* -------------------------------- UI ---------------------------------- */
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-[100dvh]"> {/* dynamic VH helps iOS */}
       <Header
         title="Transaction Management"
         subtitle="Add and manage daily income and expense transactions"
         actions={
           <TooltipProvider delayDuration={150}>
             <div className="flex flex-wrap gap-2">
-              {/* Order: Daily Bulk Income → Bulk Expenses → Add Transaction */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" onClick={() => setShowBulkIncome(true)}>
@@ -220,7 +230,7 @@ export default function Transactions() {
         }
       />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-6 overscroll-contain">
         <div className="space-y-6">
           <TransactionFilters
             onFilterChange={(filters) => {
@@ -276,8 +286,7 @@ export default function Transactions() {
                                   m.totals.ssp >= 0 ? "text-green-600" : "text-red-600"
                                 }`}
                               >
-                                {m.totals.ssp >= 0 ? "+" : ""}SSP{" "}
-                                {m.totals.ssp.toLocaleString()}
+                                {m.totals.ssp >= 0 ? "+" : ""}SSP {m.totals.ssp.toLocaleString()}
                               </div>
                             )}
                             {m.totals.usd !== 0 && (
@@ -286,8 +295,7 @@ export default function Transactions() {
                                   m.totals.usd >= 0 ? "text-green-600" : "text-red-600"
                                 }`}
                               >
-                                {m.totals.usd >= 0 ? "+" : ""}USD{" "}
-                                {m.totals.usd.toLocaleString()}
+                                {m.totals.usd >= 0 ? "+" : ""}USD {m.totals.usd.toLocaleString()}
                               </div>
                             )}
                           </div>
@@ -300,46 +308,25 @@ export default function Transactions() {
                             <table className="w-full">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                    Date
-                                  </th>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                    Description
-                                  </th>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                    Department
-                                  </th>
-                                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                    Amount
-                                  </th>
-                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                    Status
-                                  </th>
-                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                                    Actions
-                                  </th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Date</th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Description</th>
+                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Department</th>
+                                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Amount</th>
+                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Status</th>
+                                  <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
                                 {m.transactions.map((t: any) => (
                                   <tr key={t.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4 text-sm text-gray-900">
-                                      {formatUTCDate(t.date)}
-                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-900">{formatUTCDate(t.date)}</td>
                                     <td className="py-3 px-4 text-sm text-gray-900">
                                       {t.insuranceProviderName
-                                        ? `${t.insuranceProviderName} ${
-                                            t.description || "Income"
-                                          }`
-                                        : t.description ||
-                                          (t.type === "income" ? "Income" : "Expense")}
+                                        ? `${t.insuranceProviderName} ${t.description || "Income"}`
+                                        : t.description || (t.type === "income" ? "Income" : "Expense")}
                                     </td>
                                     <td className="py-3 px-4">
-                                      <Badge
-                                        variant={
-                                          t.type === "income" ? "default" : "destructive"
-                                        }
-                                      >
+                                      <Badge variant={t.type === "income" ? "default" : "destructive"}>
                                         {t.type === "income"
                                           ? t.departmentId
                                             ? getDepartmentName(t.departmentId)
@@ -348,26 +335,13 @@ export default function Transactions() {
                                       </Badge>
                                     </td>
                                     <td className="py-3 px-4 text-sm text-right font-medium">
-                                      <span
-                                        className={
-                                          t.type === "income"
-                                            ? "text-green-600"
-                                            : "text-red-600"
-                                        }
-                                      >
+                                      <span className={t.type === "income" ? "text-green-600" : "text-red-600"}>
                                         {t.type === "income" ? "+" : "-"}
-                                        {t.currency}{" "}
-                                        {Math.round(Number(t.amount)).toLocaleString()}
+                                        {t.currency} {Math.round(Number(t.amount)).toLocaleString()}
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-center">
-                                      <Badge
-                                        variant={
-                                          t.syncStatus === "synced"
-                                            ? "default"
-                                            : "secondary"
-                                        }
-                                      >
+                                      <Badge variant={t.syncStatus === "synced" ? "default" : "secondary"}>
                                         {t.syncStatus}
                                       </Badge>
                                     </td>
@@ -407,9 +381,8 @@ export default function Transactions() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
                 <div className="text-sm text-gray-500">
-                  Showing {(currentPage - 1) * pageSize + 1} to{" "}
-                  {Math.min(currentPage * pageSize, total)} of {total.toLocaleString()}{" "}
-                  transactions
+                  Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, total)} of{" "}
+                  {total.toLocaleString()} transactions
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -420,9 +393,7 @@ export default function Transactions() {
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" /> Previous
                   </Button>
-                  <div className="text-sm text-gray-500">
-                    Page {currentPage} of {totalPages}
-                  </div>
+                  <div className="text-sm text-gray-500">Page {currentPage} of {totalPages}</div>
                   <Button
                     variant="outline"
                     size="sm"
@@ -439,13 +410,16 @@ export default function Transactions() {
       </main>
 
       {/* Single-entry Add/Edit */}
-      <AddTransactionModal open={showAddModal} onOpenChange={(v) => {
-        setShowAddModal(v);
-        if (!v) {
-          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-        }
-      }} />
+      <AddTransactionModal
+        open={showAddModal}
+        onOpenChange={(v) => {
+          setShowAddModal(v);
+          if (!v) {
+            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          }
+        }}
+      />
       <AddTransactionModal
         open={showEditModal}
         onOpenChange={(v) => {
@@ -489,8 +463,7 @@ export default function Transactions() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be
-              undone.
+              Are you sure you want to delete this transaction? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
