@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -186,6 +189,60 @@ function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   a.download = "insurance-claims.csv";
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* ------------------------------ DateField ----------------------------- */
+/** A styled calendar picker that reads/writes simple "YYYY-MM-DD" strings. */
+function DateField({
+  label,
+  value,
+  onChange,
+  placeholder = "Pick a date",
+  className = "",
+}: {
+  label?: string;
+  value?: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const selected = value ? new Date(`${value}T00:00:00`) : undefined;
+  return (
+    <div className={className}>
+      {label ? <label className="block text-xs text-slate-500 mb-1">{label}</label> : null}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="w-full inline-flex items-center justify-between rounded-lg border px-3 py-2 text-left hover:bg-slate-50"
+          >
+            <span className={selected ? "text-slate-900" : "text-slate-400"}>
+              {selected
+                ? selected.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                : placeholder}
+            </span>
+            <CalendarIcon className="w-4 h-4 text-slate-500" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={selected}
+            onSelect={(d) =>
+              onChange(
+                d
+                  ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+                      .toISOString()
+                      .slice(0, 10)
+                  : ""
+              )
+            }
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 /* ------------------------------ Page ----------------------------- */
@@ -707,8 +764,8 @@ export default function InsurancePage() {
               ))}
               {preset === "custom" && (
                 <div className="ml-2 flex items-center gap-2">
-                  <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded-lg p-2" />
-                  <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded-lg p-2" />
+                  <DateField value={start} onChange={setStart} />
+                  <DateField value={end} onChange={setEnd} />
                 </div>
               )}
               <div className="ml-auto">
@@ -955,13 +1012,7 @@ export default function InsurancePage() {
 
                 {/* Claim Date (single date; backend period inferred from its month) */}
                 <div className="col-span-2">
-                  <label className="block text-xs text-slate-500 mb-1">Claim Date</label>
-                  <input
-                    type="date"
-                    className="border rounded-lg p-2 w-full"
-                    value={cDate}
-                    onChange={(e) => setCDate(e.target.value)}
-                  />
+                  <DateField label="Claim Date" value={cDate} onChange={setCDate} />
                   <div className="text-[11px] text-slate-500 mt-1">
                     We’ll bill this claim for the month of the selected date.
                   </div>
@@ -1003,9 +1054,8 @@ export default function InsurancePage() {
                     {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Payment Date</label>
-                  <input type="date" className="border rounded-lg p-2 w-full" value={pDate} onChange={(e) => setPDate(e.target.value)} />
+                <div className="col-span-1">
+                  <DateField label="Payment Date" value={pDate} onChange={setPDate} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Currency</label>
