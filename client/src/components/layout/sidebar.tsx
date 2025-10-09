@@ -15,6 +15,7 @@ import {
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
 
+// allow optional "sub" to render an indented sub-item
 type NavItem = {
   name: string;
   href: string;
@@ -27,6 +28,7 @@ const navigation: NavItem[] = [
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
 
+  // Insurance section (single main item + one indented sub-link)
   { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
   { name: "Insurance", href: "/insurance-providers", icon: ListChecks, sub: true },
 
@@ -44,10 +46,9 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
 
-  // ESC to close
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose?.();
+      if (e.key === "Escape" && onClose) onClose();
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
@@ -55,49 +56,23 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     }
   }, [isOpen, onClose]);
 
-  // Close on route change
-  useEffect(() => {
-    if (isOpen) onClose?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
-
-  // Body lock + marker (useful if you ever want CSS hooks)
-  useEffect(() => {
-    const b = document.body;
-    if (isOpen) {
-      b.classList.add("sidebar-open");
-      b.style.overflow = "hidden";
-    } else {
-      b.classList.remove("sidebar-open");
-      b.style.overflow = "";
-    }
-    return () => {
-      b.classList.remove("sidebar-open");
-      b.style.overflow = "";
-    };
-  }, [isOpen]);
-
-  const handleNavClick = () => onClose?.();
-
   return (
     <>
-      {/* Mobile overlay (HIGH z-index to beat any popover/portal) */}
+      {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-[90] lg:hidden"
-          aria-hidden="true"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* Sidebar panel (higher than overlay) */}
+      {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-[100] w-64 bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
-        aria-modal={isOpen ? true : undefined}
       >
         {/* Mobile close button */}
         <div className="lg:hidden absolute top-4 right-4">
@@ -105,7 +80,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             onClick={onClose}
             className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             data-testid="button-close-sidebar"
-            aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
@@ -138,7 +112,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             return (
               <Link key={item.name} href={item.href}>
                 <div
-                  onClick={handleNavClick}
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     subClasses,
