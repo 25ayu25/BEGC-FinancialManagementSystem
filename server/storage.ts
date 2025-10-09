@@ -995,10 +995,15 @@ export class DatabaseStorage implements IStorage {
     if (filters?.providerId) whereConds.push(eq(insuranceClaims.providerId, filters.providerId));
     if (filters?.status) whereConds.push(eq(insuranceClaims.status, filters.status));
 
-    // Preferred: window [start, end)
-    if (filters?.start) whereConds.push(gte(insuranceClaims.periodStart, new Date(filters.start)));
-    if (filters?.end)
-      whereConds.push(lt(insuranceClaims.periodEnd, toEndExclusive(new Date(filters.end))!));
+    // Preferred: window [start, end) with OVERLAP semantics:
+    // include a claim if (period_start < endExclusive) AND (period_end >= start)
+    if (filters?.end) {
+      const endEx = toEndExclusive(new Date(filters.end))!;
+      whereConds.push(lt(insuranceClaims.periodStart, endEx));
+    }
+    if (filters?.start) {
+      whereConds.push(gte(insuranceClaims.periodEnd, new Date(filters.start)));
+    }
 
     // Backward compat if no window was provided
     if (!filters?.start && !filters?.end) {
@@ -1098,11 +1103,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(...provConds))
       .orderBy(providerOrderExpr, insuranceProviders.name); // ✅ preferred order
 
-    // Billed inside window
+    // Billed INSIDE window — OVERLAP semantics:
+    //   period_start < endExclusive AND period_end >= start
     const billedConds: any[] = [];
     if (providerId) billedConds.push(eq(insuranceClaims.providerId, providerId));
-    if (startDate) billedConds.push(gte(insuranceClaims.periodStart, startDate));
-    if (endEx)     billedConds.push(lt(insuranceClaims.periodEnd, endEx));
+    if (endEx)     billedConds.push(lt(insuranceClaims.periodStart, endEx));
+    if (startDate) billedConds.push(gte(insuranceClaims.periodEnd, startDate));
     const billedRows = await db
       .select({
         providerId: insuranceClaims.providerId,
@@ -1113,7 +1119,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(insuranceClaims.providerId);
     const billedMap = new Map(billedRows.map(r => [r.providerId, Number(r.billed)]));
 
-    // Paid inside window
+    // Paid inside window (half-open by paymentDate)
     const paidConds: any[] = [];
     if (providerId) paidConds.push(eq(insurancePayments.providerId, providerId));
     if (startDate)  paidConds.push(gte(insurancePayments.paymentDate, startDate));
@@ -1128,10 +1134,11 @@ export class DatabaseStorage implements IStorage {
       .groupBy(insurancePayments.providerId);
     const paidMap = new Map(paidRows.map(r => [r.providerId, Number(r.paid)]));
 
-    // Carry forward BEFORE start: claims < start  minus  payments < start
+    // Carry forward BEFORE start: (claims fully before) – (payments before start)
     const carryMap = new Map<string, number>();
     if (startDate) {
-      const beforeClaimConds: any[] = [lt(insuranceClaims.periodStart, startDate)];
+      // claims fully before window ⇒ period_end < start
+      const beforeClaimConds: any[] = [lt(insuranceClaims.periodEnd, startDate)];
       if (providerId) beforeClaimConds.push(eq(insuranceClaims.providerId, providerId));
       const beforeClaims = await db
         .select({
@@ -1157,7 +1164,7 @@ export class DatabaseStorage implements IStorage {
       beforePays.forEach(r => carryMap.set(r.providerId, (carryMap.get(r.providerId) || 0) - Number(r.total)));
     }
 
-    // Claims detail within the same window (for the table)
+    // Claims detail within the same window (uses overlap via listInsuranceClaims)
     const claims = await this.listInsuranceClaims({
       providerId,
       start,
