@@ -1,4 +1,3 @@
-// client/src/App.tsx
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -21,14 +20,11 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
 import { useLocation } from "wouter";
 
-// Global date filter (used by dashboards/transactions/etc.)
+// ⬇️ NEW: bring in the global date filter provider
 import { DateFilterProvider } from "@/context/date-filter-context";
 
-// Insurance page
+// ⬇️ NEW: Insurance page
 import Insurance from "@/pages/insurance";
-
-// ⬇️ NEW: route-scoped Insurance filters
-import { InsuranceFilterProvider } from "@/features/insurance/filters";
 
 function Router() {
   return (
@@ -40,9 +36,9 @@ function Router() {
       <Route>
         {(params) => {
           const [sidebarOpen, setSidebarOpen] = useState(false);
-          const [location] = useLocation();
+          const [location, setLocation] = useLocation();
 
-          // Auto-logout (disabled on login page)
+          // Auto-logout functionality (only enabled when not on login page)
           const isOnLoginPage = location === "/login";
           const { isWarning, remainingSeconds, extendSession, logoutNow, formatTime } =
             useIdleTimeout({
@@ -85,16 +81,8 @@ function Router() {
                   <Route path="/reports" component={Reports} />
                   <Route path="/patient-volume" component={PatientVolume} />
                   <Route path="/insurance-providers" component={InsuranceProviders} />
-
-                  {/* ⬇️ NEW: Insurance route wrapped ONLY here with its own provider */}
-                  <Route path="/insurance">
-                    {() => (
-                      <InsuranceFilterProvider>
-                        <Insurance />
-                      </InsuranceFilterProvider>
-                    )}
-                  </Route>
-
+                  {/* ⬇️ NEW: Insurance management route */}
+                  <Route path="/insurance" component={Insurance} />
                   <Route path="/settings" component={Settings} />
                   <Route path="/security" component={Security} />
                   <Route path="/users" component={UserManagement} />
@@ -121,7 +109,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Global date context remains for dashboards/transactions, etc. */}
+      {/* ⬇️ Wrap everything that needs the global period with the provider */}
       <DateFilterProvider>
         <TooltipProvider>
           <Toaster />
