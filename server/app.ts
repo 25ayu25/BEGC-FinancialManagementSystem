@@ -1,123 +1,133 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import Dashboard from "@/pages/dashboard";
-import AdvancedDashboard from "@/pages/advanced-dashboard";
-import Transactions from "@/pages/transactions";
-import Reports from "@/pages/reports";
-import PatientVolume from "@/pages/patient-volume";
-import Settings from "@/pages/settings";
-import Security from "@/pages/security";
-import UserManagement from "@/pages/user-management";
-import InsuranceProviders from "@/pages/insurance-providers";
-import Login from "@/pages/login";
-import NotFound from "@/pages/not-found";
-import Sidebar from "@/components/layout/sidebar";
-import { useState } from "react";
-import { useIdleTimeout } from "@/hooks/useIdleTimeout";
-import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
-import { useLocation } from "wouter";
+// PRODUCTION ENTRY POINT - NO VITE DEPENDENCIES
+import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
+import { createServer } from "http";
+import cors from "cors";
+import { registerRoutes } from "./routes";
+import { seedData } from "./seed-data";
 
-// ⬇️ NEW: bring in the global date filter provider
-import { DateFilterProvider } from "@/context/date-filter-context";
-
-// ⬇️ NEW: Insurance page
-import Insurance from "@/pages/insurance";
-
-function Router() {
-  return (
-    <Switch>
-      {/* Public routes without sidebar */}
-      <Route path="/login" component={Login} />
-
-      {/* Authenticated routes with sidebar */}
-      <Route>
-        {(params) => {
-          const [sidebarOpen, setSidebarOpen] = useState(false);
-          const [location, setLocation] = useLocation();
-
-          // Auto-logout functionality (only enabled when not on login page)
-          const isOnLoginPage = location === "/login";
-          const { isWarning, remainingSeconds, extendSession, logoutNow, formatTime } =
-            useIdleTimeout({
-              timeoutMinutes: 15,
-              warningMinutes: 3,
-              enabled: !isOnLoginPage,
-              onTimeout: () => {
-                window.location.href = "/login?timeout=true";
-              },
-              onWarning: (seconds) => {
-                console.log(`Session timeout warning: ${seconds} seconds remaining`);
-              },
-            });
-
-          return (
-            <div className="flex h-screen bg-gray-50">
-              <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-              <div className="flex-1 flex flex-col overflow-auto">
-                {/* Mobile header */}
-                <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    data-testid="button-mobile-menu"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                  </button>
-                  <h1 className="text-lg font-semibold text-gray-900">Bahr El Ghazal Clinic</h1>
-                  <div className="w-10"></div>
-                </div>
-
-                <Switch>
-                  <Route path="/" component={AdvancedDashboard} />
-                  <Route path="/advanced" component={AdvancedDashboard} />
-                  <Route path="/simple" component={Dashboard} />
-                  <Route path="/dashboard" component={Dashboard} />
-                  <Route path="/transactions" component={Transactions} />
-                  <Route path="/reports" component={Reports} />
-                  <Route path="/patient-volume" component={PatientVolume} />
-                  <Route path="/insurance-providers" component={InsuranceProviders} />
-                  {/* ⬇️ NEW: Insurance management route */}
-                  <Route path="/insurance" component={Insurance} />
-                  <Route path="/settings" component={Settings} />
-                  <Route path="/security" component={Security} />
-                  <Route path="/users" component={UserManagement} />
-                  <Route component={NotFound} />
-                </Switch>
-              </div>
-
-              {/* Auto-logout warning dialog */}
-              <IdleTimeoutDialog
-                isOpen={isWarning}
-                remainingSeconds={remainingSeconds}
-                onExtend={extendSession}
-                onLogout={logoutNow}
-                formatTime={formatTime}
-              />
-            </div>
-          );
-        }}
-      </Route>
-    </Switch>
-  );
+// Simple production logger
+function log(message: string, source = "api") {
+  const t = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${t} [${source}] ${message}`);
 }
 
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      {/* ⬇️ Wrap everything that needs the global period with the provider */}
-      <DateFilterProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </DateFilterProvider>
-    </QueryClientProvider>
-  );
+const app = express();
+
+// Trust proxy for Render
+app.set("trust proxy", 1);
+
+// Core middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+// CORS configuration for cross-site authentication
+const allowList = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isAllowed(origin?: string) {
+  if (!origin) return true; // same-origin/curl
+  if (allowList.includes(origin)) return true;
+  if (origin.endsWith(".netlify.app")) return true; // allow deploy previews too
+  if (origin.endsWith(".bahrelghazalclinic.com")) return true; // allow custom domain
+  return false;
 }
 
-export default App;
+app.use(
+  cors({
+    origin: (origin, cb) =>
+      cb(isAllowed(origin) ? null : new Error("Not allowed by CORS"), isAllowed(origin)),
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-session-token"],
+  })
+);
+
+// Simple request logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  let captured: unknown;
+  const orig = res.json.bind(res);
+  (res as Response).json = ((body: unknown) => {
+    captured = body;
+    return orig(body);
+  }) as Response["json"];
+
+  res.on("finish", () => {
+    if (req.path.startsWith("/api")) {
+      let line = `${req.method} ${req.path} ${res.statusCode} in ${Date.now() - start}ms`;
+      if (captured !== undefined) {
+        const s = JSON.stringify(captured);
+        line += ` :: ${s.length > 120 ? s.slice(0, 119) + "…" : s}`;
+      }
+      log(line);
+    }
+  });
+  next();
+});
+
+// Health check endpoint
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "Bahr El Ghazal Clinic API",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Register routes (must run before 404 + error handler)
+(async () => {
+  try {
+    await registerRoutes(app);
+  } catch (error) {
+    console.error("[route-setup-error]", error);
+  }
+})();
+
+// Catch-all for unknown API routes (after routes)
+app.all("/api/*", (_req, res) => {
+  res.status(404).json({ error: "API endpoint not found" });
+});
+
+// ERROR HANDLER (must be last)
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (res.headersSent) return; // let Express handle if already started
+  const status = err?.status || err?.statusCode || 500;
+  const message = err?.message || "Internal Server Error";
+  const resp: Record<string, unknown> = { error: message };
+  if (process.env.NODE_ENV !== "production" && err?.stack) resp.stack = err.stack;
+  console.error("[api-error]", status, message);
+  res.status(status).json(resp);
+});
+
+// Start server - this keeps process alive automatically
+const port = parseInt(process.env.PORT || "5000", 10);
+app.listen(port, "0.0.0.0", () => {
+  log(`🚀 Bahr El Ghazal Clinic API running on port ${port}`);
+
+  // Optional seeding - fire and forget, no await, no exit
+  if (process.env.SEED_ON_START !== "false") {
+    seedData()
+      .then(() => log("Database seeded successfully"))
+      .catch((e) => console.error("Seeding error:", e));
+  }
+});
+
+// Clean shutdown handlers
+process.on("SIGTERM", () => {
+  log("SIGTERM received, shutting down gracefully");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  log("SIGINT received, shutting down gracefully");
+  process.exit(0);
+});
