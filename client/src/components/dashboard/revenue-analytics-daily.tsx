@@ -1,3 +1,4 @@
+// client/src/components/dashboard/revenue-analytics-daily.tsx
 'use client';
 
 import { useMemo, useEffect, useState } from "react";
@@ -143,12 +144,27 @@ function buildNiceTicks(dataMax: number) {
   const max = step * 4;
   return { max, ticks: [0, step, step * 2, step * 3, max] };
 }
-function buildTicksPreferred(dataMax: number, preferredMax: number) {
-  if (dataMax <= preferredMax) {
+
+/**
+ * Prefer the fixed "preferredMax" (to keep a consistent visual scale)
+ * ONLY when the current data reaches a reasonable fraction of it.
+ * Otherwise, fall back to a dynamic "nice" scale so small months
+ * don't look tiny against a huge fixed max.
+ *
+ * @param dataMax      max value present in the series
+ * @param preferredMax the fixed top value we'd like to use when possible
+ * @param ratio        threshold ratio (default 60%)
+ */
+function buildTicksPreferred(dataMax: number, preferredMax: number, ratio = 0.6) {
+  const maxVal = Number.isFinite(dataMax) ? dataMax : 0;
+  if (maxVal <= 0) return buildNiceTicks(0);
+
+  const usePreferred = maxVal >= preferredMax * ratio;
+  if (usePreferred) {
     const step = preferredMax / 4;
     return { max: preferredMax, ticks: [0, step, step * 2, step * 3, preferredMax] };
   }
-  return buildNiceTicks(dataMax);
+  return buildNiceTicks(maxVal);
 }
 
 /* ------------------------ Mobile helper hook --------------------- */
@@ -753,10 +769,10 @@ export default function RevenueAnalyticsDaily({
                   <td className="py-2">
                     {String((t.date ?? t.transactionDate ?? t.createdAt ?? t.postedAt) ?? "").slice(0, 10)}
                   </td>
-                  <td className="py-2">{displaySource(t)}</td>
-                  <td className="py-2">{t.currency}</td>
-                  <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
-                  <td className="py-2">{t.type}</td>
+                    <td className="py-2">{displaySource(t)}</td>
+                    <td className="py-2">{t.currency}</td>
+                    <td className="py-2">{nf0.format(Math.round(t.amount ?? 0))}</td>
+                    <td className="py-2">{t.type}</td>
                 </tr>
               ))}
             </tbody>
