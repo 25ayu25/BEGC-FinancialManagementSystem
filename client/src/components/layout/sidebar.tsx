@@ -46,10 +46,10 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
 
-  // Close on ESC
+  // Close when pressing ESC
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && onClose) onClose();
+      if (e.key === "Escape") onClose?.();
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
@@ -57,30 +57,33 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     }
   }, [isOpen, onClose]);
 
-  // 🔒 Lock body scroll when the mobile drawer is open
+  // Close on route change (prevents overlay from lingering after navigation)
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    if (isOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = prev || "";
-    return () => {
-      document.body.style.overflow = prev || "";
-    };
-  }, [isOpen]);
+    if (isOpen) onClose?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
+
+  // Helper: close on tap (especially for mobile)
+  const handleNavClick = () => {
+    // only meaningful on small screens where the overlay exists
+    onClose?.();
+  };
 
   return (
     <>
-      {/* Mobile overlay — raised above sticky headers/popovers */}
+      {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-[100] lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          aria-hidden="true"
           onClick={onClose}
         />
       )}
 
-      {/* Sidebar drawer — highest layer */}
+      {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-[110] w-64 bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
@@ -91,6 +94,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             onClick={onClose}
             className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             data-testid="button-close-sidebar"
+            aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
@@ -123,6 +127,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             return (
               <Link key={item.name} href={item.href}>
                 <div
+                  onClick={handleNavClick} // close after tapping a link
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     subClasses,
