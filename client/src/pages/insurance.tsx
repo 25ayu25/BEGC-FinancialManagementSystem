@@ -26,20 +26,20 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate?: string | null; // ISO (REAL collection date)
+  paymentDate?: string | null; // ISO (preferred display date)
   amount: number | string;
   currency: "USD" | "SSP";
   reference?: string | null;
   notes?: string | null;
-  createdAt?: string | null;   // when entered into system
+  createdAt?: string | null;   // ISO (fallback display date)
 };
 
 type BalancesResponse = {
   providers: Array<{
     providerId: string;
     providerName: string;
-    claimed: number;   // in window
-    paid: number;      // in window
+    claimed: number;   // billed in window
+    paid: number;      // collected in window
     balance?: number;
     outstanding?: number;
     credit?: number;
@@ -96,19 +96,16 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-/** Map API snake_case to our camelCase Payment type so we always use the REAL payment date */
-function normalizePayment(o: any): Payment {
-  return {
-    id: o.id,
-    providerId: o.providerId ?? o.provider_id,
-    claimId: o.claimId ?? o.claim_id ?? null,
-    paymentDate: o.paymentDate ?? o.payment_date ?? null, // <-- ensure we use DB payment_date
-    amount: Number(o.amount ?? 0),
-    currency: (o.currency || "USD") as "USD" | "SSP",
-    reference: o.reference ?? null,
-    notes: o.notes ?? null,
-    createdAt: o.createdAt ?? o.created_at ?? null,
-  };
+/* --------------------- **Payment date normalizer** --------------------- */
+/* Some APIs return snake_case. Always display payment_date if present.    */
+function getPaymentDate(p: Payment | any): string | undefined {
+  return (p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined) || undefined;
+}
+function getCreatedAt(p: Payment | any): string | undefined {
+  return (p?.createdAt ?? p?.created_at ?? undefined) || undefined;
+}
+function displayPaymentDate(p: Payment): string {
+  return fmtDate(getPaymentDate(p) || getCreatedAt(p));
 }
 
 /* ----------------------------- provider order ----------------------------- */
@@ -156,9 +153,9 @@ function HelpPopover() {
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Claims sent</strong>: claims in the selected time.</li>
-            <li><strong>Payments received</strong>: money received in the selected time.</li>
-            <li><strong>Still unpaid</strong>: Claims sent − Payments received (selected time).</li>
+            <li><strong>Billed</strong>: claims in the current window.</li>
+            <li><strong>Collected</strong>: payments received in the window.</li>
+            <li><strong>Outstanding</strong>: Billed − Collected (window only).</li>
           </ul>
           <div className="text-right mt-2">
             <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
@@ -212,7 +209,7 @@ function exportPaymentsCSV(rows: Payment[], providers: Provider[]) {
   const header = ["Date","Provider","Currency","Amount","Notes"].join(",");
   const body = rows.map((p) =>
     [
-      fmtDate(p.paymentDate || p.createdAt),
+      displayPaymentDate(p), // use normalized payment date
       (byId.get(p.providerId) || p.providerId).replace(/,/g, " "),
       p.currency,
       Number(p.amount),
@@ -321,11 +318,11 @@ export default function InsurancePage() {
   const [showPayment, setShowPayment] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<string>("");
 
-  // KPI detail drawers
+  // KPI detail modals
   const [showCollected, setShowCollected] = useState(false);
   const [showOutstanding, setShowOutstanding] = useState(false);
 
-  // payments in current window (for Collected drawer)
+  // payments in current window (for Collected modal)
   const [windowPayments, setWindowPayments] = useState<Payment[]>([]);
   const [loadingWindowPays, setLoadingWindowPays] = useState(false);
   const [paymentsQuery, setPaymentsQuery] = useState("");
@@ -447,14 +444,6 @@ export default function InsurancePage() {
     return { startIso, endIso };
   }
 
-  /* As-of text for drawers */
-  const asOfText = useMemo(() => {
-    if (preset === "all") return "All time";
-    if (preset === "ytd") return "Year to date";
-    if (preset.startsWith("year-")) return `Year ${preset.replace("year-","")}`;
-    return `Custom (${start || "…"} → ${end || "…"})`;
-  }, [preset, start, end]);
-
   /* --------------------------- effects --------------------------- */
   useEffect(() => {
     api<Provider[]>("/api/insurance-providers")
@@ -503,20 +492,20 @@ export default function InsurancePage() {
     if (!detailProviderId) return;
     setLoadingPayments(true);
     const qs = new URLSearchParams({ providerId: detailProviderId });
-    api<any[]>(`/api/insurance-payments?${qs.toString()}`)
-      .then((rows) => setPayments(rows.map(normalizePayment)))
+    api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+      .then(setPayments)
       .catch(() => setPayments([]))
       .finally(() => setLoadingPayments(false));
   }, [detailProviderId]);
 
-  // payments in current window (for Collected drawer)
+  // payments in current window (for Collected modal)
   async function loadWindowPayments() {
     setLoadingWindowPays(true);
     const params = windowParams(new URLSearchParams());
     if (providerId) params.set("providerId", providerId);
     try {
-      const rows = await api<any[]>(`/api/insurance-payments?${params.toString()}`);
-      setWindowPayments(rows.map(normalizePayment));
+      const rows = await api<Payment[]>(`/api/insurance-payments?${params.toString()}`);
+      setWindowPayments(rows);
     } catch {
       setWindowPayments([]);
     } finally {
@@ -557,16 +546,15 @@ export default function InsurancePage() {
     [balances]
   );
 
-  /* -------------------- derived data for KPI drawers -------------------- */
+  /* -------------------- derived data for KPI modals -------------------- */
   function normalizedPayments(list: Payment[]) {
-    // sort by the effective date we display: paymentDate, falling back to createdAt
     return list
       .slice()
       .filter((p) => p.currency === "USD")
       .sort((a, b) => {
-        const da = (a.paymentDate || a.createdAt || "") as string;
-        const db = (b.paymentDate || b.createdAt || "") as string;
-        return da.localeCompare(db);
+        const da = Date.parse(getPaymentDate(a) || getCreatedAt(a) || "");
+        const db = Date.parse(getPaymentDate(b) || getCreatedAt(b) || "");
+        return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da); // newest first
       });
   }
 
@@ -577,10 +565,7 @@ export default function InsurancePage() {
     const byId = new Map(providers.map((p) => [p.id, p.name.toLowerCase()]));
     return rows.filter((p) => {
       const prov = byId.get(p.providerId) || "";
-      return (
-        prov.includes(q) ||
-        String(p.notes || "").toLowerCase().includes(q)
-      );
+      return prov.includes(q) || String(p.notes || "").toLowerCase().includes(q);
     });
   }, [windowPayments, paymentsQuery, providers]);
 
@@ -601,16 +586,29 @@ export default function InsurancePage() {
   const orderedOutstanding = useMemo(() => {
     const rows = (balances?.providers || []).slice();
     const filteredByProvider = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
-    const withPositiveOutstanding = filteredByProvider.filter((r) => (r.claimed - r.paid) > 0);
-    return withPositiveOutstanding.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
+    const withPositiveOutstanding = filteredByProvider.map((r) => ({
+      providerId: r.providerId,
+      providerName: r.providerName,
+      outstanding: (r.claimed || 0) - (r.paid || 0),
+    })).filter((r) => r.outstanding > 0);
+    return withPositiveOutstanding.sort((a, b) => b.outstanding - a.outstanding);
   }, [balances, providerId]);
+
+  /* ----------------------------- small helpers ----------------------------- */
+  function windowLabel() {
+    if (preset === "all") return "All time";
+    if (preset === "ytd") return "Year to date";
+    if (preset.startsWith("year-")) return `Year ${preset.replace("year-","")}`;
+    if (preset === "custom") return `${fmtDisplay(start)} – ${fmtDisplay(end)}`;
+    return "";
+  }
 
   /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-2xl border bg-white p-4">
-          <div className="text-slate-500 text-sm">Claims sent</div>
+          <div className="text-slate-500 text-sm">Billed</div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">
             {selectedProvider ? selectedProvider.name : "All providers"}
@@ -623,9 +621,9 @@ export default function InsurancePage() {
           className="text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
           title="Click to view all payments in this window"
         >
-          <div className="text-slate-500 text-sm">Payments received</div>
+          <div className="text-slate-500 text-sm">Collected</div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.collected, "USD")}</div>
-          <div className="text-xs text-slate-500 mt-1">Payments received in the selected time • Click for details</div>
+          <div className="text-xs text-slate-500 mt-1">Payments received (window) • Click for details</div>
         </button>
 
         {/* Clickable KPI */}
@@ -634,13 +632,13 @@ export default function InsurancePage() {
           className={`text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}
           title="Click to view outstanding by provider"
         >
-          <div className="text-slate-500 text-sm">Still unpaid</div>
+          <div className="text-slate-500 text-sm">Outstanding</div>
           <div className={`mt-1 text-[22px] font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
             {summary.outstanding < 0
               ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
               : money(summary.outstanding, "USD")}
           </div>
-          <div className="text-xs text-slate-500 mt-1">Claims sent − payments received • Click for details</div>
+          <div className="text-xs text-slate-500 mt-1">Billed − Collected • Click for details</div>
         </button>
       </div>
     );
@@ -898,10 +896,10 @@ export default function InsurancePage() {
                     </div>
                     <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
                       <div className="bg-slate-50 rounded p-2">
-                        <div className="text-slate-500">Still unpaid</div>
+                        <div className="text-slate-500">Outstanding</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
                           {outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}
                         </div>
@@ -916,7 +914,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Drawer: Provider details */}
+      {/* Drawer: Provider details (unchanged layout) */}
       {detailProviderId && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
@@ -926,7 +924,7 @@ export default function InsurancePage() {
               <button className="text-slate-500" onClick={() => setDetailProviderId("")}>✕</button>
             </div>
 
-            <div className="p-4 overflow-y-auto space-y-6 max-h-[75vh]">
+            <div className="p-4 overflow-y-auto space-y-6">
               {/* Totals in current window */}
               <div className="grid grid-cols-3 gap-3">
                 {(() => {
@@ -935,10 +933,10 @@ export default function InsurancePage() {
                   const paidPct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
                   return (
                     <>
-                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Claims sent</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
-                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Payments received</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
+                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Billed</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
+                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Collected</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
                       <div className="rounded-lg border p-3">
-                        <div className="text-xs text-slate-500">Still unpaid</div>
+                        <div className="text-xs text-slate-500">Outstanding</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
                         <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                       </div>
@@ -973,9 +971,9 @@ export default function InsurancePage() {
                         </div>
 
                         <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(c.claimedAmount, c.currency)}</div></div>
-                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(c.paidToDate, c.currency)}</div></div>
-                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Still unpaid</div><div className="font-semibold">{money(c.balance, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(c.claimedAmount, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(c.paidToDate, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Outstanding</div><div className="font-semibold">{money(c.balance, c.currency)}</div></div>
                         </div>
 
                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded">
@@ -1010,7 +1008,7 @@ export default function InsurancePage() {
                       <div className="text-sm">
                         <div className="font-medium">{money(p.amount, p.currency)}</div>
                         <div className="text-xs text-slate-500">
-                          Paid: {fmtDate(p.paymentDate)} • Entered: {fmtDate(p.createdAt)}
+                          Paid: {displayPaymentDate(p)} • Entered: {fmtDate(getCreatedAt(p))}
                         </div>
                         {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
@@ -1021,8 +1019,8 @@ export default function InsurancePage() {
                               reloadBalances();
                               const qs = new URLSearchParams({ providerId: detailProviderId });
                               setLoadingPayments(true);
-                              api<any[]>(`/api/insurance-payments?${qs.toString()}`)
-                                .then((rows) => setPayments(rows.map(normalizePayment)))
+                              api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+                                .then(setPayments)
                                 .finally(() => setLoadingPayments(false));
                             });
                           }
@@ -1037,25 +1035,25 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Drawer: KPI — Collected (payments in window) */}
+      {/* Modal: KPI — Collected (payments in window) */}
       {showCollected && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowCollected(false)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-3xl bg-white shadow-2xl border-l z-50 flex flex-col">
+          <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border z-50">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">
-                Payments received — {money(summary.collected, "USD")}
-                {providerId ? (
-                  <span className="ml-2 text-slate-500 text-sm">
-                    ({providers.find((p) => p.id === providerId)?.name})
-                  </span>
-                ) : null}
+                Collected — {money(summary.collected, "USD")}
+                <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
               </div>
-              <button className="text-slate-500" onClick={() => setShowCollected(false)} title="Close"><X size={18} /></button>
-            </div>
-
-            <div className="px-4 text-xs text-slate-500 -mt-2 mb-2">
-              As of: {asOfText}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportPaymentsCSV(filteredWindowPayments, providers)}
+                  className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
+                >
+                  Export CSV
+                </button>
+                <button className="text-slate-500" onClick={() => setShowCollected(false)} title="Close"><X size={18} /></button>
+              </div>
             </div>
 
             {/* Filters line */}
@@ -1069,16 +1067,10 @@ export default function InsurancePage() {
                   onChange={(e) => setPaymentsQuery(e.target.value)}
                 />
               </div>
-              <button
-                onClick={() => exportPaymentsCSV(filteredWindowPayments, providers)}
-                className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
-              >
-                Export CSV
-              </button>
             </div>
 
             {/* Content */}
-            <div className="p-4 overflow-y-auto max-h-[75vh]">
+            <div className="p-4 overflow-y-auto max-h-[70vh]">
               {loadingWindowPays && <div className="text-slate-500">Loading…</div>}
               {!loadingWindowPays && filteredWindowPayments.length === 0 && (
                 <div className="text-slate-500">No payments in this window.</div>
@@ -1087,7 +1079,7 @@ export default function InsurancePage() {
               {/* Provider roll-up */}
               {filteredWindowPayments.length > 0 && (
                 <div className="mb-4">
-                  <div className="text-xs text-slate-500 mb-1">By provider (selected time)</div>
+                  <div className="text-xs text-slate-500 mb-1">By provider (window)</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {providerTotals.map(({ providerId: pid, name, total }) => (
                       <div key={pid} className="border rounded-lg p-3 bg-slate-50 flex items-center justify-between">
@@ -1099,13 +1091,13 @@ export default function InsurancePage() {
                 </div>
               )}
 
-              {/* Table (without Reference column) */}
+              {/* Table */}
               {filteredWindowPayments.length > 0 && (
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="min-w-full text-sm">
                     <thead className="bg-slate-50 text-slate-600">
                       <tr>
-                        <th className="text-left p-3">Date (paid)</th>
+                        <th className="text-left p-3">Date</th>
                         <th className="text-left p-3">Provider</th>
                         <th className="text-left p-3">Amount</th>
                         <th className="text-left p-3">Notes</th>
@@ -1116,19 +1108,20 @@ export default function InsurancePage() {
                         const pv = providers.find((x) => x.id === p.providerId);
                         return (
                           <tr key={p.id} className="hover:bg-slate-50/60">
-                            <td className="p-3">{fmtDate(p.paymentDate || p.createdAt)}</td>
+                            <td className="p-3">{displayPaymentDate(p)}</td>
                             <td className="p-3">{pv?.name || p.providerId}</td>
                             <td className="p-3 font-medium">{money(p.amount, p.currency)}</td>
                             <td className="p-3">{p.notes || ""}</td>
                           </tr>
                         );
                       })}
-                      {/* optional total row */}
+                      {/* total row */}
                       <tr className="bg-slate-50/60 font-medium">
-                        <td className="p-3">Total</td>
-                        <td className="p-3"></td>
-                        <td className="p-3">{money(summary.collected, "USD")}</td>
-                        <td className="p-3"></td>
+                        <td className="p-3" colSpan={2}>Total</td>
+                        <td className="p-3">
+                          {money(filteredWindowPayments.reduce((a, r) => a + Number(r.amount || 0), 0), "USD")}
+                        </td>
+                        <td className="p-3" />
                       </tr>
                     </tbody>
                   </table>
@@ -1139,66 +1132,48 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* Drawer: KPI — Outstanding (provider breakdown in window) */}
+      {/* Modal: KPI — Outstanding (only outstanding by provider) */}
       {showOutstanding && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowOutstanding(false)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-3xl bg-white shadow-2xl border-l z-50 flex flex-col">
+          <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border z-50">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">
-                Still unpaid — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
-                {providerId ? (
-                  <span className="ml-2 text-slate-500 text-sm">
-                    ({providers.find((p) => p.id === providerId)?.name})
-                  </span>
-                ) : null}
+                Outstanding — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
+                <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
               </div>
               <button className="text-slate-500" onClick={() => setShowOutstanding(false)} title="Close"><X size={18} /></button>
             </div>
 
-            <div className="px-4 text-xs text-slate-500 -mt-2 mb-2">
-              As of: {asOfText}
-            </div>
-
-            <div className="p-4 overflow-y-auto max-h-[75vh]">
+            <div className="p-4 overflow-y-auto max-h-[70vh]">
               {(!balances || orderedOutstanding.length === 0) && (
                 <div className="text-slate-500">No outstanding for this window.</div>
               )}
 
               {orderedOutstanding.length > 0 && (
                 <div className="space-y-2">
-                  {orderedOutstanding.map((r) => {
-                    const out = r.claimed - r.paid;
-                    const paidPct = r.claimed > 0 ? Math.min(100, Math.round((r.paid / r.claimed) * 100)) : 0;
-                    return (
-                      <div
-                        key={r.providerId}
-                        className="border rounded-xl p-3 bg-white"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <ProgressRing billed={r.claimed} paid={r.paid} balance={out} />
-                            <div className="font-medium">{r.providerName}</div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-sm">
-                              <div className="text-slate-500 text-xs text-right">Still unpaid</div>
-                              <div className={`font-semibold text-right ${out < 0 ? "text-emerald-700" : ""}`}>
-                                {out < 0 ? `Credit ${money(Math.abs(out), "USD")}` : money(out, "USD")}
-                              </div>
-                            </div>
-                            <button
-                              className="text-sm text-indigo-600 hover:underline"
-                              onClick={() => setDetailProviderId(r.providerId)}
-                            >
-                              Open provider
-                            </button>
-                          </div>
+                  {orderedOutstanding.map((r) => (
+                    <div
+                      key={r.providerId}
+                      className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{providers.find(p => p.id === r.providerId)?.name || r.providerId}</div>
+                        <div className="text-right">
+                          <div className="text-xs text-slate-500 mb-0.5">Outstanding</div>
+                          <div className="text-base font-semibold">{money(r.outstanding, "USD")}</div>
                         </div>
-                        <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                       </div>
-                    );
-                  })}
+                      <div className="mt-2 text-right">
+                        <button
+                          className="text-sm text-indigo-600 hover:underline"
+                          onClick={() => setDetailProviderId(r.providerId)}
+                        >
+                          Open provider
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1336,8 +1311,8 @@ export default function InsurancePage() {
                   if (detailProviderId) {
                     const qs = new URLSearchParams({ providerId: detailProviderId });
                     setLoadingPayments(true);
-                    api<any[]>(`/api/insurance-payments?${qs.toString()}`)
-                      .then((rows) => setPayments(rows.map(normalizePayment)))
+                    api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+                      .then(setPayments)
                       .finally(() => setLoadingPayments(false));
                   }
                   alert("Payment saved");
