@@ -27,10 +27,10 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate?: string | null; // ISO (we’ll display this)
+  paymentDate?: string | null; // ISO
   amount: number | string;
   currency: "USD" | "SSP";
-  reference?: string | null; // not shown in UI per request
+  reference?: string | null; // not shown per request
   notes?: string | null;
   createdAt?: string | null;
 };
@@ -42,7 +42,7 @@ type BalancesResponse = {
     claimed: number;   // billed in window
     paid: number;      // collected in window
     balance?: number;
-    outstanding?: number; // window-only outstanding (server may include)
+    outstanding?: number;
     credit?: number;
   }>;
   claims: Array<
@@ -143,7 +143,7 @@ function HelpPopover() {
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li><strong>Billed</strong>: claims in the selected window.</li>
-            <li><strong>Collected</strong>: payments received in the window (by payment date).</li>
+            <li><strong>Collected</strong>: payments received in the window.</li>
             <li><strong>Outstanding</strong>: Billed − Collected (window-only).</li>
           </ul>
           <div className="text-right mt-2">
@@ -213,7 +213,7 @@ function exportPaymentsCsv(rows: Payment[], providers: Provider[]) {
   URL.revokeObjectURL(a.href);
 }
 
-/* ------------------------- DateField (new) ------------------------ */
+/* ------------------------- DateField ------------------------ */
 function toISO(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -282,7 +282,7 @@ export default function InsurancePage() {
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
 
   // payments (for drawer views)
-  const [payments, setPayments] = useState<Payment[]>([]); // detail drawer (all-time for provider)
+  const [payments, setPayments] = useState<Payment[]>([]);           // provider detail (all-time)
   const [paymentsWindow, setPaymentsWindow] = useState<Payment[]>([]); // collected drawer (window)
   const [paymentsSearch, setPaymentsSearch] = useState("");
 
@@ -328,7 +328,7 @@ export default function InsurancePage() {
 
   // ---- Add-Claim form (single Claim Date) ----
   const [cProviderId, setCProviderId] = useState<string>("");
-  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10)); // user-picks a date
+  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [cCurrency, setCCurrency] = useState<"USD" | "SSP">("USD");
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
@@ -475,7 +475,7 @@ export default function InsurancePage() {
       .catch(() => setPaymentsWindow([]));
   }, [showCollected, start, end, providerId]);
 
-  // NO carry forward; Outstanding = Billed - Collected (window-only)
+  // dashboard summary (window only)
   const summary = useMemo(() => {
     const provRows = balances?.providers ?? [];
     const filtered = providerId ? provRows.filter((r) => r.providerId === providerId) : provRows;
@@ -510,120 +510,32 @@ export default function InsurancePage() {
     [balances]
   );
 
-  /* ------------------------ create/delete helpers ------------------------ */
-  async function submitClaim() {
-    const { startIso, endIso } = monthBoundsFromDateStr(cDate);
-    const body = {
-      providerId: cProviderId || providerId,
-      periodStart: startIso,
-      periodEnd: endIso,
-      currency: cCurrency,
-      claimedAmount: Number(cAmount),
-      notes: cNotes || undefined,
-    };
-    try {
-      await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
-      setShowClaim(false);
-      setEditingClaimId("");
-      // reset form
-      setCProviderId("");
-      setCDate(new Date().toISOString().slice(0,10));
-      setCCurrency("USD");
-      setCAmount("0");
-      setCNotes("");
-      reloadClaims();
-      reloadBalances();
-      alert("Claim saved");
-    } catch (e: any) {
-      alert(`Failed to save claim: ${e.message || e}`);
-    }
+  /* ---------------------- derived lists (MOVED ABOVE return) ---------------------- */
+  function normalize(str?: string | null) {
+    return (str || "").toLowerCase().trim();
   }
 
-  async function deleteClaim(id: string) {
-    if (!confirm("Delete this claim? This cannot be undone.")) return;
-    try {
-      await api(`/api/insurance-claims/${id}`, { method: "DELETE" });
-      reloadClaims();
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-    } catch (e: any) {
-      alert(`Failed to delete claim: ${e.message || e}`);
-    }
-  }
+  const filteredPayments = useMemo(() => {
+    const q = normalize(paymentsSearch);
+    if (!q) return paymentsWindow;
+    return paymentsWindow.filter((p) => {
+      const prov = providerMap.get(p.providerId) || "";
+      const hay = `${prov} ${p.notes || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [paymentsSearch, paymentsWindow, providerMap]);
 
-  async function submitPayment() {
-    const body = {
-      providerId: pProviderId || providerId,
-      paymentDate: pDate || undefined,
-      amount: Number(pAmount),
-      currency: pCurrency,
-      notes: pNotes || undefined,
-    };
-    try {
-      await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
-      setShowPayment(false);
-      setEditingPaymentId("");
-      // reset
-      setPProviderId("");
-      setPDate(new Date().toISOString().slice(0,10));
-      setPAmount("0");
-      setPCurrency("USD");
-      setPNotes("");
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-      if (showCollected) {
-        // refresh collected drawer data too
-        const params = windowParams(new URLSearchParams());
-        if (providerId) params.set("providerId", providerId);
-        api<Payment[]>(`/api/insurance-payments?${params.toString()}`).then(setPaymentsWindow);
-      }
-      alert("Payment saved");
-    } catch (e: any) {
-      alert(`Failed to save payment: ${e.message || e}`);
-    }
-  }
+  const onlyOutstanding = useMemo(() => {
+    const rows = orderedBalanceProviders.map((r) => ({
+      ...r,
+      computedOutstanding: (r.outstanding ?? (r.claimed || 0) - (r.paid || 0)),
+    }));
+    return rows
+      .filter((r) => r.computedOutstanding > 0)
+      .sort((a, b) => b.computedOutstanding - a.computedOutstanding);
+  }, [orderedBalanceProviders]);
 
-  async function deletePayment(id: string) {
-    if (!confirm("Delete this payment? This cannot be undone.")) return;
-    try {
-      await api(`/api/insurance-payments/${id}`, { method: "DELETE" });
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-      if (showCollected) {
-        const params = windowParams(new URLSearchParams());
-        if (providerId) params.set("providerId", providerId);
-        api<Payment[]>(`/api/insurance-payments?${params.toString()}`).then(setPaymentsWindow);
-      }
-    } catch (e: any) {
-      alert(`Failed to delete payment: ${e.message || e}`);
-    }
-  }
-
-  function clearFilters() {
-    setProviderId("");
-    setStatus("");
-    setPresetWindow("all");
-  }
-
-  /* ----------------------------- UI helpers ----------------------------- */
+  /* ---------------------------------- UI ---------------------------------- */
   function SummaryCards() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -660,7 +572,6 @@ export default function InsurancePage() {
     );
   }
 
-  /* ----------------------------- UI ----------------------------- */
   return (
     <div className="max-w-[1200px] mx-auto">
       {/* Sticky header with actions */}
@@ -922,7 +833,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* ========== Drawer: Provider details (unchanged core) ========== */}
+      {/* Provider details drawer */}
       {detailProviderId && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
@@ -1029,7 +940,7 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* ========== Drawer: Collected (payments within window) ========== */}
+      {/* Collected drawer (window payments) */}
       {showCollected && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowCollected(false)} />
@@ -1112,7 +1023,7 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* ========== Drawer: Outstanding (providers with positive outstanding only) ========== */}
+      {/* Outstanding drawer (only positive outstanding) */}
       {showOutstanding && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowOutstanding(false)} />
@@ -1255,29 +1166,4 @@ export default function InsurancePage() {
       )}
     </div>
   );
-
-  /* ---------------------- memoized derived lists ---------------------- */
-  function normalize(str?: string | null) {
-    return (str || "").toLowerCase().trim();
-  }
-
-  const filteredPayments = useMemo(() => {
-    const q = normalize(paymentsSearch);
-    if (!q) return paymentsWindow;
-    return paymentsWindow.filter((p) => {
-      const prov = providerMap.get(p.providerId) || "";
-      const hay = `${prov} ${p.notes || ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [paymentsSearch, paymentsWindow, providerMap]);
-
-  const onlyOutstanding = useMemo(() => {
-    const rows = orderedBalanceProviders.map((r) => ({
-      ...r,
-      computedOutstanding: (r.outstanding ?? (r.claimed || 0) - (r.paid || 0)),
-    }));
-    return rows
-      .filter((r) => r.computedOutstanding > 0)
-      .sort((a, b) => b.computedOutstanding - a.computedOutstanding);
-  }, [orderedBalanceProviders]);
 }
