@@ -1,24 +1,29 @@
 import { useEffect } from "react";
 import { api } from "@/lib/queryClient";
+import { useAuth } from "@/context/auth";
 
 /**
- * Redirect to /login whenever an API response returns 401.
- * Works even in incognito because the first failing request triggers the redirect.
- * Cleans itself up when the component unmounts.
+ * Safety net: if a 401 happens *after* login (e.g., session expiry),
+ * send the user to /login and preserve the intended return path.
+ * We only attach the interceptor when status === "authed" to avoid pre-login flicker.
  */
 export function useRequireAuth() {
+  const { status } = useAuth(); // "loading" | "guest" | "authed"
+
   useEffect(() => {
+    if (status !== "authed") return;
+
     const id = api.interceptors.response.use(
       (res) => res,
       (error) => {
-        const status = error?.response?.status;
-        if (status === 401) {
+        const st = error?.response?.status;
+        const onLogin = window.location.pathname.startsWith("/login");
+        if (st === 401 && !onLogin) {
           const next = encodeURIComponent(
             `${window.location.pathname}${window.location.search}`
           );
-          // Use replace so back button doesn't come back to a broken page
           window.location.replace(`/login?next=${next}`);
-          return; // stop promise chain; navigation will take over
+          return; // break chain; navigation takes over
         }
         return Promise.reject(error);
       }
@@ -27,5 +32,5 @@ export function useRequireAuth() {
     return () => {
       api.interceptors.response.eject(id);
     };
-  }, []);
+  }, [status]);
 }
