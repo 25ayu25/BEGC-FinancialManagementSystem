@@ -191,15 +191,17 @@ function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   URL.revokeObjectURL(a.href);
 }
 
-function exportPaymentsCSV(rows: Payment[]) {
-  const header = ["Date","Provider","Amount","Reference","Notes"].join(",");
+/* CSV for payments (no reference column) */
+function exportPaymentsCSV(rows: Payment[], providers: Provider[]) {
+  const byId = new Map(providers.map((p) => [p.id, p.name]));
+  const header = ["Date","Provider","Currency","Amount","Notes"].join(",");
   const body = rows.map((p) =>
     [
-      fmtDate(p.paymentDate).replace(/,/g, " "),
-      p.providerId.replace(/,/g, " "),
+      fmtDate(p.paymentDate || p.createdAt),
+      (byId.get(p.providerId) || p.providerId).replace(/,/g, " "),
+      p.currency,
       Number(p.amount),
-      (p.reference || "").replace(/,/g, " "),
-      (p.notes || "").replace(/[\r\n,]+/g, " "),
+      String(p.notes || "").replace(/[\r\n,]+/g, " "),
     ].join(",")
   );
   const csv = [header, ...body].join("\n");
@@ -344,7 +346,6 @@ export default function InsurancePage() {
   const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
-  const [pReference, setPReference] = useState<string>("");
   const [pNotes, setPNotes] = useState<string>("");
 
   // sticky header shadow only after scroll
@@ -535,10 +536,11 @@ export default function InsurancePage() {
 
   /* -------------------- derived data for KPI drawers -------------------- */
   function normalizedPayments(list: Payment[]) {
+    // sort by the effective date we display: paymentDate, falling back to createdAt
     return list
       .slice()
       .filter((p) => p.currency === "USD")
-      .sort((a, b) => (a.paymentDate || "").localeCompare(b.paymentDate || ""));
+      .sort((a, b) => ((a.paymentDate || a.createdAt || "") as string).localeCompare((b.paymentDate || b.createdAt || "") as string));
   }
 
   const filteredWindowPayments = useMemo(() => {
@@ -550,7 +552,6 @@ export default function InsurancePage() {
       const prov = byId.get(p.providerId) || "";
       return (
         prov.includes(q) ||
-        String(p.reference || "").toLowerCase().includes(q) ||
         String(p.notes || "").toLowerCase().includes(q)
       );
     });
@@ -572,8 +573,9 @@ export default function InsurancePage() {
 
   const orderedOutstanding = useMemo(() => {
     const rows = (balances?.providers || []).slice();
-    const filtered = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
-    return filtered.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
+    const filteredByProvider = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
+    const withPositiveOutstanding = filteredByProvider.filter((r) => (r.claimed - r.paid) > 0);
+    return withPositiveOutstanding.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
   }, [balances, providerId]);
 
   /* ----------------------------- UI helpers ----------------------------- */
@@ -647,7 +649,7 @@ export default function InsurancePage() {
                 setEditingPaymentId("");
                 setPProviderId(providerId || "");
                 setPDate(new Date().toISOString().slice(0, 10));
-                setPAmount("0"); setPCurrency("USD"); setPReference(""); setPNotes("");
+                setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
               }}
               className="px-3 py-2 rounded-lg border hover:bg-slate-50"
@@ -693,7 +695,7 @@ export default function InsurancePage() {
                     setEditingPaymentId("");
                     setPProviderId(providerId || "");
                     setPDate(new Date().toISOString().slice(0, 10));
-                    setPAmount("0"); setPCurrency("USD"); setPReference(""); setPNotes("");
+                    setPAmount("0"); setPCurrency("USD"); setPNotes("");
                     setShowPayment(true);
                   }}
                 >
@@ -1031,13 +1033,13 @@ export default function InsurancePage() {
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm"
-                  placeholder="Search payments by provider, reference, or notes…"
+                  placeholder="Search payments by provider or notes…"
                   value={paymentsQuery}
                   onChange={(e) => setPaymentsQuery(e.target.value)}
                 />
               </div>
               <button
-                onClick={() => exportPaymentsCSV(filteredWindowPayments)}
+                onClick={() => exportPaymentsCSV(filteredWindowPayments, providers)}
                 className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
               >
                 Export CSV
@@ -1066,7 +1068,7 @@ export default function InsurancePage() {
                 </div>
               )}
 
-              {/* Table */}
+              {/* Table (without Reference column) */}
               {filteredWindowPayments.length > 0 && (
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="min-w-full text-sm">
@@ -1075,7 +1077,6 @@ export default function InsurancePage() {
                         <th className="text-left p-3">Date</th>
                         <th className="text-left p-3">Provider</th>
                         <th className="text-left p-3">Amount</th>
-                        <th className="text-left p-3">Reference</th>
                         <th className="text-left p-3">Notes</th>
                       </tr>
                     </thead>
@@ -1084,10 +1085,9 @@ export default function InsurancePage() {
                         const pv = providers.find((x) => x.id === p.providerId);
                         return (
                           <tr key={p.id} className="hover:bg-slate-50/60">
-                            <td className="p-3">{fmtDate(p.paymentDate)}</td>
+                            <td className="p-3">{fmtDate(p.paymentDate || p.createdAt)}</td>
                             <td className="p-3">{pv?.name || p.providerId}</td>
                             <td className="p-3 font-medium">{money(p.amount, p.currency)}</td>
-                            <td className="p-3">{p.reference || "—"}</td>
                             <td className="p-3">{p.notes || ""}</td>
                           </tr>
                         );
@@ -1119,52 +1119,47 @@ export default function InsurancePage() {
             </div>
 
             <div className="p-4 overflow-y-auto">
-              {(!balances || loadingBalances) && <div className="text-slate-500">Loading…</div>}
+              {(!balances || orderedOutstanding.length === 0) && (
+                <div className="text-slate-500">No outstanding for this window.</div>
+              )}
 
-              {balances && (
-                <>
-                  {(() => {
-                    const filteredOutstanding = orderedOutstanding.filter(r => (r.claimed - r.paid) !== 0);
-                    if (filteredOutstanding.length === 0) {
-                      return <div className="text-slate-500">No outstanding balances in this window.</div>;
-                    }
+              {orderedOutstanding.length > 0 && (
+                <div className="space-y-2">
+                  {orderedOutstanding.map((r) => {
+                    const out = r.claimed - r.paid;
+                    const paidPct = r.claimed > 0 ? Math.min(100, Math.round((r.paid / r.claimed) * 100)) : 0;
                     return (
-                      <div className="space-y-2">
-                        {filteredOutstanding.map((r) => {
-                          const out = r.claimed - r.paid;
-                          const paidPct = r.claimed > 0 ? Math.min(100, Math.round((r.paid / r.claimed) * 100)) : 0;
-                          return (
-                            <div key={r.providerId} className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <ProgressRing billed={r.claimed} paid={r.paid} balance={out} />
-                                  <div className="font-medium">{r.providerName}</div>
-                                </div>
-                                <button
-                                  className="text-sm text-indigo-600 hover:underline"
-                                  onClick={() => setDetailProviderId(r.providerId)}
-                                >
-                                  Open provider
-                                </button>
-                              </div>
-                              <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
-                              <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                                <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(r.claimed, "USD")}</div></div>
-                                <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(r.paid, "USD")}</div></div>
-                                <div className="bg-slate-50 rounded p-2">
-                                  <div className="text-slate-500">Outstanding</div>
-                                  <div className={`font-semibold ${out < 0 ? "text-emerald-700" : ""}`}>
-                                    {out < 0 ? `Credit ${money(Math.abs(out), "USD")}` : money(out, "USD")}
-                                  </div>
-                                </div>
-                              </div>
+                      <div
+                        key={r.providerId}
+                        className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <ProgressRing billed={r.claimed} paid={r.paid} balance={out} />
+                            <div className="font-medium">{r.providerName}</div>
+                          </div>
+                          <button
+                            className="text-sm text-indigo-600 hover:underline"
+                            onClick={() => setDetailProviderId(r.providerId)}
+                          >
+                            Open provider
+                          </button>
+                        </div>
+                        <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(r.claimed, "USD")}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(r.paid, "USD")}</div></div>
+                          <div className="bg-slate-50 rounded p-2">
+                            <div className="text-slate-500">Outstanding</div>
+                            <div className={`font-semibold ${out < 0 ? "text-emerald-700" : ""}`}>
+                              {out < 0 ? `Credit ${money(Math.abs(out), "USD")}` : money(out, "USD")}
                             </div>
-                          );
-                        })}
+                          </div>
+                        </div>
                       </div>
                     );
-                  })()}
-                </>
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -1277,10 +1272,6 @@ export default function InsurancePage() {
                   <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs text-slate-500 mb-1">Reference (optional)</label>
-                  <input className="border rounded-lg p-2 w-full" value={pReference} onChange={(e) => setPReference(e.target.value)} />
-                </div>
-                <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
                   <input className="border rounded-lg p-2 w-full" value={pNotes} onChange={(e) => setPNotes(e.target.value)} />
                 </div>
@@ -1289,22 +1280,18 @@ export default function InsurancePage() {
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
               <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={async () => {
-                if (!pProviderId) return alert("Select a provider");
-                if (!pDate) return alert("Select a payment date");
-                if (!pAmount || Number(pAmount) <= 0) return alert("Enter a positive amount");
                 const body = {
                   providerId: pProviderId || providerId,
                   paymentDate: pDate || undefined,
                   amount: Number(pAmount),
                   currency: pCurrency,
-                  reference: pReference || undefined,
                   notes: pNotes || undefined,
                 };
                 try {
                   await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
                   setShowPayment(false);
                   setEditingPaymentId("");
-                  setPProviderId(""); setPDate(new Date().toISOString().slice(0,10)); setPAmount("0"); setPCurrency("USD"); setPReference(""); setPNotes("");
+                  setPProviderId(""); setPDate(new Date().toISOString().slice(0,10)); setPAmount("0"); setPCurrency("USD"); setPNotes("");
                   reloadBalances();
                   if (detailProviderId) {
                     const qs = new URLSearchParams({ providerId: detailProviderId });
