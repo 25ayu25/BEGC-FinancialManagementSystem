@@ -153,9 +153,9 @@ function HelpPopover() {
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Billed</strong>: claims in the current window.</li>
-            <li><strong>Collected</strong>: payments received in the window.</li>
-            <li><strong>Outstanding</strong>: Billed − Collected (window only).</li>
+            <li><strong>Claims sent</strong>: claims in the current window.</li>
+            <li><strong>Payments received</strong>: payments received in the window.</li>
+            <li><strong>Still unpaid</strong>: Claims sent − Payments received (window only).</li>
           </ul>
           <div className="text-right mt-2">
             <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
@@ -182,7 +182,7 @@ function ProgressRing({ billed, paid, balance }: { billed: number; paid: number;
 
 function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   const byId = new Map(providers.map((p) => [p.id, p.name]));
-  const header = ["Provider","Year","Month","Currency","Billed","Status","Notes"].join(",");
+  const header = ["Provider","Year","Month","Currency","Claims sent","Status","Notes"].join(",");
   const body = rows.map((c) =>
     [
       (byId.get(c.providerId) || c.providerId).replace(/,/g, " "),
@@ -608,7 +608,7 @@ export default function InsurancePage() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-2xl border bg-white p-4">
-          <div className="text-slate-500 text-sm">Billed</div>
+          <div className="text-slate-500 text-sm">Claims sent</div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">
             {selectedProvider ? selectedProvider.name : "All providers"}
@@ -621,7 +621,7 @@ export default function InsurancePage() {
           className="text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
           title="Click to view all payments in this window"
         >
-          <div className="text-slate-500 text-sm">Collected</div>
+          <div className="text-slate-500 text-sm">Payments received</div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received (window) • Click for details</div>
         </button>
@@ -632,13 +632,13 @@ export default function InsurancePage() {
           className={`text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}
           title="Click to view outstanding by provider"
         >
-          <div className="text-slate-500 text-sm">Outstanding</div>
+          <div className="text-slate-500 text-sm">Still unpaid</div>
           <div className={`mt-1 text-[22px] font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
             {summary.outstanding < 0
               ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
               : money(summary.outstanding, "USD")}
           </div>
-          <div className="text-xs text-slate-500 mt-1">Billed − Collected • Click for details</div>
+          <div className="text-xs text-slate-500 mt-1">Claims sent − Payments received • Click for details</div>
         </button>
       </div>
     );
@@ -835,7 +835,7 @@ export default function InsurancePage() {
                   <tr>
                     <th className="text-left p-3">Provider</th>
                     <th className="text-left p-3">Period</th>
-                    <th className="text-left p-3">Billed</th>
+                    <th className="text-left p-3">Claims sent</th>
                     <th className="text-left p-3">Status</th>
                     <th className="text-left p-3">Notes</th>
                     <th className="text-right p-3 w-32">Actions</th>
@@ -896,10 +896,10 @@ export default function InsurancePage() {
                     </div>
                     <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
+                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
                       <div className="bg-slate-50 rounded p-2">
-                        <div className="text-slate-500">Outstanding</div>
+                        <div className="text-slate-500">Still unpaid</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
                           {outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}
                         </div>
@@ -933,10 +933,10 @@ export default function InsurancePage() {
                   const paidPct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
                   return (
                     <>
-                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Billed</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
-                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Collected</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
+                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Claims sent</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
+                      <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Payments received</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
                       <div className="rounded-lg border p-3">
-                        <div className="text-xs text-slate-500">Outstanding</div>
+                        <div className="text-xs text-slate-500">Still unpaid</div>
                         <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
                         <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                       </div>
@@ -971,9 +971,9 @@ export default function InsurancePage() {
                         </div>
 
                         <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(c.claimedAmount, c.currency)}</div></div>
-                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(c.paidToDate, c.currency)}</div></div>
-                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Outstanding</div><div className="font-semibold">{money(c.balance, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(c.claimedAmount, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(c.paidToDate, c.currency)}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Still unpaid</div><div className="font-semibold">{money(c.balance, c.currency)}</div></div>
                         </div>
 
                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded">
@@ -1042,7 +1042,7 @@ export default function InsurancePage() {
           <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border z-50">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">
-                Collected — {money(summary.collected, "USD")}
+                Payments received — {money(summary.collected, "USD")}
                 <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
               </div>
               <div className="flex items-center gap-2">
@@ -1139,7 +1139,7 @@ export default function InsurancePage() {
           <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border z-50">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">
-                Outstanding — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
+                Still unpaid — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
                 <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
               </div>
               <button className="text-slate-500" onClick={() => setShowOutstanding(false)} title="Close"><X size={18} /></button>
@@ -1147,7 +1147,7 @@ export default function InsurancePage() {
 
             <div className="p-4 overflow-y-auto max-h-[70vh]">
               {(!balances || orderedOutstanding.length === 0) && (
-                <div className="text-slate-500">No outstanding for this window.</div>
+                <div className="text-slate-500">No unpaid amounts for this window.</div>
               )}
 
               {orderedOutstanding.length > 0 && (
@@ -1160,7 +1160,7 @@ export default function InsurancePage() {
                       <div className="flex items-center justify-between">
                         <div className="font-medium">{providers.find(p => p.id === r.providerId)?.name || r.providerId}</div>
                         <div className="text-right">
-                          <div className="text-xs text-slate-500 mb-0.5">Outstanding</div>
+                          <div className="text-xs text-slate-500 mb-0.5">Still unpaid</div>
                           <div className="text-base font-semibold">{money(r.outstanding, "USD")}</div>
                         </div>
                       </div>
