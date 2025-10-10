@@ -334,39 +334,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   /* ---------------- Insurance payments maintenance ---------------- */
-
   async listInsurancePayments(filters?: {
-  providerId?: string;
-  claimId?: string;
-  start?: string;
-  end?: string;
-}) {
-  const conds: any[] = [];
-  if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
-  if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
-  if (filters?.start) conds.push(gte(insurancePayments.paymentDate, new Date(filters.start)));
-  if (filters?.end)
-    conds.push(lt(insurancePayments.paymentDate, toEndExclusive(new Date(filters.end))!));
+    providerId?: string;
+    claimId?: string;
+    start?: string;
+    end?: string;
+  }) {
+    const conds: any[] = [];
 
-  let q = db
-    .select({
-      id: insurancePayments.id,
-      providerId: insurancePayments.providerId,
-      claimId: insurancePayments.claimId,
-      paymentDate: insurancePayments.paymentDate, // Explicitly include paymentDate
-      amount: insurancePayments.amount,
-      currency: insurancePayments.currency,
-      reference: insurancePayments.reference,
-      notes: insurancePayments.notes,
-      createdBy: insurancePayments.createdBy,
-      createdAt: insurancePayments.createdAt,
-      updatedAt: insurancePayments.updatedAt,
-    })
-    .from(insurancePayments);
-  if (conds.length) q = q.where(and(...conds));
-  return await q.orderBy(desc(insurancePayments.paymentDate), desc(insurancePayments.createdAt));
-}
-  
+    // Use COALESCE(payment_date, created_at) so legacy rows are included
+    const payDate = sql`COALESCE(${insurancePayments.paymentDate}, ${insurancePayments.createdAt})`;
+
+    if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
+    if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
+    if (filters?.start) conds.push(sql`${payDate} >= ${new Date(filters.start)}`);
+    if (filters?.end) conds.push(sql`${payDate} < ${toEndExclusive(new Date(filters.end))!}`);
+
+    let q = db
+      .select({
+        id: insurancePayments.id,
+        providerId: insurancePayments.providerId,
+        claimId: insurancePayments.claimId,
+        paymentDate: insurancePayments.paymentDate, // explicit for frontend
+        amount: insurancePayments.amount,
+        currency: insurancePayments.currency,
+        reference: insurancePayments.reference,
+        notes: insurancePayments.notes,
+        createdBy: insurancePayments.createdBy,
+        createdAt: insurancePayments.createdAt,
+        updatedAt: insurancePayments.updatedAt,
+      })
+      .from(insurancePayments);
+
+    if (conds.length) q = q.where(and(...conds));
+
+    // Order by payment date (fallback to createdAt)
+    return await q.orderBy(desc(payDate), desc(insurancePayments.createdAt));
+  }
+
   async updateInsurancePayment(
     id: string,
     updates: Partial<InsurancePayment>
@@ -1127,11 +1132,12 @@ export class DatabaseStorage implements IStorage {
       .groupBy(insuranceClaims.providerId);
     const billedMap = new Map(billedRows.map(r => [r.providerId, Number(r.billed)]));
 
-    // Paid inside window
+    // Paid inside window (use COALESCE for legacy rows)
     const paidConds: any[] = [];
+    const payDate = sql`COALESCE(${insurancePayments.paymentDate}, ${insurancePayments.createdAt})`;
     if (providerId) paidConds.push(eq(insurancePayments.providerId, providerId));
-    if (startDate)  paidConds.push(gte(insurancePayments.paymentDate, startDate));
-    if (endEx)      paidConds.push(lt(insurancePayments.paymentDate, endEx));
+    if (startDate)  paidConds.push(sql`${payDate} >= ${startDate}`);
+    if (endEx)      paidConds.push(sql`${payDate} < ${endEx}`);
     const paidRows = await db
       .select({
         providerId: insurancePayments.providerId,
@@ -1156,7 +1162,7 @@ export class DatabaseStorage implements IStorage {
         .where(and(...beforeClaimConds))
         .groupBy(insuranceClaims.providerId);
 
-      const beforePayConds: any[] = [lt(insurancePayments.paymentDate, startDate)];
+      const beforePayConds: any[] = [lt(payDate, startDate)];
       if (providerId) beforePayConds.push(eq(insurancePayments.providerId, providerId));
       const beforePays = await db
         .select({
