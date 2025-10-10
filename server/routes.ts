@@ -805,188 +805,172 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ error: "Failed to fetch detailed transactions" });
     }
   });
+      /* --------------------------------------------------------------- */
+  /* Insurance Management                                            */
   /* --------------------------------------------------------------- */
-/* Insurance Management                                            */
-/* --------------------------------------------------------------- */
 
-// Helper to accept the new window (start/end) and still support old year/month
-const getDateWindow = (q: any) => {
-  const start = (q.start as string) || (q.startDate as string) || undefined;
-  const end   = (q.end   as string) || (q.endDate   as string) || undefined;
-  if (start && end) return { start, end };
+  // Helper to accept the new window (start/end) and still support old year/month
+  const getDateWindow = (q: any) => {
+    const start = (q.start as string) || (q.startDate as string) || undefined;
+    const end   = (q.end   as string) || (q.endDate   as string) || undefined;
+    if (start && end) return { start, end };
 
-  const year  = q.year ? Number(q.year) : undefined;
-  const month = q.month ? Number(q.month) : undefined;
-  if (year && !month) return { start: `${year}-01-01`, end: `${year}-12-31` };
-  if (year && month) {
-    const mm = String(month).padStart(2, "0");
-    const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(last).padStart(2,"0")}` };
-  }
-  return { start: undefined, end: undefined };
-};
-
-// --- NEW: ensure the client always gets paymentDate + camelCase fields
-function normalizePaymentRow(raw: any) {
-  return {
-    id: raw.id,
-    providerId: raw.providerId ?? raw.provider_id,
-    claimId: raw.claimId ?? raw.claim_id ?? null,
-    // always use the real payment date from DB; never fall back silently here
-    paymentDate: raw.paymentDate ?? raw.payment_date ?? null,
-    amount: Number(raw.amount ?? 0),
-    currency: (raw.currency || "USD") as "USD" | "SSP",
-    reference: raw.reference ?? null,
-    notes: raw.notes ?? null,
-    createdAt: raw.createdAt ?? raw.created_at ?? null,
-    createdBy: raw.createdBy ?? raw.created_by ?? null,
+    const year  = q.year ? Number(q.year) : undefined;
+    const month = q.month ? Number(q.month) : undefined;
+    if (year && !month) return { start: `${year}-01-01`, end: `${year}-12-31` };
+    if (year && month) {
+      const mm = String(month).padStart(2, "0");
+      const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(last).padStart(2,"0")}` };
+    }
+    return { start: undefined, end: undefined };
   };
-}
 
-// Zod request schemas
-const ClaimCreate = z.object({
-  providerId: z.string().min(1),
-  periodStart: z.string().min(8),  // YYYY-MM-DD
-  periodEnd:   z.string().min(8),
-  currency: z.enum(["USD", "SSP"]).default("USD"),
-  claimedAmount: z.number().nonnegative(),
-  status: z.enum(["submitted","partially_paid","paid"]).default("submitted"),
-  notes: z.string().optional(),
-});
+  // Zod request schemas
+  const ClaimCreate = z.object({
+    providerId: z.string().min(1),
+    // UI now sends only dates; server derives year/month for DB
+    periodStart: z.string().min(8),  // YYYY-MM-DD
+    periodEnd:   z.string().min(8),
+    currency: z.enum(["USD", "SSP"]).default("USD"),
+    claimedAmount: z.number().nonnegative(),
+    status: z.enum(["submitted","partially_paid","paid"]).default("submitted"),
+    notes: z.string().optional(),
+  });
 
-const ClaimPatch = z.object({
-  claimedAmount: z.number().nonnegative().optional(),
-  status: z.enum(["submitted","partially_paid","paid"]).optional(),
-  notes: z.string().optional(),
-});
+  const ClaimPatch = z.object({
+    claimedAmount: z.number().nonnegative().optional(),
+    status: z.enum(["submitted","partially_paid","paid"]).optional(),
+    notes: z.string().optional(),
+  });
 
-const PaymentCreate = z.object({
-  providerId: z.string().min(1),
-  claimId: z.string().min(1).optional(),
-  paymentDate: z.string().min(8),         // YYYY-MM-DD
-  amount: z.number().positive(),
-  currency: z.enum(["USD","SSP"]).default("USD"),
-  reference: z.string().optional(),
-  notes: z.string().optional(),
-});
+  const PaymentCreate = z.object({
+    providerId: z.string().min(1),
+    claimId: z.string().min(1).optional(),  // can link to a claim or leave null
+    paymentDate: z.string().min(8),         // YYYY-MM-DD
+    amount: z.number().positive(),
+    currency: z.enum(["USD","SSP"]).default("USD"),
+    reference: z.string().optional(),
+    notes: z.string().optional(),
+  });
 
-// keep patch schema too
-const PaymentPatch = PaymentCreate.partial();
+  // ✅ this was missing before
+  const PaymentPatch = PaymentCreate.partial();
 
-/** Delete a claim */
-app.delete("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
-  try { await storage.deleteInsuranceClaim(req.params.id); res.json({ success: true }); }
-  catch (err) { next(err); }
-});
+  /** Delete a claim */
+  app.delete("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+    try { await storage.deleteInsuranceClaim(req.params.id); res.json({ success: true }); }
+    catch (err) { next(err); }
+  });
 
-/** List payments (returns normalized rows with paymentDate) */
-app.get("/api/insurance-payments", requireAuth, async (req, res, next) => {
-  try {
-    const { start, end } = getDateWindow(req.query);
-    const rows = await storage.listInsurancePayments({
-      providerId: req.query.providerId as string | undefined,
-      claimId: req.query.claimId as string | undefined,
-      start, end,
-    });
-    res.json((rows || []).map(normalizePaymentRow));
-  } catch (err) { next(err); }
-});
+  /** List payments (now supports date window) */
+  app.get("/api/insurance-payments", requireAuth, async (req, res, next) => {
+    try {
+      const { start, end } = getDateWindow(req.query);
+      const rows = await storage.listInsurancePayments({
+        providerId: req.query.providerId as string | undefined,
+        claimId: req.query.claimId as string | undefined,
+        start, end,
+      });
+      res.json(rows);
+    } catch (err) { next(err); }
+  });
 
-/** Edit a payment (responds with normalized row) */
-app.patch("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
-  try {
-    const patch = PaymentPatch.parse(req.body);
-    const row = await storage.updateInsurancePayment(req.params.id, patch);
-    if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(normalizePaymentRow(row));
-  } catch (err) { next(err); }
-});
+  /** Edit a payment */
+  app.patch("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
+    try {
+      const patch = PaymentPatch.parse(req.body);
+      const row = await storage.updateInsurancePayment(req.params.id, patch);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
 
-/** Delete a payment */
-app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
-  try { await storage.deleteInsurancePayment(req.params.id); res.json({ success: true }); }
-  catch (err) { next(err); }
-});
+  /** Delete a payment */
+  app.delete("/api/insurance-payments/:id", requireAuth, async (req, res, next) => {
+    try { await storage.deleteInsurancePayment(req.params.id); res.json({ success: true }); }
+    catch (err) { next(err); }
+  });
 
-/** Create a claim — derives year/month from periodStart */
-app.post("/api/insurance-claims", requireAuth, async (req, res, next) => {
-  try {
-    const input = ClaimCreate.parse(req.body);
-    const d = new Date(input.periodStart + "T00:00:00Z");
-    const periodYear = d.getUTCFullYear();
-    const periodMonth = d.getUTCMonth() + 1;
+  /** Create a claim — derives year/month from periodStart */
+  app.post("/api/insurance-claims", requireAuth, async (req, res, next) => {
+    try {
+      const input = ClaimCreate.parse(req.body);
+      const d = new Date(input.periodStart + "T00:00:00Z");
+      const periodYear = d.getUTCFullYear();
+      const periodMonth = d.getUTCMonth() + 1;
 
-    const row = await storage.createInsuranceClaim({
-      providerId: input.providerId,
-      periodYear,
-      periodMonth,
-      periodStart: input.periodStart,
-      periodEnd: input.periodEnd,
-      currency: input.currency,
-      claimedAmount: input.claimedAmount,
-      status: input.status,
-      notes: input.notes,
-      createdBy: req.user?.id ?? null,
-    });
-    res.json(row);
-  } catch (err) { next(err); }
-});
+      const row = await storage.createInsuranceClaim({
+        providerId: input.providerId,
+        periodYear,
+        periodMonth,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        currency: input.currency,
+        claimedAmount: input.claimedAmount,
+        status: input.status,
+        notes: input.notes,
+        createdBy: req.user?.id ?? null,
+      });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
 
-/** List claims (window-aware) */
-app.get("/api/insurance-claims", requireAuth, async (req, res, next) => {
-  try {
-    const { start, end } = getDateWindow(req.query);
-    const rows = await storage.listInsuranceClaims({
-      providerId: req.query.providerId as string | undefined,
-      status: req.query.status as string | undefined,
-      start, end,
-    });
-    res.json(rows);
-  } catch (err) { next(err); }
-});
+  /** List claims (now understands window) */
+  app.get("/api/insurance-claims", requireAuth, async (req, res, next) => {
+    try {
+      const { start, end } = getDateWindow(req.query);
+      const rows = await storage.listInsuranceClaims({
+        providerId: req.query.providerId as string | undefined,
+        status: req.query.status as string | undefined,
+        start, end,
+      });
+      res.json(rows);
+    } catch (err) { next(err); }
+  });
 
-/** Get one claim */
-app.get("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
-  try {
-    const row = await storage.getInsuranceClaim(req.params.id);
-    if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(row);
-  } catch (err) { next(err); }
-});
+  /** Get one claim */
+  app.get("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+    try {
+      const row = await storage.getInsuranceClaim(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
 
-/** Update claim amount/status/notes */
-app.patch("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
-  try {
-    const patch = ClaimPatch.parse(req.body);
-    const row = await storage.updateInsuranceClaim(req.params.id, patch);
-    if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(row);
-  } catch (err) { next(err); }
-});
+  /** Update claim amount/status/notes */
+  app.patch("/api/insurance-claims/:id", requireAuth, async (req, res, next) => {
+    try {
+      const patch = ClaimPatch.parse(req.body);
+      const row = await storage.updateInsuranceClaim(req.params.id, patch);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
 
-/** Record a payment (responds with normalized row) */
-app.post("/api/insurance-payments", requireAuth, async (req, res, next) => {
-  try {
-    const input = PaymentCreate.parse(req.body);
-    const row = await storage.createInsurancePayment({
-      ...input,
-      createdBy: req.user?.id ?? null,
-    });
-    res.json(normalizePaymentRow(row));
-  } catch (err) { next(err); }
-});
+  /** Record a payment */
+  app.post("/api/insurance-payments", requireAuth, async (req, res, next) => {
+    try {
+      const input = PaymentCreate.parse(req.body);
+      const row = await storage.createInsurancePayment({
+        ...input,
+        createdBy: req.user?.id ?? null,
+      });
+      res.json(row);
+    } catch (err) { next(err); }
+  });
 
-/** Provider + per-claim balances (window-aware) */
-app.get("/api/insurance-balances", requireAuth, async (req, res, next) => {
-  try {
-    const { start, end } = getDateWindow(req.query);
-    const data = await storage.getInsuranceBalances({
-      providerId: req.query.providerId as string | undefined,
-      start, end,
-    });
-    res.json(data);
-  } catch (err) { next(err); }
-});
+  /** Provider + per-claim balances (now supports window) */
+  app.get("/api/insurance-balances", requireAuth, async (req, res, next) => {
+    try {
+      const { start, end } = getDateWindow(req.query);
+      const data = await storage.getInsuranceBalances({
+        providerId: req.query.providerId as string | undefined,
+        start, end,
+      });
+      res.json(data);
+    } catch (err) { next(err); }
+  });
   
   /* --------------------------------------------------------------- */
   /* Dashboard & Trends                                              */
