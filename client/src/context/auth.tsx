@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/queryClient";
 
 type User = {
   id: string;
@@ -6,40 +7,72 @@ type User = {
   role: string;
   location?: string;
   fullName?: string;
+  email?: string;
+  defaultCurrency?: string;
 };
 
-type AuthState =
-  | { status: "loading"; user: null }
-  | { status: "guest"; user: null }
-  | { status: "authed"; user: User };
+type AuthState = "loading" | "guest" | "authed";
 
-const AuthCtx = createContext<AuthState>({ status: "loading", user: null });
-export const useAuth = () => useContext(AuthCtx);
+type AuthContextValue = {
+  status: AuthState;
+  user: User | null;
+  /** Re-check session with the API and update state */
+  refresh: () => Promise<void>;
+  /** Force guest (e.g., after logout) */
+  setGuest: () => void;
+};
 
-/**
- * Boots auth once at app start by calling /api/auth/user.
- * Until we know, renders nothing (prevents sidebar/dashboard flash).
- */
+const AuthCtx = createContext<AuthContextValue | null>(null);
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthCtx);
+  if (!ctx) {
+    throw new Error("useAuth must be used inside <AuthProvider>");
+  }
+  return ctx;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ status: "loading", user: null });
+  const [status, setStatus] = useState<AuthState>("loading");
+  const [user, setUser] = useState<User | null>(null);
 
+  // Always send cookies to the API
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/auth/user", { credentials: "include" });
-        if (!res.ok) throw new Error(String(res.status));
-        const user = (await res.json()) as User;
-        if (!cancelled) setState({ status: "authed", user });
-      } catch {
-        if (!cancelled) setState({ status: "guest", user: null });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    api.defaults.withCredentials = true;
   }, []);
 
-  if (state.status === "loading") return null; // optional: a full-screen splash
-  return <AuthCtx.Provider value={state}>{children}</AuthCtx.Provider>;
+  const refresh = async () => {
+    try {
+      const res = await api.get<User>("/api/auth/user", { withCredentials: true });
+      setUser(res.data || null);
+      setStatus(res.data ? "authed" : "guest");
+    } catch {
+      setUser(null);
+      setStatus("guest");
+    }
+  };
+
+  useEffect(() => {
+    // Boot-time auth check; avoids showing the shell for guests
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status,
+      user,
+      refresh,
+      setGuest: () => {
+        setUser(null);
+        setStatus("guest");
+      },
+    }),
+    [status, user]
+  );
+
+  // Render nothing until we know (prevents sidebar flash)
+  if (status === "loading") return null;
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
