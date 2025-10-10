@@ -336,23 +336,37 @@ export class DatabaseStorage implements IStorage {
   /* ---------------- Insurance payments maintenance ---------------- */
 
   async listInsurancePayments(filters?: {
-    providerId?: string;
-    claimId?: string;
-    start?: string;
-    end?: string;
-  }) {
-    const conds: any[] = [];
-    if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
-    if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
-    if (filters?.start) conds.push(gte(insurancePayments.paymentDate, new Date(filters.start)));
-    if (filters?.end)
-      conds.push(lt(insurancePayments.paymentDate, toEndExclusive(new Date(filters.end))!));
+  providerId?: string;
+  claimId?: string;
+  start?: string;
+  end?: string;
+}) {
+  const conds: any[] = [];
+  if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
+  if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
+  if (filters?.start) conds.push(gte(insurancePayments.paymentDate, new Date(filters.start)));
+  if (filters?.end)
+    conds.push(lt(insurancePayments.paymentDate, toEndExclusive(new Date(filters.end))!));
 
-    let q = db.select().from(insurancePayments);
-    if (conds.length) q = q.where(and(...conds));
-    return await q.orderBy(desc(insurancePayments.paymentDate), desc(insurancePayments.createdAt));
-  }
-
+  let q = db
+    .select({
+      id: insurancePayments.id,
+      providerId: insurancePayments.providerId,
+      claimId: insurancePayments.claimId,
+      paymentDate: insurancePayments.paymentDate, // Explicitly include paymentDate
+      amount: insurancePayments.amount,
+      currency: insurancePayments.currency,
+      reference: insurancePayments.reference,
+      notes: insurancePayments.notes,
+      createdBy: insurancePayments.createdBy,
+      createdAt: insurancePayments.createdAt,
+      updatedAt: insurancePayments.updatedAt,
+    })
+    .from(insurancePayments);
+  if (conds.length) q = q.where(and(...conds));
+  return await q.orderBy(desc(insurancePayments.paymentDate), desc(insurancePayments.createdAt));
+}
+  
   async updateInsurancePayment(
     id: string,
     updates: Partial<InsurancePayment>
