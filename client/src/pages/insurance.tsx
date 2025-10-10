@@ -1,4 +1,3 @@
-// client/src/pages/insurance.tsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Calendar as CalendarIcon, Search, X } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -27,12 +26,12 @@ type Payment = {
   id: string;
   providerId: string;
   claimId?: string | null;
-  paymentDate?: string | null; // ISO
+  paymentDate?: string | null; // ISO (preferred display date)
   amount: number | string;
   currency: "USD" | "SSP";
   reference?: string | null;
   notes?: string | null;
-  createdAt?: string | null;
+  createdAt?: string | null;   // ISO (fallback display date)
 };
 
 type BalancesResponse = {
@@ -97,6 +96,18 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/* --------------------- **Payment date normalizer** --------------------- */
+/* Some APIs return snake_case. Always display payment_date if present.    */
+function getPaymentDate(p: Payment | any): string | undefined {
+  return (p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined) || undefined;
+}
+function getCreatedAt(p: Payment | any): string | undefined {
+  return (p?.createdAt ?? p?.created_at ?? undefined) || undefined;
+}
+function displayPaymentDate(p: Payment): string {
+  return fmtDate(getPaymentDate(p) || getCreatedAt(p));
+}
+
 /* ----------------------------- provider order ----------------------------- */
 const PROVIDER_ORDER = ["CIC", "CIGNA", "UAP", "New Sudan", "Nile International", "Other"];
 const rank = (name: string) => {
@@ -142,8 +153,8 @@ function HelpPopover() {
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Billed</strong>: claims in the selected date window.</li>
-            <li><strong>Collected</strong>: payments received in the same window.</li>
+            <li><strong>Billed</strong>: claims in the current window.</li>
+            <li><strong>Collected</strong>: payments received in the window.</li>
             <li><strong>Outstanding</strong>: Billed − Collected (window only).</li>
           </ul>
           <div className="text-right mt-2">
@@ -198,7 +209,7 @@ function exportPaymentsCSV(rows: Payment[], providers: Provider[]) {
   const header = ["Date","Provider","Currency","Amount","Notes"].join(",");
   const body = rows.map((p) =>
     [
-      fmtDate(p.paymentDate || p.createdAt),
+      displayPaymentDate(p), // use normalized payment date
       (byId.get(p.providerId) || p.providerId).replace(/,/g, " "),
       p.currency,
       Number(p.amount),
@@ -231,45 +242,6 @@ function fmtDisplay(iso?: string) {
   const d = fromISO(iso || "");
   return d ? d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
 }
-
-/* Centered modal shell (used by both KPI modals) */
-function CenterModal({
-  title,
-  subtitle,
-  onClose,
-  right,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  onClose: () => void;
-  right?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative mx-auto my-6 w-[min(100vw-2rem,900px)] max-h-[85vh] rounded-2xl border bg-white shadow-2xl overflow-hidden">
-        <div className="sticky top-0 z-10 border-b bg-white">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div>
-              <div className="font-medium">{title}</div>
-              {subtitle ? <div className="text-xs text-slate-500">{subtitle}</div> : null}
-            </div>
-            <div className="flex items-center gap-2">
-              {right}
-              <button className="text-slate-500" onClick={onClose} title="Close">
-                <X size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="p-4 overflow-auto">{children}</div>
-      </div>
-    </div>
-  );
-}
-
 function DateField({
   value,
   onChange,
@@ -374,7 +346,7 @@ export default function InsurancePage() {
     return () => document.removeEventListener("click", onDocClick);
   }, []);
 
-  // ---- Add-Claim form
+  // ---- Add-Claim form (single Claim Date) ----
   const [cProviderId, setCProviderId] = useState<string>("");
   const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [cCurrency, setCCurrency] = useState<"USD" | "SSP">("USD");
@@ -575,19 +547,19 @@ export default function InsurancePage() {
   );
 
   /* -------------------- derived data for KPI modals -------------------- */
-  function sortedPaymentsDesc(list: Payment[]) {
-    // sort by the effective displayed date: paymentDate (preferred) else createdAt
+  function normalizedPayments(list: Payment[]) {
     return list
       .slice()
+      .filter((p) => p.currency === "USD")
       .sort((a, b) => {
-        const da = Date.parse(a.paymentDate || a.createdAt || "");
-        const db = Date.parse(b.paymentDate || b.createdAt || "");
-        return db - da; // newest first
+        const da = Date.parse(getPaymentDate(a) || getCreatedAt(a) || "");
+        const db = Date.parse(getPaymentDate(b) || getCreatedAt(b) || "");
+        return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da); // newest first
       });
   }
 
   const filteredWindowPayments = useMemo(() => {
-    const rows = sortedPaymentsDesc(windowPayments).filter((p) => p.currency === "USD");
+    const rows = normalizedPayments(windowPayments);
     if (!paymentsQuery.trim()) return rows;
     const q = paymentsQuery.toLowerCase();
     const byId = new Map(providers.map((p) => [p.id, p.name.toLowerCase()]));
@@ -599,7 +571,7 @@ export default function InsurancePage() {
 
   const providerTotals = useMemo(() => {
     const byId = new Map<string, number>();
-    filteredWindowPayments.forEach((p) => {
+    normalizedPayments(filteredWindowPayments).forEach((p) => {
       const cur = byId.get(p.providerId) || 0;
       byId.set(p.providerId, cur + Number(p.amount || 0));
     });
@@ -614,14 +586,22 @@ export default function InsurancePage() {
   const orderedOutstanding = useMemo(() => {
     const rows = (balances?.providers || []).slice();
     const filteredByProvider = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
-    const withPositiveOutstanding = filteredByProvider.filter((r) => (r.claimed - r.paid) > 0);
-    return withPositiveOutstanding.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
+    const withPositiveOutstanding = filteredByProvider.map((r) => ({
+      providerId: r.providerId,
+      providerName: r.providerName,
+      outstanding: (r.claimed || 0) - (r.paid || 0),
+    })).filter((r) => r.outstanding > 0);
+    return withPositiveOutstanding.sort((a, b) => b.outstanding - a.outstanding);
   }, [balances, providerId]);
 
-  const rangeLabel = useMemo(() => {
-    if (!start && !end) return "All time";
-    return `${fmtDisplay(start)} – ${fmtDisplay(end)}`;
-  }, [start, end]);
+  /* ----------------------------- small helpers ----------------------------- */
+  function windowLabel() {
+    if (preset === "all") return "All time";
+    if (preset === "ytd") return "Year to date";
+    if (preset.startsWith("year-")) return `Year ${preset.replace("year-","")}`;
+    if (preset === "custom") return `${fmtDisplay(start)} – ${fmtDisplay(end)}`;
+    return "";
+  }
 
   /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
@@ -934,7 +914,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Drawer: Provider details */}
+      {/* Drawer: Provider details (unchanged layout) */}
       {detailProviderId && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
@@ -1028,7 +1008,7 @@ export default function InsurancePage() {
                       <div className="text-sm">
                         <div className="font-medium">{money(p.amount, p.currency)}</div>
                         <div className="text-xs text-slate-500">
-                          Paid: {fmtDate(p.paymentDate)} • Entered: {fmtDate(p.createdAt)}
+                          Paid: {displayPaymentDate(p)} • Entered: {fmtDate(getCreatedAt(p))}
                         </div>
                         {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
@@ -1055,144 +1035,150 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {/* MODAL: KPI — Collected (payments in window) */}
+      {/* Modal: KPI — Collected (payments in window) */}
       {showCollected && (
-        <CenterModal
-          title={`Collected — ${money(summary.collected, "USD")}`}
-          subtitle={`As of: ${rangeLabel}${providerId ? ` • ${providers.find(p => p.id === providerId)?.name}` : ""}`}
-          onClose={() => setShowCollected(false)}
-          right={
-            <button
-              onClick={() => exportPaymentsCSV(filteredWindowPayments, providers)}
-              className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
-            >
-              Export CSV
-            </button>
-          }
-        >
-          <div className="mb-3">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm"
-                placeholder="Search payments by provider or notes…"
-                value={paymentsQuery}
-                onChange={(e) => setPaymentsQuery(e.target.value)}
-              />
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowCollected(false)} />
+          <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border z-50">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div className="font-medium">
+                Collected — {money(summary.collected, "USD")}
+                <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportPaymentsCSV(filteredWindowPayments, providers)}
+                  className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
+                >
+                  Export CSV
+                </button>
+                <button className="text-slate-500" onClick={() => setShowCollected(false)} title="Close"><X size={18} /></button>
+              </div>
+            </div>
+
+            {/* Filters line */}
+            <div className="px-4 py-3 border-b flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm"
+                  placeholder="Search payments by provider or notes…"
+                  value={paymentsQuery}
+                  onChange={(e) => setPaymentsQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto max-h-[70vh]">
+              {loadingWindowPays && <div className="text-slate-500">Loading…</div>}
+              {!loadingWindowPays && filteredWindowPayments.length === 0 && (
+                <div className="text-slate-500">No payments in this window.</div>
+              )}
+
+              {/* Provider roll-up */}
+              {filteredWindowPayments.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs text-slate-500 mb-1">By provider (window)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {providerTotals.map(({ providerId: pid, name, total }) => (
+                      <div key={pid} className="border rounded-lg p-3 bg-slate-50 flex items-center justify-between">
+                        <div className="text-sm font-medium">{name}</div>
+                        <div className="text-sm font-semibold">{money(total, "USD")}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
+              {filteredWindowPayments.length > 0 && (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="text-left p-3">Date</th>
+                        <th className="text-left p-3">Provider</th>
+                        <th className="text-left p-3">Amount</th>
+                        <th className="text-left p-3">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredWindowPayments.map((p) => {
+                        const pv = providers.find((x) => x.id === p.providerId);
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50/60">
+                            <td className="p-3">{displayPaymentDate(p)}</td>
+                            <td className="p-3">{pv?.name || p.providerId}</td>
+                            <td className="p-3 font-medium">{money(p.amount, p.currency)}</td>
+                            <td className="p-3">{p.notes || ""}</td>
+                          </tr>
+                        );
+                      })}
+                      {/* total row */}
+                      <tr className="bg-slate-50/60 font-medium">
+                        <td className="p-3" colSpan={2}>Total</td>
+                        <td className="p-3">
+                          {money(filteredWindowPayments.reduce((a, r) => a + Number(r.amount || 0), 0), "USD")}
+                        </td>
+                        <td className="p-3" />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
+        </div>
+      )}
 
-          {loadingWindowPays && <div className="text-slate-500">Loading…</div>}
-          {!loadingWindowPays && filteredWindowPayments.length === 0 && (
-            <div className="text-slate-500">No payments in this window.</div>
-          )}
+      {/* Modal: KPI — Outstanding (only outstanding by provider) */}
+      {showOutstanding && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowOutstanding(false)} />
+          <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border z-50">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div className="font-medium">
+                Outstanding — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
+                <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
+              </div>
+              <button className="text-slate-500" onClick={() => setShowOutstanding(false)} title="Close"><X size={18} /></button>
+            </div>
 
-          {filteredWindowPayments.length > 0 && (
-            <>
-              {/* Provider roll-up */}
-              <div className="mb-4">
-                <div className="text-xs text-slate-500 mb-1">By provider (window)</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {providerTotals.map(({ providerId: pid, name, total }) => (
-                    <div key={pid} className="border rounded-lg p-3 bg-slate-50 flex items-center justify-between">
-                      <div className="text-sm font-medium">{name}</div>
-                      <div className="text-sm font-semibold">{money(total, "USD")}</div>
+            <div className="p-4 overflow-y-auto max-h-[70vh]">
+              {(!balances || orderedOutstanding.length === 0) && (
+                <div className="text-slate-500">No outstanding for this window.</div>
+              )}
+
+              {orderedOutstanding.length > 0 && (
+                <div className="space-y-2">
+                  {orderedOutstanding.map((r) => (
+                    <div
+                      key={r.providerId}
+                      className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{providers.find(p => p.id === r.providerId)?.name || r.providerId}</div>
+                        <div className="text-right">
+                          <div className="text-xs text-slate-500 mb-0.5">Outstanding</div>
+                          <div className="text-base font-semibold">{money(r.outstanding, "USD")}</div>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-right">
+                        <button
+                          className="text-sm text-indigo-600 hover:underline"
+                          onClick={() => setDetailProviderId(r.providerId)}
+                        >
+                          Open provider
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Table */}
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th className="text-left p-3">Date</th>
-                      <th className="text-left p-3">Provider</th>
-                      <th className="text-right p-3">Amount</th>
-                      <th className="text-left p-3">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredWindowPayments.map((p) => {
-                      const pv = providers.find((x) => x.id === p.providerId);
-                      return (
-                        <tr key={p.id} className="hover:bg-slate-50/60">
-                          <td className="p-3">{fmtDate(p.paymentDate || p.createdAt)}</td>
-                          <td className="p-3">{pv?.name || p.providerId}</td>
-                          <td className="p-3 text-right font-medium">{money(p.amount, p.currency)}</td>
-                          <td className="p-3">{p.notes || ""}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  {/* Total row */}
-                  <tfoot>
-                    <tr className="bg-slate-50">
-                      <td className="p-3 font-medium" colSpan={2}>Total</td>
-                      <td className="p-3 text-right font-semibold">
-                        {money(filteredWindowPayments.reduce((a, r) => a + Number(r.amount || 0), 0), "USD")}
-                      </td>
-                      <td className="p-3" />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </>
-          )}
-        </CenterModal>
-      )}
-
-      {/* MODAL: KPI — Outstanding (provider breakdown in window) */}
-      {showOutstanding && (
-        <CenterModal
-          title={`Outstanding — ${summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}`}
-          subtitle={`As of: ${rangeLabel}${providerId ? ` • ${providers.find(p => p.id === providerId)?.name}` : ""}`}
-          onClose={() => setShowOutstanding(false)}
-        >
-          {(!balances || orderedOutstanding.length === 0) && (
-            <div className="text-slate-500">No outstanding for this window.</div>
-          )}
-
-          {orderedOutstanding.length > 0 && (
-            <div className="space-y-2">
-              {orderedOutstanding.map((r) => {
-                const out = r.claimed - r.paid;
-                const paidPct = r.claimed > 0 ? Math.min(100, Math.round((r.paid / r.claimed) * 100)) : 0;
-                return (
-                  <div
-                    key={r.providerId}
-                    className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <ProgressRing billed={r.claimed} paid={r.paid} balance={out} />
-                        <div className="font-medium">{r.providerName}</div>
-                      </div>
-                      <button
-                        className="text-sm text-indigo-600 hover:underline"
-                        onClick={() => setDetailProviderId(r.providerId)}
-                      >
-                        Open provider
-                      </button>
-                    </div>
-                    <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(r.claimed, "USD")}</div></div>
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(r.paid, "USD")}</div></div>
-                      <div className="bg-slate-50 rounded p-2">
-                        <div className="text-slate-500">Outstanding</div>
-                        <div className={`font-semibold ${out < 0 ? "text-emerald-700" : ""}`}>
-                          {out < 0 ? `Credit ${money(Math.abs(out), "USD")}` : money(out, "USD")}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              )}
             </div>
-          )}
-        </CenterModal>
+          </div>
+        </div>
       )}
 
       {/* Add Claim */}
@@ -1220,7 +1206,7 @@ export default function InsurancePage() {
                   </select>
                 </div>
 
-                {/* Claim Date */}
+                {/* Claim Date (single date; backend period inferred from its month) */}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Claim Date</label>
                   <DateField value={cDate} onChange={setCDate} placeholder="Pick a date" />
