@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -15,30 +15,48 @@ import InsuranceProviders from "@/pages/insurance-providers";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
-import { useLocation } from "wouter";
 
-// ⬇️ NEW: bring in the global date filter provider
+// Global date filter provider
 import { DateFilterProvider } from "@/context/date-filter-context";
 
-// ⬇️ NEW: Insurance page
+// Insurance page
 import Insurance from "@/pages/insurance";
+
+// 🔒 Auth gate + 401 safety net
+import { AuthProvider, useAuth } from "@/context/auth";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 function Router() {
   return (
     <Switch>
-      {/* Public routes without sidebar */}
+      {/* Public route */}
       <Route path="/login" component={Login} />
 
-      {/* Authenticated routes with sidebar */}
+      {/* Protected area (everything else) */}
       <Route>
-        {(params) => {
+        {() => {
           const [sidebarOpen, setSidebarOpen] = useState(false);
           const [location, setLocation] = useLocation();
+          const { status } = useAuth(); // "loading" | "guest" | "authed"
 
-          // Auto-logout functionality (only enabled when not on login page)
+          // If guest, redirect to /login before rendering any shell
+          useEffect(() => {
+            if (status === "guest") {
+              const next = encodeURIComponent(`${location}${window.location.search}`);
+              setLocation(`/login?next=${next}`, { replace: true });
+            }
+          }, [status, location, setLocation]);
+
+          // Attach 401 safety net after login
+          useRequireAuth();
+
+          // Don’t render the shell until authenticated (removes flash)
+          if (status !== "authed") return null;
+
+          // Auto-logout dialog (kept as-is)
           const isOnLoginPage = location === "/login";
           const { isWarning, remainingSeconds, extendSession, logoutNow, formatTime } =
             useIdleTimeout({
@@ -81,7 +99,6 @@ function Router() {
                   <Route path="/reports" component={Reports} />
                   <Route path="/patient-volume" component={PatientVolume} />
                   <Route path="/insurance-providers" component={InsuranceProviders} />
-                  {/* ⬇️ NEW: Insurance management route */}
                   <Route path="/insurance" component={Insurance} />
                   <Route path="/settings" component={Settings} />
                   <Route path="/security" component={Security} />
@@ -109,13 +126,15 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      {/* ⬇️ Wrap everything that needs the global period with the provider */}
-      <DateFilterProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </DateFilterProvider>
+      <AuthProvider>
+        {/* Global period provider (unchanged) */}
+        <DateFilterProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </DateFilterProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
