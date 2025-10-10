@@ -4,69 +4,70 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+
+import { 
+  Eye, 
+  EyeOff
+} from "lucide-react";
 import clinicLogo from "@/assets/clinic-logo.jpeg";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/queryClient";
-import { useAuth } from "@/context/auth";
 
 export default function LoginPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const auth = useAuth();
-
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [timeoutMessage, setTimeoutMessage] = useState("");
-
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
+  
+  const [credentials, setCredentials] = useState({
+    username: "",
+    password: ""
+  });
 
   useEffect(() => {
-    // Auto-logout info banner
+    // Check if user was auto-logged out due to timeout
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("timeout") === "true") {
+    if (urlParams.get('timeout') === 'true') {
       setTimeoutMessage("You were signed out due to inactivity. Please log in again.");
-      window.history.replaceState({}, document.title, "/login");
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, '/login');
     }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError("");
-
+    setLoginError(""); // Clear previous errors
+    
     if (!credentials.username || !credentials.password) {
       setLoginError("Please enter both username and password.");
       return;
     }
 
     setIsLoading(true);
+    
     try {
-      // 1) Login (cookie set by server); send credentials with cookies
-      const response = await api.post(
-        "/api/auth/login",
-        { username: credentials.username, password: credentials.password },
-        { withCredentials: true }
-      );
-      const user = response.data;
-
-      // 2) Safari/localStorage fallback
-      localStorage.setItem("user_session_backup", JSON.stringify(user));
-
-      // 3) Flip global auth state immediately (no full reload)
-      await auth.refresh();
-
-      toast({
-        title: "Login Successful",
-        description: `Welcome, ${user.fullName || user.username}!`,
+      // Call the actual login API using axios
+      const response = await api.post('/api/auth/login', {
+        username: credentials.username,
+        password: credentials.password
       });
 
-      // 4) Respect ?next=...
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get("next") || "/";
-      navigate(next, { replace: true });
+      const user = response.data;
+      
+      // Safari fallback: store session in localStorage as backup
+      localStorage.setItem('user_session_backup', JSON.stringify(user));
+      
+      toast({
+        title: "Login Successful",
+        description: `Welcome, ${user.fullName || user.username}!`
+      });
+      
+      // Redirect to dashboard with full page refresh to ensure proper state
+      window.location.href = '/';
     } catch (error: any) {
-      setLoginError(error?.response?.data?.error || "Incorrect username or password");
+      setLoginError("Incorrect username or password");
     } finally {
       setIsLoading(false);
     }
@@ -75,11 +76,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-8">
+        
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
             <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-lg bg-white p-2">
-              <img src={clinicLogo} alt="Bahr El Ghazal Clinic Logo" className="w-full h-full object-contain rounded-xl" />
+              <img 
+                src={clinicLogo} 
+                alt="Bahr El Ghazal Clinic Logo" 
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
           </div>
           <div>
@@ -92,7 +98,9 @@ export default function LoginPage() {
         <Card className="shadow-xl border-0">
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-xl text-center">Welcome</CardTitle>
-            <p className="text-sm text-slate-600 text-center">Sign in to access the financial dashboard</p>
+            <p className="text-sm text-slate-600 text-center">
+              Sign in to access the financial dashboard
+            </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
@@ -103,12 +111,12 @@ export default function LoginPage() {
                   type="text"
                   placeholder="Enter your username"
                   value={credentials.username}
-                  onChange={(e) => setCredentials((prev) => ({ ...prev, username: e.target.value }))}
+                  onChange={(e) => setCredentials(prev => ({ ...prev, username: e.target.value }))}
                   required
                   autoFocus
                   autoComplete="username"
                   data-testid="input-username"
-                  className={`h-11 ${loginError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                  className={`h-11 ${loginError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                 />
               </div>
 
@@ -120,18 +128,18 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={credentials.password}
-                    onChange={(e) => setCredentials((prev) => ({ ...prev, password: e.target.value }))}
+                    onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
                     required
                     autoComplete="current-password"
                     data-testid="input-password"
-                    className={`h-11 pr-10 ${loginError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                    className={`h-11 pr-10 ${loginError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword((s) => !s)}
+                    onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -143,7 +151,7 @@ export default function LoginPage() {
                     onClick={() => {
                       toast({
                         title: "Password Reset",
-                        description: "Please contact your system administrator to reset your password.",
+                        description: "Please contact your system administrator to reset your password."
                       });
                     }}
                   >
@@ -169,8 +177,8 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button
-                type="submit"
+              <Button 
+                type="submit" 
                 className="w-full h-11 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
                 disabled={isLoading}
                 data-testid="button-login"
@@ -181,7 +189,14 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
+
+
         {/* Footer */}
         <div className="text-center text-xs text-slate-500">
           <p>© 2025 Bahr El Ghazal Clinic. All rights reserved.</p>
-          <p className="mt-1">Secure financial management
+          <p className="mt-1">Secure financial management for healthcare operations</p>
+        </div>
+      </div>
+    </div>
+  );
+}
