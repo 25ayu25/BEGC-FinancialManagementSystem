@@ -3,7 +3,6 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
 import Dashboard from "@/pages/dashboard";
 import AdvancedDashboard from "@/pages/advanced-dashboard";
 import Transactions from "@/pages/transactions";
@@ -13,43 +12,37 @@ import Settings from "@/pages/settings";
 import Security from "@/pages/security";
 import UserManagement from "@/pages/user-management";
 import InsuranceProviders from "@/pages/insurance-providers";
-import Insurance from "@/pages/insurance";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
-
 import Sidebar from "@/components/layout/sidebar";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
 
-// Global date filter provider
+// Date filter provider (unchanged)
 import { DateFilterProvider } from "@/context/date-filter-context";
 
-// Auth gate + 401 safety net
+// NEW: auth provider & hook
 import { AuthProvider, useAuth } from "@/context/auth";
-import { useRequireAuth } from "@/hooks/use-require-auth";
+import Insurance from "@/pages/insurance";
 
-/** Protected application shell (no render-prop hooks here) */
 function ProtectedShell() {
+  const auth = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [location, setLocation] = useLocation();
-  const { status } = useAuth(); // "loading" | "guest" | "authed"
 
-  // Redirect guests to /login BEFORE mounting the shell
+  // If guest → send to /login?next=...
   useEffect(() => {
-    if (status === "guest") {
-      const next = encodeURIComponent(`${location}${window.location.search}`);
+    if (auth.status === "guest") {
+      const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
       setLocation(`/login?next=${next}`, { replace: true });
     }
-  }, [status, location, setLocation]);
+  }, [auth.status, setLocation]);
 
-  // Attach 401 safety net only after login
-  useRequireAuth();
+  // Don’t render shell until we are authed (prevents sidebar flash)
+  if (auth.status !== "authed") return null;
 
-  // Don’t render the shell until authenticated (prevents the flash)
-  if (status !== "authed") return null;
-
-  // Auto-logout dialog (unchanged)
+  // Idle timeout only when authed
   const isOnLoginPage = location === "/login";
   const { isWarning, remainingSeconds, extendSession, logoutNow, formatTime } = useIdleTimeout({
     timeoutMinutes: 15,
@@ -76,7 +69,7 @@ function ProtectedShell() {
             </svg>
           </button>
           <h1 className="text-lg font-semibold text-gray-900">Bahr El Ghazal Clinic</h1>
-          <div className="w-10"></div>
+          <div className="w-10" />
         </div>
 
         <Switch>
@@ -96,7 +89,6 @@ function ProtectedShell() {
         </Switch>
       </div>
 
-      {/* Auto-logout warning dialog */}
       <IdleTimeoutDialog
         isOpen={isWarning}
         remainingSeconds={remainingSeconds}
@@ -114,7 +106,7 @@ function Router() {
       {/* Public route */}
       <Route path="/login" component={Login} />
 
-      {/* Protected area – render a component, not a render-prop function */}
+      {/* Everything else is behind auth */}
       <Route>
         <ProtectedShell />
       </Route>
@@ -125,6 +117,7 @@ function Router() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      {/* AuthProvider prevents shell flash & exposes refresh() for login */}
       <AuthProvider>
         <DateFilterProvider>
           <TooltipProvider>
