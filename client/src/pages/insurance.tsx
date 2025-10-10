@@ -192,8 +192,7 @@ function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
   URL.revokeObjectURL(a.href);
 }
 
-/* ------------------------- DateField (new) ------------------------ */
-
+/* ------------------------- DateField ------------------------ */
 function toISO(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -210,7 +209,6 @@ function fmtDisplay(iso?: string) {
   const d = fromISO(iso || "");
   return d ? d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
 }
-
 function DateField({
   value,
   onChange,
@@ -287,11 +285,11 @@ export default function InsurancePage() {
   const [showPayment, setShowPayment] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<string>("");
 
-  // NEW: KPI detail drawers
+  // KPI detail drawers
   const [showCollected, setShowCollected] = useState(false);
   const [showOutstanding, setShowOutstanding] = useState(false);
 
-  // NEW: payments in current window (for Collected drawer)
+  // payments in current window (for Collected drawer)
   const [windowPayments, setWindowPayments] = useState<Payment[]>([]);
   const [loadingWindowPays, setLoadingWindowPays] = useState(false);
   const [paymentsQuery, setPaymentsQuery] = useState("");
@@ -317,7 +315,7 @@ export default function InsurancePage() {
 
   // ---- Add-Claim form (single Claim Date) ----
   const [cProviderId, setCProviderId] = useState<string>("");
-  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10)); // user-picks a date
+  const [cDate, setCDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [cCurrency, setCCurrency] = useState<"USD" | "SSP">("USD");
   const [cAmount, setCAmount] = useState<string>("0");
   const [cNotes, setCNotes] = useState<string>("");
@@ -388,10 +386,7 @@ export default function InsurancePage() {
     if (p === "ytd") {
       const y = now.getUTCFullYear();
       setStart(new Date(Date.UTC(y,0,1)).toISOString().slice(0,10));
-      // end at *today* (inclusive-style; backend will bump to half-open)
-      setEnd(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-        .toISOString()
-        .slice(0, 10));
+      setEnd(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0,10));
       return;
     }
     if (p.startsWith("year-")) {
@@ -401,7 +396,6 @@ export default function InsurancePage() {
     }
   }
 
-  // Convert a picked date (YYYY-MM-DD) into month start/end (UTC) ISO (YYYY-MM-DD)
   function monthBoundsFromDateStr(dateStr?: string) {
     let y: number, m: number;
     if (dateStr && /^\d{4}-\d{2}/.test(dateStr)) {
@@ -479,14 +473,14 @@ export default function InsurancePage() {
     try {
       const rows = await api<Payment[]>(`/api/insurance-payments?${params.toString()}`);
       setWindowPayments(rows);
-    } catch (e) {
+    } catch {
       setWindowPayments([]);
     } finally {
       setLoadingWindowPays(false);
     }
   }
 
-  // NO carry forward; Outstanding = Billed - Collected
+  // summary (window)
   const summary = useMemo(() => {
     const provRows = balances?.providers ?? [];
     const filtered = providerId ? provRows.filter((r) => r.providerId === providerId) : provRows;
@@ -519,129 +513,48 @@ export default function InsurancePage() {
     [balances]
   );
 
-  /* ------------------------ create/delete helpers ------------------------ */
-  async function submitClaim() {
-    const { startIso, endIso } = monthBoundsFromDateStr(cDate);
-    const body = {
-      providerId: cProviderId || providerId,
-      periodStart: startIso,
-      periodEnd: endIso,
-      currency: cCurrency,
-      claimedAmount: Number(cAmount),
-      notes: cNotes || undefined,
-    };
-    try {
-      await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
-      setShowClaim(false);
-      setEditingClaimId("");
-      // reset form
-      setCProviderId("");
-      setCDate(new Date().toISOString().slice(0,10));
-      setCCurrency("USD");
-      setCAmount("0");
-      setCNotes("");
-      reloadClaims();
-      reloadBalances();
-      alert("Claim saved");
-    } catch (e: any) {
-      alert(`Failed to save claim: ${e.message || e}`);
-    }
+  /* -------------------- derived data for KPI drawers -------------------- */
+  function normalizedPayments(list: Payment[]) {
+    return list
+      .slice()
+      .filter((p) => p.currency === "USD")
+      .sort((a, b) => (a.paymentDate || "").localeCompare(b.paymentDate || ""));
   }
 
-  async function deleteClaim(id: string) {
-    if (!confirm("Delete this claim? This cannot be undone.")) return;
-    try {
-      await api(`/api/insurance-claims/${id}`, { method: "DELETE" });
-      reloadClaims();
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-    } catch (e: any) {
-      alert(`Failed to delete claim: ${e.message || e}`);
-    }
-  }
+  const filteredWindowPayments = useMemo(() => {
+    const rows = normalizedPayments(windowPayments);
+    if (!paymentsQuery.trim()) return rows;
+    const q = paymentsQuery.toLowerCase();
+    const byId = new Map(providers.map((p) => [p.id, p.name.toLowerCase()]));
+    return rows.filter((p) => {
+      const prov = byId.get(p.providerId) || "";
+      return (
+        prov.includes(q) ||
+        String(p.reference || "").toLowerCase().includes(q) ||
+        String(p.notes || "").toLowerCase().includes(q)
+      );
+    });
+  }, [windowPayments, paymentsQuery, providers]);
 
-  async function submitPayment() {
-    const body = {
-      providerId: pProviderId || providerId,
-      paymentDate: pDate || undefined,
-      amount: Number(pAmount),
-      currency: pCurrency,
-      notes: pNotes || undefined,
-    };
-    try {
-      await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
-      setShowPayment(false);
-      setEditingPaymentId("");
-      // reset
-      setPProviderId("");
-      setPDate(new Date().toISOString().slice(0,10));
-      setPAmount("0");
-      setPCurrency("USD");
-      setPNotes("");
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-      alert("Payment saved");
-    } catch (e: any) {
-      alert(`Failed to save payment: ${e.message || e}`);
-    }
-  }
+  const providerTotals = useMemo(() => {
+    const byId = new Map<string, number>();
+    normalizedPayments(filteredWindowPayments).forEach((p) => {
+      const cur = byId.get(p.providerId) || 0;
+      byId.set(p.providerId, cur + Number(p.amount || 0));
+    });
+    const arr = Array.from(byId.entries()).map(([pid, total]) => ({
+      providerId: pid,
+      name: providers.find((x) => x.id === pid)?.name || pid,
+      total,
+    }));
+    return arr.sort((a, b) => rank(a.name) - rank(b.name) || b.total - a.total);
+  }, [filteredWindowPayments, providers]);
 
-  async function deletePayment(id: string) {
-    if (!confirm("Delete this payment? This cannot be undone.")) return;
-    try {
-      await api(`/api/insurance-payments/${id}`, { method: "DELETE" });
-      reloadBalances();
-      if (detailProviderId) {
-        const qs = new URLSearchParams({ providerId: detailProviderId });
-        setLoadingPayments(true);
-        api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-          .then(setPayments)
-          .finally(() => setLoadingPayments(false));
-      }
-    } catch (e: any) {
-      alert(`Failed to delete payment: ${e.message || e}`);
-    }
-  }
-
-  function clearFilters() {
-    setProviderId("");
-    setStatus("");
-    setPresetWindow("all");
-  }
-
-  function exportPaymentsCSV(rows: Payment[]) {
-    const byId = new Map(providers.map((p) => [p.id, p.name]));
-    const header = ["Date","Provider","Amount","Currency","Reference","Notes"].join(",");
-    const body = rows.map((p) =>
-      [
-        fmtDate(p.paymentDate || p.createdAt || ""),
-        (byId.get(p.providerId) || p.providerId).replace(/,/g, " "),
-        Number(p.amount),
-        p.currency,
-        (p.reference || "").toString().replace(/,/g, " "),
-        (p.notes || "").toString().replace(/[\r\n,]+/g, " "),
-      ].join(",")
-    );
-    const csv = [header, ...body].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "insurance-collected.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
+  const orderedOutstanding = useMemo(() => {
+    const rows = (balances?.providers || []).slice();
+    const filtered = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
+    return filtered.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
+  }, [balances, providerId]);
 
   /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
@@ -688,10 +601,7 @@ export default function InsurancePage() {
   return (
     <div className="max-w-[1200px] mx-auto">
       {/* Sticky header with actions */}
-      <div
-        ref={headerRef}
-        className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
-      >
+      <div ref={headerRef} className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}>
         <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold">Insurance Management</h1>
 
@@ -701,7 +611,7 @@ export default function InsurancePage() {
               onClick={() => {
                 setEditingClaimId("");
                 setCProviderId(providerId || "");
-                setCDate(new Date().toISOString().slice(0,10)); // default to today
+                setCDate(new Date().toISOString().slice(0,10));
                 setCCurrency("USD");
                 setCAmount("0");
                 setCNotes("");
@@ -785,7 +695,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Auth notice (non-sticky) */}
+      {/* Auth notice */}
       <div className="p-4 sm:p-6">
         {authError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -794,12 +704,8 @@ export default function InsurancePage() {
         )}
       </div>
 
-      {/* STICKY FILTERS (mobile & desktop) */}
-      <div
-        ref={filtersRef}
-        className={`sticky z-20 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
-        style={{ top: headerH }}
-      >
+      {/* STICKY FILTERS */}
+      <div ref={filtersRef} className={`sticky z-20 bg-white ${scrolled ? "border-b shadow-sm" : ""}`} style={{ top: headerH }}>
         <div className="p-4 sm:p-6 pt-3">
           <div className="rounded-xl border p-3 mb-0 grid grid-cols-1 gap-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -848,23 +754,20 @@ export default function InsurancePage() {
                 </div>
               )}
               <div className="ml-auto">
-                <button onClick={clearFilters} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
+                <button onClick={() => { setProviderId(""); setStatus(""); setPresetWindow("all"); }} className="px-3 py-2 rounded-lg border hover:bg-slate-50">Clear filters</button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* SUMMARY (mobile: non-sticky) */}
+      {/* SUMMARY (mobile) */}
       <div className="md:hidden p-4 sm:p-6 pt-3">
         <SummaryCards />
       </div>
 
-      {/* SUMMARY (desktop: sticky under filters) */}
-      <div
-        className={`hidden md:block sticky z-10 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}
-        style={{ top: headerH + filtersH }}
-      >
+      {/* SUMMARY (desktop) */}
+      <div className={`hidden md:block sticky z-10 bg-white ${scrolled ? "border-b shadow-sm" : ""}`} style={{ top: headerH + filtersH }}>
         <div className="p-4 sm:p-6 pt-3">
           <SummaryCards />
         </div>
@@ -905,7 +808,11 @@ export default function InsurancePage() {
                         <td className="p-3">{c.notes || ""}</td>
                         <td className="p-3 text-right">
                           <div className="inline-flex gap-2">
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>
+                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => {
+                              if (confirm("Delete this claim? This cannot be undone.")) {
+                                api(`/api/insurance-claims/${c.id}`, { method: "DELETE" }).then(() => { reloadClaims(); reloadBalances(); });
+                              }
+                            }}>
                               Delete
                             </button>
                           </div>
@@ -1006,7 +913,13 @@ export default function InsurancePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deleteClaim(c.id)}>Delete</button>
+                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => {
+                              if (confirm("Delete this claim? This cannot be undone.")) {
+                                api(`/api/insurance-claims/${c.id}`, { method: "DELETE" }).then(() => { reloadClaims(); reloadBalances(); });
+                              }
+                            }}>
+                              Delete
+                            </button>
                           </div>
                         </div>
 
@@ -1053,7 +966,18 @@ export default function InsurancePage() {
                         {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => deletePayment(p.id)}>Delete</button>
+                        <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => {
+                          if (confirm("Delete this payment? This cannot be undone.")) {
+                            api(`/api/insurance-payments/${p.id}`, { method: "DELETE" }).then(() => {
+                              reloadBalances();
+                              const qs = new URLSearchParams({ providerId: detailProviderId });
+                              setLoadingPayments(true);
+                              api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+                                .then(setPayments)
+                                .finally(() => setLoadingPayments(false));
+                            });
+                          }
+                        }}>Delete</button>
                       </div>
                     </div>
                   ))}
@@ -1269,7 +1193,27 @@ export default function InsurancePage() {
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowClaim(false); setEditingClaimId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={submitClaim}>Save Claim</button>
+              <button className="px-3 py-2 rounded-lg bg-slate-900 text-white" onClick={async () => {
+                const { startIso, endIso } = monthBoundsFromDateStr(cDate);
+                const body = {
+                  providerId: cProviderId || providerId,
+                  periodStart: startIso,
+                  periodEnd: endIso,
+                  currency: cCurrency,
+                  claimedAmount: Number(cAmount),
+                  notes: cNotes || undefined,
+                };
+                try {
+                  await api<Claim>("/api/insurance-claims", { method: "POST", body: JSON.stringify(body) });
+                  setShowClaim(false);
+                  setEditingClaimId("");
+                  setCProviderId(""); setCDate(new Date().toISOString().slice(0,10)); setCCurrency("USD"); setCAmount("0"); setCNotes("");
+                  reloadClaims(); reloadBalances();
+                  alert("Claim saved");
+                } catch (e: any) {
+                  alert(`Failed to save claim: ${e.message || e}`);
+                }
+              }}>Save Claim</button>
             </div>
           </div>
         </div>
@@ -1315,54 +1259,36 @@ export default function InsurancePage() {
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={submitPayment}>Record Payment</button>
+              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={async () => {
+                const body = {
+                  providerId: pProviderId || providerId,
+                  paymentDate: pDate || undefined,
+                  amount: Number(pAmount),
+                  currency: pCurrency,
+                  notes: pNotes || undefined,
+                };
+                try {
+                  await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
+                  setShowPayment(false);
+                  setEditingPaymentId("");
+                  setPProviderId(""); setPDate(new Date().toISOString().slice(0,10)); setPAmount("0"); setPCurrency("USD"); setPNotes("");
+                  reloadBalances();
+                  if (detailProviderId) {
+                    const qs = new URLSearchParams({ providerId: detailProviderId });
+                    setLoadingPayments(true);
+                    api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+                      .then(setPayments)
+                      .finally(() => setLoadingPayments(false));
+                  }
+                  alert("Payment saved");
+                } catch (e: any) {
+                  alert(`Failed to save payment: ${e.message || e}`);
+                }
+              }}>Record Payment</button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-
-  /* ---------------------- derived data for drawers ---------------------- */
-  function normalizedPayments(payments: Payment[]) {
-    return payments
-      .slice()
-      .filter((p) => p.currency === "USD")
-      .sort((a, b) => (a.paymentDate || "").localeCompare(b.paymentDate || ""));
-  }
-
-  const filteredWindowPayments = useMemo(() => {
-    const rows = normalizedPayments(windowPayments);
-    if (!paymentsQuery.trim()) return rows;
-    const q = paymentsQuery.toLowerCase();
-    const byId = new Map(providers.map((p) => [p.id, p.name.toLowerCase()]));
-    return rows.filter((p) => {
-      const prov = byId.get(p.providerId) || "";
-      return (
-        prov.includes(q) ||
-        String(p.reference || "").toLowerCase().includes(q) ||
-        String(p.notes || "").toLowerCase().includes(q)
-      );
-    });
-  }, [windowPayments, paymentsQuery, providers]);
-
-  const providerTotals = useMemo(() => {
-    const byId = new Map<string, number>();
-    normalizedPayments(filteredWindowPayments).forEach((p) => {
-      const cur = byId.get(p.providerId) || 0;
-      byId.set(p.providerId, cur + Number(p.amount || 0));
-    });
-    const arr = Array.from(byId.entries()).map(([pid, total]) => ({
-      providerId: pid,
-      name: providers.find((x) => x.id === pid)?.name || pid,
-      total,
-    }));
-    return arr.sort((a, b) => rank(a.name) - rank(b.name) || b.total - a.total);
-  }, [filteredWindowPayments, providers]);
-
-  const orderedOutstanding = useMemo(() => {
-    const rows = (balances?.providers || []).slice();
-    const filtered = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
-    return filtered.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
-  }, [balances, providerId]);
 }
