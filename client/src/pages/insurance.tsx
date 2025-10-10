@@ -1,5 +1,6 @@
+// client/src/pages/insurance.tsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Search, X } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
@@ -143,7 +144,7 @@ function HelpPopover() {
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li><strong>Billed</strong>: claims in the current window.</li>
             <li><strong>Collected</strong>: payments received in the window.</li>
-            <li><strong>Outstanding</strong>: Billed − Collected.</li>
+            <li><strong>Outstanding</strong>: Billed − Collected (window only).</li>
           </ul>
           <div className="text-right mt-2">
             <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
@@ -236,11 +237,7 @@ function DateField({
           <CalendarIcon className="ml-2 h-4 w-4 text-slate-500 shrink-0" />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        className="z-[70] p-2 bg-white"
-        sideOffset={8}
-        align="start"
-      >
+      <PopoverContent className="z-[70] p-2 bg-white" sideOffset={8} align="start">
         <Calendar
           mode="single"
           selected={selected}
@@ -270,7 +267,7 @@ export default function InsurancePage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]); // provider drawer (all-time)
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [loadingBalances, setLoadingBalances] = useState(false);
@@ -289,6 +286,15 @@ export default function InsurancePage() {
   const [showClaim, setShowClaim] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<string>("");
+
+  // NEW: KPI detail drawers
+  const [showCollected, setShowCollected] = useState(false);
+  const [showOutstanding, setShowOutstanding] = useState(false);
+
+  // NEW: payments in current window (for Collected drawer)
+  const [windowPayments, setWindowPayments] = useState<Payment[]>([]);
+  const [loadingWindowPays, setLoadingWindowPays] = useState(false);
+  const [paymentsQuery, setPaymentsQuery] = useState("");
 
   // editing (disabled currently)
   const [_editingClaimId, setEditingClaimId] = useState<string>("");
@@ -382,7 +388,10 @@ export default function InsurancePage() {
     if (p === "ytd") {
       const y = now.getUTCFullYear();
       setStart(new Date(Date.UTC(y,0,1)).toISOString().slice(0,10));
-      setEnd(new Date(Date.UTC(y,11,31)).toISOString().slice(0,10));
+      // end at *today* (inclusive-style; backend will bump to half-open)
+      setEnd(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+        .toISOString()
+        .slice(0, 10));
       return;
     }
     if (p.startsWith("year-")) {
@@ -461,6 +470,21 @@ export default function InsurancePage() {
       .catch(() => setPayments([]))
       .finally(() => setLoadingPayments(false));
   }, [detailProviderId]);
+
+  // payments in current window (for Collected drawer)
+  async function loadWindowPayments() {
+    setLoadingWindowPays(true);
+    const params = windowParams(new URLSearchParams());
+    if (providerId) params.set("providerId", providerId);
+    try {
+      const rows = await api<Payment[]>(`/api/insurance-payments?${params.toString()}`);
+      setWindowPayments(rows);
+    } catch (e) {
+      setWindowPayments([]);
+    } finally {
+      setLoadingWindowPays(false);
+    }
+  }
 
   // NO carry forward; Outstanding = Billed - Collected
   const summary = useMemo(() => {
@@ -597,6 +621,28 @@ export default function InsurancePage() {
     setPresetWindow("all");
   }
 
+  function exportPaymentsCSV(rows: Payment[]) {
+    const byId = new Map(providers.map((p) => [p.id, p.name]));
+    const header = ["Date","Provider","Amount","Currency","Reference","Notes"].join(",");
+    const body = rows.map((p) =>
+      [
+        fmtDate(p.paymentDate || p.createdAt || ""),
+        (byId.get(p.providerId) || p.providerId).replace(/,/g, " "),
+        Number(p.amount),
+        p.currency,
+        (p.reference || "").toString().replace(/,/g, " "),
+        (p.notes || "").toString().replace(/[\r\n,]+/g, " "),
+      ].join(",")
+    );
+    const csv = [header, ...body].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "insurance-collected.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
     return (
@@ -608,20 +654,32 @@ export default function InsurancePage() {
             {selectedProvider ? selectedProvider.name : "All providers"}
           </div>
         </div>
-        <div className="rounded-2xl border bg-white p-4">
+
+        {/* Clickable KPI */}
+        <button
+          onClick={async () => { await loadWindowPayments(); setPaymentsQuery(""); setShowCollected(true); }}
+          className="text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          title="Click to view all payments in this window"
+        >
           <div className="text-slate-500 text-sm">Collected</div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.collected, "USD")}</div>
-          <div className="text-xs text-slate-500 mt-1">Payments received (window)</div>
-        </div>
-        <div className="rounded-2xl border bg-white p-4">
+          <div className="text-xs text-slate-500 mt-1">Payments received (window) • Click for details</div>
+        </button>
+
+        {/* Clickable KPI */}
+        <button
+          onClick={() => setShowOutstanding(true)}
+          className={`text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}
+          title="Click to view outstanding by provider"
+        >
           <div className="text-slate-500 text-sm">Outstanding</div>
           <div className={`mt-1 text-[22px] font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
             {summary.outstanding < 0
               ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
               : money(summary.outstanding, "USD")}
           </div>
-          <div className="text-xs text-slate-500 mt-1">Billed − Collected</div>
-        </div>
+          <div className="text-xs text-slate-500 mt-1">Billed − Collected • Click for details</div>
+        </button>
       </div>
     );
   }
@@ -902,7 +960,7 @@ export default function InsurancePage() {
         </div>
       </div>
 
-      {/* Drawer */}
+      {/* Drawer: Provider details */}
       {detailProviderId && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
@@ -1001,6 +1059,164 @@ export default function InsurancePage() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drawer: KPI — Collected (payments in window) */}
+      {showCollected && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowCollected(false)} />
+          <div className="absolute right-0 top-0 h-full w-full max-w-3xl bg-white shadow-2xl border-l z-50 flex flex-col">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div className="font-medium">
+                Collected — {money(summary.collected, "USD")}
+                {providerId ? (
+                  <span className="ml-2 text-slate-500 text-sm">
+                    ({providers.find((p) => p.id === providerId)?.name})
+                  </span>
+                ) : null}
+              </div>
+              <button className="text-slate-500" onClick={() => setShowCollected(false)} title="Close"><X size={18} /></button>
+            </div>
+
+            {/* Filters line */}
+            <div className="px-4 py-3 border-b flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm"
+                  placeholder="Search payments by provider, reference, or notes…"
+                  value={paymentsQuery}
+                  onChange={(e) => setPaymentsQuery(e.target.value)}
+                />
+              </div>
+              <button
+                onClick={() => exportPaymentsCSV(filteredWindowPayments)}
+                className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
+              >
+                Export CSV
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto">
+              {loadingWindowPays && <div className="text-slate-500">Loading…</div>}
+              {!loadingWindowPays && filteredWindowPayments.length === 0 && (
+                <div className="text-slate-500">No payments in this window.</div>
+              )}
+
+              {/* Provider roll-up */}
+              {filteredWindowPayments.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs text-slate-500 mb-1">By provider (window)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {providerTotals.map(({ providerId: pid, name, total }) => (
+                      <div key={pid} className="border rounded-lg p-3 bg-slate-50 flex items-center justify-between">
+                        <div className="text-sm font-medium">{name}</div>
+                        <div className="text-sm font-semibold">{money(total, "USD")}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
+              {filteredWindowPayments.length > 0 && (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="text-left p-3">Date</th>
+                        <th className="text-left p-3">Provider</th>
+                        <th className="text-left p-3">Amount</th>
+                        <th className="text-left p-3">Reference</th>
+                        <th className="text-left p-3">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredWindowPayments.map((p) => {
+                        const pv = providers.find((x) => x.id === p.providerId);
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50/60">
+                            <td className="p-3">{fmtDate(p.paymentDate)}</td>
+                            <td className="p-3">{pv?.name || p.providerId}</td>
+                            <td className="p-3 font-medium">{money(p.amount, p.currency)}</td>
+                            <td className="p-3">{p.reference || "—"}</td>
+                            <td className="p-3">{p.notes || ""}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drawer: KPI — Outstanding (provider breakdown in window) */}
+      {showOutstanding && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowOutstanding(false)} />
+          <div className="absolute right-0 top-0 h-full w-full max-w-3xl bg-white shadow-2xl border-l z-50 flex flex-col">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div className="font-medium">
+                Outstanding — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
+                {providerId ? (
+                  <span className="ml-2 text-slate-500 text-sm">
+                    ({providers.find((p) => p.id === providerId)?.name})
+                  </span>
+                ) : null}
+              </div>
+              <button className="text-slate-500" onClick={() => setShowOutstanding(false)} title="Close"><X size={18} /></button>
+            </div>
+
+            <div className="p-4 overflow-y-auto">
+              {(!balances || orderedOutstanding.length === 0) && (
+                <div className="text-slate-500">No outstanding for this window.</div>
+              )}
+
+              {orderedOutstanding.length > 0 && (
+                <div className="space-y-2">
+                  {orderedOutstanding.map((r) => {
+                    const out = r.claimed - r.paid;
+                    const paidPct = r.claimed > 0 ? Math.min(100, Math.round((r.paid / r.claimed) * 100)) : 0;
+                    return (
+                      <div
+                        key={r.providerId}
+                        className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <ProgressRing billed={r.claimed} paid={r.paid} balance={out} />
+                            <div className="font-medium">{r.providerName}</div>
+                          </div>
+                          <button
+                            className="text-sm text-indigo-600 hover:underline"
+                            onClick={() => setDetailProviderId(r.providerId)}
+                          >
+                            Open provider
+                          </button>
+                        </div>
+                        <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Billed</div><div className="font-semibold">{money(r.claimed, "USD")}</div></div>
+                          <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Collected</div><div className="font-semibold">{money(r.paid, "USD")}</div></div>
+                          <div className="bg-slate-50 rounded p-2">
+                            <div className="text-slate-500">Outstanding</div>
+                            <div className={`font-semibold ${out < 0 ? "text-emerald-700" : ""}`}>
+                              {out < 0 ? `Credit ${money(Math.abs(out), "USD")}` : money(out, "USD")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1106,4 +1322,47 @@ export default function InsurancePage() {
       )}
     </div>
   );
+
+  /* ---------------------- derived data for drawers ---------------------- */
+  function normalizedPayments(payments: Payment[]) {
+    return payments
+      .slice()
+      .filter((p) => p.currency === "USD")
+      .sort((a, b) => (a.paymentDate || "").localeCompare(b.paymentDate || ""));
+  }
+
+  const filteredWindowPayments = useMemo(() => {
+    const rows = normalizedPayments(windowPayments);
+    if (!paymentsQuery.trim()) return rows;
+    const q = paymentsQuery.toLowerCase();
+    const byId = new Map(providers.map((p) => [p.id, p.name.toLowerCase()]));
+    return rows.filter((p) => {
+      const prov = byId.get(p.providerId) || "";
+      return (
+        prov.includes(q) ||
+        String(p.reference || "").toLowerCase().includes(q) ||
+        String(p.notes || "").toLowerCase().includes(q)
+      );
+    });
+  }, [windowPayments, paymentsQuery, providers]);
+
+  const providerTotals = useMemo(() => {
+    const byId = new Map<string, number>();
+    normalizedPayments(filteredWindowPayments).forEach((p) => {
+      const cur = byId.get(p.providerId) || 0;
+      byId.set(p.providerId, cur + Number(p.amount || 0));
+    });
+    const arr = Array.from(byId.entries()).map(([pid, total]) => ({
+      providerId: pid,
+      name: providers.find((x) => x.id === pid)?.name || pid,
+      total,
+    }));
+    return arr.sort((a, b) => rank(a.name) - rank(b.name) || b.total - a.total);
+  }, [filteredWindowPayments, providers]);
+
+  const orderedOutstanding = useMemo(() => {
+    const rows = (balances?.providers || []).slice();
+    const filtered = providerId ? rows.filter((r) => r.providerId === providerId) : rows;
+    return filtered.sort((a, b) => (b.claimed - b.paid) - (a.claimed - a.paid));
+  }, [balances, providerId]);
 }
