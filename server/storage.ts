@@ -57,6 +57,11 @@ function toEndExclusive(end?: Date): Date | undefined {
   return end;
 }
 
+/** YYYY-MM-DD string (UTC) */
+function isoDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
 function monthStartUTC(y: number, m1_12: number) {
   return new Date(Date.UTC(y, m1_12 - 1, 1, 0, 0, 0, 0));
 }
@@ -64,7 +69,7 @@ function nextMonthUTC(y: number, m1_12: number) {
   return m1_12 === 12 ? new Date(Date.UTC(y + 1, 0, 1)) : new Date(Date.UTC(y, m1_12, 1));
 }
 
-/* ---------- preferred provider order (CIC, CIGNA, UAP, New Sudan, Nile International, Other) ---------- */
+/* ---------- preferred provider order ---------- */
 const providerOrderExpr = sql`
   CASE
     WHEN ${insuranceProviders.name} ILIKE 'CIC' THEN 1
@@ -215,17 +220,17 @@ export interface IStorage {
 
   getIncomeTrends(days: number): Promise<
     Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }>
-  >; // USD is insurance-only
+  >;
 
   getIncomeTrendsForMonth(
     year: number,
     month: number
-  ): Promise<Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }>>; // USD insurance-only
+  ): Promise<Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }>>;
 
   getIncomeTrendsForDateRange(
     startDate: Date,
     endDate: Date
-  ): Promise<Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }>>; // USD insurance-only
+  ): Promise<Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }>>;
 
   getDetailedTransactionsForMonth(year: number, month: number): Promise<
     Array<{
@@ -257,7 +262,7 @@ export interface IStorage {
     Array<
       InsuranceClaim & {
         providerName: string;
-        billedAmount: number;   // alias of claimedAmount
+        billedAmount: number;
         paidToDate: number;
         balance: number;
       }
@@ -290,8 +295,8 @@ export interface IStorage {
       claimed: number;
       paid: number;
       balance: number;
-      outstanding: number;   // non-negative
-      credit: number;        // non-negative
+      outstanding: number;
+      credit: number;
     }>;
     claims: Array<
       InsuranceClaim & { providerName: string; billedAmount: number; paidToDate: number; balance: number }
@@ -334,6 +339,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   /* ---------------- Insurance payments maintenance ---------------- */
+
   async listInsurancePayments(filters?: {
     providerId?: string;
     claimId?: string;
@@ -341,21 +347,26 @@ export class DatabaseStorage implements IStorage {
     end?: string;
   }) {
     const conds: any[] = [];
-
-    // Use COALESCE(payment_date, created_at) so legacy rows are included
-    const payDate = sql`COALESCE(${insurancePayments.paymentDate}, ${insurancePayments.createdAt})`;
-
     if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
     if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
-    if (filters?.start) conds.push(sql`${payDate} >= ${new Date(filters.start)}`);
-    if (filters?.end) conds.push(sql`${payDate} < ${toEndExclusive(new Date(filters.end))!}`);
+
+    // Cast BOTH sides to ::date to avoid date vs timestamptz errors
+    if (filters?.start) {
+      const startStr = isoDate(new Date(filters.start));
+      conds.push(gte(sql`${insurancePayments.paymentDate}::date`, sql`${startStr}::date`));
+    }
+    if (filters?.end) {
+      const endEx = toEndExclusive(new Date(filters.end))!;
+      const endStr = isoDate(endEx);
+      conds.push(lt(sql`${insurancePayments.paymentDate}::date`, sql`${endStr}::date`));
+    }
 
     let q = db
       .select({
         id: insurancePayments.id,
         providerId: insurancePayments.providerId,
         claimId: insurancePayments.claimId,
-        paymentDate: insurancePayments.paymentDate, // explicit for frontend
+        paymentDate: insurancePayments.paymentDate,
         amount: insurancePayments.amount,
         currency: insurancePayments.currency,
         reference: insurancePayments.reference,
@@ -368,8 +379,10 @@ export class DatabaseStorage implements IStorage {
 
     if (conds.length) q = q.where(and(...conds));
 
-    // Order by payment date (fallback to createdAt)
-    return await q.orderBy(desc(payDate), desc(insurancePayments.createdAt));
+    return await q.orderBy(
+      desc(insurancePayments.paymentDate),
+      desc(insurancePayments.createdAt)
+    );
   }
 
   async updateInsurancePayment(
@@ -680,27 +693,11 @@ export class DatabaseStorage implements IStorage {
     const sum = (arr: typeof txData, pred: (t: Transaction) => boolean) =>
       arr.filter(pred).reduce((a, t) => a + Number(t.amount || 0), 0);
 
-    const totalIncomeSSP = sum(
-      txData,
-      (t) => t.type === "income" && t.currency === "SSP"
-    );
+    const totalIncomeSSP = sum(txData, (t) => t.type === "income" && t.currency === "SSP");
+    const totalIncomeUSD = sum(txData, (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId);
+    const totalExpenseSSP = sum(txData, (t) => t.type === "expense" && t.currency === "SSP"));
+    const totalExpenseUSD = sum(txData, (t) => t.type === "expense" && t.currency === "USD"));
 
-    // USD tile is "Insurance (USD)" ⇒ only USD rows with a provider
-    const totalIncomeUSD = sum(
-      txData,
-      (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId
-    );
-
-    const totalExpenseSSP = sum(
-      txData,
-      (t) => t.type === "expense" && t.currency === "SSP"
-    );
-    const totalExpenseUSD = sum(
-      txData,
-      (t) => t.type === "expense" && t.currency === "USD"
-    );
-
-    // Department breakdown (SSP income only)
     const departmentBreakdown: Record<string, string> = {};
     for (const t of txData) {
       if (t.type !== "income" || t.currency !== "SSP" || !t.departmentId) continue;
@@ -709,7 +706,6 @@ export class DatabaseStorage implements IStorage {
       ).toString();
     }
 
-    // Insurance breakdown (USD by provider)
     const allProviders = await db.select().from(insuranceProviders);
     const providerMap = new Map<string, string>();
     allProviders.forEach((p) => providerMap.set(p.id, p.name));
@@ -722,7 +718,6 @@ export class DatabaseStorage implements IStorage {
       insuranceBreakdown[name] = (Number(insuranceBreakdown[name] || 0) + Number(t.amount || 0)).toString();
     }
 
-    // Expense breakdown (SSP only)
     const expenseBreakdown: Record<string, string> = {};
     for (const t of txData) {
       if (t.type === "expense" && t.currency === "SSP" && t.expenseCategory) {
@@ -732,16 +727,12 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Patients in same window
     const patientVolumeData = await db
       .select()
       .from(patientVolume)
       .where(and(gte(patientVolume.date, startDate), lt(patientVolume.date, endDateExclusive)));
 
-    const totalPatients = patientVolumeData.reduce(
-      (s, pv) => s + (pv.patientCount || 0),
-      0
-    );
+    const totalPatients = patientVolumeData.reduce((s, pv) => s + (pv.patientCount || 0), 0);
 
     const recentTransactions = txData
       .slice()
@@ -756,13 +747,13 @@ export class DatabaseStorage implements IStorage {
     const netIncomeUSDStr = (totalIncomeUSD - totalExpenseUSD).toString();
 
     return {
-      totalIncome: totalIncomeSSPStr, // legacy (SSP)
+      totalIncome: totalIncomeSSPStr,
       totalIncomeSSP: totalIncomeSSPStr,
-      totalIncomeUSD: totalIncomeUSDStr, // insurance USD only
-      totalExpenses: totalExpensesSSPStr, // legacy (SSP)
+      totalIncomeUSD: totalIncomeUSDStr,
+      totalExpenses: totalExpensesSSPStr,
       totalExpensesSSP: totalExpensesSSPStr,
       totalExpensesUSD: totalExpensesUSDStr,
-      netIncome: netIncomeSSPStr, // legacy (SSP)
+      netIncome: netIncomeSSPStr,
       netIncomeSSP: netIncomeSSPStr,
       netIncomeUSD: netIncomeUSDStr,
       departmentBreakdown,
@@ -770,18 +761,8 @@ export class DatabaseStorage implements IStorage {
       expenseBreakdown,
       recentTransactions,
       totalPatients,
-      previousPeriod: {
-        totalIncomeSSP: 0,
-        totalExpensesSSP: 0,
-        netIncomeSSP: 0,
-        totalIncomeUSD: 0,
-      },
-      changes: {
-        incomeChangeSSP: 0,
-        expenseChangeSSP: 0,
-        netIncomeChangeSSP: 0,
-        incomeChangeUSD: 0,
-      },
+      previousPeriod: { totalIncomeSSP: 0, totalExpensesSSP: 0, netIncomeSSP: 0, totalIncomeUSD: 0 },
+      changes: { incomeChangeSSP: 0, expenseChangeSSP: 0, netIncomeChangeSSP: 0, incomeChangeUSD: 0 },
     };
   }
 
@@ -1045,8 +1026,8 @@ export class DatabaseStorage implements IStorage {
         periodStart: insuranceClaims.periodStart,
         periodEnd: insuranceClaims.periodEnd,
         currency: insuranceClaims.currency,
-        claimedAmount: insuranceClaims.claimedAmount,     // legacy
-        billedAmount: insuranceClaims.claimedAmount,      // alias for UI
+        claimedAmount: insuranceClaims.claimedAmount,
+        billedAmount: insuranceClaims.claimedAmount,
         status: insuranceClaims.status,
         notes: insuranceClaims.notes,
         createdBy: insuranceClaims.createdBy,
@@ -1062,10 +1043,7 @@ export class DatabaseStorage implements IStorage {
     if (whereConds.length) q = q.where(and(...whereConds));
 
     const rows = await q
-      .orderBy(
-        desc(insuranceClaims.periodStart),
-        desc(insuranceClaims.createdAt)
-      );
+      .orderBy(desc(insuranceClaims.periodStart), desc(insuranceClaims.createdAt));
 
     return rows.map((r: any) => ({
       ...r,
@@ -1090,7 +1068,7 @@ export class DatabaseStorage implements IStorage {
     return row || undefined;
   }
 
-  // Record a payment (collections) – coerce date; allow createdBy passthrough
+  // Record a payment (collections)
   async createInsurancePayment(
     payment: InsertInsurancePayment & { createdBy?: string | null }
   ): Promise<InsurancePayment> {
@@ -1102,11 +1080,14 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  // Provider + claim balances (active providers only; add outstanding/credit)
+  // Provider + claim balances
   async getInsuranceBalances(filters?: { providerId?: string; start?: string; end?: string }) {
     const { providerId, start, end } = filters || {};
     const startDate = start ? new Date(start) : undefined;
     const endEx     = end   ? toEndExclusive(new Date(end))! : undefined;
+
+    const startStr = startDate ? isoDate(startDate) : undefined;
+    const endStr   = endEx ? isoDate(endEx) : undefined;
 
     // Active providers (optional filter)
     const provConds: any[] = [eq(insuranceProviders.isActive, true)];
@@ -1115,9 +1096,9 @@ export class DatabaseStorage implements IStorage {
       .select({ id: insuranceProviders.id, name: insuranceProviders.name })
       .from(insuranceProviders)
       .where(and(...provConds))
-      .orderBy(providerOrderExpr, insuranceProviders.name); // ✅ preferred order
+      .orderBy(providerOrderExpr, insuranceProviders.name);
 
-    // Billed inside window
+    // Billed inside window (claims are timestamp columns => no cast needed)
     const billedConds: any[] = [];
     if (providerId) billedConds.push(eq(insuranceClaims.providerId, providerId));
     if (startDate) billedConds.push(gte(insuranceClaims.periodStart, startDate));
@@ -1132,12 +1113,11 @@ export class DatabaseStorage implements IStorage {
       .groupBy(insuranceClaims.providerId);
     const billedMap = new Map(billedRows.map(r => [r.providerId, Number(r.billed)]));
 
-    // Paid inside window (use COALESCE for legacy rows)
+    // Paid inside window (payment_date is DATE => cast both sides to ::date)
     const paidConds: any[] = [];
-    const payDate = sql`COALESCE(${insurancePayments.paymentDate}, ${insurancePayments.createdAt})`;
     if (providerId) paidConds.push(eq(insurancePayments.providerId, providerId));
-    if (startDate)  paidConds.push(sql`${payDate} >= ${startDate}`);
-    if (endEx)      paidConds.push(sql`${payDate} < ${endEx}`);
+    if (startStr)  paidConds.push(gte(sql`${insurancePayments.paymentDate}::date`, sql`${startStr}::date`));
+    if (endStr)    paidConds.push(lt(sql`${insurancePayments.paymentDate}::date`,  sql`${endStr}::date`));
     const paidRows = await db
       .select({
         providerId: insurancePayments.providerId,
@@ -1162,8 +1142,9 @@ export class DatabaseStorage implements IStorage {
         .where(and(...beforeClaimConds))
         .groupBy(insuranceClaims.providerId);
 
-      const beforePayConds: any[] = [lt(payDate, startDate)];
+      const beforePayConds: any[] = [];
       if (providerId) beforePayConds.push(eq(insurancePayments.providerId, providerId));
+      beforePayConds.push(lt(sql`${insurancePayments.paymentDate}::date`, sql`${isoDate(startDate)}::date`));
       const beforePays = await db
         .select({
           providerId: insurancePayments.providerId,
@@ -1177,12 +1158,8 @@ export class DatabaseStorage implements IStorage {
       beforePays.forEach(r => carryMap.set(r.providerId, (carryMap.get(r.providerId) || 0) - Number(r.total)));
     }
 
-    // Claims detail within the same window (for the table)
-    const claims = await this.listInsuranceClaims({
-      providerId,
-      start,
-      end,
-    });
+    // Claims detail in the same window
+    const claims = await this.listInsuranceClaims({ providerId, start, end });
 
     // Build provider summaries
     const providers = provs.map(p => {
@@ -1196,8 +1173,8 @@ export class DatabaseStorage implements IStorage {
         claimed: billed,
         paid: collected,
         balance: outstandingRaw,
-        outstanding: outstandingRaw > 0 ? outstandingRaw : 0,
-        credit: outstandingRaw < 0 ? -outstandingRaw : 0,
+        outstanding: Math.max(0, outstandingRaw),
+        credit: Math.max(0, -outstandingRaw),
       };
     });
 
