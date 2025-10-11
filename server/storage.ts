@@ -57,7 +57,7 @@ function toEndExclusive(end?: Date): Date | undefined {
   return end;
 }
 
-/** YYYY-MM-DD string (UTC) */
+/** YYYY-MM-DD (UTC) */
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -69,7 +69,7 @@ function nextMonthUTC(y: number, m1_12: number) {
   return m1_12 === 12 ? new Date(Date.UTC(y + 1, 0, 1)) : new Date(Date.UTC(y, m1_12, 1));
 }
 
-/* ---------- preferred provider order ---------- */
+/* ---------- preferred provider order (CIC, CIGNA, UAP, New Sudan, Nile International, Other) ---------- */
 const providerOrderExpr = sql`
   CASE
     WHEN ${insuranceProviders.name} ILIKE 'CIC' THEN 1
@@ -262,7 +262,7 @@ export interface IStorage {
     Array<
       InsuranceClaim & {
         providerName: string;
-        billedAmount: number;
+        billedAmount: number;   // alias of claimedAmount
         paidToDate: number;
         balance: number;
       }
@@ -295,8 +295,8 @@ export interface IStorage {
       claimed: number;
       paid: number;
       balance: number;
-      outstanding: number;
-      credit: number;
+      outstanding: number;   // non-negative
+      credit: number;        // non-negative
     }>;
     claims: Array<
       InsuranceClaim & { providerName: string; billedAmount: number; paidToDate: number; balance: number }
@@ -345,12 +345,12 @@ export class DatabaseStorage implements IStorage {
     claimId?: string;
     start?: string;
     end?: string;
-  }) {
+  }): Promise<InsurancePayment[]> {
     const conds: any[] = [];
     if (filters?.providerId) conds.push(eq(insurancePayments.providerId, filters.providerId));
     if (filters?.claimId) conds.push(eq(insurancePayments.claimId, filters.claimId));
 
-    // Cast BOTH sides to ::date to avoid date vs timestamptz errors
+    // Cast BOTH sides to ::date to avoid date vs timestamptz problems
     if (filters?.start) {
       const startStr = isoDate(new Date(filters.start));
       conds.push(gte(sql`${insurancePayments.paymentDate}::date`, sql`${startStr}::date`));
@@ -378,11 +378,7 @@ export class DatabaseStorage implements IStorage {
       .from(insurancePayments);
 
     if (conds.length) q = q.where(and(...conds));
-
-    return await q.orderBy(
-      desc(insurancePayments.paymentDate),
-      desc(insurancePayments.createdAt)
-    );
+    return await q.orderBy(desc(insurancePayments.paymentDate), desc(insurancePayments.createdAt));
   }
 
   async updateInsurancePayment(
@@ -694,10 +690,12 @@ export class DatabaseStorage implements IStorage {
       arr.filter(pred).reduce((a, t) => a + Number(t.amount || 0), 0);
 
     const totalIncomeSSP = sum(txData, (t) => t.type === "income" && t.currency === "SSP");
+    // USD tile is "Insurance (USD)" ⇒ only USD rows with a provider
     const totalIncomeUSD = sum(txData, (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId);
-    const totalExpenseSSP = sum(txData, (t) => t.type === "expense" && t.currency === "SSP");
-    const totalExpenseUSD = sum(txData, (t) => t.type === "expense" && t.currency === "USD");
+    const totalExpenseSSP = sum(txData, (t) => t.type === "expense" && t.currency === "SSP"));
+    const totalExpenseUSD = sum(txData, (t) => t.type === "expense" && t.currency === "USD"));
 
+    // Department breakdown (SSP income only)
     const departmentBreakdown: Record<string, string> = {};
     for (const t of txData) {
       if (t.type !== "income" || t.currency !== "SSP" || !t.departmentId) continue;
@@ -706,6 +704,7 @@ export class DatabaseStorage implements IStorage {
       ).toString();
     }
 
+    // Insurance breakdown (USD by provider)
     const allProviders = await db.select().from(insuranceProviders);
     const providerMap = new Map<string, string>();
     allProviders.forEach((p) => providerMap.set(p.id, p.name));
@@ -718,6 +717,7 @@ export class DatabaseStorage implements IStorage {
       insuranceBreakdown[name] = (Number(insuranceBreakdown[name] || 0) + Number(t.amount || 0)).toString();
     }
 
+    // Expense breakdown (SSP only)
     const expenseBreakdown: Record<string, string> = {};
     for (const t of txData) {
       if (t.type === "expense" && t.currency === "SSP" && t.expenseCategory) {
@@ -727,6 +727,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // Patients in same window
     const patientVolumeData = await db
       .select()
       .from(patientVolume)
@@ -747,13 +748,13 @@ export class DatabaseStorage implements IStorage {
     const netIncomeUSDStr = (totalIncomeUSD - totalExpenseUSD).toString();
 
     return {
-      totalIncome: totalIncomeSSPStr,
+      totalIncome: totalIncomeSSPStr, // legacy (SSP)
       totalIncomeSSP: totalIncomeSSPStr,
-      totalIncomeUSD: totalIncomeUSDStr,
-      totalExpenses: totalExpensesSSPStr,
+      totalIncomeUSD: totalIncomeUSDStr, // insurance USD only
+      totalExpenses: totalExpensesSSPStr, // legacy (SSP)
       totalExpensesSSP: totalExpensesSSPStr,
       totalExpensesUSD: totalExpensesUSDStr,
-      netIncome: netIncomeSSPStr,
+      netIncome: netIncomeSSPStr, // legacy (SSP)
       netIncomeSSP: netIncomeSSPStr,
       netIncomeUSD: netIncomeUSDStr,
       departmentBreakdown,
@@ -761,8 +762,18 @@ export class DatabaseStorage implements IStorage {
       expenseBreakdown,
       recentTransactions,
       totalPatients,
-      previousPeriod: { totalIncomeSSP: 0, totalExpensesSSP: 0, netIncomeSSP: 0, totalIncomeUSD: 0 },
-      changes: { incomeChangeSSP: 0, expenseChangeSSP: 0, netIncomeChangeSSP: 0, incomeChangeUSD: 0 },
+      previousPeriod: {
+        totalIncomeSSP: 0,
+        totalExpensesSSP: 0,
+        netIncomeSSP: 0,
+        totalIncomeUSD: 0,
+      },
+      changes: {
+        incomeChangeSSP: 0,
+        expenseChangeSSP: 0,
+        netIncomeChangeSSP: 0,
+        incomeChangeUSD: 0,
+      },
     };
   }
 
@@ -1026,8 +1037,8 @@ export class DatabaseStorage implements IStorage {
         periodStart: insuranceClaims.periodStart,
         periodEnd: insuranceClaims.periodEnd,
         currency: insuranceClaims.currency,
-        claimedAmount: insuranceClaims.claimedAmount,
-        billedAmount: insuranceClaims.claimedAmount,
+        claimedAmount: insuranceClaims.claimedAmount,     // legacy
+        billedAmount: insuranceClaims.claimedAmount,      // alias for UI
         status: insuranceClaims.status,
         notes: insuranceClaims.notes,
         createdBy: insuranceClaims.createdBy,
@@ -1043,7 +1054,10 @@ export class DatabaseStorage implements IStorage {
     if (whereConds.length) q = q.where(and(...whereConds));
 
     const rows = await q
-      .orderBy(desc(insuranceClaims.periodStart), desc(insuranceClaims.createdAt));
+      .orderBy(
+        desc(insuranceClaims.periodStart),
+        desc(insuranceClaims.createdAt)
+      );
 
     return rows.map((r: any) => ({
       ...r,
@@ -1080,7 +1094,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  // Provider + claim balances
+  // Provider + claim balances (active providers only; add outstanding/credit)
   async getInsuranceBalances(filters?: { providerId?: string; start?: string; end?: string }) {
     const { providerId, start, end } = filters || {};
     const startDate = start ? new Date(start) : undefined;
@@ -1096,21 +1110,22 @@ export class DatabaseStorage implements IStorage {
       .select({ id: insuranceProviders.id, name: insuranceProviders.name })
       .from(insuranceProviders)
       .where(and(...provConds))
-      .orderBy(providerOrderExpr, insuranceProviders.name);
+      .orderBy(providerOrderExpr, insuranceProviders.name); // ✅ preferred order
 
-    // Billed inside window (claims are timestamp columns => no cast needed)
+    // Billed inside window
     const billedConds: any[] = [];
     if (providerId) billedConds.push(eq(insuranceClaims.providerId, providerId));
     if (startDate) billedConds.push(gte(insuranceClaims.periodStart, startDate));
     if (endEx)     billedConds.push(lt(insuranceClaims.periodEnd, endEx));
-    const billedRows = await db
+
+    let billedQ = db
       .select({
         providerId: insuranceClaims.providerId,
         billed: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}),0)`,
       })
-      .from(insuranceClaims)
-      .where(billedConds.length ? and(...billedConds) : undefined as any)
-      .groupBy(insuranceClaims.providerId);
+      .from(insuranceClaims);
+    if (billedConds.length) billedQ = billedQ.where(and(...billedConds));
+    const billedRows = await billedQ.groupBy(insuranceClaims.providerId);
     const billedMap = new Map(billedRows.map(r => [r.providerId, Number(r.billed)]));
 
     // Paid inside window (payment_date is DATE => cast both sides to ::date)
@@ -1118,14 +1133,15 @@ export class DatabaseStorage implements IStorage {
     if (providerId) paidConds.push(eq(insurancePayments.providerId, providerId));
     if (startStr)  paidConds.push(gte(sql`${insurancePayments.paymentDate}::date`, sql`${startStr}::date`));
     if (endStr)    paidConds.push(lt(sql`${insurancePayments.paymentDate}::date`,  sql`${endStr}::date`));
-    const paidRows = await db
+
+    let paidQ = db
       .select({
         providerId: insurancePayments.providerId,
         paid: sql<number>`COALESCE(SUM(${insurancePayments.amount}),0)`,
       })
-      .from(insurancePayments)
-      .where(paidConds.length ? and(...paidConds) : undefined as any)
-      .groupBy(insurancePayments.providerId);
+      .from(insurancePayments);
+    if (paidConds.length) paidQ = paidQ.where(and(...paidConds));
+    const paidRows = await paidQ.groupBy(insurancePayments.providerId);
     const paidMap = new Map(paidRows.map(r => [r.providerId, Number(r.paid)]));
 
     // Carry forward BEFORE start: claims < start  minus  payments < start
@@ -1133,32 +1149,32 @@ export class DatabaseStorage implements IStorage {
     if (startDate) {
       const beforeClaimConds: any[] = [lt(insuranceClaims.periodStart, startDate)];
       if (providerId) beforeClaimConds.push(eq(insuranceClaims.providerId, providerId));
-      const beforeClaims = await db
+      let beforeClaimsQ = db
         .select({
           providerId: insuranceClaims.providerId,
           total: sql<number>`COALESCE(SUM(${insuranceClaims.claimedAmount}),0)`,
         })
-        .from(insuranceClaims)
-        .where(and(...beforeClaimConds))
-        .groupBy(insuranceClaims.providerId);
+        .from(insuranceClaims);
+      if (beforeClaimConds.length) beforeClaimsQ = beforeClaimsQ.where(and(...beforeClaimConds));
+      const beforeClaims = await beforeClaimsQ.groupBy(insuranceClaims.providerId);
 
       const beforePayConds: any[] = [];
       if (providerId) beforePayConds.push(eq(insurancePayments.providerId, providerId));
       beforePayConds.push(lt(sql`${insurancePayments.paymentDate}::date`, sql`${isoDate(startDate)}::date`));
-      const beforePays = await db
+      let beforePaysQ = db
         .select({
           providerId: insurancePayments.providerId,
           total: sql<number>`COALESCE(SUM(${insurancePayments.amount}),0)`,
         })
-        .from(insurancePayments)
-        .where(and(...beforePayConds))
-        .groupBy(insurancePayments.providerId);
+        .from(insurancePayments);
+      if (beforePayConds.length) beforePaysQ = beforePaysQ.where(and(...beforePayConds));
+      const beforePays = await beforePaysQ.groupBy(insurancePayments.providerId);
 
       beforeClaims.forEach(r => carryMap.set(r.providerId, Number(r.total)));
       beforePays.forEach(r => carryMap.set(r.providerId, (carryMap.get(r.providerId) || 0) - Number(r.total)));
     }
 
-    // Claims detail in the same window
+    // Claims detail within the same window (for the table)
     const claims = await this.listInsuranceClaims({ providerId, start, end });
 
     // Build provider summaries
@@ -1173,8 +1189,8 @@ export class DatabaseStorage implements IStorage {
         claimed: billed,
         paid: collected,
         balance: outstandingRaw,
-        outstanding: Math.max(0, outstandingRaw),
-        credit: Math.max(0, -outstandingRaw),
+        outstanding: outstandingRaw > 0 ? outstandingRaw : 0,
+        credit: outstandingRaw < 0 ? -outstandingRaw : 0,
       };
     });
 
