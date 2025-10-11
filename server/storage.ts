@@ -695,8 +695,8 @@ export class DatabaseStorage implements IStorage {
 
     const totalIncomeSSP = sum(txData, (t) => t.type === "income" && t.currency === "SSP");
     const totalIncomeUSD = sum(txData, (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId);
-    const totalExpenseSSP = sum(txData, (t) => t.type === "expense" && t.currency === "SSP"));
-    const totalExpenseUSD = sum(txData, (t) => t.type === "expense" && t.currency === "USD"));
+    const totalExpenseSSP = sum(txData, (t) => t.type === "expense" && t.currency === "SSP");
+    const totalExpenseUSD = sum(txData, (t) => t.type === "expense" && t.currency === "USD");
 
     const departmentBreakdown: Record<string, string> = {};
     for (const t of txData) {
