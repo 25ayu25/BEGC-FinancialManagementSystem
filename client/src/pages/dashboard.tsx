@@ -1,4 +1,3 @@
-// client/src/pages/dashboard.tsx
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -65,6 +64,7 @@ export default function Dashboard() {
     }
   };
 
+  // IMPORTANT FIX: treat last-month like a specific month for API calls
   const normalizedRange =
     timeRange === "month-select" || timeRange === "last-month"
       ? "current-month"
@@ -132,12 +132,12 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="sticky-page-top bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
+      <div className="flex-1 flex flex-col h-full">
+        <div className="bg-white border-b border-slate-200 px-6 py-4">
           <h1 className="text-2xl font-bold text-slate-900">Overview</h1>
           <p className="text-slate-600">Daily operations at a glance</p>
         </div>
-        <main className="px-6 py-6">
+        <main className="flex-1 overflow-y-auto p-6">
           <Card><CardContent className="pt-6">
             <div className="text-center text-red-600">
               <p className="text-lg font-semibold">Error Loading Dashboard</p>
@@ -151,8 +151,8 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-        <div className="sticky-page-top bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-6">
+      <div className="flex-1 flex flex-col h-full bg-slate-50">
+        <div className="bg-white border-b border-slate-200 px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
               <Skeleton className="h-8 w-32 mb-2" />
@@ -164,7 +164,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <main className="px-6 py-6 space-y-8">
+        <main className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <Card key={i} className="p-6"><Skeleton className="h-20 w-full" /></Card>
@@ -190,10 +190,9 @@ export default function Dashboard() {
       : "Custom period";
 
   return (
-    // The scroll container is the content column in App.tsx (not here)
-    <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-      {/* Sticky page header (sits below the mobile top bar) */}
-      <div className="sticky-page-top bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
+    <div className="flex-1 flex flex-col h-full bg-slate-50">
+      {/* Header with Time Controls */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900">Overview</h1>
@@ -275,10 +274,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Page content (no own scrolling) */}
-      <main className="px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
         <ExecutiveStyleKPIs data={dashboardData || {}} />
 
+        {/* NEW: Monthly Income (inserted under KPI band) */}
         <MonthlyIncome
           timeRange={timeRange}
           selectedYear={selectedYear}
@@ -292,6 +292,7 @@ export default function Dashboard() {
             data={dashboardData?.departmentBreakdown || {}}
             departments={(departments as any) || []}
           />
+
           <SimpleExpenseBreakdown
             breakdown={(dashboardData as any)?.expenseBreakdown}
             total={parseFloat((dashboardData as any)?.totalExpenses || "0")}
