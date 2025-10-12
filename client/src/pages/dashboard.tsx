@@ -134,7 +134,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="flex-1 flex flex-col min-h-full">
-        <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
           <h1 className="text-2xl font-bold text-slate-900">Overview</h1>
           <p className="text-slate-600">Daily operations at a glance</p>
         </div>
