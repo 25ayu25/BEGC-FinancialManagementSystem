@@ -133,7 +133,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
+        <div className="sticky-page-top bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
           <h1 className="text-2xl font-bold text-slate-900">Overview</h1>
           <p className="text-slate-600">Daily operations at a glance</p>
         </div>
@@ -152,7 +152,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-6">
+        <div className="sticky-page-top bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
               <Skeleton className="h-8 w-32 mb-2" />
@@ -190,10 +190,10 @@ export default function Dashboard() {
       : "Custom period";
 
   return (
-    // IMPORTANT: no overflow here (the scroll container is the content column in App.tsx)
+    // The scroll container is the content column in App.tsx (not here)
     <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
+      {/* Sticky page header (sits below the mobile top bar) */}
+      <div className="sticky-page-top bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
           <div>
             <h1 className="text-3xl font-semibold leading-tight text-slate-900">Overview</h1>
@@ -292,7 +292,6 @@ export default function Dashboard() {
             data={dashboardData?.departmentBreakdown || {}}
             departments={(departments as any) || []}
           />
-
           <SimpleExpenseBreakdown
             breakdown={(dashboardData as any)?.expenseBreakdown}
             total={parseFloat((dashboardData as any)?.totalExpenses || "0")}
