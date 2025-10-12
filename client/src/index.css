@@ -137,12 +137,23 @@ body {
   padding-bottom: max(24px, var(--safe-bottom));
 }
 
-/* ✅ Sticky header helper:
-   Works inside scroll containers and respects the notch. */
+/* ✅ Sticky header helpers */
 .sticky-safe-top {
   position: sticky;
   top: max(0px, var(--safe-top));
-  z-index: 50; /* keep above content */
+  z-index: 50; /* above page sections */
+}
+/* Page header that must stick *below* the mobile top bar */
+.sticky-page-top {
+  position: sticky;
+  top: 0;       /* desktop default */
+  z-index: 30;  /* below the mobile top bar */
+}
+/* Mobile offset: header height (~56px) + safe area */
+@media (max-width: 1024px) {
+  .sticky-page-top {
+    top: calc(56px + max(0px, var(--safe-top)));
+  }
 }
 /* Fallback if env() isn’t available */
 @supports not (top: env(safe-area-inset-top)) {
@@ -157,7 +168,6 @@ body {
 /* =========================
    Radix UI Overlays
    ========================= */
-
 /* Select menu (bright, high contrast) */
 [data-radix-select-content] {
   background: white !important;
