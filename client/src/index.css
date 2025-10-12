@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================
+   Design Tokens (Light)
+   ========================= */
 :root {
   --background: hsl(0 0% 100%);
   --foreground: hsl(210 25% 7.8431%);
@@ -45,137 +48,17 @@
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 0.75rem;
+
+  /* Safe-area (iOS & supported Android Chrome) */
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
+  --safe-right: env(safe-area-inset-right);
 }
 
-/* Force bright dropdown styling */
-[data-radix-select-content] {
-  background: white !important;
-  color: #1f2937 !important;
-  border: 1px solid #d1d5db !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-  z-index: 9999 !important;
-}
-
-/* Ensure popover content appears above everything */
-[data-radix-popover-content] {
-  z-index: 50000 !important;
-  background: white !important;
-  border: 1px solid #d1d5db !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-  position: relative !important;
-}
-
-/* Fix calendar overlay issues - make more compact and professional */
-[data-radix-popover-content] .rdp {
-  --rdp-cell-size: 24px !important;
-  --rdp-accent-color: var(--primary) !important;
-  --rdp-background-color: white !important;
-  background: white !important;
-  font-size: 12px !important;
-  min-width: 240px !important;
-}
-
-/* Ensure completely opaque calendar background */
-[data-radix-popover-content] {
-  background: rgba(255, 255, 255, 1) !important;
-  backdrop-filter: none !important;
-}
-
-[data-radix-popover-content] .rdp,
-[data-radix-popover-content] .rdp-months,
-[data-radix-popover-content] .rdp-month,
-[data-radix-popover-content] .rdp-table {
-  background: rgba(255, 255, 255, 1) !important;
-}
-
-/* Style the calendar with teal accent */
-[data-radix-popover-content] .rdp-day_selected,
-[data-radix-popover-content] .rdp-day_selected:focus,
-[data-radix-popover-content] .rdp-day_selected:hover {
-  background-color: var(--primary) !important;
-  color: white !important;
-  border-radius: 4px !important;
-}
-
-[data-radix-popover-content] .rdp-day_today {
-  color: var(--primary) !important;
-  font-weight: 600 !important;
-  border: 1px solid var(--primary) !important;
-  border-radius: 4px !important;
-}
-
-/* Hide outside days as fallback */
-[data-radix-popover-content] .rdp-day_outside {
-  visibility: hidden;
-}
-
-[data-radix-popover-content] .rdp-day:hover:not(.rdp-day_selected) {
-  background-color: hsl(173 50% 96%) !important;
-  color: hsl(173 100% 30%) !important;
-  border-radius: 4px !important;
-}
-
-[data-radix-popover-content] .rdp-nav_button:hover {
-  background-color: hsl(173 50% 96%) !important;
-  border-radius: 4px !important;
-}
-
-[data-radix-popover-content] .rdp-head_cell {
-  font-size: 11px !important;
-  color: hsl(210 25% 50%) !important;
-  font-weight: 600 !important;
-  padding: 4px !important;
-}
-
-[data-radix-popover-content] .rdp-caption {
-  padding: 6px !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-}
-
-[data-radix-popover-content] .rdp-table {
-  margin: 0 !important;
-}
-
-[data-radix-popover-content] .rdp-cell {
-  width: 24px !important;
-  height: 24px !important;
-  padding: 1px !important;
-}
-
-[data-radix-popover-content] .rdp-button {
-  width: 22px !important;
-  height: 22px !important;
-  font-size: 11px !important;
-}
-
-/* Ensure all dashboard content has lower z-index */
-.dashboard-content {
-  position: relative;
-  z-index: 1;
-}
-
-[data-radix-select-viewport] {
-  background: white !important;
-  padding: 4px !important;
-}
-
-[data-radix-select-item] {
-  color: #1f2937 !important;
-  background: transparent !important;
-  padding: 8px 12px 8px 32px !important;
-  border-radius: 4px !important;
-  margin: 1px 0 !important;
-}
-
-[data-radix-select-item][data-highlighted],
-[data-radix-select-item]:hover,
-[data-radix-select-item][data-state="checked"] {
-  background: #f0fdfa !important;
-  color: #0f766e !important;
-  outline: none !important;
-}
-
+/* =========================
+   Design Tokens (Dark)
+   ========================= */
 .dark {
   --background: hsl(0 0% 0%);
   --foreground: hsl(200 6.6667% 91.1765%);
@@ -204,72 +87,222 @@
   --info-foreground: hsl(0 0% 100%);
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
+/* =========================
+   Global Mobile Resets
+   ========================= */
+html, body, #root {
+  height: 100%;
+}
 
-  body {
-    @apply font-sans antialiased bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+html {
+  /* Prevent font auto-scaling quirks on iOS/Android */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  @apply font-sans antialiased bg-background text-foreground;
+  font-family: 'Inter', sans-serif;
+  /* Smooth scroll and snap feel on mobile */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Prevent iOS zoom when focusing inputs by ensuring >=16px */
+@media (max-width: 480px) {
+  input, select, textarea {
+    font-size: 16px;
   }
+}
+
+/* Momentum scrolling inside panels on iOS/Android */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overflow: auto;
+}
+
+/* Real viewport height on mobile (fixes address-bar resize) */
+.fullscreen {
+  min-height: 100dvh;
+}
+
+/* Safe-area helpers (handles iOS notch + Android supported devices) */
+.safe-pad {
+  padding-top: max(12px, var(--safe-top));
+  padding-bottom: max(12px, var(--safe-bottom));
+  padding-left: max(12px, var(--safe-left));
+  padding-right: max(12px, var(--safe-right));
+}
+.content-safe-b {
+  padding-bottom: max(24px, var(--safe-bottom));
+}
+
+/* Lock page scroll when drawers/modals are open */
+.no-scroll {
+  overflow: hidden;
+}
+
+/* =========================
+   Radix UI Overlays
+   ========================= */
+
+/* Select menu (bright, high contrast) */
+[data-radix-select-content] {
+  background: white !important;
+  color: #1f2937 !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04) !important;
+  z-index: 9999 !important;
+}
+[data-radix-select-viewport] {
+  background: white !important;
+  padding: 4px !important;
+}
+[data-radix-select-item] {
+  color: #1f2937 !important;
+  background: transparent !important;
+  padding: 8px 12px 8px 32px !important;
+  border-radius: 4px !important;
+  margin: 1px 0 !important;
+}
+[data-radix-select-item][data-highlighted],
+[data-radix-select-item]:hover,
+[data-radix-select-item][data-state="checked"] {
+  background: #f0fdfa !important;
+  color: #0f766e !important;
+  outline: none !important;
+}
+
+/* Popovers (calendar etc.) */
+[data-radix-popover-content] {
+  z-index: 50000 !important;
+  background: rgba(255, 255, 255, 1) !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04) !important;
+  position: relative !important;
+}
+
+/* DayPicker tweaks — smaller, crisp on phones */
+[data-radix-popover-content] .rdp {
+  --rdp-cell-size: 24px !important;
+  --rdp-accent-color: var(--primary) !important;
+  --rdp-background-color: white !important;
+  background: white !important;
+  font-size: 12px !important;
+  min-width: 240px !important;
+}
+[data-radix-popover-content] .rdp,
+[data-radix-popover-content] .rdp-months,
+[data-radix-popover-content] .rdp-month,
+[data-radix-popover-content] .rdp-table {
+  background: rgba(255,255,255,1) !important;
+}
+[data-radix-popover-content] .rdp-day_selected,
+[data-radix-popover-content] .rdp-day_selected:focus,
+[data-radix-popover-content] .rdp-day_selected:hover {
+  background-color: var(--primary) !important;
+  color: white !important;
+  border-radius: 4px !important;
+}
+[data-radix-popover-content] .rdp-day_today {
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  border: 1px solid var(--primary) !important;
+  border-radius: 4px !important;
+}
+[data-radix-popover-content] .rdp-day_outside {
+  visibility: hidden;
+}
+[data-radix-popover-content] .rdp-day:hover:not(.rdp-day_selected) {
+  background-color: hsl(173 50% 96%) !important;
+  color: hsl(173 100% 30%) !important;
+  border-radius: 4px !important;
+}
+[data-radix-popover-content] .rdp-nav_button:hover {
+  background-color: hsl(173 50% 96%) !important;
+  border-radius: 4px !important;
+}
+[data-radix-popover-content] .rdp-head_cell {
+  font-size: 11px !important;
+  color: hsl(210 25% 50%) !important;
+  font-weight: 600 !important;
+  padding: 4px !important;
+}
+[data-radix-popover-content] .rdp-caption {
+  padding: 6px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+[data-radix-popover-content] .rdp-table { margin: 0 !important; }
+[data-radix-popover-content] .rdp-cell { width: 24px !important; height: 24px !important; padding: 1px !important; }
+[data-radix-popover-content] .rdp-button { width: 22px !important; height: 22px !important; font-size: 11px !important; }
+
+/* Keep dashboard content below overlays */
+.dashboard-content { position: relative; z-index: 1; }
+
+/* =========================
+   Mobile Drawer Primitives
+   ========================= */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 60;
+}
+.drawer-panel {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: min(88vw, 360px);
+  height: 100dvh;
+  background: #fff;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 12px 32px rgba(0,0,0,.16);
+  z-index: 61;
+}
+
+/* =========================
+   Base Typographic Layer
+   ========================= */
+@layer base {
+  * { @apply border-border; }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold;
   }
 }
 
+/* =========================
+   Utilities
+   ========================= */
 @layer utilities {
-  .text-success {
-    color: hsl(var(--success));
-  }
-  
-  .text-warning {
-    color: hsl(var(--warning));
-  }
-  
-  .text-info {
-    color: hsl(var(--info));
-  }
-  
-  .bg-success {
-    background-color: hsl(var(--success));
-  }
-  
-  .bg-success\/10 {
-    background-color: hsl(var(--success) / 0.1);
-  }
-  
-  .bg-warning {
-    background-color: hsl(var(--warning));
-  }
-  
-  .bg-warning\/10 {
-    background-color: hsl(var(--warning) / 0.1);
-  }
-  
-  .bg-info {
-    background-color: hsl(var(--info));
-  }
-  
-  .bg-info\/10 {
-    background-color: hsl(var(--info) / 0.1);
-  }
-  
-  .border-success {
-    border-color: hsl(var(--success));
-  }
-  
-  .border-warning {
-    border-color: hsl(var(--warning));
-  }
-  
-  .border-info {
-    border-color: hsl(var(--info));
+  .text-success { color: hsl(var(--success)); }
+  .text-warning { color: hsl(var(--warning)); }
+  .text-info { color: hsl(var(--info)); }
+
+  .bg-success { background-color: hsl(var(--success)); }
+  .bg-success\/10 { background-color: hsl(var(--success) / 0.1); }
+  .bg-warning { background-color: hsl(var(--warning)); }
+  .bg-warning\/10 { background-color: hsl(var(--warning) / 0.1); }
+  .bg-info { background-color: hsl(var(--info)); }
+  .bg-info\/10 { background-color: hsl(var(--info) / 0.1); }
+
+  .border-success { border-color: hsl(var(--success)); }
+  .border-warning { border-color: hsl(var(--warning)); }
+  .border-info { border-color: hsl(var(--info)); }
+
+  /* Perfectly aligned KPIs (no digit “wobble”) */
+  .font-variant-numeric-tabular,
+  .kpi-number {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .2px;
   }
 
-  /* Tabular numerals for perfect alignment */
-  .font-variant-numeric-tabular {
-    font-variant-numeric: tabular-nums;
-  }
+  /* Minimum touch target area for taps */
+  .touch-target { min-height: 44px; }
+
+  /* Softer shadow suited for mobile surfaces */
+  .shadow-soft { box-shadow: 0 6px 20px rgba(0,0,0,.12); }
 }
