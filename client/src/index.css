@@ -137,6 +137,18 @@ body {
   padding-bottom: max(24px, var(--safe-bottom));
 }
 
+/* ✅ Sticky header helper:
+   Works inside scroll containers and respects the notch. */
+.sticky-safe-top {
+  position: sticky;
+  top: max(0px, var(--safe-top));
+  z-index: 50; /* keep above content */
+}
+/* Fallback if env() isn’t available */
+@supports not (top: env(safe-area-inset-top)) {
+  .sticky-safe-top { top: 0; }
+}
+
 /* Lock page scroll when drawers/modals are open */
 .no-scroll {
   overflow: hidden;
