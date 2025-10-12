@@ -1,3 +1,4 @@
+// client/src/App.tsx
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -20,25 +21,25 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleTimeoutDialog } from "@/components/ui/idle-timeout-dialog";
 import { useLocation } from "wouter";
 
-// ⬇️ NEW: bring in the global date filter provider
+// Global date filter provider
 import { DateFilterProvider } from "@/context/date-filter-context";
 
-// ⬇️ NEW: Insurance page
+// Insurance page
 import Insurance from "@/pages/insurance";
 
 function Router() {
   return (
     <Switch>
-      {/* Public routes without sidebar */}
+      {/* Public route without app chrome */}
       <Route path="/login" component={Login} />
 
       {/* Authenticated routes with sidebar */}
       <Route>
-        {(params) => {
+        {() => {
           const [sidebarOpen, setSidebarOpen] = useState(false);
-          const [location, setLocation] = useLocation();
+          const [location] = useLocation();
 
-          // Auto-logout functionality (only enabled when not on login page)
+          // Auto-logout (disabled on login page)
           const isOnLoginPage = location === "/login";
           const { isWarning, remainingSeconds, extendSession, logoutNow, formatTime } =
             useIdleTimeout({
@@ -54,40 +55,51 @@ function Router() {
             });
 
           return (
-            <div className="flex h-screen bg-gray-50">
+            // 👇 Use fullscreen + content-safe-b to be safe across iOS/Android UI bars
+            <main
+              role="main"
+              className="fullscreen content-safe-b flex bg-gray-50"
+            >
               <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-              <div className="flex-1 flex flex-col overflow-auto">
-                {/* Mobile header */}
-                <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+
+              {/* Content column: single scroll container */}
+              <div className="flex-1 min-w-0 flex flex-col overflow-y-auto scroll-touch">
+                {/* Mobile header (sticky + safe notch padding) */}
+                <div className="lg:hidden safe-pad sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-200 px-4 py-3 flex items-center justify-between">
                   <button
                     onClick={() => setSidebarOpen(true)}
                     className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                     data-testid="button-mobile-menu"
+                    aria-label="Open navigation"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                   </button>
-                  <h1 className="text-lg font-semibold text-gray-900">Bahr El Ghazal Clinic</h1>
-                  <div className="w-10"></div>
+                  <h1 className="text-lg font-semibold text-gray-900 truncate">
+                    Bahr El Ghazal Clinic
+                  </h1>
+                  <div aria-hidden className="w-10" />
                 </div>
 
-                <Switch>
-                  <Route path="/" component={AdvancedDashboard} />
-                  <Route path="/advanced" component={AdvancedDashboard} />
-                  <Route path="/simple" component={Dashboard} />
-                  <Route path="/dashboard" component={Dashboard} />
-                  <Route path="/transactions" component={Transactions} />
-                  <Route path="/reports" component={Reports} />
-                  <Route path="/patient-volume" component={PatientVolume} />
-                  <Route path="/insurance-providers" component={InsuranceProviders} />
-                  {/* ⬇️ NEW: Insurance management route */}
-                  <Route path="/insurance" component={Insurance} />
-                  <Route path="/settings" component={Settings} />
-                  <Route path="/security" component={Security} />
-                  <Route path="/users" component={UserManagement} />
-                  <Route component={NotFound} />
-                </Switch>
+                {/* Page routes */}
+                <div className="px-4 sm:px-6 lg:px-8 py-4">
+                  <Switch>
+                    <Route path="/" component={AdvancedDashboard} />
+                    <Route path="/advanced" component={AdvancedDashboard} />
+                    <Route path="/simple" component={Dashboard} />
+                    <Route path="/dashboard" component={Dashboard} />
+                    <Route path="/transactions" component={Transactions} />
+                    <Route path="/reports" component={Reports} />
+                    <Route path="/patient-volume" component={PatientVolume} />
+                    <Route path="/insurance-providers" component={InsuranceProviders} />
+                    <Route path="/insurance" component={Insurance} />
+                    <Route path="/settings" component={Settings} />
+                    <Route path="/security" component={Security} />
+                    <Route path="/users" component={UserManagement} />
+                    <Route component={NotFound} />
+                  </Switch>
+                </div>
               </div>
 
               {/* Auto-logout warning dialog */}
@@ -98,7 +110,7 @@ function Router() {
                 onLogout={logoutNow}
                 formatTime={formatTime}
               />
-            </div>
+            </main>
           );
         }}
       </Route>
@@ -109,7 +121,6 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      {/* ⬇️ Wrap everything that needs the global period with the provider */}
       <DateFilterProvider>
         <TooltipProvider>
           <Toaster />
