@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
@@ -29,13 +29,12 @@ import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-dail
 /* ================== number formatting helpers ================== */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
 const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== helper: normalize range ================== */
+/* ================== helpers: normalize + compare periods ================== */
 function computeRangeParams(
   timeRange: string,
   selectedYear: number | null,
@@ -63,7 +62,6 @@ function computeRangeParams(
   };
 }
 
-/* Label for the comparison period */
 function comparisonLabel(range: string) {
   switch (range) {
     case "current-month":
@@ -74,16 +72,54 @@ function comparisonLabel(range: string) {
       return "prior 3 months";
     case "year":
       return "last year";
-    case "custom":
     default:
       return "previous period";
   }
 }
 
-/* Safe % change */
 function pctChange(cur: number, prev: number): number | null {
   if (!isFinite(prev) || prev === 0) return null;
   return ((cur - prev) / prev) * 100;
+}
+
+/** Previous period params for a second request we’ll use to compute deltas */
+function previousPeriodParams(
+  rangeToSend: string,
+  y: number,
+  m: number,
+  customStart?: Date,
+  customEnd?: Date
+):
+  | { range: "current-month" | "last-3-months" | "year" | "custom"; y?: number; m?: number; startDate?: string; endDate?: string }
+  | null {
+  if (rangeToSend === "current-month") {
+    // Go to previous month (wrap year)
+    const d = new Date(y, m - 2, 1); // months are 0-based
+    return { range: "current-month", y: d.getFullYear(), m: d.getMonth() + 1 };
+  }
+  if (rangeToSend === "last-3-months") {
+    // Compare to the 3 months directly before the current 3-month window
+    const end = new Date(y, m - 1, 1);
+    const endPrev = new Date(end.getFullYear(), end.getMonth() - 3, 1);
+    return { range: "last-3-months", y: endPrev.getFullYear(), m: endPrev.getMonth() + 1 };
+  }
+  if (rangeToSend === "year") {
+    return { range: "year", y: y - 1, m: 1 };
+  }
+  if (rangeToSend === "custom" && customStart && customEnd) {
+    // Previous period of equal length ending the day before customStart
+    const days = differenceInCalendarDays(customEnd, customStart) + 1;
+    const prevEnd = new Date(customStart);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - (days - 1));
+    return {
+      range: "custom",
+      startDate: format(prevStart, "yyyy-MM-dd"),
+      endDate: format(prevEnd, "yyyy-MM-dd"),
+    };
+  }
+  return null;
 }
 
 /* ================== Insurance Providers Card ================== */
@@ -190,7 +226,7 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // Normalize the range for API/links (key fix for "Last Month")
+  // Normalize the range for API/links
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
     timeRange, selectedYear ?? null, selectedMonth ?? null
   );
@@ -209,33 +245,22 @@ export default function AdvancedDashboard() {
   const thisYear = now.getFullYear();
   const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
   const months = [
-    { label: "January", value: 1 },
-    { label: "February", value: 2 },
-    { label: "March", value: 3 },
-    { label: "April", value: 4 },
-    { label: "May", value: 5 },
-    { label: "June", value: 6 },
-    { label: "July", value: 7 },
-    { label: "August", value: 8 },
-    { label: "September", value: 9 },
-    { label: "October", value: 10 },
-    { label: "November", value: 11 },
-    { label: "December", value: 12 },
+    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
+    { label: "April", value: 4 },   { label: "May", value: 5 },      { label: "June", value: 6 },
+    { label: "July", value: 7 },    { label: "August", value: 8 },   { label: "September", value: 9 },
+    { label: "October", value: 10 },{ label: "November", value: 11 },{ label: "December", value: 12 },
   ];
 
-  // ---------- queries ----------
+  // ---------- current period ----------
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
-      yearToSend,
-      monthToSend,
-      rangeToSend,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      yearToSend, monthToSend, rangeToSend,
+      customStartDate?.toISOString(), customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/dashboard?year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
+      if (rangeToSend === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const { data } = await api.get(url);
@@ -243,20 +268,42 @@ export default function AdvancedDashboard() {
     },
   });
 
-  const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
+  // ---------- previous period (for deltas) ----------
+  const prevParams = previousPeriodParams(
+    rangeToSend, yearToSend!, monthToSend!, customStartDate ?? undefined, customEndDate ?? undefined
+  );
 
+  const { data: prevData } = useQuery({
+    queryKey: [
+      "/api/dashboard.previous",
+      prevParams?.range, prevParams?.y, prevParams?.m, prevParams?.startDate, prevParams?.endDate,
+    ],
+    enabled: Boolean(prevParams),
+    queryFn: async () => {
+      if (!prevParams) return null;
+      let url = `/api/dashboard?range=${prevParams.range}`;
+      if (prevParams.range === "custom") {
+        url += `&startDate=${prevParams.startDate}&endDate=${prevParams.endDate}`;
+        // supply anchors so API knows “base” month/year (not always necessary)
+        url += `&year=${yearToSend}&month=${monthToSend}`;
+      } else {
+        url += `&year=${prevParams.y}&month=${prevParams.m}`;
+      }
+      const { data } = await api.get(url);
+      return data;
+    },
+  });
+
+  // ---------- daily series for charts ----------
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
-      yearToSend,
-      monthToSend,
-      rangeToSend,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
+      yearToSend, monthToSend, rangeToSend,
+      customStartDate?.toISOString(), customEndDate?.toISOString(),
     ],
     queryFn: async () => {
       let url = `/api/income-trends/${yearToSend}/${monthToSend}?range=${rangeToSend}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
+      if (rangeToSend === "custom" && customStartDate && customEndDate) {
         url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const { data } = await api.get(url);
@@ -265,10 +312,8 @@ export default function AdvancedDashboard() {
   });
 
   // ---------- build income series ----------
-  let incomeSeries: Array<{
-    day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
-  }> = [];
-  if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
+  let incomeSeries: Array<{ day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string }> = [];
+  if (rangeToSend === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
     incomeSeries = rawIncome.map((r: any, i: number) => ({
       day: i + 1,
       amount: Number(r.income ?? r.amount ?? 0),
@@ -300,17 +345,11 @@ export default function AdvancedDashboard() {
     }
   }
 
-  // ---------- totals & metrics ----------
+  // ---------- totals ----------
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
-  const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
-  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
-  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
-  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
-  const showAvgLine = daysWithSSP >= 2;
-  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
 
-  // loading
+  // loading skeleton
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -322,49 +361,53 @@ export default function AdvancedDashboard() {
     );
   }
 
-  // summary numbers
+  // ---------- current + previous numbers ----------
   const curIncomeSSP = Number(dashboardData?.totalIncomeSSP || 0);
   const curIncomeUSD = Number(dashboardData?.totalIncomeUSD || 0);
   const curExpensesSSP = Number(dashboardData?.totalExpenses || 0); // expenses are SSP
   const curNetSSP = (monthTotalSSP || curIncomeSSP) - curExpensesSSP;
 
-  const prevIncomeSSP = Number(dashboardData?.previousPeriod?.totalIncomeSSP || 0);
-  const prevExpensesSSP = Number(dashboardData?.previousPeriod?.totalExpensesSSP || 0);
-  const prevNetSSP = Number(
-    dashboardData?.previousPeriod?.netIncomeSSP ??
-    (prevIncomeSSP - prevExpensesSSP)
-  );
-  const prevIncomeUSD = Number(dashboardData?.previousPeriod?.totalIncomeUSD || 0);
+  const prevIncomeSSP_fromServer = Number(dashboardData?.previousPeriod?.totalIncomeSSP || 0);
+  const prevExpensesSSP_fromServer = Number(dashboardData?.previousPeriod?.totalExpensesSSP || 0);
+  const prevNetSSP_fromServer =
+    Number(dashboardData?.previousPeriod?.netIncomeSSP) ||
+    (prevIncomeSSP_fromServer - prevExpensesSSP_fromServer);
+  const prevIncomeUSD_fromServer = Number(dashboardData?.previousPeriod?.totalIncomeUSD || 0);
 
-  // prefer backend-provided deltas, else fallback to local calc
+  const prevIncomeSSP = prevData ? Number(prevData?.totalIncomeSSP || 0) : prevIncomeSSP_fromServer;
+  const prevExpensesSSP = prevData ? Number(prevData?.totalExpenses || 0) : prevExpensesSSP_fromServer;
+  const prevNetSSP = prevData ? (Number(prevData?.totalIncomeSSP || 0) - Number(prevData?.totalExpenses || 0)) : prevNetSSP_fromServer;
+  const prevIncomeUSD = prevData ? Number(prevData?.totalIncomeUSD || 0) : prevIncomeUSD_fromServer;
+
   const cmpLabel = comparisonLabel(timeRange);
+
+  // Prefer locally computed % (from prevData). If not available, use previousPeriod; if still not, use backend .changes; else show “—”.
   const incomeChangeSSP =
-    dashboardData?.changes?.incomeChangeSSP ??
-    pctChange(curIncomeSSP, prevIncomeSSP);
+    (prevData ? pctChange(curIncomeSSP, prevIncomeSSP) : null) ??
+    (dashboardData?.previousPeriod ? pctChange(curIncomeSSP, prevIncomeSSP_fromServer) : null) ??
+    (typeof dashboardData?.changes?.incomeChangeSSP === "number" ? dashboardData.changes.incomeChangeSSP : null);
+
   const expenseChangeSSP =
-    dashboardData?.changes?.expenseChangeSSP ??
-    pctChange(curExpensesSSP, prevExpensesSSP);
+    (prevData ? pctChange(curExpensesSSP, prevExpensesSSP) : null) ??
+    (dashboardData?.previousPeriod ? pctChange(curExpensesSSP, prevExpensesSSP_fromServer) : null) ??
+    (typeof dashboardData?.changes?.expenseChangeSSP === "number" ? dashboardData.changes.expenseChangeSSP : null);
+
   const netIncomeChangeSSP =
-    dashboardData?.changes?.netIncomeChangeSSP ??
-    pctChange(curNetSSP, prevNetSSP);
+    (prevData ? pctChange(curNetSSP, prevNetSSP) : null) ??
+    (dashboardData?.previousPeriod ? pctChange(curNetSSP, prevNetSSP_fromServer) : null) ??
+    (typeof dashboardData?.changes?.netIncomeChangeSSP === "number" ? dashboardData.changes.netIncomeChangeSSP : null);
+
   const incomeChangeUSD =
-    dashboardData?.changes?.incomeChangeUSD ??
-    pctChange(curIncomeUSD, prevIncomeUSD);
+    (prevData ? pctChange(curIncomeUSD, prevIncomeUSD) : null) ??
+    (dashboardData?.previousPeriod ? pctChange(curIncomeUSD, prevIncomeUSD_fromServer) : null) ??
+    (typeof dashboardData?.changes?.incomeChangeUSD === "number" ? dashboardData.changes.incomeChangeUSD : null);
 
   const sspRevenue = monthTotalSSP || curIncomeSSP;
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Sticky, modern header with mobile-safe padding */}
-      <header
-        className="
-          sticky top-0 z-50
-          bg-white/80 dark:bg-slate-900/70
-          backdrop-blur-md supports-[backdrop-filter]:bg-white/60
-          shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)]
-          dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]
-        "
-      >
+      {/* Sticky header */}
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/70 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)] dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]">
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
             <div>
@@ -376,7 +419,7 @@ export default function AdvancedDashboard() {
               </div>
             </div>
 
-            {/* RIGHT: range + (optional) month/year or custom dates) */}
+            {/* RIGHT controls */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                 <SelectTrigger className="h-10 w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
@@ -400,7 +443,7 @@ export default function AdvancedDashboard() {
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
-                      {years.map((y) => (
+                      {[thisYear, thisYear - 1, thisYear - 2].map((y) => (
                         <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                       ))}
                     </SelectContent>
@@ -435,18 +478,13 @@ export default function AdvancedDashboard() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      side="bottom"
-                      align="start"
-                      sideOffset={12}
+                      side="bottom" align="start" sideOffset={12}
                       className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                      avoidCollisions
-                      collisionPadding={15}
+                      style={{ zIndex: 50000 }}
+                      avoidCollisions collisionPadding={15}
                     >
                       <DatePicker
-                        mode="single"
-                        numberOfMonths={1}
-                        showOutsideDays={false}
+                        mode="single" numberOfMonths={1} showOutsideDays={false}
                         selected={customStartDate}
                         onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
                         initialFocus
@@ -467,18 +505,13 @@ export default function AdvancedDashboard() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      side="bottom"
-                      align="start"
-                      sideOffset={12}
+                      side="bottom" align="start" sideOffset={12}
                       className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
-                      avoidCollisions
-                      collisionPadding={15}
+                      style={{ zIndex: 50000 }}
+                      avoidCollisions collisionPadding={15}
                     >
                       <DatePicker
-                        mode="single"
-                        numberOfMonths={1}
-                        showOutsideDays={false}
+                        mode="single" numberOfMonths={1} showOutsideDays={false}
                         selected={customEndDate}
                         onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
                         initialFocus
@@ -513,17 +546,17 @@ export default function AdvancedDashboard() {
                           incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
                         }`}>
                           {incomeChangeSSP > 0 ? "+" : ""}
-                          {incomeChangeSSP.toFixed(1)}% vs {cmpLabel}
+                          {incomeChangeSSP.toFixed(1)}% vs {comparisonLabel(timeRange)}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">— vs {cmpLabel}</span>
+                        <span className="text-xs text-slate-400">— vs {comparisonLabel(timeRange)}</span>
                       )}
                     </div>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {incomeChangeSSP !== null && incomeChangeSSP < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-red-600" />
-                    ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
+                    {incomeChangeSSP !== null && incomeChangeSSP < 0
+                      ? <TrendingDown className="h-4 w-4 text-red-600" />
+                      : <TrendingUp className="h-4 w-4 text-emerald-600" />}
                   </div>
                 </div>
               </CardContent>
@@ -549,17 +582,17 @@ export default function AdvancedDashboard() {
                           expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
                         }`}>
                           {expenseChangeSSP > 0 ? "+" : ""}
-                          {expenseChangeSSP.toFixed(1)}% vs {cmpLabel}
+                          {expenseChangeSSP.toFixed(1)}% vs {comparisonLabel(timeRange)}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">— vs {cmpLabel}</span>
+                        <span className="text-xs text-slate-400">— vs {comparisonLabel(timeRange)}</span>
                       )}
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {expenseChangeSSP !== null && expenseChangeSSP < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-emerald-600" />
-                    ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+                    {expenseChangeSSP !== null && expenseChangeSSP < 0
+                      ? <TrendingDown className="h-4 w-4 text-emerald-600" />
+                      : <TrendingUp className="h-4 w-4 text-red-600" />}
                   </div>
                 </div>
               </CardContent>
@@ -581,10 +614,10 @@ export default function AdvancedDashboard() {
                           netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
                         }`}>
                           {netIncomeChangeSSP > 0 ? "+" : ""}
-                          {netIncomeChangeSSP.toFixed(1)}% vs {cmpLabel}
+                          {netIncomeChangeSSP.toFixed(1)}% vs {comparisonLabel(timeRange)}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">— vs {cmpLabel}</span>
+                        <span className="text-xs text-slate-400">— vs {comparisonLabel(timeRange)}</span>
                       )}
                     </div>
                   </div>
@@ -597,7 +630,7 @@ export default function AdvancedDashboard() {
 
             {/* Insurance (USD) quick nav */}
             <Link href={`/insurance-providers?range=${rangeToSend}${
-              timeRange === "custom" && customStartDate && customEndDate
+              rangeToSend === "custom" && customStartDate && customEndDate
                 ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
                 : `&year=${yearToSend}&month=${monthToSend}`
             }`}>
@@ -607,7 +640,7 @@ export default function AdvancedDashboard() {
                     <div>
                       <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                       <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                        USD {fmtUSD(Math.round(curIncomeUSD))}
+                        USD {fmtUSD(Math.round(Number(dashboardData?.totalIncomeUSD || 0)))}
                       </p>
                       <div className="flex items-center mt-1">
                         {incomeChangeUSD !== null && incomeChangeUSD !== undefined ? (
@@ -616,7 +649,7 @@ export default function AdvancedDashboard() {
                             incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
                           }`}>
                             {incomeChangeUSD > 0 ? "+" : ""}
-                            {incomeChangeUSD.toFixed(1)}% vs {cmpLabel}
+                            {incomeChangeUSD.toFixed(1)}% vs {comparisonLabel(timeRange)}
                           </span>
                         ) : (
                           <span className="text-xs font-medium text-purple-600">
@@ -655,7 +688,7 @@ export default function AdvancedDashboard() {
 
           {/* ======= Main Content: Two-column layout ======= */}
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-            {/* LEFT COLUMN: chart + quick actions */}
+            {/* LEFT COLUMN */}
             <div className="space-y-6">
               <RevenueAnalyticsDaily
                 timeRange={rangeToSend}
@@ -711,10 +744,10 @@ export default function AdvancedDashboard() {
               </Card>
             </div>
 
-            {/* RIGHT COLUMN: departments + providers + system status */}
+            {/* RIGHT COLUMN */}
             <div className="space-y-6">
               <DepartmentsPanel
-                departments={Array.isArray(departments) ? (departments as any[]) : []}
+                departments={Array.isArray(dashboardData?.departments) ? (dashboardData.departments as any[]) : []}
                 departmentBreakdown={dashboardData?.departmentBreakdown}
                 totalSSP={sspRevenue}
               />
