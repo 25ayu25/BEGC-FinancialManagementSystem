@@ -63,6 +63,29 @@ function computeRangeParams(
   };
 }
 
+/* Label for the comparison period */
+function comparisonLabel(range: string) {
+  switch (range) {
+    case "current-month":
+    case "last-month":
+    case "month-select":
+      return "last month";
+    case "last-3-months":
+      return "prior 3 months";
+    case "year":
+      return "last year";
+    case "custom":
+    default:
+      return "previous period";
+  }
+}
+
+/* Safe % change */
+function pctChange(cur: number, prev: number): number | null {
+  if (!isFinite(prev) || prev === 0) return null;
+  return ((cur - prev) / prev) * 100;
+}
+
 /* ================== Insurance Providers Card ================== */
 function InsuranceProvidersUSD({
   breakdown,
@@ -300,11 +323,35 @@ export default function AdvancedDashboard() {
   }
 
   // summary numbers
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
-  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
-  const sspNetIncome = sspRevenue - totalExpenses;
+  const curIncomeSSP = Number(dashboardData?.totalIncomeSSP || 0);
+  const curIncomeUSD = Number(dashboardData?.totalIncomeUSD || 0);
+  const curExpensesSSP = Number(dashboardData?.totalExpenses || 0); // expenses are SSP
+  const curNetSSP = (monthTotalSSP || curIncomeSSP) - curExpensesSSP;
+
+  const prevIncomeSSP = Number(dashboardData?.previousPeriod?.totalIncomeSSP || 0);
+  const prevExpensesSSP = Number(dashboardData?.previousPeriod?.totalExpensesSSP || 0);
+  const prevNetSSP = Number(
+    dashboardData?.previousPeriod?.netIncomeSSP ??
+    (prevIncomeSSP - prevExpensesSSP)
+  );
+  const prevIncomeUSD = Number(dashboardData?.previousPeriod?.totalIncomeUSD || 0);
+
+  // prefer backend-provided deltas, else fallback to local calc
+  const cmpLabel = comparisonLabel(timeRange);
+  const incomeChangeSSP =
+    dashboardData?.changes?.incomeChangeSSP ??
+    pctChange(curIncomeSSP, prevIncomeSSP);
+  const expenseChangeSSP =
+    dashboardData?.changes?.expenseChangeSSP ??
+    pctChange(curExpensesSSP, prevExpensesSSP);
+  const netIncomeChangeSSP =
+    dashboardData?.changes?.netIncomeChangeSSP ??
+    pctChange(curNetSSP, prevNetSSP);
+  const incomeChangeUSD =
+    dashboardData?.changes?.incomeChangeUSD ??
+    pctChange(curIncomeUSD, prevIncomeUSD);
+
+  const sspRevenue = monthTotalSSP || curIncomeSSP;
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
@@ -457,23 +504,24 @@ export default function AdvancedDashboard() {
                   <div>
                     <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
+                      SSP {nf0.format(Math.round(monthTotalSSP || curIncomeSSP))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.incomeChangeSSP !== undefined && (
+                      {incomeChangeSSP !== null && incomeChangeSSP !== undefined ? (
                         <span className={`text-xs font-medium ${
-                          dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
-                          dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                          incomeChangeSSP > 0 ? "text-emerald-600" :
+                          incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
                         }`}>
-                          {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
+                          {incomeChangeSSP > 0 ? "+" : ""}
+                          {incomeChangeSSP.toFixed(1)}% vs {cmpLabel}
                         </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">— vs {cmpLabel}</span>
                       )}
                     </div>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.incomeChangeSSP !== undefined &&
-                    dashboardData.changes.incomeChangeSSP < 0 ? (
+                    {incomeChangeSSP !== null && incomeChangeSSP < 0 ? (
                       <TrendingDown className="h-4 w-4 text-red-600" />
                     ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
                   </div>
@@ -492,23 +540,24 @@ export default function AdvancedDashboard() {
                   <div>
                     <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
+                      SSP {nf0.format(Math.round(curExpensesSSP))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.expenseChangeSSP !== undefined && (
+                      {expenseChangeSSP !== null && expenseChangeSSP !== undefined ? (
                         <span className={`text-xs font-medium ${
-                          dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
-                          dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
+                          expenseChangeSSP > 0 ? "text-red-600" :
+                          expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
                         }`}>
-                          {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
+                          {expenseChangeSSP > 0 ? "+" : ""}
+                          {expenseChangeSSP.toFixed(1)}% vs {cmpLabel}
                         </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">— vs {cmpLabel}</span>
                       )}
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                    dashboardData.changes.expenseChangeSSP < 0 ? (
+                    {expenseChangeSSP !== null && expenseChangeSSP < 0 ? (
                       <TrendingDown className="h-4 w-4 text-emerald-600" />
                     ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
                   </div>
@@ -523,17 +572,19 @@ export default function AdvancedDashboard() {
                   <div>
                     <p className="text-slate-600 text-xs font-medium">Net Income</p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
+                      SSP {nf0.format(Math.round(curNetSSP))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
+                      {netIncomeChangeSSP !== null && netIncomeChangeSSP !== undefined ? (
                         <span className={`text-xs font-medium ${
-                          dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
-                          dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
+                          netIncomeChangeSSP > 0 ? "text-emerald-600" :
+                          netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
                         }`}>
-                          {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
+                          {netIncomeChangeSSP > 0 ? "+" : ""}
+                          {netIncomeChangeSSP.toFixed(1)}% vs {cmpLabel}
                         </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">— vs {cmpLabel}</span>
                       )}
                     </div>
                   </div>
@@ -556,16 +607,16 @@ export default function AdvancedDashboard() {
                     <div>
                       <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                       <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                        USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
+                        USD {fmtUSD(Math.round(curIncomeUSD))}
                       </p>
                       <div className="flex items-center mt-1">
-                        {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
+                        {incomeChangeUSD !== null && incomeChangeUSD !== undefined ? (
                           <span className={`text-xs font-medium ${
-                            dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
-                            dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
+                            incomeChangeUSD > 0 ? "text-emerald-600" :
+                            incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
                           }`}>
-                            {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
-                            {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                            {incomeChangeUSD > 0 ? "+" : ""}
+                            {incomeChangeUSD.toFixed(1)}% vs {cmpLabel}
                           </span>
                         ) : (
                           <span className="text-xs font-medium text-purple-600">
@@ -670,7 +721,7 @@ export default function AdvancedDashboard() {
 
               <InsuranceProvidersUSD
                 breakdown={dashboardData?.insuranceBreakdown}
-                totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
+                totalUSD={Number(dashboardData?.totalIncomeUSD || 0)}
                 timeRange={rangeToSend}
                 selectedYear={yearToSend}
                 selectedMonth={monthToSend}
