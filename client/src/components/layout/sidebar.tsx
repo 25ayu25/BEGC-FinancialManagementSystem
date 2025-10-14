@@ -9,12 +9,13 @@ import {
   Users,
   Activity,
   X,
-  ShieldCheck,
-  ListChecks,
+  ShieldCheck,   // main insurance ledger
+  ListChecks,    // providers sub-link
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 
+// allow optional "sub" to render an indented sub-item
 type NavItem = {
   name: string;
   href: string;
@@ -27,6 +28,7 @@ const navigation: NavItem[] = [
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
 
+  // Insurance section (single main item + one indented sub-link)
   { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
   { name: "Insurance", href: "/insurance-providers", icon: ListChecks, sub: true },
 
@@ -44,54 +46,40 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
 
-  // Close on ESC (mobile)
   useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && onClose) onClose();
     };
     if (isOpen) {
-      document.addEventListener("keydown", onEsc);
-      return () => document.removeEventListener("keydown", onEsc);
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
     }
   }, [isOpen, onClose]);
 
-  // Close drawer when a link is tapped on mobile
-  const handleNavClick = useCallback(() => {
-    if (!onClose) return;
-    if (window.matchMedia("(max-width: 1023px)").matches) onClose();
-  }, [onClose]);
-
   return (
     <>
-      {/* Backdrop (mobile only) */}
-      <div
-        className={cn(
-          "fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity",
-          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-        aria-hidden="true"
-        onClick={onClose}
-      />
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
       {/* Sidebar */}
       <aside
-        role="navigation"
-        aria-label="Main navigation"
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 shadow-xl",
-          "flex flex-col transform transition-transform duration-200 ease-in-out",
-          isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0"
+          "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
       >
-        {/* Close button (mobile) */}
+        {/* Mobile close button */}
         <div className="lg:hidden absolute top-4 right-4">
           <button
             onClick={onClose}
             className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             data-testid="button-close-sidebar"
-            aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
           </button>
@@ -102,7 +90,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 shadow-sm">
             <div className="flex items-center space-x-3">
               <div className="bg-teal-50 text-teal-600 border border-teal-100 rounded-lg p-2 flex items-center justify-center">
-                <Building2 className="w-5 h-5" aria-hidden="true" />
+                <Building2 className="w-5 h-5" />
               </div>
               <div>
                 <h1 className="text-slate-800 font-semibold text-base leading-tight">
@@ -116,13 +104,13 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           </div>
         </div>
 
-        {/* Scrollable menu */}
+        {/* Scrollable menu area */}
         <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
           {navigation.map((item) => {
             const isActive = location === item.href;
             const subClasses = item.sub ? "pl-10 text-sm" : "";
             return (
-              <Link key={item.name} href={item.href} onClick={handleNavClick}>
+              <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
@@ -143,7 +131,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* User Profile */}
+        {/* User Profile & Status */}
         <div className="p-4 border-t border-gray-200">
           <UserProfileMenu />
         </div>
