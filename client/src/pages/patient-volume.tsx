@@ -21,7 +21,8 @@ import {
   X,
   Save,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -34,14 +35,24 @@ import {
   Tooltip,
 } from "recharts";
 
-import AppContainer from "@/components/layout/AppContainer";
+import { AppContainer } from "@/components/app-container";
 
 type PatientVolume = {
   id: string;
-  date: string;           // ISO string from API
+  date: string;
   patientCount: number;
-  notes?: string | null;
+  notes: string | null;
 };
+
+type NewVolumeEntry = {
+  date: Date;
+  patientCount: string;
+  notes: string;
+};
+
+function getMonthName(date: Date) {
+  return format(date, "MMMM yyyy");
+}
 
 export default function PatientVolumePage() {
   // URL deep-link support from dashboards (optional)
@@ -60,9 +71,9 @@ export default function PatientVolumePage() {
   }, [viewParam, yearParam, monthParam]);
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(initialMonthDate);
-  const [mode, setMode] = useState<"chart" | "table">("chart");
+  const [tableViewMode, setTableViewMode] = useState<"daily" | "monthly">("daily");
   const [addOpen, setAddOpen] = useState(false);
-  const [newEntry, setNewEntry] = useState<{ date: Date; patientCount: string; notes: string }>({
+  const [newEntry, setNewEntry] = useState<NewVolumeEntry>({
     date: new Date(),
     patientCount: "0",
     notes: "",
@@ -78,10 +89,20 @@ export default function PatientVolumePage() {
   const isThisMonth = isSameMonth(selectedMonth, thisMonthAnchor);
   const isLastMonth = isSameMonth(selectedMonth, lastMonthAnchor);
 
-  const goPrevMonth = () => setSelectedMonth(addMonths(selectedMonth, -1));
-  const goNextMonth = () => setSelectedMonth(addMonths(selectedMonth, +1));
-  const jumpThisMonth = () => setSelectedMonth(thisMonthAnchor);
-  const jumpLastMonth = () => setSelectedMonth(lastMonthAnchor);
+  const handleQuickMonth = (type: "this" | "last") => {
+    if (type === "this") {
+      setSelectedMonth(thisMonthAnchor);
+    } else {
+      setSelectedMonth(lastMonthAnchor);
+    }
+  };
+
+  const gotoPrevMonth = () => {
+    setSelectedMonth((prev) => addMonths(prev, -1));
+  };
+  const gotoNextMonth = () => {
+    setSelectedMonth((prev) => addMonths(prev, 1));
+  };
 
   // --- Fetch the selected month's volumes ---
   const year = selectedMonth.getFullYear();
@@ -97,6 +118,7 @@ export default function PatientVolumePage() {
   });
 
   // --- Normalize & aggregate to days ---
+
   const daysInMonth = useMemo(
     () => new Date(year, monthIndex + 1, 0).getDate(),
     [year, monthIndex]
@@ -151,11 +173,34 @@ export default function PatientVolumePage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Parse and validate patient count
     const pc = parseInt(newEntry.patientCount, 10);
     if (Number.isNaN(pc) || pc < 0) {
       toast({ title: "Enter a valid patient count", variant: "destructive" });
       return;
     }
+
+    // Prevent entering volume twice for the same calendar date
+    const newDate = newEntry.date;
+    const alreadyExistsForDay = rawVolumes.some((v) => {
+      const d = parseISO(v.date);
+      return (
+        d.getFullYear() === newDate.getFullYear() &&
+        d.getMonth() === newDate.getMonth() &&
+        d.getDate() === newDate.getDate()
+      );
+    });
+
+    if (alreadyExistsForDay) {
+      toast({
+        title: "Patient volume already recorded for this date",
+        description: "You can delete the existing record in the table before adding a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createMutation.mutate({
       date: newEntry.date.toISOString(),
       departmentId: null,
@@ -164,258 +209,421 @@ export default function PatientVolumePage() {
     });
   };
 
-  // --- Rendering helpers ---
-  const monthTitle = format(selectedMonth, "MMMM yyyy");
+  const handleDelete = (id: string | null) => {
+    if (!id || deleteMutation.isPending) return;
+    deleteMutation.mutate(id);
+  };
 
-  const TooltipBox = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const p = payload[0].payload;
-    const d = new Date(year, monthIndex, p.day, 12);
-    return (
-      <div className="bg-white border border-slate-200 rounded-md shadow-md px-3 py-2">
-        <div className="font-medium text-slate-900 mb-1">{format(d, "EEE, MMM d, yyyy")}</div>
-        <div className="text-sm text-slate-700">
-          Patients: <span className="font-semibold">{p.count}</span>
-        </div>
-      </div>
-    );
+  // --- Rendering helpers ---
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setNewEntry((prev) => ({ ...prev, date }));
+  };
+
+  const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9]/g, "");
+    setNewEntry((prev) => ({ ...prev, patientCount: value }));
+  };
+
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewEntry((prev) => ({ ...prev, notes: e.target.value }));
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-100">
-        <AppContainer className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <AppContainer>
+        <div className="py-6 space-y-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-              <p className="text-slate-600">Monthly & multi-period summary</p>
+              <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
+                <Users className="w-6 h-6 text-teal-600" />
+                Patient Volume
+              </h1>
+              <p className="text-slate-600 max-w-xl">
+                Track daily patient volume. Each calendar date can only have one entry; delete and re-enter if
+                you need to correct a day.
+              </p>
             </div>
-            <Button
-              className="bg-teal-600 hover:bg-teal-700 w-full sm:w-auto"
-              onClick={() => setAddOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Volume
-            </Button>
-          </div>
-        </AppContainer>
-      </header>
 
-      <AppContainer className="space-y-6 py-6">
-        {/* KPI cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Total Patients</div>
-              <div className="text-2xl font-semibold">{totalPatients.toLocaleString()}</div>
-              <div className="text-xs text-slate-500">{monthTitle}</div>
-            </CardContent>
-          </Card>
-        <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Average / Active Day</div>
-              <div className="text-2xl font-semibold">
-                {activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={gotoPrevMonth}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[220px] justify-start text-left font-normal bg-white",
+                        !selectedMonth && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <span>{getMonthName(selectedMonth)}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={selectedMonth}
+                      onSelect={(v) => v && setSelectedMonth(new Date(v.getFullYear(), v.getMonth(), 1, 12))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <button
+                  type="button"
+                  onClick={gotoNextMonth}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-              <div className="text-xs text-slate-500">{activeDays} active days</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Peak Day</div>
-              <div className="text-2xl font-semibold">{peakCount}</div>
-              <div className="text-xs text-slate-500">
-                {peakDay ? format(new Date(year, monthIndex, peakDay, 12), "EEE, MMM d, yyyy") : "—"}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Controls: month navigation + quick chips + month picker */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={goPrevMonth} title="Previous month">
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="h-8">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  {monthTitle}
+              <div className="flex items-center space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickMonth("this")}
+                  className={cn(
+                    "border-slate-200 text-slate-700",
+                    isThisMonth && "border-teal-500 text-teal-700 bg-teal-50"
+                  )}
+                >
+                  This month
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
-                <Calendar
-                  mode="single"
-                  selected={selectedMonth}
-                  onSelect={(d) => d && setSelectedMonth(new Date(d.getFullYear(), d.getMonth(), 1, 12))}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={goNextMonth} title="Next month">
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-
-            <div className="mx-1 h-6 w-px bg-slate-200" />
-
-            <Button
-              variant={isThisMonth ? "default" : "outline"}
-              className={cn("h-8", isThisMonth ? "bg-slate-900 text-white hover:bg-slate-800" : "")}
-              onClick={jumpThisMonth}
-            >
-              This month
-            </Button>
-            <Button
-              variant={isLastMonth ? "default" : "outline"}
-              className={cn("h-8", isLastMonth ? "bg-slate-900 text-white hover:bg-slate-800" : "")}
-              onClick={jumpLastMonth}
-            >
-              Last month
-            </Button>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant={mode === "chart" ? "default" : "outline"}
-              className={cn(
-                "h-8 px-3",
-                mode === "chart"
-                  ? "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white"
-                  : "text-slate-700"
-              )}
-              onClick={() => setMode("chart")}
-            >
-              <BarChart3 className="w-4 h-4 mr-1 shrink-0" />
-              Chart
-            </Button>
-            <Button
-              variant={mode === "table" ? "default" : "outline"}
-              className={cn(
-                "h-8 px-3",
-                mode === "table"
-                  ? "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white"
-                  : "text-slate-700"
-              )}
-              onClick={() => setMode("table")}
-            >
-              <TableIcon className="w-4 h-4 mr-1 shrink-0" />
-              Table
-            </Button>
-          </div>
-        </div>
-
-        {/* Chart / Table */}
-        <Card>
-          <CardContent className="p-4">
-            {isLoading ? (
-              <div className="py-14 text-center text-slate-500">Loading…</div>
-            ) : mode === "chart" ? (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
-                    <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
-                    <XAxis
-                      dataKey="day"
-                      ticks={xTicks}
-                      tick={{ fontSize: 11, fill: "#64748b" }}
-                      axisLine={{ stroke: "#e5e7eb" }}
-                      tickLine={false}
-                      label={{ value: "Day", position: "insideBottomRight", offset: -14, style: { fill: "#64748b", fontSize: 11 } }}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#64748b" }}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                      label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
-                    />
-                    <Tooltip content={<TooltipBox />} />
-                    <Bar dataKey="count" name="Patients" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickMonth("last")}
+                  className={cn(
+                    "border-slate-200 text-slate-700",
+                    isLastMonth && "border-teal-500 text-teal-700 bg-teal-50"
+                  )}
+                >
+                  Last month
+                </Button>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[480px]">
-                  <div className="grid grid-cols-[1fr_120px_44px] bg-slate-50 text-slate-600 text-sm px-3 py-2 font-medium">
-                    <div>Date</div>
-                    <div className="text-right pr-6">Patients</div>
-                    <div />
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[2fr,3fr]">
+            {/* Left: metrics & summary */}
+            <div className="space-y-4">
+              <Card className="border border-slate-200 shadow-sm">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Total patients this month
+                      </p>
+                      <p className="text-2xl font-semibold text-slate-900">
+                        {isLoading ? "…" : totalPatients}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end space-y-1">
+                      <span className="inline-flex items-center rounded-full bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700 border border-teal-100">
+                        <Users className="w-3 h-3 mr-1" />
+                        {activeDays} active day{activeDays === 1 ? "" : "s"}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        Avg per active day:{" "}
+                        <span className="font-medium text-slate-800">
+                          {activeDays ? Math.round(avgPerActiveDay) : 0}
+                        </span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="divide-y divide-slate-100">
-                    {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
-                      const count = dayBuckets[d - 1] || 0;
-                      const dayDate = new Date(year, monthIndex, d, 12);
-                      const idToDelete =
-                        rawVolumes.find((v) => {
-                          const vd = parseISO(v.date);
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-500">Peak day</p>
+                      <p className="font-medium text-slate-900">
+                        {peakDay ? `${format(new Date(year, monthIndex, peakDay), "MMM d")}` : "-"}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {peakDay ? `${peakCount} patients` : "No volume recorded yet"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Coverage</p>
+                      <p className="font-medium text-slate-900">
+                        {daysInMonth ? Math.round((activeDays / daysInMonth) * 100) : 0}%
+                      </p>
+                      <p className="text-xs text-slate-500">Days with at least 1 patient</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-slate-200 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-slate-500" />
+                      <p className="text-sm font-medium text-slate-800">
+                        Daily Volume ({getMonthName(selectedMonth)})
+                      </p>
+                    </div>
+                    <span className="text-xs text-slate-500">Tap bars to inspect days</span>
+                  </div>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                        <XAxis
+                          dataKey="day"
+                          ticks={xTicks}
+                          tick={{ fontSize: 10 }}
+                          axisLine={{ stroke: "#CBD5F5" }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 10 }}
+                          axisLine={{ stroke: "#CBD5F5" }}
+                          tickLine={false}
+                          allowDecimals={false}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "rgba(56, 189, 248, 0.1)" }}
+                          contentStyle={{
+                            borderRadius: 8,
+                            borderColor: "#E5E7EB",
+                            padding: "6px 8px",
+                          }}
+                          labelFormatter={(value) =>
+                            format(new Date(year, monthIndex, Number(value)), "MMM d")
+                          }
+                          formatter={(value: any) => [`${value} patients`, "Volume"]}
+                        />
+                        <Bar
+                          dataKey="count"
+                          radius={[3, 3, 0, 0]}
+                          className="fill-sky-500 hover:fill-sky-600 transition-colors"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right: table & add form trigger */}
+            <div className="space-y-4">
+              <Card className="border border-slate-200 shadow-sm">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <TableIcon className="w-4 h-4 text-slate-500" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">
+                          Daily entries for {getMonthName(selectedMonth)}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          One entry per calendar date. Delete and re-add to correct a day.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      className="bg-teal-600 hover:bg-teal-700 w-full sm:w-auto"
+                      onClick={() => setAddOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Volume
+                    </Button>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-xs text-slate-500">
+                            Date
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium text-xs text-slate-500">
+                            Patient count
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium text-xs text-slate-500">
+                            Notes (if any)
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium text-xs text-slate-500">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: daysInMonth }).map((_, idx) => {
+                          const day = idx + 1;
+                          const dayDate = new Date(year, monthIndex, day);
+                          const countForDay = dayBuckets[idx];
+
+                          const existingForDay = rawVolumes.filter((v) => {
+                            const d = parseISO(v.date);
+                            return (
+                              d.getFullYear() === dayDate.getFullYear() &&
+                              d.getMonth() === dayDate.getMonth() &&
+                              d.getDate() === dayDate.getDate()
+                            );
+                          });
+
+                          const notesForDay =
+                            existingForDay.length > 0
+                              ? existingForDay
+                                  .map((v) => v.notes)
+                                  .filter(Boolean)
+                                  .join("; ")
+                              : "";
+
+                          const idToDelete = existingForDay.length > 0 ? existingForDay[0].id : null;
+
                           return (
-                            vd.getFullYear() === dayDate.getFullYear() &&
-                            vd.getMonth() === dayDate.getMonth() &&
-                            vd.getDate() === dayDate.getDate()
+                            <tr
+                              key={day}
+                              className={cn(
+                                "border-t border-slate-100",
+                                countForDay > 0 && "bg-slate-50/60"
+                              )}
+                            >
+                              <td className="px-3 py-2 text-xs sm:text-sm text-slate-800 whitespace-nowrap">
+                                {format(dayDate, "EEE, MMM d")}
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs sm:text-sm font-medium text-slate-900">
+                                {countForDay > 0 ? countForDay : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-xs sm:text-sm text-slate-700">
+                                {notesForDay || <span className="text-slate-400">—</span>}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {idToDelete && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-slate-500 hover:text-red-600 hover:bg-red-50"
+                                    disabled={deleteMutation.isPending}
+                                    onClick={() => handleDelete(idToDelete)}
+                                    title="Delete this day's record"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
                           );
-                        })?.id ?? null;
-
-                      return (
-                        <div key={d} className="grid grid-cols-[1fr_120px_44px] items-center px-3 py-2 hover:bg-slate-50">
-                          <div className="text-slate-900">{format(dayDate, "EEE, MMM d, yyyy")}</div>
-                          <div className="text-right font-medium text-slate-900 pr-6">{count}</div>
-                          <div className="flex justify-end">
-                            {idToDelete ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700"
-                                onClick={() => deleteMutation.mutate(idToDelete)}
-                                title="Delete entry"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            ) : (
-                              <div className="h-8 w-8" />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
 
-        {/* Add modal */}
+              <Card className="border border-slate-200 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-slate-500" />
+                      <p className="text-sm font-medium text-slate-800">
+                        Table view mode
+                      </p>
+                    </div>
+                    <div className="inline-flex rounded-full bg-slate-100 p-1">
+                      <button
+                        type="button"
+                        className={cn(
+                          "px-3 py-1 text-xs rounded-full",
+                          tableViewMode === "daily"
+                            ? "bg-white shadow-sm text-slate-900"
+                            : "text-slate-600"
+                        )}
+                        onClick={() => setTableViewMode("daily")}
+                      >
+                        Daily
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(
+                          "px-3 py-1 text-xs rounded-full",
+                          tableViewMode === "monthly"
+                            ? "bg-white shadow-sm text-slate-900"
+                            : "text-slate-600"
+                        )}
+                        onClick={() => setTableViewMode("monthly")}
+                      >
+                        Monthly summary
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Daily view shows each calendar day. Monthly summary aggregates months when you
+                    navigate across time.
+                  </p>
+                  {/* For now, daily & monthly share the same table above; this section explains behavior */}
+                  <p className="text-xs text-slate-500">
+                    Note: This view is scoped to the selected month. Use the month selector above to
+                    navigate.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Volume modal */}
         {addOpen && (
-          <div className="fixed inset-0 z-50 bg-black/20 flex items-start justify-center p-4">
-            <div className="mt-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-                <h3 className="text-base font-semibold text-slate-900">Add Patient Volume</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAddOpen(false)}>
-                  <X className="h-4 w-4" />
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-4 border border-slate-200">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-teal-600" />
+                  <h2 className="text-sm font-semibold text-slate-900">Add patient volume</h2>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setAddOpen(false)}
+                  className="text-slate-500 hover:text-slate-800"
+                  disabled={createMutation.isPending}
+                >
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
-
-              <div className="px-5 py-4">
+              <div className="px-4 py-3">
                 <form onSubmit={handleSave} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Date</Label>
+                    <Label className="text-xs font-medium text-slate-700">Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start">
-                          <CalendarIcon className="w-4 h-4 mr-2" />
-                          {format(newEntry.date, "PPP")}
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-white",
+                            !newEntry.date && "text-muted-foreground"
+                          )}
+                          type="button"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newEntry.date ? (
+                            format(newEntry.date, "EEE, MMM d, yyyy")
+                          ) : (
+                            <span>Select date</span>
+                          )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={newEntry.date}
-                          onSelect={(d) => d && setNewEntry((p) => ({ ...p, date: d }))}
+                          onSelect={(d) => d && handleDateSelect(d)}
+                          disabled={(date) => date > new Date()}
                           initialFocus
                         />
                       </PopoverContent>
@@ -423,35 +631,64 @@ export default function PatientVolumePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Patient Count</Label>
+                    <Label htmlFor="patientCount" className="text-xs font-medium text-slate-700">
+                      Patient count
+                    </Label>
                     <Input
-                      type="number"
-                      min={0}
+                      id="patientCount"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={newEntry.patientCount}
-                      onChange={(e) => setNewEntry((p) => ({ ...p, patientCount: e.target.value }))}
+                      onChange={handleCountChange}
+                      className="bg-white"
                     />
+                    <p className="text-xs text-slate-500">
+                      Enter the total number of patients seen on that date.
+                    </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Notes (Optional)</Label>
+                    <Label htmlFor="notes" className="text-xs font-medium text-slate-700">
+                      Notes (optional)
+                    </Label>
                     <Textarea
+                      id="notes"
                       value={newEntry.notes}
-                      onChange={(e) => setNewEntry((p) => ({ ...p, notes: e.target.value }))}
-                      placeholder="Enter any additional notes (optional)…"
+                      onChange={handleNotesChange}
+                      placeholder="Add any relevant notes (e.g., clinics, outreach, special events)."
+                      className="bg-white"
+                      rows={3}
                     />
                   </div>
 
                   <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                    <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setAddOpen(false)}
+                      disabled={createMutation.isPending}
+                    >
                       Cancel
                     </Button>
                     <Button
                       type="submit"
-                      className="bg-teal-600 hover:bg-teal-700"
+                      className={cn(
+                        "bg-teal-600 hover:bg-teal-700",
+                        createMutation.isPending && "opacity-60 cursor-not-allowed"
+                      )}
                       disabled={createMutation.isPending}
                     >
-                      <Save className="w-4 h-4 mr-2" />
-                      {createMutation.isPending ? "Saving…" : "Save"}
+                      {createMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving…
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save
+                        </>
+                      )}
                     </Button>
                   </div>
                 </form>
