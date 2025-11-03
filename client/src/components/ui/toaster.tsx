@@ -27,7 +27,21 @@ export function Toaster() {
           </Toast>
         )
       })}
-      <ToastViewport />
+
+      {/* Show all toasts at the top-right instead of bottom-right */}
+      <ToastViewport
+        className="
+          fixed
+          top-4 right-4
+          z-[100]
+          flex
+          w-full max-w-[420px]
+          flex-col
+          gap-2
+          p-4
+          sm:w-auto
+        "
+      />
     </ToastProvider>
   )
 }
