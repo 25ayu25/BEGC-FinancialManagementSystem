@@ -28,12 +28,12 @@ export function Toaster() {
         )
       })}
 
-      {/* Show all toasts at the top-right instead of bottom-right */}
+      {/* Centered at the top so it doesn't overlap right-side UI */}
       <ToastViewport
         className="
           fixed
-          top-4 right-4
-          z-[100]
+          top-6 left-1/2 -translate-x-1/2
+          z-[1200]
           flex
           w-full max-w-[420px]
           flex-col
