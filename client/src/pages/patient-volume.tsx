@@ -156,6 +156,28 @@ export default function PatientVolumePage() {
       toast({ title: "Enter a valid patient count", variant: "destructive" });
       return;
     }
+
+    // 🚫 Prevent double entry for the same calendar date (same year/month/day)
+    const newDate = newEntry.date;
+    const alreadyExistsForDay = rawVolumes.some((v) => {
+      const d = parseISO(v.date);
+      return (
+        d.getFullYear() === newDate.getFullYear() &&
+        d.getMonth() === newDate.getMonth() &&
+        d.getDate() === newDate.getDate()
+      );
+    });
+
+    if (alreadyExistsForDay) {
+      toast({
+        title: "Patient volume already recorded for this date",
+        description:
+          "To change the value, delete the existing entry for this date in the table, then add a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createMutation.mutate({
       date: newEntry.date.toISOString(),
       departmentId: null,
@@ -212,7 +234,7 @@ export default function PatientVolumePage() {
               <div className="text-xs text-slate-500">{monthTitle}</div>
             </CardContent>
           </Card>
-        <Card>
+          <Card>
             <CardContent className="p-4">
               <div className="text-xs text-slate-600">Average / Active Day</div>
               <div className="text-2xl font-semibold">
@@ -396,7 +418,7 @@ export default function PatientVolumePage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
                 <h3 className="text-base font-semibold text-slate-900">Add Patient Volume</h3>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAddOpen(false)}>
-                  <X className="h-4 w-4" />
+                  <X className="h-4 h-4" />
                 </Button>
               </div>
 
