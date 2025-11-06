@@ -194,8 +194,10 @@ app.use((req, res, next) => {
   await registerRoutes(app);
 
   // Claim Reconciliation routes
+  log("Registering claim reconciliation router at /api/claim-reconciliation");
   const { claimReconciliationRouter } = await import("./src/routes/claimReconciliation");
   app.use("/api/claim-reconciliation", claimReconciliationRouter);
+  log("Claim reconciliation router registered successfully");
 
   // Error handler (after routes)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
