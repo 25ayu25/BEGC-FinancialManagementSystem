@@ -1717,7 +1717,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   /* Claim Reconciliation                                            */
   /* --------------------------------------------------------------- */
-  app.use("/api/claim-reconciliation", claimReconciliationRouter);
+  app.use("/api/claim-reconciliation", requireAuth, claimReconciliationRouter);
 
   /* --------------------------------------------------------------- */
   /* Catch-all for unknown API routes (must be after all routes)    */
