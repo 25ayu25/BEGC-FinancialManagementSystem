@@ -84,9 +84,11 @@ app.use((req, res, next) => {
 
 /* --------------- Incognito-friendly session header bridge --------------- */
 /**
- * If a client sends X-Session-Token (used by Safari/Incognito fallback),
- * make it available as if it were the "session" cookie so downstream
- * auth code that reads req.cookies.session continues to work unchanged.
+ * Legacy middleware: If a client sends X-Session-Token header,
+ * make it available as req.cookies.session for backward compatibility.
+ * Note: The global auth middleware below handles both user_session cookie 
+ * and x-session-token header directly, so this bridge is primarily for 
+ * any legacy code that still reads req.cookies.session.
  */
 app.use((req, _res, next) => {
   const headerToken =
@@ -105,6 +107,10 @@ app.use((req, _res, next) => {
  * Attempt to populate req.user from session cookie or X-Session-Token header.
  * This middleware runs for all requests but doesn't fail if there's no session.
  * Individual routes can use requireAuth to enforce authentication.
+ * 
+ * Note: This logic is similar to the requireAuth middleware in routes.ts.
+ * The duplication is intentional - this middleware is non-blocking (doesn't fail
+ * requests without auth), while requireAuth in routes.ts blocks unauthorized requests.
  */
 app.use(async (req, _res, next) => {
   try {
