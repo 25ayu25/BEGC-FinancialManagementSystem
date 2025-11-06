@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed-data";
+import { storage } from "./storage";
 
 /* ------------------------------- logging ------------------------------- */
 
@@ -111,18 +112,25 @@ app.use(async (req, _res, next) => {
 
     const sessionCookie = (req as any).cookies?.user_session;
     if (sessionCookie) {
-      try { userSession = JSON.parse(sessionCookie); } catch {}
+      try { 
+        userSession = JSON.parse(sessionCookie); 
+      } catch (e) {
+        // Ignore invalid JSON in session cookie
+      }
     }
 
     if (!userSession) {
       const header = req.headers["x-session-token"];
       if (header) {
-        try { userSession = JSON.parse(header as string); } catch {}
+        try { 
+          userSession = JSON.parse(header as string); 
+        } catch (e) {
+          // Ignore invalid JSON in X-Session-Token header
+        }
       }
     }
 
     if (userSession) {
-      const { storage } = await import("./storage");
       const user = await storage.getUser(userSession.id);
       if (user && user.status !== "inactive") {
         (req as any).user = {
