@@ -46,6 +46,80 @@ const upload = multer({
   },
 });
 
+// Shared handler for POST /upload and POST /run
+const uploadHandler = async (req: Request, res: Response) => {
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const { providerName, periodYear, periodMonth } = req.body;
+    const userId = req.user?.id; // Get from authenticated user
+
+    // Validate required fields
+    if (!providerName || !periodYear || !periodMonth) {
+      return res.status(400).json({
+        error: "Missing required fields: providerName, periodYear, periodMonth",
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        error: "User authentication required",
+      });
+    }
+
+    if (!files.claimsFile || !files.remittanceFile) {
+      return res.status(400).json({
+        error: "Both claimsFile and remittanceFile are required",
+      });
+    }
+
+    // Parse files
+    const claimsBuffer = files.claimsFile[0].buffer;
+    const remittanceBuffer = files.remittanceFile[0].buffer;
+
+    const claims = parseClaimsFile(claimsBuffer);
+    const remittances = parseRemittanceFile(remittanceBuffer);
+
+    // Validate parsed data
+    if (claims.length === 0) {
+      return res.status(400).json({
+        error: "No valid claims found in the uploaded file",
+      });
+    }
+
+    if (remittances.length === 0) {
+      return res.status(400).json({
+        error: "No valid remittances found in the uploaded file",
+      });
+    }
+
+    // Create reconciliation run
+    const run = await createReconRun(
+      providerName,
+      parseInt(periodYear),
+      parseInt(periodMonth),
+      userId
+    );
+
+    // Insert claims and remittances
+    await insertClaims(run.id, claims);
+    await insertRemittances(run.id, remittances);
+
+    // Perform matching
+    const summary = await performMatching(run.id);
+
+    res.json({
+      success: true,
+      runId: run.id,
+      summary,
+    });
+  } catch (error: any) {
+    console.error("Error processing reconciliation:", error);
+    res.status(500).json({
+      error: error.message || "Failed to process reconciliation",
+    });
+  }
+};
+
 /**
  * POST /api/claim-reconciliation/upload
  * Upload and process claim reconciliation files
@@ -57,78 +131,23 @@ router.post(
     { name: "claimsFile", maxCount: 1 },
     { name: "remittanceFile", maxCount: 1 },
   ]),
-  async (req, res) => {
-    try {
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      const { providerName, periodYear, periodMonth } = req.body;
-      const userId = req.user?.id; // Get from authenticated user
+  uploadHandler
+);
 
-      // Validate required fields
-      if (!providerName || !periodYear || !periodMonth) {
-        return res.status(400).json({
-          error: "Missing required fields: providerName, periodYear, periodMonth",
-        });
-      }
-
-      if (!userId) {
-        return res.status(401).json({
-          error: "User authentication required",
-        });
-      }
-
-      if (!files.claimsFile || !files.remittanceFile) {
-        return res.status(400).json({
-          error: "Both claimsFile and remittanceFile are required",
-        });
-      }
-
-      // Parse files
-      const claimsBuffer = files.claimsFile[0].buffer;
-      const remittanceBuffer = files.remittanceFile[0].buffer;
-
-      const claims = parseClaimsFile(claimsBuffer);
-      const remittances = parseRemittanceFile(remittanceBuffer);
-
-      // Validate parsed data
-      if (claims.length === 0) {
-        return res.status(400).json({
-          error: "No valid claims found in the uploaded file",
-        });
-      }
-
-      if (remittances.length === 0) {
-        return res.status(400).json({
-          error: "No valid remittances found in the uploaded file",
-        });
-      }
-
-      // Create reconciliation run
-      const run = await createReconRun(
-        providerName,
-        parseInt(periodYear),
-        parseInt(periodMonth),
-        userId
-      );
-
-      // Insert claims and remittances
-      await insertClaims(run.id, claims);
-      await insertRemittances(run.id, remittances);
-
-      // Perform matching
-      const summary = await performMatching(run.id);
-
-      res.json({
-        success: true,
-        runId: run.id,
-        summary,
-      });
-    } catch (error: any) {
-      console.error("Error processing reconciliation:", error);
-      res.status(500).json({
-        error: error.message || "Failed to process reconciliation",
-      });
-    }
-  }
+/**
+ * POST /api/claim-reconciliation/run
+ * Alias for /upload endpoint - accepts the same multipart form-data
+ * This route is provided for compatibility with frontend code that may call /run
+ * instead of /upload. Both routes use the same handler and have identical functionality.
+ */
+router.post(
+  "/run",
+  requireAuth,
+  upload.fields([
+    { name: "claimsFile", maxCount: 1 },
+    { name: "remittanceFile", maxCount: 1 },
+  ]),
+  uploadHandler
 );
 
 /**
