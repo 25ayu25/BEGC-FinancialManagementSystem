@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { API_BASE_URL } from "@/lib/constants";
+import { api } from "@/lib/queryClient"; // ✅ use shared axios client
 
 interface ReconRun {
   id: number;
@@ -59,30 +59,19 @@ export default function ClaimReconciliation() {
     enabled: !!selectedRunId,
   });
 
-  // Upload mutation
+  // Upload mutation (✅ now uses axios client with cookies + X-Session-Token)
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const uploadUrl = new URL("/api/claim-reconciliation/upload", API_BASE_URL).toString();
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        // Check if response is JSON before parsing
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const error = await response.json();
-          throw new Error(error.error || "Upload failed");
-        } else {
-          // Non-JSON error (likely HTML error page)
-          const text = await response.text();
-          throw new Error(`Upload failed (${response.status}): ${text.substring(0, 100)}`);
+      const response = await api.post(
+        "/api/claim-reconciliation/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         }
-      }
-
-      return response.json();
+      );
+      return response.data;
     },
     onSuccess: (data) => {
       toast({
@@ -95,10 +84,10 @@ export default function ClaimReconciliation() {
       setClaimsFile(null);
       setRemittanceFile(null);
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error?.message || "Upload failed",
         variant: "destructive",
       });
     },
@@ -122,7 +111,7 @@ export default function ClaimReconciliation() {
     formData.append("providerName", providerName);
     formData.append("periodYear", periodYear);
     formData.append("periodMonth", periodMonth);
-    // Note: userId is now obtained server-side from the authenticated session
+    // userId is resolved server-side from session / x-session-token
 
     uploadMutation.mutate(formData);
   };
@@ -130,11 +119,26 @@ export default function ClaimReconciliation() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
-        return <Badge className="bg-green-500"><CheckCircle2 className="w-3 h-3 mr-1" />Paid</Badge>;
+        return (
+          <Badge className="bg-green-500">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Paid
+          </Badge>
+        );
       case "partially_paid":
-        return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" />Partial</Badge>;
+        return (
+          <Badge className="bg-yellow-500">
+            <Clock className="w-3 h-3 mr-1" />
+            Partial
+          </Badge>
+        );
       case "manual_review":
-        return <Badge className="bg-orange-500"><AlertCircle className="w-3 h-3 mr-1" />Review</Badge>;
+        return (
+          <Badge className="bg-orange-500">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Review
+          </Badge>
+        );
       case "submitted":
       default:
         return <Badge variant="secondary">Submitted</Badge>;
