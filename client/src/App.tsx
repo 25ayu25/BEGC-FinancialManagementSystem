@@ -27,6 +27,9 @@ import { DateFilterProvider } from "@/context/date-filter-context";
 // Insurance page
 import Insurance from "@/pages/insurance";
 
+// Claim Reconciliation page
+import ClaimReconciliation from "@/pages/claim-reconciliation";
+
 function Router() {
   return (
     <Switch>
@@ -94,6 +97,7 @@ function Router() {
                     <Route path="/patient-volume" component={PatientVolume} />
                     <Route path="/insurance-providers" component={InsuranceProviders} />
                     <Route path="/insurance" component={Insurance} />
+                    <Route path="/claim-reconciliation" component={ClaimReconciliation} />
                     <Route path="/settings" component={Settings} />
                     <Route path="/security" component={Security} />
                     <Route path="/users" component={UserManagement} />

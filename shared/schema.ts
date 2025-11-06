@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, integer, jsonb, serial, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -214,3 +214,97 @@ export type InsertInsuranceClaim = z.infer<typeof insertInsuranceClaimSchema>;
 
 export type InsurancePayment = typeof insurancePayments.$inferSelect;
 export type InsertInsurancePayment = z.infer<typeof insertInsurancePaymentSchema>;
+
+/* =======================
+   Claim Reconciliation
+   ======================= */
+
+// 1) Reconciliation run (per provider + period)
+export const claimReconRuns = pgTable("claim_recon_runs", {
+  id: serial("id").primaryKey(),
+  providerName: varchar("provider_name", { length: 128 }).notNull(),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month").notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+
+  // summary stats
+  totalClaimRows: integer("total_claim_rows").notNull().default(0),
+  totalRemittanceRows: integer("total_remittance_rows").notNull().default(0),
+  autoMatched: integer("auto_matched").notNull().default(0),
+  partialMatched: integer("partial_matched").notNull().default(0),
+  manualReview: integer("manual_review").notNull().default(0),
+});
+
+// 2) Raw "Claims Submitted" rows
+export const claimReconClaims = pgTable("claim_recon_claims", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull().references(() => claimReconRuns.id, { onDelete: "cascade" }),
+
+  memberNumber: varchar("member_number", { length: 64 }).notNull(),
+  patientName: varchar("patient_name", { length: 256 }),
+  serviceDate: date("service_date").notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 64 }),
+  claimType: varchar("claim_type", { length: 64 }),
+  schemeName: varchar("scheme_name", { length: 256 }),
+  benefitDesc: varchar("benefit_desc", { length: 256 }),
+
+  billedAmount: decimal("billed_amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("SSP"),
+
+  // reconciliation fields
+  status: varchar("status", { length: 32 }).notNull().default("submitted"),
+  amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).notNull().default("0"),
+  remittanceLineId: integer("remittance_line_id"),
+
+  compositeKey: varchar("composite_key", { length: 128 }).notNull(),
+
+  rawRow: jsonb("raw_row"),
+});
+
+// 3) Raw remittance lines
+export const claimReconRemittances = pgTable("claim_recon_remittances", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull().references(() => claimReconRuns.id, { onDelete: "cascade" }),
+
+  employerName: varchar("employer_name", { length: 256 }),
+  patientName: varchar("patient_name", { length: 256 }),
+  memberNumber: varchar("member_number", { length: 64 }).notNull(),
+  claimNumber: varchar("claim_number", { length: 64 }),
+  relationship: varchar("relationship", { length: 64 }),
+  serviceDate: date("service_date").notNull(),
+  claimAmount: decimal("claim_amount", { precision: 12, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).notNull(),
+  paymentNo: varchar("payment_no", { length: 64 }),
+  paymentMode: varchar("payment_mode", { length: 64 }),
+
+  compositeKey: varchar("composite_key", { length: 128 }).notNull(),
+
+  matchedClaimId: integer("matched_claim_id"),
+  matchType: varchar("match_type", { length: 32 }),
+  rawRow: jsonb("raw_row"),
+});
+
+// Insert schemas for claim reconciliation
+export const insertClaimReconRunSchema = createInsertSchema(claimReconRuns).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertClaimReconClaimSchema = createInsertSchema(claimReconClaims).omit({
+  id: true,
+});
+
+export const insertClaimReconRemittanceSchema = createInsertSchema(claimReconRemittances).omit({
+  id: true,
+});
+
+// Types for claim reconciliation
+export type ClaimReconRun = typeof claimReconRuns.$inferSelect;
+export type InsertClaimReconRun = z.infer<typeof insertClaimReconRunSchema>;
+
+export type ClaimReconClaim = typeof claimReconClaims.$inferSelect;
+export type InsertClaimReconClaim = z.infer<typeof insertClaimReconClaimSchema>;
+
+export type ClaimReconRemittance = typeof claimReconRemittances.$inferSelect;
+export type InsertClaimReconRemittance = z.infer<typeof insertClaimReconRemittanceSchema>;
