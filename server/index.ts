@@ -1,8 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed-data";
+import { storage } from "./storage";
 
 /* ------------------------------- logging ------------------------------- */
 
@@ -19,61 +21,56 @@ function log(message: string, source = "express") {
 /* -------------------------------- setup -------------------------------- */
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
 
 // trust proxy (Render/Netlify)
 app.set("trust proxy", 1);
 
 // Allowed web origins for CORS (comma-separated). Example:
 // WEB_ORIGINS="https://finance.bahrelghazalclinic.com,https://your-preview-site.netlify.app"
-const RAW_ORIGINS = (process.env.WEB_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+// Also supports ALLOWED_ORIGINS for backward compatibility
+const RAW_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 const isProd = app.get("env") === "production";
 
 /* --------------------------------- CORS --------------------------------- */
 /**
- * We allow credentials so cookies can flow when they work,
- * and we also allow the fallback X-Session-Token header.
+ * Configure CORS to allow credentials (cookies) and the fallback X-Session-Token header.
+ * In production, only allow origins listed in ALLOWED_ORIGINS or WEB_ORIGINS environment variable.
+ * In development, allow any origin for local testing.
  */
-app.use((req, res, next) => {
-  const origin = req.headers.origin as string | undefined;
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (!isProd) {
+      // In development, allow any origin
+      return callback(null, true);
+    }
+    
+    // In production, check against allowed origins
+    if (RAW_ORIGINS.length > 0 && RAW_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Reject other origins in production
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  allowedHeaders: ["Content-Type", "X-Session-Token", "Authorization"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS", "PUT"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
 
-  // Decide if we should reflect the origin
-  let allowThisOrigin = false;
-  if (!origin) {
-    allowThisOrigin = false;
-  } else if (!isProd) {
-    // in dev we reflect any origin to simplify local development
-    allowThisOrigin = true;
-  } else if (RAW_ORIGINS.length > 0) {
-    allowThisOrigin = RAW_ORIGINS.includes(origin);
-  } else {
-    // in prod with no explicit list, only allow same-origin (no CORS)
-    allowThisOrigin = false;
-  }
-
-  if (allowThisOrigin) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, X-Session-Token"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PATCH, DELETE, OPTIONS"
-    );
-  }
-
-  if (req.method === "OPTIONS") {
-    // Preflight
-    return res.sendStatus(204);
-  }
-
-  next();
-});
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 /* ---------- Prevent caching for API responses that change often ---------- */
 app.use((req, res, next) => {
@@ -87,9 +84,11 @@ app.use((req, res, next) => {
 
 /* --------------- Incognito-friendly session header bridge --------------- */
 /**
- * If a client sends X-Session-Token (used by Safari/Incognito fallback),
- * make it available as if it were the "session" cookie so downstream
- * auth code that reads req.cookies.session continues to work unchanged.
+ * Legacy middleware: If a client sends X-Session-Token header,
+ * make it available as req.cookies.session for backward compatibility.
+ * Note: The global auth middleware below handles both user_session cookie 
+ * and x-session-token header directly, so this bridge is primarily for 
+ * any legacy code that still reads req.cookies.session.
  */
 app.use((req, _res, next) => {
   const headerToken =
@@ -100,6 +99,60 @@ app.use((req, _res, next) => {
   if (headerToken && (!req.cookies || !req.cookies.session)) {
     (req as any).cookies = { ...(req as any).cookies, session: String(headerToken) };
   }
+  next();
+});
+
+/* -------------------- Global authentication middleware -------------------- */
+/**
+ * Attempt to populate req.user from session cookie or X-Session-Token header.
+ * This middleware runs for all requests but doesn't fail if there's no session.
+ * Individual routes can use requireAuth to enforce authentication.
+ * 
+ * Note: This logic is similar to the requireAuth middleware in routes.ts.
+ * The duplication is intentional - this middleware is non-blocking (doesn't fail
+ * requests without auth), while requireAuth in routes.ts blocks unauthorized requests.
+ */
+app.use(async (req, _res, next) => {
+  try {
+    let userSession: any = null;
+
+    const sessionCookie = (req as any).cookies?.user_session;
+    if (sessionCookie) {
+      try { 
+        userSession = JSON.parse(sessionCookie); 
+      } catch (e) {
+        // Ignore invalid JSON in session cookie
+      }
+    }
+
+    if (!userSession) {
+      const header = req.headers["x-session-token"];
+      if (header) {
+        try { 
+          userSession = JSON.parse(header as string); 
+        } catch (e) {
+          // Ignore invalid JSON in X-Session-Token header
+        }
+      }
+    }
+
+    if (userSession) {
+      const user = await storage.getUser(userSession.id);
+      if (user && user.status !== "inactive") {
+        (req as any).user = {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          location: user.location,
+          fullName: user.fullName,
+        };
+      }
+    }
+  } catch (err) {
+    console.error("Error populating req.user:", err);
+    // Don't fail the request, just continue without user
+  }
+  
   next();
 });
 
