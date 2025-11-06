@@ -10,6 +10,7 @@ import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -159,6 +160,60 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
     next();
   });
+
+  /* --------------------------------------------------------------- */
+  /* User session hydration middleware                               */
+  /* --------------------------------------------------------------- */
+  app.use(async (req, _res, next) => {
+    try {
+      let userSession: any = null;
+
+      // Try to get session from cookie first
+      const sessionCookie = (req as any).cookies?.user_session;
+      if (sessionCookie) {
+        try {
+          userSession = JSON.parse(sessionCookie);
+        } catch {
+          // Ignore invalid JSON in cookie
+        }
+      }
+
+      // If no cookie, try X-Session-Token header
+      if (!userSession) {
+        const header = req.headers["x-session-token"];
+        if (header) {
+          try {
+            userSession = JSON.parse(header as string);
+          } catch {
+            // Ignore invalid JSON in header
+          }
+        }
+      }
+
+      // If we have a session, validate and populate req.user
+      if (userSession && userSession.id) {
+        const user = await storage.getUser(userSession.id);
+        if (user && user.status !== "inactive") {
+          req.user = {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            location: user.location,
+            fullName: user.fullName,
+          };
+        }
+      }
+    } catch (err) {
+      // Silent failure - don't block the request
+      console.error("Session hydration error:", err);
+    }
+    next();
+  });
+
+  /* --------------------------------------------------------------- */
+  /* Claim Reconciliation Routes                                     */
+  /* --------------------------------------------------------------- */
+  app.use('/api/claim-reconciliation', claimReconciliationRouter);
 
   /* --------------------------------------------------------------- */
   /* Health                                                          */
