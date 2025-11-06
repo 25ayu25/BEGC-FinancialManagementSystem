@@ -54,7 +54,10 @@ DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-ID].supabase.co:5432/p
 SUPABASE_URL=https://[PROJECT-ID].supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 NODE_ENV=production
+ALLOWED_ORIGINS=https://finance.bahrelghazalclinic.com,https://your-site.netlify.app
 ```
+
+**Note on CORS**: The `ALLOWED_ORIGINS` environment variable is crucial for security. It should contain a comma-separated list of allowed frontend origins. The server will reject requests from any other origin.
 
 ### 4. File Storage Migration (Optional)
 If using file uploads, migrate from Google Cloud to Supabase Storage:
@@ -129,7 +132,11 @@ dist/
 **Solution**: Check DATABASE_URL format, verify IP allowlist
 
 **Issue**: "CORS errors"
-**Solution**: Configure proper CORS headers in Express app
+**Solution**: 
+1. Make sure `ALLOWED_ORIGINS` environment variable is set in your deployment platform (Render, Netlify, etc.)
+2. The value should be a comma-separated list of frontend URLs, e.g., `https://finance.bahrelghazalclinic.com,https://preview.netlify.app`
+3. Check that the frontend origin exactly matches one of the allowed origins (including protocol and no trailing slash)
+4. For Render deployments, update the `ALLOWED_ORIGINS` value in the render.yaml or dashboard
 
 **Issue**: "Cold start delays"
 **Solution**: Implement function warming or consider upgrading to paid plan

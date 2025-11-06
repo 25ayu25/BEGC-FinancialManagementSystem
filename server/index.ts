@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
@@ -19,61 +20,56 @@ function log(message: string, source = "express") {
 /* -------------------------------- setup -------------------------------- */
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
 
 // trust proxy (Render/Netlify)
 app.set("trust proxy", 1);
 
 // Allowed web origins for CORS (comma-separated). Example:
 // WEB_ORIGINS="https://finance.bahrelghazalclinic.com,https://your-preview-site.netlify.app"
-const RAW_ORIGINS = (process.env.WEB_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+// Also supports ALLOWED_ORIGINS for backward compatibility
+const RAW_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 const isProd = app.get("env") === "production";
 
 /* --------------------------------- CORS --------------------------------- */
 /**
- * We allow credentials so cookies can flow when they work,
- * and we also allow the fallback X-Session-Token header.
+ * Configure CORS to allow credentials (cookies) and the fallback X-Session-Token header.
+ * In production, only allow origins listed in ALLOWED_ORIGINS or WEB_ORIGINS environment variable.
+ * In development, allow any origin for local testing.
  */
-app.use((req, res, next) => {
-  const origin = req.headers.origin as string | undefined;
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (!isProd) {
+      // In development, allow any origin
+      return callback(null, true);
+    }
+    
+    // In production, check against allowed origins
+    if (RAW_ORIGINS.length > 0 && RAW_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Reject other origins in production
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  allowedHeaders: ["Content-Type", "X-Session-Token", "Authorization"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS", "PUT"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
 
-  // Decide if we should reflect the origin
-  let allowThisOrigin = false;
-  if (!origin) {
-    allowThisOrigin = false;
-  } else if (!isProd) {
-    // in dev we reflect any origin to simplify local development
-    allowThisOrigin = true;
-  } else if (RAW_ORIGINS.length > 0) {
-    allowThisOrigin = RAW_ORIGINS.includes(origin);
-  } else {
-    // in prod with no explicit list, only allow same-origin (no CORS)
-    allowThisOrigin = false;
-  }
-
-  if (allowThisOrigin) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, X-Session-Token"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PATCH, DELETE, OPTIONS"
-    );
-  }
-
-  if (req.method === "OPTIONS") {
-    // Preflight
-    return res.sendStatus(204);
-  }
-
-  next();
-});
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 /* ---------- Prevent caching for API responses that change often ---------- */
 app.use((req, res, next) => {
