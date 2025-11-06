@@ -136,7 +136,9 @@ router.post(
 
 /**
  * POST /api/claim-reconciliation/run
- * Alias for /upload endpoint
+ * Alias for /upload endpoint - accepts the same multipart form-data
+ * This route is provided for compatibility with frontend code that may call /run
+ * instead of /upload. Both routes use the same handler and have identical functionality.
  */
 router.post(
   "/run",

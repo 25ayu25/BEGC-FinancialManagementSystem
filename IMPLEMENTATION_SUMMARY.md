@@ -5,14 +5,14 @@
 ### 1. Added POST /run Route (server/src/routes/claimReconciliation.ts)
 - **Purpose:** Provides an alias to the existing POST /upload endpoint
 - **Implementation:** Extracted upload handler logic into a shared function `uploadHandler` used by both routes
-- **Location:** Lines 49-107 (handler), Lines 109-125 (routes)
+- **Location:** Lines 49-109 (handler), Lines 111-152 (routes)
 - **Routes:**
   - `POST /api/claim-reconciliation/upload` (existing)
   - `POST /api/claim-reconciliation/run` (new alias)
 
 ### 2. Added Route Registration Logging (server/index.ts)
 - **Purpose:** Aid debugging by logging when the claim reconciliation router is registered
-- **Location:** Lines 196-200
+- **Location:** Lines 197 and 200
 - **Log Messages:**
   - "Registering claim reconciliation router at /api/claim-reconciliation"
   - "Claim reconciliation router registered successfully"
