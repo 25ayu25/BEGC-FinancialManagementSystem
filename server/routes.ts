@@ -1730,7 +1730,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* Error Handler (must be last)                                   */
   /* --------------------------------------------------------------- */
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    if (res.headersSent) return; // let Express handle if already started
+    if (res.headersSent) {
+      return next(err); // let Express handle if already started
+    }
     const status = err?.status || err?.statusCode || 500;
     const message = err?.message || "Internal Server Error";
     const resp: Record<string, unknown> = { error: message };
