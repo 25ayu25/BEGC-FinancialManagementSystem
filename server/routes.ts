@@ -1718,4 +1718,24 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* Claim Reconciliation                                            */
   /* --------------------------------------------------------------- */
   app.use("/api/claim-reconciliation", claimReconciliationRouter);
+
+  /* --------------------------------------------------------------- */
+  /* Catch-all for unknown API routes (must be after all routes)    */
+  /* --------------------------------------------------------------- */
+  app.all("/api/*", (_req, res) => {
+    res.status(404).json({ error: "API endpoint not found" });
+  });
+
+  /* --------------------------------------------------------------- */
+  /* Error Handler (must be last)                                   */
+  /* --------------------------------------------------------------- */
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (res.headersSent) return; // let Express handle if already started
+    const status = err?.status || err?.statusCode || 500;
+    const message = err?.message || "Internal Server Error";
+    const resp: Record<string, unknown> = { error: message };
+    if (process.env.NODE_ENV !== "production" && err?.stack) resp.stack = err.stack;
+    console.error("[api-error]", status, message);
+    res.status(status).json(resp);
+  });
 }
