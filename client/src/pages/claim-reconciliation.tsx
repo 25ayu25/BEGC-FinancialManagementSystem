@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/constants";
 
 interface ReconRun {
   id: number;
@@ -61,15 +62,24 @@ export default function ClaimReconciliation() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch("/api/claim-reconciliation/upload", {
+      const uploadUrl = new URL("/api/claim-reconciliation/upload", API_BASE_URL).toString();
+      const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
         credentials: "include",
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Upload failed");
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        } else {
+          // Non-JSON error (likely HTML error page)
+          const text = await response.text();
+          throw new Error(`Upload failed (${response.status}): ${text.substring(0, 100)}`);
+        }
       }
 
       return response.json();
