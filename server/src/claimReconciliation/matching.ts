@@ -3,7 +3,63 @@
 import type { ClaimRow, RemittanceRow, MatchResult } from "./types";
 
 /**
- * Generate a composite key for matching
+ * Normalize a member number: remove whitespace, uppercase
+ */
+const normalizeMember = (m: string) =>
+  m.trim().replace(/\s+/g, "").toUpperCase();
+
+/**
+ * Normalize a date into YYYY-MM-DD
+ */
+const normalizeDate = (d: Date | string) => {
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toISOString().slice(0, 10); // e.g. "2025-08-03"
+};
+
+/**
+ * Convert to integer cents
+ */
+const toCents = (amount: number) => Math.round(amount * 100);
+
+/**
+ * For claims table: single canonical composite key
+ */
+export function buildClaimCompositeKey(
+  memberNumber: string,
+  serviceDate: Date | string,
+  billedAmount: number
+): string {
+  return [
+    normalizeMember(memberNumber),
+    normalizeDate(serviceDate),
+    toCents(billedAmount).toString(),
+  ].join("|");
+}
+
+/**
+ * For remittance lines: generate several key variants with small
+ * ±1–2 currency unit tolerance to account for rounding / small changes.
+ */
+export function buildRemittanceKeyVariants(
+  memberNumber: string,
+  serviceDate: Date | string,
+  claimAmount: number
+): string[] {
+  const member = normalizeMember(memberNumber);
+  const date = normalizeDate(serviceDate);
+  const baseCents = toCents(claimAmount);
+
+  // 0, ±1, ±2 units of currency (in cents)
+  const deltas = [0, 100, -100, 200, -200];
+
+  return deltas.map((delta) =>
+    [member, date, (baseCents + delta).toString()].join("|")
+  );
+}
+
+/**
+ * Legacy function - kept for backward compatibility but deprecated
+ * @deprecated Use buildClaimCompositeKey instead
  */
 export function generateCompositeKey(
   memberNumber: string,
@@ -29,20 +85,75 @@ export function matchClaimsToRemittances(
 ): MatchResult[] {
   const results: MatchResult[] = [];
   
-  // Build a map of remittances by composite key
-  const remitMap = new Map<string, Array<{ id: number; data: RemittanceRow }>>();
-  for (const rem of remittances) {
-    const existing = remitMap.get(rem.compositeKey) || [];
-    existing.push(rem);
-    remitMap.set(rem.compositeKey, existing);
+  // Build a map of claims by composite key for efficient lookup
+  const claimMap = new Map<string, { id: number; data: ClaimRow }>();
+  for (const claim of claims) {
+    claimMap.set(claim.compositeKey, claim);
   }
 
-  // Match each claim
+  // Track which claims have been matched to avoid duplicates
+  const matchedClaims = new Set<number>();
+
+  // Match each remittance to claims using key variants
+  for (const rem of remittances) {
+    // Generate key variants for this remittance
+    const keyVariants = buildRemittanceKeyVariants(
+      rem.data.memberNumber,
+      rem.data.serviceDate,
+      rem.data.claimAmount
+    );
+
+    // Try to find a matching claim using any of the key variants
+    let matchedClaim: { id: number; data: ClaimRow } | undefined;
+    for (const key of keyVariants) {
+      const claim = claimMap.get(key);
+      if (claim && !matchedClaims.has(claim.id)) {
+        matchedClaim = claim;
+        break;
+      }
+    }
+
+    if (matchedClaim) {
+      matchedClaims.add(matchedClaim.id);
+      
+      const claimAmount = normalizeAmount(matchedClaim.data.billedAmount);
+      const paidAmount = normalizeAmount(rem.data.paidAmount);
+
+      // Determine match status based on amounts
+      let status: "submitted" | "paid" | "partially_paid" | "manual_review";
+      let matchType: "exact" | "partial" | "none";
+
+      if (paidAmount === claimAmount) {
+        // Exact match
+        status = "paid";
+        matchType = "exact";
+      } else if (paidAmount >= claimAmount) {
+        // Overpaid (still considered paid)
+        status = "paid";
+        matchType = "partial";
+      } else if (paidAmount > 0 && paidAmount < claimAmount) {
+        // Partially paid
+        status = "partially_paid";
+        matchType = "partial";
+      } else {
+        // Manual review needed
+        status = "manual_review";
+        matchType = "partial";
+      }
+
+      results.push({
+        claimId: matchedClaim.id,
+        remittanceId: rem.id,
+        matchType,
+        amountPaid: rem.data.paidAmount,
+        status,
+      });
+    }
+  }
+
+  // Add unmatched claims
   for (const claim of claims) {
-    const matchingRemits = remitMap.get(claim.compositeKey) || [];
-    
-    if (matchingRemits.length === 0) {
-      // No match
+    if (!matchedClaims.has(claim.id)) {
       results.push({
         claimId: claim.id,
         remittanceId: null,
@@ -50,64 +161,6 @@ export function matchClaimsToRemittances(
         amountPaid: 0,
         status: "submitted",
       });
-      continue;
-    }
-
-    // Try to find exact amount match
-    const claimAmount = normalizeAmount(claim.data.billedAmount);
-    let exactMatch = matchingRemits.find(
-      (r) => normalizeAmount(r.data.paidAmount) === claimAmount
-    );
-
-    if (exactMatch) {
-      // Exact match
-      results.push({
-        claimId: claim.id,
-        remittanceId: exactMatch.id,
-        matchType: "exact",
-        amountPaid: exactMatch.data.paidAmount,
-        status: "paid",
-      });
-      // Remove from map to avoid duplicate matching
-      const arr = remitMap.get(claim.compositeKey)!;
-      const idx = arr.indexOf(exactMatch);
-      if (idx > -1) arr.splice(idx, 1);
-    } else {
-      // Partial match - sum all matching remittances
-      const totalPaid = matchingRemits.reduce(
-        (sum, r) => sum + r.data.paidAmount,
-        0
-      );
-      const normalizedTotal = normalizeAmount(totalPaid);
-
-      if (normalizedTotal > 0 && normalizedTotal < claimAmount) {
-        // Partially paid
-        results.push({
-          claimId: claim.id,
-          remittanceId: matchingRemits[0].id, // Link to first remittance
-          matchType: "partial",
-          amountPaid: totalPaid,
-          status: "partially_paid",
-        });
-      } else if (normalizedTotal >= claimAmount) {
-        // Overpaid or exact (after summing)
-        results.push({
-          claimId: claim.id,
-          remittanceId: matchingRemits[0].id,
-          matchType: normalizedTotal === claimAmount ? "exact" : "partial",
-          amountPaid: totalPaid,
-          status: "paid",
-        });
-      } else {
-        // Manual review needed
-        results.push({
-          claimId: claim.id,
-          remittanceId: matchingRemits[0].id,
-          matchType: "partial",
-          amountPaid: totalPaid,
-          status: "manual_review",
-        });
-      }
     }
   }
 

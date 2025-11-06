@@ -4,7 +4,7 @@ import { db } from "../../../server/db";
 import { claimReconRuns, claimReconClaims, claimReconRemittances } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
-import { generateCompositeKey, matchClaimsToRemittances } from "./matching";
+import { buildClaimCompositeKey, buildRemittanceKeyVariants, matchClaimsToRemittances } from "./matching";
 
 /**
  * Create a new reconciliation run
@@ -45,7 +45,7 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
     currency: claim.currency || "SSP",
     status: "submitted" as const,
     amountPaid: "0",
-    compositeKey: generateCompositeKey(claim.memberNumber, claim.serviceDate),
+    compositeKey: buildClaimCompositeKey(claim.memberNumber, claim.serviceDate, claim.billedAmount),
     rawRow: claim as any,
   }));
 
@@ -61,21 +61,27 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
  * Insert parsed remittances
  */
 export async function insertRemittances(runId: number, remittances: RemittanceRow[]) {
-  const remittancesToInsert = remittances.map((rem) => ({
-    runId,
-    employerName: rem.employerName || null,
-    patientName: rem.patientName || null,
-    memberNumber: rem.memberNumber,
-    claimNumber: rem.claimNumber || null,
-    relationship: rem.relationship || null,
-    serviceDate: rem.serviceDate.toISOString().split("T")[0],
-    claimAmount: rem.claimAmount.toString(),
-    paidAmount: rem.paidAmount.toString(),
-    paymentNo: rem.paymentNo || null,
-    paymentMode: rem.paymentMode || null,
-    compositeKey: generateCompositeKey(rem.memberNumber, rem.serviceDate),
-    rawRow: rem as any,
-  }));
+  const remittancesToInsert = remittances.map((rem) => {
+    // For remittances, we store the first variant as the composite key
+    // The matching algorithm will generate all variants during matching
+    const keyVariants = buildRemittanceKeyVariants(rem.memberNumber, rem.serviceDate, rem.claimAmount);
+    
+    return {
+      runId,
+      employerName: rem.employerName || null,
+      patientName: rem.patientName || null,
+      memberNumber: rem.memberNumber,
+      claimNumber: rem.claimNumber || null,
+      relationship: rem.relationship || null,
+      serviceDate: rem.serviceDate.toISOString().split("T")[0],
+      claimAmount: rem.claimAmount.toString(),
+      paidAmount: rem.paidAmount.toString(),
+      paymentNo: rem.paymentNo || null,
+      paymentMode: rem.paymentMode || null,
+      compositeKey: keyVariants[0], // Store the base key (no delta)
+      rawRow: rem as any,
+    };
+  });
 
   const inserted = await db
     .insert(claimReconRemittances)
