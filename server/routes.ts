@@ -10,6 +10,7 @@ import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -157,6 +158,58 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader("Access-Control-Max-Age", "600");
       return res.status(204).end();
     }
+    next();
+  });
+
+  /* --------------------------------------------------------------- */
+  /* Global user-session hydration middleware                       */
+  /* --------------------------------------------------------------- */
+  /**
+   * Attempt to populate req.user from session cookie or X-Session-Token header.
+   * This middleware runs for all requests but doesn't fail if there's no session.
+   * Individual routes can use requireAuth to enforce authentication.
+   */
+  app.use(async (req, _res, next) => {
+    try {
+      let userSession: any = null;
+
+      const sessionCookie = (req as any).cookies?.user_session;
+      if (sessionCookie) {
+        try { 
+          userSession = JSON.parse(sessionCookie); 
+        } catch (e) {
+          // Ignore invalid JSON in session cookie
+        }
+      }
+
+      if (!userSession) {
+        const header = req.headers["x-session-token"];
+        if (header) {
+          try { 
+            userSession = JSON.parse(header as string); 
+          } catch (e) {
+            // Ignore invalid JSON in X-Session-Token header
+          }
+        }
+      }
+
+      if (userSession) {
+        const user = await storage.getUser(userSession.id);
+        if (user && user.status !== "inactive") {
+          (req as any).user = {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            location: user.location,
+            fullName: user.fullName,
+          };
+        }
+      }
+    } catch (err) {
+      console.error("Error populating req.user:", err);
+      // Don't fail the request, just continue without user
+    }
+    
     next();
   });
 
@@ -1660,4 +1713,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ error: "Failed to delete patient volume record" });
     }
   });
+
+  /* --------------------------------------------------------------- */
+  /* Claim Reconciliation                                            */
+  /* --------------------------------------------------------------- */
+  app.use("/api/claim-reconciliation", claimReconciliationRouter);
 }

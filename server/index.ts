@@ -5,7 +5,6 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed-data";
 import { storage } from "./storage";
-import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
 
 /* ------------------------------- logging ------------------------------- */
 
@@ -193,11 +192,6 @@ app.use((req, res, next) => {
 (async () => {
   await seedData();
   await registerRoutes(app);
-
-  // Claim Reconciliation routes
-  log("Registering claim reconciliation router at /api/claim-reconciliation");
-  app.use("/api/claim-reconciliation", claimReconciliationRouter);
-  log("Claim reconciliation router registered successfully");
 
   // Error handler (after routes)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
