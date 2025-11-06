@@ -31,6 +31,7 @@ const navigation: NavItem[] = [
   // Insurance section (single main item + one indented sub-link)
   { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
   { name: "Insurance", href: "/insurance-providers", icon: ListChecks, sub: true },
+  { name: "Claim Reconciliation", href: "/claim-reconciliation", icon: ListChecks, sub: true },
 
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },

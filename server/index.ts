@@ -140,6 +140,10 @@ app.use((req, res, next) => {
   await seedData();
   await registerRoutes(app);
 
+  // Claim Reconciliation routes
+  const { claimReconciliationRouter } = await import("./src/routes/claimReconciliation");
+  app.use("/api/claim-reconciliation", claimReconciliationRouter);
+
   // Error handler (after routes)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
