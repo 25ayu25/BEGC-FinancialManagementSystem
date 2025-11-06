@@ -4,7 +4,7 @@ CREATE TABLE claim_recon_runs (
   provider_name   VARCHAR(128) NOT NULL,          -- e.g. 'CIC'
   period_year     INT NOT NULL,
   period_month    INT NOT NULL,
-  created_by      UUID NOT NULL,                  -- user id (optional if easier)
+  created_by      UUID NOT NULL REFERENCES users(id),  -- user id with foreign key
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   -- summary stats

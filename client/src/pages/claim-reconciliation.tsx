@@ -106,28 +106,13 @@ export default function ClaimReconciliation() {
       return;
     }
 
-    // Get user session
-    let userId = "00000000-0000-0000-0000-000000000000"; // default
-    try {
-      const sessionStr = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("user_session="))
-        ?.split("=")[1];
-      if (sessionStr) {
-        const session = JSON.parse(decodeURIComponent(sessionStr));
-        userId = session.id;
-      }
-    } catch (e) {
-      console.error("Error parsing session:", e);
-    }
-
     const formData = new FormData();
     formData.append("claimsFile", claimsFile);
     formData.append("remittanceFile", remittanceFile);
     formData.append("providerName", providerName);
     formData.append("periodYear", periodYear);
     formData.append("periodMonth", periodMonth);
-    formData.append("userId", userId);
+    // Note: userId is now obtained server-side from the authenticated session
 
     uploadMutation.mutate(formData);
   };

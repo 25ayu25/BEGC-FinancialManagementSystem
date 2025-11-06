@@ -14,8 +14,11 @@ function parseDate(val: any): Date | null {
   
   // If it's a number (Excel serial date)
   if (typeof val === "number") {
-    const date = XLSX.SSF.parse_date_code(val);
-    return new Date(date.y, date.m - 1, date.d);
+    // Excel dates are days since 1900-01-01 (with adjustments for Excel bug)
+    const excelEpoch = new Date(1900, 0, 1);
+    const days = val - 1; // Excel counts from 1, not 0
+    const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
+    return date;
   }
   
   // If it's a string

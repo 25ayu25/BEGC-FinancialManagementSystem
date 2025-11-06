@@ -225,7 +225,7 @@ export const claimReconRuns = pgTable("claim_recon_runs", {
   providerName: varchar("provider_name", { length: 128 }).notNull(),
   periodYear: integer("period_year").notNull(),
   periodMonth: integer("period_month").notNull(),
-  createdBy: varchar("created_by").notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 
   // summary stats

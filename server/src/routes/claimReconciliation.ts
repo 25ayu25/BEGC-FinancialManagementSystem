@@ -1,6 +1,6 @@
 // server/src/routes/claimReconciliation.ts
 
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { parseClaimsFile, parseRemittanceFile } from "../claimReconciliation/parseCic";
 import {
@@ -16,6 +16,14 @@ import {
 
 const router = Router();
 
+// Auth middleware - extracted from main routes for consistency
+const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+};
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -27,10 +35,13 @@ const upload = multer({
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
-    if (allowedMimes.includes(file.mimetype)) {
+    const allowedExtensions = [".xlsx", ".xls"];
+    const fileExtension = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf("."));
+    
+    if (allowedMimes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only Excel files are allowed."));
+      cb(new Error("Invalid file type. Only Excel files (.xlsx, .xls) are allowed."));
     }
   },
 });
@@ -41,6 +52,7 @@ const upload = multer({
  */
 router.post(
   "/upload",
+  requireAuth,
   upload.fields([
     { name: "claimsFile", maxCount: 1 },
     { name: "remittanceFile", maxCount: 1 },
@@ -48,12 +60,19 @@ router.post(
   async (req, res) => {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      const { providerName, periodYear, periodMonth, userId } = req.body;
+      const { providerName, periodYear, periodMonth } = req.body;
+      const userId = req.user?.id; // Get from authenticated user
 
       // Validate required fields
-      if (!providerName || !periodYear || !periodMonth || !userId) {
+      if (!providerName || !periodYear || !periodMonth) {
         return res.status(400).json({
-          error: "Missing required fields: providerName, periodYear, periodMonth, userId",
+          error: "Missing required fields: providerName, periodYear, periodMonth",
+        });
+      }
+
+      if (!userId) {
+        return res.status(401).json({
+          error: "User authentication required",
         });
       }
 
@@ -116,7 +135,7 @@ router.post(
  * GET /api/claim-reconciliation/runs
  * Get all reconciliation runs
  */
-router.get("/runs", async (_req, res) => {
+router.get("/runs", requireAuth, async (_req, res) => {
   try {
     const runs = await getAllReconRuns();
     res.json(runs);
@@ -132,7 +151,7 @@ router.get("/runs", async (_req, res) => {
  * GET /api/claim-reconciliation/runs/:runId
  * Get a specific reconciliation run
  */
-router.get("/runs/:runId", async (req, res) => {
+router.get("/runs/:runId", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId);
     const run = await getReconRun(runId);
@@ -154,7 +173,7 @@ router.get("/runs/:runId", async (req, res) => {
  * GET /api/claim-reconciliation/runs/:runId/claims
  * Get claims for a specific run
  */
-router.get("/runs/:runId/claims", async (req, res) => {
+router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId);
     const claims = await getClaimsForRun(runId);
@@ -171,7 +190,7 @@ router.get("/runs/:runId/claims", async (req, res) => {
  * GET /api/claim-reconciliation/runs/:runId/remittances
  * Get remittances for a specific run
  */
-router.get("/runs/:runId/remittances", async (req, res) => {
+router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId);
     const remittances = await getRemittancesForRun(runId);
