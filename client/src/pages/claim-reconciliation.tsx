@@ -457,6 +457,10 @@ export default function ClaimReconciliation() {
     deleteMutation.mutate(runId);
   };
 
+  /* ====================================================================
+   * ✨ FIX: Corrected the closing </Data_Card> to </Badge>
+   * ====================================================================
+  */
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
@@ -471,7 +475,7 @@ export default function ClaimReconciliation() {
           <Badge className="bg-yellow-500 text-black">
             <Clock className="w-3 h-3 mr-1" />
             Partial
-          </Data_Card>
+          </Badge>
         );
       case "manual_review":
         return (
@@ -524,10 +528,7 @@ export default function ClaimReconciliation() {
           </div>
         </div>
 
-        {/* ====================================================================
-          ✨ UPDATED: KPI strip now has a consistent bg-white style
-          ====================================================================
-        */}
+        {/* KPI strip */}
         <div className="grid gap-3 md:grid-cols-3">
           {/* Runs Card */}
           <div className="rounded-xl border bg-white px-4 py-3">
@@ -567,7 +568,6 @@ export default function ClaimReconciliation() {
               Items needing attention
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              {/* Using color to draw attention instead of a dark background */}
               <span className="text-lg font-semibold text-orange-500">
                 {stats.openItems}
               </span>
@@ -604,11 +604,6 @@ export default function ClaimReconciliation() {
         <CardContent className="space-y-6 pt-0">
           <TooltipProvider delayDuration={100}>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* ====================================================================
-                ✨ UPDATED: Replaced stacked grids with a single 6-column grid
-                for perfect alignment.
-                ====================================================================
-              */}
               <div className="grid grid-cols-1 md:grid-cols-6 gap-x-6 gap-y-6">
                 {/* Row 1: Settings */}
                 <div className="space-y-2 md:col-span-2">
