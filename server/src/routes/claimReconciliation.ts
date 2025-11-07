@@ -12,7 +12,7 @@ import {
   getReconRun,
   getClaimsForRun,
   getRemittancesForRun,
-  deleteReconRun,
+  exportIssuesForRun,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -37,12 +37,19 @@ const upload = multer({
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
     const allowedExtensions = [".xlsx", ".xls"];
-    const fileExtension = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf("."));
+    const fileExtension = file.originalname
+      .toLowerCase()
+      .slice(file.originalname.lastIndexOf("."));
 
-    if (allowedMimes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
+    if (
+      allowedMimes.includes(file.mimetype) &&
+      allowedExtensions.includes(fileExtension)
+    ) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only Excel files (.xlsx, .xls) are allowed."));
+      cb(
+        new Error("Invalid file type. Only Excel files (.xlsx, .xls) are allowed.")
+      );
     }
   },
 });
@@ -96,8 +103,8 @@ const uploadHandler = async (req: Request, res: Response) => {
     // Create reconciliation run
     const run = await createReconRun(
       providerName,
-      parseInt(periodYear, 10),
-      parseInt(periodMonth, 10),
+      parseInt(periodYear),
+      parseInt(periodMonth),
       userId
     );
 
@@ -137,7 +144,7 @@ router.post(
 
 /**
  * POST /api/claim-reconciliation/run
- * Alias for /upload endpoint - accepts the same multipart form-data
+ * Alias for /upload endpoint
  */
 router.post(
   "/run",
@@ -171,11 +178,7 @@ router.get("/runs", requireAuth, async (_req, res) => {
  */
 router.get("/runs/:runId", requireAuth, async (req, res) => {
   try {
-    const runId = parseInt(req.params.runId, 10);
-    if (Number.isNaN(runId)) {
-      return res.status(400).json({ error: "Invalid runId" });
-    }
-
+    const runId = parseInt(req.params.runId);
     const run = await getReconRun(runId);
 
     if (!run) {
@@ -197,11 +200,7 @@ router.get("/runs/:runId", requireAuth, async (req, res) => {
  */
 router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
   try {
-    const runId = parseInt(req.params.runId, 10);
-    if (Number.isNaN(runId)) {
-      return res.status(400).json({ error: "Invalid runId" });
-    }
-
+    const runId = parseInt(req.params.runId);
     const claims = await getClaimsForRun(runId);
     res.json(claims);
   } catch (error: any) {
@@ -218,11 +217,7 @@ router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
  */
 router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
   try {
-    const runId = parseInt(req.params.runId, 10);
-    if (Number.isNaN(runId)) {
-      return res.status(400).json({ error: "Invalid runId" });
-    }
-
+    const runId = parseInt(req.params.runId);
     const remittances = await getRemittancesForRun(runId);
     res.json(remittances);
   } catch (error: any) {
@@ -234,41 +229,42 @@ router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
 });
 
 /**
- * DELETE /api/claim-reconciliation/runs/:runId
- * Delete a reconciliation run (and its claims/remittances)
+ * GET /api/claim-reconciliation/runs/:runId/issues/export
+ * Export problem claims (partial / unpaid) as an Excel file for CIC
  */
-router.delete("/runs/:runId", requireAuth, async (req, res) => {
-  try {
-    const runId = parseInt(req.params.runId, 10);
-    if (Number.isNaN(runId)) {
-      return res.status(400).json({ error: "Invalid runId" });
+router.get(
+  "/runs/:runId/issues/export",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const runId = parseInt(req.params.runId, 10);
+      if (Number.isNaN(runId)) {
+        return res.status(400).json({ error: "Invalid runId" });
+      }
+
+      const { fileName, buffer } = await exportIssuesForRun(runId);
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${fileName}"`
+      );
+
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error exporting reconciliation issues:", error);
+      const message = error.message || "Failed to export problem claims";
+
+      if (message.includes("not found")) {
+        return res.status(404).json({ error: message });
+      }
+
+      res.status(500).json({ error: message });
     }
-
-    // Optional: only allow admin or the user who created the run to delete it
-    const run = await getReconRun(runId);
-    if (!run) {
-      return res.status(404).json({ error: "Reconciliation run not found" });
-    }
-
-    const isAdmin = req.user?.role === "admin";
-    const isOwner = run.createdBy === req.user?.id;
-
-    if (!isAdmin && !isOwner) {
-      return res.status(403).json({ error: "You are not allowed to delete this run" });
-    }
-
-    await deleteReconRun(runId);
-
-    res.json({
-      success: true,
-      message: "Reconciliation run deleted",
-    });
-  } catch (error: any) {
-    console.error("Error deleting reconciliation run:", error);
-    res.status(500).json({
-      error: error.message || "Failed to delete reconciliation run",
-    });
   }
-});
+);
 
 export { router as claimReconciliationRouter };
