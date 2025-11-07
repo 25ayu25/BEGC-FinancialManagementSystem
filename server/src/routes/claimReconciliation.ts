@@ -12,6 +12,7 @@ import {
   getReconRun,
   getClaimsForRun,
   getRemittancesForRun,
+  deleteReconRun,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -37,7 +38,7 @@ const upload = multer({
     ];
     const allowedExtensions = [".xlsx", ".xls"];
     const fileExtension = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf("."));
-    
+
     if (allowedMimes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
@@ -95,8 +96,8 @@ const uploadHandler = async (req: Request, res: Response) => {
     // Create reconciliation run
     const run = await createReconRun(
       providerName,
-      parseInt(periodYear),
-      parseInt(periodMonth),
+      parseInt(periodYear, 10),
+      parseInt(periodMonth, 10),
       userId
     );
 
@@ -137,8 +138,6 @@ router.post(
 /**
  * POST /api/claim-reconciliation/run
  * Alias for /upload endpoint - accepts the same multipart form-data
- * This route is provided for compatibility with frontend code that may call /run
- * instead of /upload. Both routes use the same handler and have identical functionality.
  */
 router.post(
   "/run",
@@ -172,7 +171,11 @@ router.get("/runs", requireAuth, async (_req, res) => {
  */
 router.get("/runs/:runId", requireAuth, async (req, res) => {
   try {
-    const runId = parseInt(req.params.runId);
+    const runId = parseInt(req.params.runId, 10);
+    if (Number.isNaN(runId)) {
+      return res.status(400).json({ error: "Invalid runId" });
+    }
+
     const run = await getReconRun(runId);
 
     if (!run) {
@@ -194,7 +197,11 @@ router.get("/runs/:runId", requireAuth, async (req, res) => {
  */
 router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
   try {
-    const runId = parseInt(req.params.runId);
+    const runId = parseInt(req.params.runId, 10);
+    if (Number.isNaN(runId)) {
+      return res.status(400).json({ error: "Invalid runId" });
+    }
+
     const claims = await getClaimsForRun(runId);
     res.json(claims);
   } catch (error: any) {
@@ -211,13 +218,55 @@ router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
  */
 router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
   try {
-    const runId = parseInt(req.params.runId);
+    const runId = parseInt(req.params.runId, 10);
+    if (Number.isNaN(runId)) {
+      return res.status(400).json({ error: "Invalid runId" });
+    }
+
     const remittances = await getRemittancesForRun(runId);
     res.json(remittances);
   } catch (error: any) {
     console.error("Error fetching remittances:", error);
     res.status(500).json({
       error: error.message || "Failed to fetch remittances",
+    });
+  }
+});
+
+/**
+ * DELETE /api/claim-reconciliation/runs/:runId
+ * Delete a reconciliation run (and its claims/remittances)
+ */
+router.delete("/runs/:runId", requireAuth, async (req, res) => {
+  try {
+    const runId = parseInt(req.params.runId, 10);
+    if (Number.isNaN(runId)) {
+      return res.status(400).json({ error: "Invalid runId" });
+    }
+
+    // Optional: only allow admin or the user who created the run to delete it
+    const run = await getReconRun(runId);
+    if (!run) {
+      return res.status(404).json({ error: "Reconciliation run not found" });
+    }
+
+    const isAdmin = req.user?.role === "admin";
+    const isOwner = run.createdBy === req.user?.id;
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: "You are not allowed to delete this run" });
+    }
+
+    await deleteReconRun(runId);
+
+    res.json({
+      success: true,
+      message: "Reconciliation run deleted",
+    });
+  } catch (error: any) {
+    console.error("Error deleting reconciliation run:", error);
+    res.status(500).json({
+      error: error.message || "Failed to delete reconciliation run",
     });
   }
 });
