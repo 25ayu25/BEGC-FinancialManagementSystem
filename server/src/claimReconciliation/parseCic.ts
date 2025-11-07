@@ -1,249 +1,353 @@
 // server/src/claimReconciliation/parseCic.ts
+
 import * as XLSX from "xlsx";
 import type { ClaimRow, RemittanceRow } from "./types";
 
-/* ------------------ utilities ------------------ */
+/** ---------- Helpers: normalisation, dates, amounts ---------- **/
 
-function isLikelyHeaderRow(row: any[]): boolean {
-  const joined = row.map(v => String(v || "").toLowerCase()).join(" ");
-  // Any hint that this row contains a header-ish set of labels
-  return /member|m\/?no|patient|invoice|claim|date|service|billed|amount|employer/.test(joined);
+function normalizeHeader(val: unknown): string {
+  return String(val ?? "")
+    .toLowerCase()
+    .replace(/[\r\n]+/g, " ") // newlines -> space
+    .replace(/[^a-z0-9]+/g, " ") // drop punctuation, keep letters/digits
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function toCleanString(v: any): string {
-  return String(v ?? "").trim();
-}
+function parseDate(val: any): Date | null {
+  if (!val) return null;
 
-function parseAmountLoose(v: any): number {
-  if (v == null || v === "") return 0;
-  if (typeof v === "number" && Number.isFinite(v)) return v;
+  // Already a JS Date
+  if (val instanceof Date && !isNaN(val.getTime())) return val;
 
-  // strings like "SSP 1,234.50" or "1 234,50"
-  let s = String(v).trim();
-  // normalize decimal comma -> dot if needed
-  const hasCommaAsDecimal =
-    /,\d{1,2}$/.test(s.replace(/[^0-9,.-]/g, "")) && (s.match(/\./g)?.length || 0) <= 1;
-  s = s.replace(/[^\d,.\-]/g, "");
-  if (hasCommaAsDecimal && s.indexOf(",") >= 0 && s.indexOf(".") === -1) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  } else {
-    s = s.replace(/,/g, "");
-  }
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function excelSerialToDate(n: number): Date {
-  // Excel epoch 1899-12-30 for js-xlsx (handles the 1900 leap year bug)
-  const epoch = new Date(Date.UTC(1899, 11, 30));
-  const ms = Math.round(n * 24 * 60 * 60 * 1000);
-  return new Date(epoch.getTime() + ms);
-}
-
-function parseDateLoose(v: any): Date | null {
-  if (!v && v !== 0) return null;
-  if (v instanceof Date && !isNaN(v.getTime())) return v;
-  if (typeof v === "number" && isFinite(v)) {
-    const d = excelSerialToDate(v);
+  // Excel serial date (e.g. 45567)
+  if (typeof val === "number") {
+    // Excel's "serial 1" is 1900-01-01, but there is an off-by-one bug with 1900 leap year.
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const ms = val * 24 * 60 * 60 * 1000;
+    const d = new Date(excelEpoch.getTime() + ms);
     return isNaN(d.getTime()) ? null : d;
   }
-  const s = String(v).trim();
-  if (!s) return null;
 
-  // Try known patterns first (DD/MM/YYYY and MM/DD/YYYY)
-  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (m) {
-    let d = parseInt(m[1], 10);
-    let mo = parseInt(m[2], 10);
-    let y = parseInt(m[3], 10);
-    if (y < 100) y += 2000;
-
-    // If DD>12, then it's DD/MM; else let Date decide (but swap if needed)
-    if (d > 12 && mo <= 12) {
-      // DD/MM/YYYY
-      const dt = new Date(Date.UTC(y, mo - 1, d));
-      return isNaN(dt.getTime()) ? null : dt;
-    }
-    // try MM/DD/YYYY then DD/MM/YYYY fallback
-    const mmdd = new Date(Date.UTC(y, d - 1, mo));
-    if (!isNaN(mmdd.getTime())) return mmdd;
-    const ddmm = new Date(Date.UTC(y, mo - 1, d));
-    if (!isNaN(ddmm.getTime())) return ddmm;
+  // Strings like "8/31/2025", "2025-08-31", etc.
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    const d = new Date(trimmed);
+    return isNaN(d.getTime()) ? null : d;
   }
 
-  // Fallback: Date parser
-  const dflt = new Date(s);
-  return isNaN(dflt.getTime()) ? null : dflt;
-}
-
-/* ------------------ header mapping ------------------ */
-
-type MapSpec = Record<string, string[]>;
-
-const CLAIMS_MAP: MapSpec = {
-  memberNumber: [
-    "member number", "member no", "member #", "membership no", "m/no", "m no", "card no",
-    "member", "membership number"
-  ],
-  patientName:  ["patient name", "name", "beneficiary", "dependent"],
-  serviceDate:  ["service date", "date of service", "claim date", "treatment date", "billing date", "date"],
-  invoiceNumber:["invoice number", "invoice no", "inv no", "invoice"],
-  claimType:    ["claim type", "type"],
-  schemeName:   ["scheme name", "scheme", "plan"],
-  benefitDesc:  ["benefit description", "benefit", "service", "description", "diagnosis"],
-  billedAmount: ["billed amount", "amount", "claim amount", "gross amount", "total", "billed"],
-  currency:     ["currency"]
-};
-
-const REMIT_MAP: MapSpec = {
-  employerName: ["employer name", "employer", "company"],
-  patientName:  ["patient name", "name", "beneficiary", "dependent"],
-  memberNumber: ["member number", "member no", "member #", "membership no", "m/no", "m no", "card no", "member"],
-  claimNumber:  ["claim number", "claim no", "claim #", "reference"],
-  relationship: ["relationship", "rel"],
-  serviceDate:  ["service date", "date of service", "claim date", "treatment date", "billing date", "date"],
-  claimAmount:  ["claim amount", "claimed amount", "billed amount", "amount"],
-  paidAmount:   ["paid amount", "amount paid", "net amount", "payment amount", "paid"],
-  paymentNo:    ["payment no", "payment number", "payment ref", "cheque no", "check no"],
-  paymentMode:  ["payment mode", "mode", "method"]
-};
-
-function buildIndexMap(headers: string[], spec: MapSpec): Record<keyof MapSpec, number | -1> {
-  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-  const map: Record<any, any> = {};
-  const H = headers.map(norm);
-
-  for (const key of Object.keys(spec)) {
-    map[key] = -1;
-    for (const alias of spec[key as keyof MapSpec]) {
-      const pos = H.indexOf(norm(alias));
-      if (pos !== -1) { map[key] = pos; break; }
-    }
-  }
-  return map as any;
-}
-
-/* ------------------ parsing helpers ------------------ */
-
-function pickFirstSheetWith(headersNeeded: string[], wb: XLSX.WorkBook): string | null {
-  for (const name of wb.SheetNames) {
-    const sh = wb.Sheets[name];
-    const rows = XLSX.utils.sheet_to_json<any[]>(sh, { header: 1, raw: true });
-    // find header row
-    for (const row of rows) {
-      if (!Array.isArray(row)) continue;
-      if (row.filter(Boolean).length < 2) continue;
-      if (isLikelyHeaderRow(row)) {
-        const lower = row.map(v => String(v || "").toLowerCase());
-        const hasAny = headersNeeded.some(h =>
-          lower.some(c => String(c).includes(h))
-        );
-        if (hasAny) return name;
-      }
-    }
-  }
   return null;
 }
 
-function findHeaderRow(rows: any[][]): { header: string[]; startIndex: number } | null {
+function parseAmount(val: any): number {
+  if (typeof val === "number") return val;
+  if (typeof val === "string") {
+    const cleaned = val.replace(/[^0-9.-]/g, "");
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  }
+  return 0;
+}
+
+/**
+ * Given a 2D array of rows, find the most likely header row.
+ * We look for a row that contains words like "member", "date" and "amount".
+ */
+function findHeaderRow(rows: any[][]): number {
+  let bestIndex = -1;
+  let bestScore = 0;
+
   for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    if (!Array.isArray(r)) continue;
-    const nonEmpty = r.filter(Boolean);
-    if (nonEmpty.length < 2) continue;
-    if (isLikelyHeaderRow(r)) {
-      // normalize header labels to strings
-      return { header: r.map(toCleanString), startIndex: i + 1 };
+    const row = rows[i] ?? [];
+    const norm = normalizeHeader(row.join(" "));
+
+    if (!norm) continue;
+
+    const hasMember = /member|card|membership/.test(norm);
+    const hasDate = /date/.test(norm);
+    const hasAmount = /amount|total|billed|claim/.test(norm);
+
+    const score = Number(hasMember) + Number(hasDate) + Number(hasAmount);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+
+    if (score >= 2) {
+      // good enough – don't keep scanning forever
+      break;
     }
   }
-  return null;
+
+  // Fallback: first non-empty row
+  if (bestIndex === -1) {
+    bestIndex = rows.findIndex((row) =>
+      row.some((cell) => normalizeHeader(cell))
+    );
+  }
+
+  return bestIndex === -1 ? 0 : bestIndex;
 }
 
-/* ------------------ public API ------------------ */
+function buildIndexMap(
+  headers: any[],
+  aliasGroups: Record<string, string[]>
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  const normHeaders = headers.map(normalizeHeader);
+
+  for (const [field, aliases] of Object.entries(aliasGroups)) {
+    const normAliases = aliases.map(normalizeHeader);
+    let idx = -1;
+
+    for (let i = 0; i < normHeaders.length; i++) {
+      const h = normHeaders[i];
+      if (!h) continue;
+      for (const a of normAliases) {
+        if (!a) continue;
+        // exact, or one contains the other
+        if (h === a || h.includes(a) || a.includes(h)) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx !== -1) break;
+    }
+
+    result[field] = idx;
+  }
+
+  return result;
+}
+
+/** ---------- Claims: CIC "claims submitted" parser ---------- **/
 
 export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
-  const targetSheet =
-    pickFirstSheetWith(["member", "date", "amount"], wb) ?? wb.SheetNames[0];
-  const sh = wb.Sheets[targetSheet];
-  const rows = XLSX.utils.sheet_to_json<any[]>(sh, { header: 1, raw: true });
+  const workbook = XLSX.read(buffer, { type: "buffer" });
 
-  const headerInfo = findHeaderRow(rows);
-  if (!headerInfo) return [];
+  // Use first sheet for now – CIC exports usually put claims on sheet 0
+  const firstSheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[firstSheetName];
 
-  const { header, startIndex } = headerInfo;
-  const idx = buildIndexMap(header, CLAIMS_MAP);
+  // 2D array of rows (each row is an array of cell values)
+  const rows = XLSX.utils.sheet_to_json<any[]>(sheet, {
+    header: 1,
+    raw: false,
+  }) as any[][];
 
-  const out: ClaimRow[] = [];
-  for (let r = startIndex; r < rows.length; r++) {
-    const row = rows[r] || [];
-    const memberRaw = row[idx.memberNumber];
-    const dateRaw = row[idx.serviceDate];
-    const amtRaw = row[idx.billedAmount];
+  if (!rows.length) return [];
 
-    // minimal guard
-    if (!memberRaw && !dateRaw) continue;
+  const headerRowIndex = findHeaderRow(rows);
+  const headerRow = rows[headerRowIndex] ?? [];
+  const dataRows = rows.slice(headerRowIndex + 1);
 
-    const serviceDate = parseDateLoose(dateRaw);
-    const billedAmount = parseAmountLoose(amtRaw);
+  const aliases = {
+    memberNumber: [
+      "member number",
+      "member no",
+      "member no.",
+      "membership number",
+      "membership no",
+      "card number",
+      "card no",
+      "member",
+    ],
+    patientName: [
+      "patient name",
+      "member name",
+      "beneficiary name",
+      "name",
+    ],
+    serviceDate: [
+      "service date",
+      "date of service",
+      "claim date",
+      "billing date",
+      "bill date",
+      "visit date",
+      "date",
+    ],
+    invoiceNumber: [
+      "invoice number",
+      "invoice no",
+      "invoice no.",
+      "inv number",
+      "inv no",
+    ],
+    claimType: ["claim type", "type"],
+    schemeName: ["scheme name", "employer name", "account name"],
+    benefitDesc: ["benefit description", "benefit", "description"],
+    billedAmount: [
+      "billed amount",
+      "amount",
+      "claim amount",
+      "claimed amount",
+      "gross amount",
+      "total amount",
+      "amount billed",
+    ],
+    currency: ["currency", "curr"],
+  } as const;
 
-    // must have a date and a positive amount
-    if (!serviceDate || billedAmount <= 0) continue;
+  const indexMap = buildIndexMap(headerRow, aliases);
 
-    out.push({
-      memberNumber: toCleanString(memberRaw),
-      patientName: toCleanString(row[idx.patientName]),
+  const claims: ClaimRow[] = [];
+
+  for (const row of dataRows) {
+    const get = (field: keyof typeof aliases): any => {
+      const idx = indexMap[field];
+      return idx != null && idx >= 0 ? row[idx] : undefined;
+    };
+
+    const memberNumber = String(get("memberNumber") ?? "").trim();
+    const serviceDate = parseDate(get("serviceDate"));
+    const billedAmount = parseAmount(get("billedAmount"));
+
+    if (!memberNumber || !serviceDate || billedAmount <= 0) {
+      // Not a valid claim row – skip
+      continue;
+    }
+
+    const patientNameRaw = String(get("patientName") ?? "").trim();
+    const invoiceNumberRaw = String(get("invoiceNumber") ?? "").trim();
+    const claimTypeRaw = String(get("claimType") ?? "").trim();
+    const schemeNameRaw = String(get("schemeName") ?? "").trim();
+    const benefitDescRaw = String(get("benefitDesc") ?? "").trim();
+    const currencyRaw = String(get("currency") ?? "").trim() || "SSP";
+
+    claims.push({
+      memberNumber,
       serviceDate,
-      invoiceNumber: toCleanString(row[idx.invoiceNumber]) || undefined,
-      claimType: toCleanString(row[idx.claimType]) || undefined,
-      schemeName: toCleanString(row[idx.schemeName]) || undefined,
-      benefitDesc: toCleanString(row[idx.benefitDesc]) || undefined,
       billedAmount,
-      currency: (toCleanString(row[idx.currency]) || "SSP").toUpperCase(),
+      currency: currencyRaw,
+      patientName: patientNameRaw || undefined,
+      invoiceNumber: invoiceNumberRaw || undefined,
+      claimType: claimTypeRaw || undefined,
+      schemeName: schemeNameRaw || undefined,
+      benefitDesc: benefitDescRaw || undefined,
     });
   }
-  return out;
+
+  return claims;
 }
 
+/** ---------- Remittance: CIC remittance advice parser ---------- **/
+
 export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
-  const targetSheet =
-    pickFirstSheetWith(["member", "date", "paid"], wb) ?? wb.SheetNames[0];
-  const sh = wb.Sheets[targetSheet];
-  const rows = XLSX.utils.sheet_to_json<any[]>(sh, { header: 1, raw: true });
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const firstSheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[firstSheetName];
 
-  const headerInfo = findHeaderRow(rows);
-  if (!headerInfo) return [];
+  const rows = XLSX.utils.sheet_to_json<any[]>(sheet, {
+    header: 1,
+    raw: false,
+  }) as any[][];
 
-  const { header, startIndex } = headerInfo;
-  const idx = buildIndexMap(header, REMIT_MAP);
+  if (!rows.length) return [];
 
-  const out: RemittanceRow[] = [];
-  for (let r = startIndex; r < rows.length; r++) {
-    const row = rows[r] || [];
-    const memberRaw = row[idx.memberNumber];
-    const dateRaw = row[idx.serviceDate];
+  const headerRowIndex = findHeaderRow(rows);
+  const headerRow = rows[headerRowIndex] ?? [];
+  const dataRows = rows.slice(headerRowIndex + 1);
 
-    if (!memberRaw && !dateRaw) continue;
+  const aliases = {
+    employerName: ["employer name", "employer", "account name", "company"],
+    patientName: [
+      "patient name",
+      "member name",
+      "beneficiary name",
+      "name",
+    ],
+    memberNumber: [
+      "member number",
+      "member no",
+      "member no.",
+      "membership number",
+      "membership no",
+      "card number",
+      "card no",
+      "member",
+    ],
+    claimNumber: ["claim number", "claim no", "claim no.", "claim ref"],
+    relationship: ["relationship", "rel"],
+    serviceDate: [
+      "service date",
+      "date of service",
+      "claim date",
+      "billing date",
+      "bill date",
+      "date",
+    ],
+    claimAmount: [
+      "claim amount",
+      "claimed amount",
+      "gross amount",
+      "billed amount",
+      "amount",
+      "total amount",
+    ],
+    paidAmount: [
+      "paid amount",
+      "amount paid",
+      "settled amount",
+      "approved amount",
+    ],
+    paymentNo: [
+      "payment no",
+      "payment number",
+      "payment ref",
+      "payment reference",
+      "transaction id",
+    ],
+    paymentMode: [
+      "payment mode",
+      "mode of payment",
+      "payment method",
+      "mode",
+    ],
+  } as const;
 
-    const serviceDate = parseDateLoose(dateRaw);
-    if (!serviceDate) continue;
+  const indexMap = buildIndexMap(headerRow, aliases);
 
-    const claimAmount = parseAmountLoose(row[idx.claimAmount]);
-    const paidAmount = parseAmountLoose(row[idx.paidAmount]);
+  const remittances: RemittanceRow[] = [];
 
-    out.push({
-      employerName: toCleanString(row[idx.employerName]) || undefined,
-      patientName: toCleanString(row[idx.patientName]) || undefined,
-      memberNumber: toCleanString(memberRaw),
-      claimNumber: toCleanString(row[idx.claimNumber]) || undefined,
-      relationship: toCleanString(row[idx.relationship]) || undefined,
+  for (const row of dataRows) {
+    const get = (field: keyof typeof aliases): any => {
+      const idx = indexMap[field];
+      return idx != null && idx >= 0 ? row[idx] : undefined;
+    };
+
+    const memberNumber = String(get("memberNumber") ?? "").trim();
+    const serviceDate = parseDate(get("serviceDate"));
+    const paidAmount = parseAmount(get("paidAmount"));
+    const claimAmount =
+      parseAmount(get("claimAmount")) || paidAmount;
+
+    if (!memberNumber || !serviceDate) {
+      continue;
+    }
+
+    const employerNameRaw = String(get("employerName") ?? "").trim();
+    const patientNameRaw = String(get("patientName") ?? "").trim();
+    const claimNumberRaw = String(get("claimNumber") ?? "").trim();
+    const relationshipRaw = String(get("relationship") ?? "").trim();
+    const paymentNoRaw = String(get("paymentNo") ?? "").trim();
+    const paymentModeRaw = String(get("paymentMode") ?? "").trim();
+
+    remittances.push({
+      memberNumber,
       serviceDate,
       claimAmount,
       paidAmount,
-      paymentNo: toCleanString(row[idx.paymentNo]) || undefined,
-      paymentMode: toCleanString(row[idx.paymentMode]) || undefined,
+      employerName: employerNameRaw || undefined,
+      patientName: patientNameRaw || undefined,
+      claimNumber: claimNumberRaw || undefined,
+      relationship: relationshipRaw || undefined,
+      paymentNo: paymentNoRaw || undefined,
+      paymentMode: paymentModeRaw || undefined,
     });
   }
-  return out;
+
+  return remittances;
 }
