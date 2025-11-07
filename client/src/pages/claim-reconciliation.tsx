@@ -6,7 +6,7 @@ import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
-/* Shadcn/UI Components
+/* Shadcn/UI Components */
 /* -------------------------------------------------------------------------- */
 import {
   Card,
@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 /* -------------------------------------------------------------------------- */
-/* Icons (from lucide-react)
+/* Icons (from lucide-react) */
 /* -------------------------------------------------------------------------- */
 import {
   Upload,
@@ -62,16 +62,17 @@ import {
   MoreHorizontal,
   X,
   Info,
+  Download,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/* Other Imports
+/* Other Imports */
 /* -------------------------------------------------------------------------- */
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
 /* -------------------------------------------------------------------------- */
-/* Types
+/* Types */
 /* -------------------------------------------------------------------------- */
 
 interface ReconRun {
@@ -98,7 +99,7 @@ interface ClaimDetail {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Session backup helper
+/* Session backup helper */
 /* -------------------------------------------------------------------------- */
 
 const BACKUP_KEY = "user_session_backup";
@@ -112,7 +113,7 @@ function readSessionBackup(): string | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Re-usable FileDropzone Component
+/* Re-usable FileDropzone Component */
 /* -------------------------------------------------------------------------- */
 interface FileDropzoneProps {
   file: File | null;
@@ -217,7 +218,7 @@ function FileDropzone({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Main Component
+/* Main Component */
 /* -------------------------------------------------------------------------- */
 
 export default function ClaimReconciliation() {
@@ -236,9 +237,12 @@ export default function ClaimReconciliation() {
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">(
+    "issues"
+  );
 
   /* ------------------------------------------------------------------------ */
-  /* Data loading
+  /* Data loading */
   /* ------------------------------------------------------------------------ */
 
   const {
@@ -257,7 +261,7 @@ export default function ClaimReconciliation() {
   });
 
   /* ------------------------------------------------------------------------ */
-  /* Simple derived stats for summary strip
+  /* Simple derived stats for summary strip */
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
@@ -265,8 +269,9 @@ export default function ClaimReconciliation() {
       return {
         totalRuns: 0,
         totalClaims: 0,
-        openItems: 0,
+        problemClaims: 0,
         lastPeriodLabel: "—",
+        latestRunId: null as number | null,
       };
     }
 
@@ -275,13 +280,18 @@ export default function ClaimReconciliation() {
       (sum, r) => sum + (r.totalClaimRows || 0),
       0
     );
-    const openItems = runs.reduce(
-      (sum, r) => sum + (r.partialMatched || 0) + (r.manualReview || 0),
-      0
-    );
+
+    // "Problem" = not fully paid = totalClaims - fullyPaid (autoMatched)
+    const problemClaims = runs.reduce((sum, r) => {
+      const total = r.totalClaimRows || 0;
+      const fullyPaid = r.autoMatched || 0;
+      return sum + Math.max(total - fullyPaid, 0);
+    }, 0);
+
     // Sort runs to get the latest one reliably
     const sortedRuns = [...runs].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
     const latest = sortedRuns[0];
     const lastPeriodLabel = new Date(
@@ -289,11 +299,17 @@ export default function ClaimReconciliation() {
       latest.periodMonth - 1
     ).toLocaleString("default", { month: "short", year: "numeric" });
 
-    return { totalRuns, totalClaims, openItems, lastPeriodLabel };
+    return {
+      totalRuns,
+      totalClaims,
+      problemClaims,
+      lastPeriodLabel,
+      latestRunId: latest?.id ?? null,
+    };
   }, [runs]);
 
   /* ------------------------------------------------------------------------ */
-  /* Mutations
+  /* Mutations */
   /* ------------------------------------------------------------------------ */
 
   // Upload & reconcile
@@ -345,6 +361,7 @@ export default function ClaimReconciliation() {
       setSelectedRunId(data.runId);
       setClaimsFile(null);
       setRemittanceFile(null);
+      setAttentionFilter("issues");
     },
     onError: (error: Error) => {
       toast({
@@ -379,7 +396,9 @@ export default function ClaimReconciliation() {
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const error = await response.json();
-          throw new Error(error.error || "Failed to delete reconciliation run");
+          throw new Error(
+            error.error || "Failed to delete reconciliation run"
+          );
         } else {
           const text = await response.text();
           throw new Error(
@@ -416,11 +435,85 @@ export default function ClaimReconciliation() {
     },
   });
 
+  // Export problem claims (partial / unpaid) for CIC
+  const exportIssuesMutation = useMutation({
+    mutationFn: async (runId: number) => {
+      const url = new URL(
+        `/api/claim-reconciliation/runs/${runId}/issues/export`,
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Export failed");
+        }
+        const text = await response.text();
+        throw new Error(
+          `Export failed (${response.status}): ${text.substring(0, 120)}`
+        );
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.error || "Export failed");
+      }
+
+      const blob = await response.blob();
+      const disposition =
+        response.headers.get("content-disposition") || "";
+      let fileName = "claim_issues.xlsx";
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      if (match?.[1]) {
+        fileName = match[1];
+      }
+
+      return { blob, fileName };
+    },
+    onSuccess: ({ blob, fileName }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export ready",
+        description: "Problem claims were exported for CIC.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Export failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const isUploading = uploadMutation.isPending;
   const isDeleting = deleteMutation.isPending;
+  const isExporting = exportIssuesMutation.isPending;
 
   /* ------------------------------------------------------------------------ */
-  /* Handlers
+  /* Handlers */
   /* ------------------------------------------------------------------------ */
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -462,6 +555,18 @@ export default function ClaimReconciliation() {
     deleteMutation.mutate(runId);
   };
 
+  const handleExportIssues = () => {
+    if (!selectedRunId) return;
+    if (issuesCountForSelected === 0) {
+      toast({
+        title: "Nothing to export",
+        description: "All claims for this run are fully paid.",
+      });
+      return;
+    }
+    exportIssuesMutation.mutate(selectedRunId);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
@@ -492,13 +597,27 @@ export default function ClaimReconciliation() {
   };
 
   /* ------------------------------------------------------------------------ */
-  /* Render
+  /* Derived data for current run                                             */
   /* ------------------------------------------------------------------------ */
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
   const isFormDisabled = isUploading || isDeleting;
   const isSubmitDisabled =
     !claimsFile || !remittanceFile || isUploading || isDeleting;
+
+  const issuesCountForSelected = useMemo(
+    () => claims.filter((c) => c.status !== "paid").length,
+    [claims]
+  );
+
+  const filteredClaims = useMemo(() => {
+    if (attentionFilter === "all") return claims;
+    return claims.filter((c) => c.status !== "paid");
+  }, [claims, attentionFilter]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Render */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
@@ -538,13 +657,17 @@ export default function ClaimReconciliation() {
 
         {/* KPI strip */}
         <div className="grid gap-3 md:grid-cols-3">
-          {/* Runs Card */}
+          {/* Reconciliations done */}
           <div className="rounded-xl border bg-white px-4 py-3">
-            <div className="text-xs font-medium text-slate-500">Runs</div>
+            <div className="text-xs font-medium text-slate-500">
+              Reconciliations done
+            </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-semibold">{stats.totalRuns}</span>
+              <span className="text-lg font-semibold">
+                {stats.totalRuns}
+              </span>
               <span className="text-[11px] uppercase tracking-wide text-slate-500">
-                total
+                periods checked
               </span>
             </div>
             <div className="mt-1 text-[11px] text-slate-500">
@@ -552,39 +675,39 @@ export default function ClaimReconciliation() {
             </div>
           </div>
 
-          {/* Claims Reconciled Card */}
+          {/* Claims processed */}
           <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-xs font-medium text-slate-500">
-              Claims reconciled
+              Claims processed
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-semibold">
                 {stats.totalClaims.toLocaleString()}
               </span>
               <span className="text-[11px] uppercase tracking-wide text-slate-500">
-                rows processed
+                rows in total
               </span>
             </div>
             <div className="mt-1 text-[11px] text-slate-500">
-              Across all uploaded periods.
+              Across all uploads.
             </div>
           </div>
 
-          {/* Items Needing Attention Card */}
+          {/* Claims to follow up */}
           <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-xs font-medium text-slate-500">
-              Items needing attention
+              Claims to follow up
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-semibold text-orange-500">
-                {stats.openItems}
+                {stats.problemClaims}
               </span>
               <span className="text-[11px] uppercase tracking-wide text-orange-500">
-                open
+                not fully paid
               </span>
             </div>
             <div className="mt-1 text-[11px] text-slate-500">
-              Partial or manual-review claims.
+              Partial or unpaid claims to discuss with CIC.
             </div>
           </div>
         </div>
@@ -597,7 +720,9 @@ export default function ClaimReconciliation() {
                 How reconciliation works
               </div>
               <ul className="list-disc list-inside space-y-1">
-                <li>Upload one Claims Submitted file and one Remittance file.</li>
+                <li>
+                  Upload one Claims Submitted file and one Remittance file.
+                </li>
                 <li>
                   Only Excel files are supported (<code>.xlsx</code> or{" "}
                   <code>.xls</code>).
@@ -789,7 +914,8 @@ export default function ClaimReconciliation() {
             </p>
           ) : runs.length === 0 ? (
             <p className="text-muted-foreground py-6 text-sm">
-              No reconciliation runs yet. Upload your first pair of files above.
+              No reconciliation runs yet. Upload your first pair of files
+              above.
             </p>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -808,94 +934,110 @@ export default function ClaimReconciliation() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runs.map((run) => (
-                    <TableRow
-                      key={run.id}
-                      className={cn(
-                        "odd:bg-slate-50/40",
-                        selectedRunId === run.id &&
-                          "bg-slate-50/80 hover:bg-slate-100"
-                      )}
-                    >
-                      <TableCell className="font-medium">
-                        {run.providerName}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(
-                          run.periodYear,
-                          run.periodMonth - 1
-                        ).toLocaleString("default", {
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell>{run.totalClaimRows}</TableCell>
-                      <TableCell>{run.totalRemittanceRows}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className="text-xs font-semibold"
-                        >
-                          {run.autoMatched} Matched
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
-                          {run.partialMatched} Partial
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
-                          {run.manualReview} Review
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(run.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-8 h-8"
-                              disabled={isDeleting}
-                            >
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => setSelectedRunId(run.id)}
-                              className={cn(
-                                "cursor-pointer",
-                                selectedRunId === run.id && "bg-slate-100"
-                              )}
-                            >
-                              View details
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                              onClick={() => handleDeleteRun(run.id)}
-                              disabled={
-                                isDeleting && deleteMutation.variables === run.id
-                              }
-                            >
-                              {isDeleting &&
-                              deleteMutation.variables === run.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin mr-2" />
-                              ) : (
-                                <Trash2 className="w-3 h-3 mr-2" />
-                              )}
-                              Delete Run
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {runs.map((run) => {
+                    const periodLabel = new Date(
+                      run.periodYear,
+                      run.periodMonth - 1
+                    ).toLocaleString("default", {
+                      month: "short",
+                      year: "numeric",
+                    });
+                    const isLatest = stats.latestRunId === run.id;
+
+                    return (
+                      <TableRow
+                        key={run.id}
+                        className={cn(
+                          "odd:bg-slate-50/40 hover:bg-slate-100 transition-colors",
+                          selectedRunId === run.id &&
+                            "border-l-2 border-l-emerald-500 bg-emerald-50/60"
+                        )}
+                      >
+                        <TableCell className="font-medium">
+                          {run.providerName}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>{periodLabel}</span>
+                            {isLatest && (
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                                Latest
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{run.totalClaimRows}</TableCell>
+                        <TableCell>{run.totalRemittanceRows}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-semibold"
+                          >
+                            {run.autoMatched} Matched
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
+                            {run.partialMatched} Partial
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
+                            {run.manualReview} Review
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(run.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-8 h-8"
+                                disabled={isDeleting}
+                              >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedRunId(run.id);
+                                  setAttentionFilter("issues");
+                                }}
+                                className={cn(
+                                  "cursor-pointer",
+                                  selectedRunId === run.id && "bg-slate-100"
+                                )}
+                              >
+                                View details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                                onClick={() => handleDeleteRun(run.id)}
+                                disabled={
+                                  isDeleting &&
+                                  deleteMutation.variables === run.id
+                                }
+                              >
+                                {isDeleting &&
+                                deleteMutation.variables === run.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-2" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3 mr-2" />
+                                )}
+                                Delete Run
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -947,40 +1089,109 @@ export default function ClaimReconciliation() {
                 No claims found for this run.
               </p>
             ) : (
-              <div className="w-full overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Member #</TableHead>
-                      <TableHead>Patient name</TableHead>
-                      <TableHead>Service date</TableHead>
-                      <TableHead>Billed amount</TableHead>
-                      <TableHead>Amount paid</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {claims.map((claim) => (
-                      <TableRow key={claim.id} className="odd:bg-slate-50/40">
-                        <TableCell className="font-mono">
-                          {claim.memberNumber}
-                        </TableCell>
-                        <TableCell>{claim.patientName || "N/A"}</TableCell>
-                        <TableCell>
-                          {new Date(claim.serviceDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          SSP {parseFloat(claim.billedAmount).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          SSP {parseFloat(claim.amountPaid).toFixed(2)}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(claim.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <>
+                {/* Filter + Export row */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 py-3">
+                  <div className="inline-flex items-center rounded-full bg-slate-100 p-1 text-xs">
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-3 py-1 rounded-full",
+                        attentionFilter === "all"
+                          ? "bg-white shadow-sm"
+                          : "text-slate-600"
+                      )}
+                      onClick={() => setAttentionFilter("all")}
+                    >
+                      All claims ({claims.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-3 py-1 rounded-full",
+                        attentionFilter === "issues"
+                          ? "bg-white shadow-sm"
+                          : "text-slate-600"
+                      )}
+                      onClick={() => setAttentionFilter("issues")}
+                    >
+                      Needs attention ({issuesCountForSelected})
+                    </button>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleExportIssues}
+                    disabled={
+                      !selectedRunId ||
+                      issuesCountForSelected === 0 ||
+                      isExporting
+                    }
+                  >
+                    {isExporting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Export for CIC
+                  </Button>
+                </div>
+
+                {filteredClaims.length === 0 &&
+                attentionFilter === "issues" ? (
+                  <p className="text-muted-foreground py-6 text-sm">
+                    All claims for this period are fully paid. There is nothing
+                    to follow up.
+                  </p>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Member #</TableHead>
+                          <TableHead>Patient name</TableHead>
+                          <TableHead>Service date</TableHead>
+                          <TableHead>Billed amount</TableHead>
+                          <TableHead>Amount paid</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredClaims.map((claim) => (
+                          <TableRow
+                            key={claim.id}
+                            className="odd:bg-slate-50/40"
+                          >
+                            <TableCell className="font-mono">
+                              {claim.memberNumber}
+                            </TableCell>
+                            <TableCell>
+                              {claim.patientName || "N/A"}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(
+                                claim.serviceDate
+                              ).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              SSP {parseFloat(claim.billedAmount).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              SSP {parseFloat(claim.amountPaid).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(claim.status)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
