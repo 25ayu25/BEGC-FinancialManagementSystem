@@ -92,6 +92,12 @@ export default function ClaimReconciliation() {
     queryKey: ["/api/claim-reconciliation/runs"],
   });
 
+  // Sort newest first for a nicer history view
+  const sortedRuns = [...runs].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
   // Claims for selected run
   const { data: claims = [], isLoading: claimsLoading } = useQuery<
     ClaimDetail[]
@@ -212,6 +218,7 @@ export default function ClaimReconciliation() {
 
   const isUploading = uploadMutation.isPending;
   const isDeleting = deleteMutation.isPending;
+  const deletingRunId = deleteMutation.variables;
 
   /* -------------------------------------------------------------------------- */
   /* Handlers                                                                   */
@@ -474,7 +481,7 @@ export default function ClaimReconciliation() {
         <CardContent>
           {runsLoading ? (
             <p className="text-muted-foreground">Loading runs…</p>
-          ) : runs.length === 0 ? (
+          ) : sortedRuns.length === 0 ? (
             <p className="text-muted-foreground">
               No reconciliation runs yet. Upload your first pair of files above.
             </p>
@@ -497,7 +504,7 @@ export default function ClaimReconciliation() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runs.map((run) => (
+                  {sortedRuns.map((run) => (
                     <TableRow
                       key={run.id}
                       className={
@@ -553,7 +560,7 @@ export default function ClaimReconciliation() {
                           onClick={() => handleDeleteRun(run.id)}
                           disabled={isDeleting}
                         >
-                          {isDeleting && deleteMutation.variables === run.id ? (
+                          {isDeleting && deletingRunId === run.id ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : (
                             <Trash2 className="w-3 h-3" />
