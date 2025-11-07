@@ -1,7 +1,13 @@
 // client/src/pages/claim-reconciliation.tsx
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDropzone } from "react-dropzone"; // <-- ADDED for drag-and-drop
+import { cn } from "@/lib/utils"; // <-- ADDED for conditional classnames
+
+/* -------------------------------------------------------------------------- */
+/* Shadcn/UI Components 
+/* -------------------------------------------------------------------------- */
 import {
   Card,
   CardContent,
@@ -29,6 +35,23 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // <-- ADDED for smart button
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"; // <-- ADDED for kebab menu
+
+/* -------------------------------------------------------------------------- */
+/* Icons (from lucide-react)
+/* -------------------------------------------------------------------------- */
+import {
   Upload,
   FileSpreadsheet,
   CheckCircle2,
@@ -36,12 +59,18 @@ import {
   Clock,
   Trash2,
   Loader2,
+  MoreHorizontal, // <-- ADDED for kebab menu
+  X, // <-- ADDED for remove file button
 } from "lucide-react";
+
+/* -------------------------------------------------------------------------- */
+/* Other Imports
+/* -------------------------------------------------------------------------- */
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
 /* -------------------------------------------------------------------------- */
-/* Types                                                                      */
+/* Types 
 /* -------------------------------------------------------------------------- */
 
 interface ReconRun {
@@ -68,7 +97,7 @@ interface ClaimDetail {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Session backup helper (same key as in queryClient.ts)                      */
+/* Session backup helper
 /* -------------------------------------------------------------------------- */
 
 const BACKUP_KEY = "user_session_backup";
@@ -82,7 +111,109 @@ function readSessionBackup(): string | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Component                                                                  */
+/* ✨ NEW: Re-usable FileDropzone Component
+/* -------------------------------------------------------------------------- */
+interface FileDropzoneProps {
+  file: File | null;
+  onFileChange: (file: File | null) => void;
+  label: string;
+  description: string;
+  disabled?: boolean;
+}
+
+function FileDropzone({
+  file,
+  onFileChange,
+  label,
+  description,
+  disabled,
+}: FileDropzoneProps) {
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (acceptedFiles.length > 0) {
+        onFileChange(acceptedFiles[0]);
+      }
+    },
+    [onFileChange]
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+        ".xlsx",
+      ],
+      "application/vnd.ms-excel": [".xls"],
+    },
+    maxFiles: 1,
+    multiple: false,
+    disabled,
+  });
+
+  // State 1: File is selected
+  if (file) {
+    return (
+      <div className="space-y-2">
+        <Label>{label}</Label>
+        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white/60 p-3">
+          <FileSpreadsheet className="w-5 h-5 text-emerald-500 shrink-0" />
+          <span
+            className="text-sm font-medium text-slate-800 truncate"
+            title={file.name}
+          >
+            {file.name}
+          </span>
+          <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
+            {(file.size / 1024).toFixed(1)} KB
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="w-6 h-6 shrink-0"
+            onClick={() => onFileChange(null)}
+            disabled={disabled}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+    );
+  }
+
+  // State 2: Empty / Dragging
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={label}>{label}</Label>
+      <div
+        {...getRootProps()}
+        className={cn(
+          "flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white/60 hover:bg-slate-50 transition-colors",
+          isDragActive && "border-primary bg-primary/10",
+          disabled && "cursor-not-allowed opacity-60"
+        )}
+      >
+        <input {...getInputProps()} id={label} />
+        {isDragActive ? (
+          <p className="text-sm font-medium text-primary">Drop the file here...</p>
+        ) : (
+          <div className="text-center">
+            <Upload className="w-5 h-5 text-slate-500 mx-auto mb-1" />
+            <p className="text-sm text-slate-600">
+              <span className="font-semibold">Click to upload</span> or drag & drop
+            </p>
+            <p className="text-xs text-slate-500">Excel files (.xlsx, .xls)</p>
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main Component 
 /* -------------------------------------------------------------------------- */
 
 export default function ClaimReconciliation() {
@@ -102,7 +233,7 @@ export default function ClaimReconciliation() {
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
 
   /* ------------------------------------------------------------------------ */
-  /* Data loading                                                             */
+  /* Data loading 
   /* ------------------------------------------------------------------------ */
 
   const {
@@ -121,7 +252,7 @@ export default function ClaimReconciliation() {
   });
 
   /* ------------------------------------------------------------------------ */
-  /* Simple derived stats for summary strip                                   */
+  /* Simple derived stats for summary strip 
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
@@ -143,7 +274,11 @@ export default function ClaimReconciliation() {
       (sum, r) => sum + (r.partialMatched || 0) + (r.manualReview || 0),
       0
     );
-    const latest = runs[runs.length - 1];
+    // Sort runs to get the latest one reliably
+    const sortedRuns = [...runs].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const latest = sortedRuns[0];
     const lastPeriodLabel = new Date(
       latest.periodYear,
       latest.periodMonth - 1
@@ -153,7 +288,7 @@ export default function ClaimReconciliation() {
   }, [runs]);
 
   /* ------------------------------------------------------------------------ */
-  /* Mutations                                                                */
+  /* Mutations 
   /* ------------------------------------------------------------------------ */
 
   // Upload & reconcile
@@ -280,7 +415,7 @@ export default function ClaimReconciliation() {
   const isDeleting = deleteMutation.isPending;
 
   /* ------------------------------------------------------------------------ */
-  /* Handlers                                                                 */
+  /* Handlers 
   /* ------------------------------------------------------------------------ */
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -352,10 +487,13 @@ export default function ClaimReconciliation() {
   };
 
   /* ------------------------------------------------------------------------ */
-  /* Render                                                                   */
+  /* Render 
   /* ------------------------------------------------------------------------ */
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
+  const isFormDisabled = isUploading || isDeleting;
+  const isSubmitDisabled =
+    !claimsFile || !remittanceFile || isUploading || isDeleting;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
@@ -418,6 +556,7 @@ export default function ClaimReconciliation() {
             </div>
           </div>
 
+          {/* This card can be made clickable */}
           <div className="rounded-xl border bg-slate-900 text-slate-50 px-4 py-3">
             <div className="text-xs font-medium text-slate-200">
               Items needing attention
@@ -455,147 +594,142 @@ export default function ClaimReconciliation() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="provider">Insurance provider</Label>
-                <Select
-                  value={providerName}
-                  onValueChange={setProviderName}
-                  disabled={isUploading || isDeleting}
-                >
-                  <SelectTrigger
-                    id="provider"
-                    className="bg-white/60 focus-visible:ring-slate-300"
+          {/* ====================================================================
+            ✨ UPDATED: Form is wrapped in TooltipProvider
+            ====================================================================
+          */}
+          <TooltipProvider delayDuration={100}>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="provider">Insurance provider</Label>
+                  <Select
+                    value={providerName}
+                    onValueChange={setProviderName}
+                    disabled={isFormDisabled}
                   >
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CIC">CIC</SelectItem>
-                    <SelectItem value="UAP">UAP</SelectItem>
-                    <SelectItem value="CIGNA">CIGNA</SelectItem>
-                    <SelectItem value="OTHER">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      id="provider"
+                      className="bg-white/60 focus-visible:ring-slate-300"
+                    >
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CIC">CIC</SelectItem>
+                      <SelectItem value="UAP">UAP</SelectItem>
+                      <SelectItem value="CIGNA">CIGNA</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="year">Period year</Label>
+                  <Input
+                    id="year"
+                    type="number"
+                    value={periodYear}
+                    onChange={(e) => setPeriodYear(e.target.value)}
+                    min="2020"
+                    max="2099"
+                    disabled={isFormDisabled}
+                    className="bg-white/60 focus-visible:ring-slate-300"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="month">Period month</Label>
+                  <Select
+                    value={periodMonth}
+                    onValueChange={setPeriodMonth}
+                    disabled={isFormDisabled}
+                  >
+                    <SelectTrigger
+                      id="month"
+                      className="bg-white/60 focus-visible:ring-slate-300"
+                    >
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <SelectItem key={m} value={m.toString()}>
+                          {new Date(2000, m - 1).toLocaleString("default", {
+                            month: "long",
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="year">Period year</Label>
-                <Input
-                  id="year"
-                  type="number"
-                  value={periodYear}
-                  onChange={(e) => setPeriodYear(e.target.value)}
-                  min="2020"
-                  max="2099"
-                  disabled={isUploading || isDeleting}
-                  className="bg-white/60 focus-visible:ring-slate-300"
+              {/* ====================================================================
+                ✨ UPDATED: File inputs replaced with new FileDropzone component
+                ====================================================================
+              */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FileDropzone
+                  label="Claims submitted file"
+                  description="The billing export you send to CIC (one row per claim)."
+                  file={claimsFile}
+                  onFileChange={setClaimsFile}
+                  disabled={isFormDisabled}
+                />
+
+                <FileDropzone
+                  label="Remittance advice file"
+                  description="The payment / remittance report you receive back from CIC."
+                  file={remittanceFile}
+                  onFileChange={setRemittanceFile}
+                  disabled={isFormDisabled}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="month">Period month</Label>
-                <Select
-                  value={periodMonth}
-                  onValueChange={setPeriodMonth}
-                  disabled={isUploading || isDeleting}
-                >
-                  <SelectTrigger
-                    id="month"
-                    className="bg-white/60 focus-visible:ring-slate-300"
-                  >
-                    <SelectValue placeholder="Select month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <SelectItem key={m} value={m.toString()}>
-                        {new Date(2000, m - 1).toLocaleString("default", {
-                          month: "long",
-                        })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="claims-file">Claims submitted file</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="claims-file"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(e) =>
-                      setClaimsFile(e.target.files?.[0] || null)
-                    }
-                    disabled={isUploading || isDeleting}
-                    className="bg-white/60 file:border-0 file:bg-slate-900 file:text-slate-50 file:px-3 file:py-1.5 file:mr-3 hover:file:bg-slate-800"
-                  />
-                  {claimsFile && (
-                    <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
+                {/* ====================================================================
+                  ✨ UPDATED: Submit button wrapped in Tooltip for smart feedback
+                  ====================================================================
+                */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* This span wrapper is needed for the tooltip to work on a disabled button */}
+                    <div className="inline-block">
+                      <Button
+                        type="submit"
+                        size="lg"
+                        disabled={isSubmitDisabled}
+                        className="w-full md:w-auto font-semibold shadow-md gap-2 px-6"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Processing…
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Upload &amp; Reconcile
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {isSubmitDisabled && !isUploading && (
+                    <TooltipContent>
+                      <p>
+                        Please upload both a Claims and Remittance file.
+                      </p>
+                    </TooltipContent>
                   )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  The billing export you send to CIC (one row per claim).
+                </Tooltip>
+
+                <p className="text-xs text-muted-foreground md:text-right max-w-md">
+                  Uploading again for the same period will create a new run.
+                  All runs are kept so you can compare and audit over time.
                 </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="remittance-file">Remittance advice file</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="remittance-file"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(e) =>
-                      setRemittanceFile(e.target.files?.[0] || null)
-                    }
-                    disabled={isUploading || isDeleting}
-                    className="bg-white/60 file:border-0 file:bg-slate-900 file:text-slate-50 file:px-3 file:py-1.5 file:mr-3 hover:file:bg-slate-800"
-                  />
-                  {remittanceFile && (
-                    <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  The payment / remittance report you receive back from CIC.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
-              <Button
-                type="submit"
-                size="lg"
-                disabled={
-                  !claimsFile ||
-                  !remittanceFile ||
-                  isUploading ||
-                  isDeleting
-                }
-                className="w-full md:w-auto font-semibold shadow-md gap-2 px-6"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Processing…
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    Upload &amp; Reconcile
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-muted-foreground md:text-right max-w-md">
-                Uploading again for the same period will create a new run. All
-                runs are kept so you can compare and audit over time.
-              </p>
-            </div>
-          </form>
+            </form>
+          </TooltipProvider>
         </CardContent>
       </Card>
 
@@ -621,7 +755,8 @@ export default function ClaimReconciliation() {
             </p>
           ) : runs.length === 0 ? (
             <p className="text-muted-foreground py-6 text-sm">
-              No reconciliation runs yet. Upload your first pair of files above.
+              No reconciliation runs yet. Upload your first pair of files
+              above.
             </p>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -636,9 +771,8 @@ export default function ClaimReconciliation() {
                     <TableHead>Partial</TableHead>
                     <TableHead>Review</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead className="text-right w-[200px]">
-                      Actions
-                    </TableHead>
+                    {/* ✨ UPDATED: Actions column is cleaner */}
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -665,50 +799,76 @@ export default function ClaimReconciliation() {
                       </TableCell>
                       <TableCell>{run.totalClaimRows}</TableCell>
                       <TableCell>{run.totalRemittanceRows}</TableCell>
+                      {/* ====================================================================
+                        ✨ UPDATED: Badges are now descriptive
+                        ====================================================================
+                      */}
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {run.autoMatched}
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold"
+                        >
+                          {run.autoMatched} Matched
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-yellow-500 text-black font-mono text-xs">
-                          {run.partialMatched}
+                        <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
+                          {run.partialMatched} Partial
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-orange-500 text-white font-mono text-xs">
-                          {run.manualReview}
+                        <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
+                          {run.manualReview} Review
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {new Date(run.createdAt).toLocaleDateString()}
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          size="sm"
-                          variant={
-                            selectedRunId === run.id ? "default" : "outline"
-                          }
-                          onClick={() => setSelectedRunId(run.id)}
-                          className="px-3"
-                        >
-                          View details
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="gap-1 px-3"
-                          onClick={() => handleDeleteRun(run.id)}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting &&
-                          deleteMutation.variables === run.id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3 h-3" />
-                          )}
-                          <span className="hidden sm:inline">Delete</span>
-                        </Button>
+                      {/* ====================================================================
+                        ✨ UPDATED: Actions buttons replaced with DropdownMenu
+                        ====================================================================
+                      */}
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-8 h-8"
+                              disabled={isDeleting}
+                            >
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => setSelectedRunId(run.id)}
+                              className={cn(
+                                "cursor-pointer",
+                                selectedRunId === run.id && "bg-slate-100"
+                              )}
+                            >
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              onClick={() => handleDeleteRun(run.id)}
+                              disabled={
+                                isDeleting && deleteMutation.variables === run.id
+                              }
+                            >
+                              {isDeleting &&
+                              deleteMutation.variables === run.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin mr-2" />
+                              ) : (
+                                <Trash2 className="w-3 h-3 mr-2" />
+                              )}
+                              Delete Run
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
