@@ -61,7 +61,6 @@ import {
   Loader2,
   MoreHorizontal,
   X,
-  Info,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -197,15 +196,12 @@ function FileDropzone({
       >
         <input {...getInputProps()} id={label} />
         {isDragActive ? (
-          <p className="text-sm font-medium text-primary">
-            Drop the file here...
-          </p>
+          <p className="text-sm font-medium text-primary">Drop the file here...</p>
         ) : (
           <div className="text-center">
             <Upload className="w-5 h-5 text-slate-500 mx-auto mb-1" />
             <p className="text-sm text-slate-600">
-              <span className="font-semibold">Click to upload</span> or drag &
-              drop
+              <span className="font-semibold">Click to upload</span> or drag & drop
             </p>
             <p className="text-xs text-slate-500">Excel files (.xlsx, .xls)</p>
           </div>
@@ -235,7 +231,9 @@ export default function ClaimReconciliation() {
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
+
+  // Claims table filter
+  const [claimsFilter, setClaimsFilter] = useState<"all" | "attention">("all");
 
   /* ------------------------------------------------------------------------ */
   /* Data loading
@@ -267,6 +265,7 @@ export default function ClaimReconciliation() {
         totalClaims: 0,
         openItems: 0,
         lastPeriodLabel: "—",
+        latestRunId: null as number | null,
       };
     }
 
@@ -279,7 +278,6 @@ export default function ClaimReconciliation() {
       (sum, r) => sum + (r.partialMatched || 0) + (r.manualReview || 0),
       0
     );
-    // Sort runs to get the latest one reliably
     const sortedRuns = [...runs].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -289,7 +287,13 @@ export default function ClaimReconciliation() {
       latest.periodMonth - 1
     ).toLocaleString("default", { month: "short", year: "numeric" });
 
-    return { totalRuns, totalClaims, openItems, lastPeriodLabel };
+    return {
+      totalRuns,
+      totalClaims,
+      openItems,
+      lastPeriodLabel,
+      latestRunId: latest.id,
+    };
   }, [runs]);
 
   /* ------------------------------------------------------------------------ */
@@ -345,6 +349,7 @@ export default function ClaimReconciliation() {
       setSelectedRunId(data.runId);
       setClaimsFile(null);
       setRemittanceFile(null);
+      setClaimsFilter("attention"); // jump straight to problem claims for the new run
     },
     onError: (error: Error) => {
       toast({
@@ -492,6 +497,19 @@ export default function ClaimReconciliation() {
   };
 
   /* ------------------------------------------------------------------------ */
+  /* Derived claims list for filter toggle
+  /* ------------------------------------------------------------------------ */
+
+  const filteredClaims = useMemo(() => {
+    if (claimsFilter === "all") return claims;
+
+    // Needs attention = partial or manual review
+    return claims.filter(
+      (c) => c.status === "partially_paid" || c.status === "manual_review"
+    );
+  }, [claims, claimsFilter]);
+
+  /* ------------------------------------------------------------------------ */
   /* Render
   /* ------------------------------------------------------------------------ */
 
@@ -502,37 +520,30 @@ export default function ClaimReconciliation() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
-      {/* Page title + summary + help toggle */}
+      {/* Page title + summary */}
       <section className="space-y-4 pt-2">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
               Claim Reconciliation
             </h1>
             <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
-              Upload claim and remittance files, then review matches,
-              underpayments, and outstanding balances.
+              Upload the claims you sent to the insurer and their remittance
+              report, then review matches, underpayments, and outstanding
+              balances.
             </p>
           </div>
 
-          <div className="flex items-end justify-between md:justify-end gap-2">
+          <div className="hidden md:flex flex-col items-end text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Reconciliation workspace
+            </span>
             {runsFetching && (
-              <span className="hidden md:inline text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span className="mt-1 text-[11px] uppercase tracking-wide">
                 Refreshing data…
               </span>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowHelp((v) => !v)}
-            >
-              <Info className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {showHelp ? "Hide help" : "Show help"}
-              </span>
-            </Button>
           </div>
         </div>
 
@@ -540,7 +551,9 @@ export default function ClaimReconciliation() {
         <div className="grid gap-3 md:grid-cols-3">
           {/* Runs Card */}
           <div className="rounded-xl border bg-white px-4 py-3">
-            <div className="text-xs font-medium text-slate-500">Runs</div>
+            <div className="text-xs font-medium text-slate-500">
+              Reconciliation runs
+            </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-semibold">{stats.totalRuns}</span>
               <span className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -573,7 +586,7 @@ export default function ClaimReconciliation() {
           {/* Items Needing Attention Card */}
           <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-xs font-medium text-slate-500">
-              Items needing attention
+              Open issues
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-semibold text-orange-500">
@@ -584,40 +597,10 @@ export default function ClaimReconciliation() {
               </span>
             </div>
             <div className="mt-1 text-[11px] text-slate-500">
-              Partial or manual-review claims.
+              Claims that are partial or need manual review.
             </div>
           </div>
         </div>
-
-        {/* Collapsible Help Panel */}
-        {showHelp && (
-          <Card className="border border-dashed border-slate-300 bg-slate-50/80">
-            <CardContent className="pt-4 text-sm text-slate-700 space-y-2">
-              <div className="font-medium text-slate-800">
-                How reconciliation works
-              </div>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Upload one Claims Submitted file and one Remittance file.</li>
-                <li>
-                  Only Excel files are supported (<code>.xlsx</code> or{" "}
-                  <code>.xls</code>).
-                </li>
-                <li>
-                  Member numbers and service dates should match between the two
-                  files.
-                </li>
-                <li>
-                  Re-uploading for the same period will create a new run; older
-                  runs stay available for audit.
-                </li>
-                <li>
-                  Use the history table below to open a run, review unmatched
-                  items, or delete test runs.
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-        )}
       </section>
 
       {/* Upload Form */}
@@ -628,9 +611,15 @@ export default function ClaimReconciliation() {
               Upload reconciliation files
             </CardTitle>
             <CardDescription>
-              Choose the period and upload the Claims Submitted and Remittance
-              Advice Excel exports.
+              Step 1 &mdash; choose the period and upload the Claims Submitted
+              and Remittance Advice Excel files.
             </CardDescription>
+          </div>
+          <div className="text-xs text-muted-foreground pt-2">
+            <span>• Only Excel files (.xlsx, .xls).</span>
+            <span className="ml-4">
+              • Member numbers &amp; dates should align.
+            </span>
           </div>
         </CardHeader>
 
@@ -723,7 +712,6 @@ export default function ClaimReconciliation() {
                 </div>
               </div>
 
-              {/* Primary action */}
               <div className="flex flex-col gap-3 pt-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -756,8 +744,8 @@ export default function ClaimReconciliation() {
                 </Tooltip>
 
                 <p className="text-xs text-muted-foreground max-w-md">
-                  Uploading again for the same period will create a new run.
-                  All runs are kept so you can compare and audit over time.
+                  Uploading again for the same period will create a new run. All
+                  runs are kept so you can compare and audit over time.
                 </p>
               </div>
             </form>
@@ -776,9 +764,7 @@ export default function ClaimReconciliation() {
               </CardDescription>
             </div>
             {runsFetching && (
-              <span className="text-xs text-muted-foreground">
-                Refreshing…
-              </span>
+              <span className="text-xs text-muted-foreground">Refreshing…</span>
             )}
           </div>
         </CardHeader>
@@ -789,7 +775,8 @@ export default function ClaimReconciliation() {
             </p>
           ) : runs.length === 0 ? (
             <p className="text-muted-foreground py-6 text-sm">
-              No reconciliation runs yet. Upload your first pair of files above.
+              No reconciliation runs yet. Upload your first pair of files
+              above.
             </p>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -808,94 +795,112 @@ export default function ClaimReconciliation() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runs.map((run) => (
-                    <TableRow
-                      key={run.id}
-                      className={cn(
-                        "odd:bg-slate-50/40",
-                        selectedRunId === run.id &&
-                          "bg-slate-50/80 hover:bg-slate-100"
-                      )}
-                    >
-                      <TableCell className="font-medium">
-                        {run.providerName}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(
-                          run.periodYear,
-                          run.periodMonth - 1
-                        ).toLocaleString("default", {
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell>{run.totalClaimRows}</TableCell>
-                      <TableCell>{run.totalRemittanceRows}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className="text-xs font-semibold"
-                        >
-                          {run.autoMatched} Matched
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
-                          {run.partialMatched} Partial
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
-                          {run.manualReview} Review
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(run.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-8 h-8"
-                              disabled={isDeleting}
-                            >
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => setSelectedRunId(run.id)}
-                              className={cn(
-                                "cursor-pointer",
-                                selectedRunId === run.id && "bg-slate-100"
-                              )}
-                            >
-                              View details
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                              onClick={() => handleDeleteRun(run.id)}
-                              disabled={
-                                isDeleting && deleteMutation.variables === run.id
-                              }
-                            >
-                              {isDeleting &&
-                              deleteMutation.variables === run.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin mr-2" />
-                              ) : (
-                                <Trash2 className="w-3 h-3 mr-2" />
-                              )}
-                              Delete Run
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {runs.map((run) => {
+                    const isSelected = selectedRunId === run.id;
+                    const isLatest = stats.latestRunId === run.id;
+
+                    return (
+                      <TableRow
+                        key={run.id}
+                        className={cn(
+                          "hover:bg-slate-50 transition-colors",
+                          isSelected && "bg-slate-50/80",
+                          isLatest && "border-l-2 border-l-emerald-500"
+                        )}
+                      >
+                        <TableCell className="font-medium">
+                          {run.providerName}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {new Date(
+                                run.periodYear,
+                                run.periodMonth - 1
+                              ).toLocaleString("default", {
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                            {isLatest && (
+                              <span className="text-[10px] rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                                Latest
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{run.totalClaimRows}</TableCell>
+                        <TableCell>{run.totalRemittanceRows}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-semibold"
+                          >
+                            {run.autoMatched} Matched
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
+                            {run.partialMatched} Partial
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
+                            {run.manualReview} Review
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(run.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-8 h-8"
+                                disabled={isDeleting}
+                              >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedRunId(run.id);
+                                  setClaimsFilter("attention");
+                                }}
+                                className={cn(
+                                  "cursor-pointer",
+                                  isSelected && "bg-slate-100"
+                                )}
+                              >
+                                View details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                                onClick={() => handleDeleteRun(run.id)}
+                                disabled={
+                                  isDeleting &&
+                                  deleteMutation.variables === run.id
+                                }
+                              >
+                                {isDeleting &&
+                                deleteMutation.variables === run.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-2" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3 mr-2" />
+                                )}
+                                Delete Run
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -947,40 +952,85 @@ export default function ClaimReconciliation() {
                 No claims found for this run.
               </p>
             ) : (
-              <div className="w-full overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Member #</TableHead>
-                      <TableHead>Patient name</TableHead>
-                      <TableHead>Service date</TableHead>
-                      <TableHead>Billed amount</TableHead>
-                      <TableHead>Amount paid</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {claims.map((claim) => (
-                      <TableRow key={claim.id} className="odd:bg-slate-50/40">
-                        <TableCell className="font-mono">
-                          {claim.memberNumber}
-                        </TableCell>
-                        <TableCell>{claim.patientName || "N/A"}</TableCell>
-                        <TableCell>
-                          {new Date(claim.serviceDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          SSP {parseFloat(claim.billedAmount).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          SSP {parseFloat(claim.amountPaid).toFixed(2)}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(claim.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <>
+                {/* Filter toggle above table */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-xs text-muted-foreground">
+                    Showing {filteredClaims.length} of {claims.length} claims
+                    {claimsFilter === "attention" && " needing attention"}
+                    .
+                  </div>
+                  <div className="inline-flex rounded-full border bg-slate-50 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setClaimsFilter("all")}
+                      className={cn(
+                        "px-3 py-1 rounded-full font-medium",
+                        claimsFilter === "all"
+                          ? "bg-white shadow-sm text-slate-900"
+                          : "text-slate-600"
+                      )}
+                    >
+                      All claims
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClaimsFilter("attention")}
+                      className={cn(
+                        "px-3 py-1 rounded-full font-medium",
+                        claimsFilter === "attention"
+                          ? "bg-white shadow-sm text-slate-900"
+                          : "text-slate-600"
+                      )}
+                    >
+                      Needs attention
+                    </button>
+                  </div>
+                </div>
+
+                {filteredClaims.length === 0 && claimsFilter === "attention" ? (
+                  <p className="text-muted-foreground py-6 text-sm">
+                    No partial or manual-review claims for this run. 🎉
+                  </p>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Member #</TableHead>
+                          <TableHead>Patient name</TableHead>
+                          <TableHead>Service date</TableHead>
+                          <TableHead>Billed amount</TableHead>
+                          <TableHead>Amount paid</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredClaims.map((claim) => (
+                          <TableRow key={claim.id}>
+                            <TableCell className="font-mono">
+                              {claim.memberNumber}
+                            </TableCell>
+                            <TableCell>{claim.patientName || "N/A"}</TableCell>
+                            <TableCell>
+                              {new Date(
+                                claim.serviceDate
+                              ).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              SSP {parseFloat(claim.billedAmount).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              SSP {parseFloat(claim.amountPaid).toFixed(2)}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(claim.status)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
