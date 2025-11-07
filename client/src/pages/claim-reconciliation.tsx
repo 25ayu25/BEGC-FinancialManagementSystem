@@ -1,6 +1,6 @@
 // client/src/pages/claim-reconciliation.tsx
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -40,6 +40,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
+
 interface ReconRun {
   id: number;
   providerName: string;
@@ -77,6 +81,10 @@ function readSessionBackup(): string | null {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Component                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -97,7 +105,6 @@ export default function ClaimReconciliation() {
   /* Data loading                                                             */
   /* ------------------------------------------------------------------------ */
 
-  // All reconciliation runs
   const {
     data: runs = [],
     isLoading: runsLoading,
@@ -106,13 +113,44 @@ export default function ClaimReconciliation() {
     queryKey: ["/api/claim-reconciliation/runs"],
   });
 
-  // Claims for selected run
   const { data: claims = [], isLoading: claimsLoading } = useQuery<
     ClaimDetail[]
   >({
     queryKey: [`/api/claim-reconciliation/runs/${selectedRunId}/claims`],
     enabled: !!selectedRunId,
   });
+
+  /* ------------------------------------------------------------------------ */
+  /* Simple derived stats for summary strip                                   */
+  /* ------------------------------------------------------------------------ */
+
+  const stats = useMemo(() => {
+    if (!runs.length) {
+      return {
+        totalRuns: 0,
+        totalClaims: 0,
+        openItems: 0,
+        lastPeriodLabel: "—",
+      };
+    }
+
+    const totalRuns = runs.length;
+    const totalClaims = runs.reduce(
+      (sum, r) => sum + (r.totalClaimRows || 0),
+      0
+    );
+    const openItems = runs.reduce(
+      (sum, r) => sum + (r.partialMatched || 0) + (r.manualReview || 0),
+      0
+    );
+    const latest = runs[runs.length - 1];
+    const lastPeriodLabel = new Date(
+      latest.periodYear,
+      latest.periodMonth - 1
+    ).toLocaleString("default", { month: "short", year: "numeric" });
+
+    return { totalRuns, totalClaims, openItems, lastPeriodLabel };
+  }, [runs]);
 
   /* ------------------------------------------------------------------------ */
   /* Mutations                                                                */
@@ -129,7 +167,6 @@ export default function ClaimReconciliation() {
       const headers: HeadersInit = {};
       const backup = readSessionBackup();
       if (backup) {
-        // Same fallback header that axios sends
         headers["x-session-token"] = backup;
       }
 
@@ -289,21 +326,21 @@ export default function ClaimReconciliation() {
     switch (status) {
       case "paid":
         return (
-          <Badge className="bg-green-500">
+          <Badge className="bg-green-500 text-white">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Paid
           </Badge>
         );
       case "partially_paid":
         return (
-          <Badge className="bg-yellow-500">
+          <Badge className="bg-yellow-500 text-black">
             <Clock className="w-3 h-3 mr-1" />
             Partial
           </Badge>
         );
       case "manual_review":
         return (
-          <Badge className="bg-orange-500">
+          <Badge className="bg-orange-500 text-white">
             <AlertCircle className="w-3 h-3 mr-1" />
             Review
           </Badge>
@@ -319,45 +356,116 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Claim Reconciliation
-          </h1>
-          <p className="text-muted-foreground">
-            Upload the claims you sent to the insurer and their remittance
-            report, then review matches and outstanding balances.
-          </p>
+    <div className="max-w-6xl mx-auto space-y-8 pb-10">
+      {/* Page title + summary */}
+      <section className="space-y-4 pt-2">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+              Claim Reconciliation
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
+              Upload the claims you sent to the insurer and their remittance
+              report, then review matches, underpayments, and outstanding
+              balances.
+            </p>
+          </div>
+
+          <div className="hidden md:flex flex-col items-end text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Reconciliation workspace
+            </span>
+            {runsFetching && (
+              <span className="mt-1 text-[11px] uppercase tracking-wide">
+                Refreshing data…
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="text-xs md:text-sm text-muted-foreground md:text-right">
-          <div className="font-medium">Tips</div>
-          <div>• Only Excel files (.xlsx, .xls) are supported.</div>
-          <div>• Make sure member numbers and dates match between files.</div>
+        {/* Small KPI strip */}
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-3">
+            <div className="text-xs font-medium text-slate-500">Runs</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-lg font-semibold">{stats.totalRuns}</span>
+              <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                total
+              </span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">
+              Latest period: {stats.lastPeriodLabel}
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-white px-4 py-3">
+            <div className="text-xs font-medium text-slate-500">
+              Claims reconciled
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-lg font-semibold">
+                {stats.totalClaims.toLocaleString()}
+              </span>
+              <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                rows processed
+              </span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">
+              Across all uploaded periods.
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-slate-900 text-slate-50 px-4 py-3">
+            <div className="text-xs font-medium text-slate-200">
+              Items needing attention
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-lg font-semibold">{stats.openItems}</span>
+              <span className="text-[11px] uppercase tracking-wide text-slate-300">
+                open
+              </span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-300">
+              Partial or manual-review claims.
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Upload Form */}
-      <Card className="border border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle>Upload Reconciliation Files</CardTitle>
-          <CardDescription>
-            Select the Claims Submitted and Remittance Advice Excel files. The
-            system will create a reconciliation run for the chosen period.
-          </CardDescription>
+      <Card className="border border-slate-200/80 shadow-sm">
+        <CardHeader className="space-y-1 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg md:text-xl">
+                Upload reconciliation files
+              </CardTitle>
+              <CardDescription>
+                Step 1 &mdash; choose the period and upload the Claims Submitted
+                and Remittance Advice Excel files.
+              </CardDescription>
+            </div>
+            <div className="hidden md:flex flex-col items-end text-xs text-muted-foreground">
+              <span>• Only Excel files (.xlsx, .xls).</span>
+              <span>• Member numbers &amp; dates should align.</span>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6 pt-0">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="provider">Insurance Provider</Label>
+                <Label htmlFor="provider">Insurance provider</Label>
                 <Select
                   value={providerName}
                   onValueChange={setProviderName}
                   disabled={isUploading || isDeleting}
                 >
-                  <SelectTrigger id="provider">
+                  <SelectTrigger
+                    id="provider"
+                    className="bg-white/60 focus-visible:ring-slate-300"
+                  >
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
@@ -370,7 +478,7 @@ export default function ClaimReconciliation() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="year">Period Year</Label>
+                <Label htmlFor="year">Period year</Label>
                 <Input
                   id="year"
                   type="number"
@@ -379,17 +487,21 @@ export default function ClaimReconciliation() {
                   min="2020"
                   max="2099"
                   disabled={isUploading || isDeleting}
+                  className="bg-white/60 focus-visible:ring-slate-300"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="month">Period Month</Label>
+                <Label htmlFor="month">Period month</Label>
                 <Select
                   value={periodMonth}
                   onValueChange={setPeriodMonth}
                   disabled={isUploading || isDeleting}
                 >
-                  <SelectTrigger id="month">
+                  <SelectTrigger
+                    id="month"
+                    className="bg-white/60 focus-visible:ring-slate-300"
+                  >
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -407,7 +519,7 @@ export default function ClaimReconciliation() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="claims-file">Claims Submitted File</Label>
+                <Label htmlFor="claims-file">Claims submitted file</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="claims-file"
@@ -417,9 +529,10 @@ export default function ClaimReconciliation() {
                       setClaimsFile(e.target.files?.[0] || null)
                     }
                     disabled={isUploading || isDeleting}
+                    className="bg-white/60 file:border-0 file:bg-slate-900 file:text-slate-50 file:px-3 file:py-1.5 file:mr-3 hover:file:bg-slate-800"
                   />
                   {claimsFile && (
-                    <FileSpreadsheet className="w-5 h-5 text-green-500" />
+                    <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -428,7 +541,7 @@ export default function ClaimReconciliation() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="remittance-file">Remittance Advice File</Label>
+                <Label htmlFor="remittance-file">Remittance advice file</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="remittance-file"
@@ -438,9 +551,10 @@ export default function ClaimReconciliation() {
                       setRemittanceFile(e.target.files?.[0] || null)
                     }
                     disabled={isUploading || isDeleting}
+                    className="bg-white/60 file:border-0 file:bg-slate-900 file:text-slate-50 file:px-3 file:py-1.5 file:mr-3 hover:file:bg-slate-800"
                   />
                   {remittanceFile && (
-                    <FileSpreadsheet className="w-5 h-5 text-green-500" />
+                    <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -449,7 +563,7 @@ export default function ClaimReconciliation() {
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
               <Button
                 type="submit"
                 size="lg"
@@ -459,7 +573,7 @@ export default function ClaimReconciliation() {
                   isUploading ||
                   isDeleting
                 }
-                className="w-full md:w-auto font-semibold shadow-md gap-2"
+                className="w-full md:w-auto font-semibold shadow-md gap-2 px-6"
               >
                 {isUploading ? (
                   <>
@@ -474,9 +588,9 @@ export default function ClaimReconciliation() {
                 )}
               </Button>
 
-              <p className="text-xs text-muted-foreground md:text-right">
-                Uploading again for the same period will create a new run.
-                Historical runs are kept so you can compare or audit later.
+              <p className="text-xs text-muted-foreground md:text-right max-w-md">
+                Uploading again for the same period will create a new run. All
+                runs are kept so you can compare and audit over time.
               </p>
             </div>
           </form>
@@ -484,27 +598,27 @@ export default function ClaimReconciliation() {
       </Card>
 
       {/* Reconciliation Runs List */}
-      <Card className="border border-slate-200 shadow-sm">
-        <CardHeader>
+      <Card className="border border-slate-200/80 shadow-sm">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <CardTitle>Reconciliation History</CardTitle>
+              <CardTitle className="text-lg">Reconciliation history</CardTitle>
               <CardDescription>
                 Previous reconciliation runs for all providers.
               </CardDescription>
             </div>
             {runsFetching && (
-              <span className="text-xs text-muted-foreground">
-                Refreshing…
-              </span>
+              <span className="text-xs text-muted-foreground">Refreshing…</span>
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {runsLoading ? (
-            <p className="text-muted-foreground">Loading runs…</p>
+            <p className="text-muted-foreground py-6 text-sm">
+              Loading reconciliation runs…
+            </p>
           ) : runs.length === 0 ? (
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground py-6 text-sm">
               No reconciliation runs yet. Upload your first pair of files above.
             </p>
           ) : (
@@ -516,11 +630,11 @@ export default function ClaimReconciliation() {
                     <TableHead>Period</TableHead>
                     <TableHead>Claims</TableHead>
                     <TableHead>Remittances</TableHead>
-                    <TableHead>Auto Matched</TableHead>
+                    <TableHead>Auto matched</TableHead>
                     <TableHead>Partial</TableHead>
                     <TableHead>Review</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead className="text-right w-[180px]">
+                    <TableHead className="text-right w-[200px]">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -531,7 +645,7 @@ export default function ClaimReconciliation() {
                       key={run.id}
                       className={
                         selectedRunId === run.id
-                          ? "bg-slate-50 hover:bg-slate-100"
+                          ? "bg-slate-50/80 hover:bg-slate-100"
                           : undefined
                       }
                     >
@@ -550,15 +664,17 @@ export default function ClaimReconciliation() {
                       <TableCell>{run.totalClaimRows}</TableCell>
                       <TableCell>{run.totalRemittanceRows}</TableCell>
                       <TableCell>
-                        <Badge variant="default">{run.autoMatched}</Badge>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {run.autoMatched}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-yellow-500">
+                        <Badge className="bg-yellow-500 text-black font-mono text-xs">
                           {run.partialMatched}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-orange-500">
+                        <Badge className="bg-orange-500 text-white font-mono text-xs">
                           {run.manualReview}
                         </Badge>
                       </TableCell>
@@ -572,13 +688,14 @@ export default function ClaimReconciliation() {
                             selectedRunId === run.id ? "default" : "outline"
                           }
                           onClick={() => setSelectedRunId(run.id)}
+                          className="px-3"
                         >
-                          View Details
+                          View details
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
-                          className="gap-1"
+                          className="gap-1 px-3"
                           onClick={() => handleDeleteRun(run.id)}
                           disabled={isDeleting}
                         >
@@ -602,65 +719,9 @@ export default function ClaimReconciliation() {
 
       {/* Claims Details */}
       {selectedRunId && (
-        <Card className="border border-slate-200 shadow-sm">
-          <CardHeader>
+        <Card className="border border-slate-200/80 shadow-sm">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <CardTitle>Claims Details – Run #{selectedRunId}</CardTitle>
-                <CardDescription>
-                  Detailed view of reconciled claims for the selected run.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {claimsLoading ? (
-              <p className="text-muted-foreground">Loading claims…</p>
-            ) : claims.length === 0 ? (
-              <p className="text-muted-foreground">No claims found.</p>
-            ) : (
-              <div className="w-full overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Member #</TableHead>
-                      <TableHead>Patient Name</TableHead>
-                      <TableHead>Service Date</TableHead>
-                      <TableHead>Billed Amount</TableHead>
-                      <TableHead>Amount Paid</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {claims.map((claim) => (
-                      <TableRow key={claim.id}>
-                        <TableCell className="font-mono">
-                          {claim.memberNumber}
-                        </TableCell>
-                        <TableCell>
-                          {claim.patientName || "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(
-                            claim.serviceDate
-                          ).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          SSP {parseFloat(claim.billedAmount).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          SSP {parseFloat(claim.amountPaid).toFixed(2)}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(claim.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
+                <CardTitle className="text-lg">
+                  Claims details &mdash; Run #{selectedRunId}
