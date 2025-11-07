@@ -61,6 +61,7 @@ import {
   Loader2,
   MoreHorizontal,
   X,
+  Info,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -196,12 +197,15 @@ function FileDropzone({
       >
         <input {...getInputProps()} id={label} />
         {isDragActive ? (
-          <p className="text-sm font-medium text-primary">Drop the file here...</p>
+          <p className="text-sm font-medium text-primary">
+            Drop the file here...
+          </p>
         ) : (
           <div className="text-center">
             <Upload className="w-5 h-5 text-slate-500 mx-auto mb-1" />
             <p className="text-sm text-slate-600">
-              <span className="font-semibold">Click to upload</span> or drag & drop
+              <span className="font-semibold">Click to upload</span> or drag &
+              drop
             </p>
             <p className="text-xs text-slate-500">Excel files (.xlsx, .xls)</p>
           </div>
@@ -231,6 +235,7 @@ export default function ClaimReconciliation() {
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /* Data loading
@@ -497,30 +502,37 @@ export default function ClaimReconciliation() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
-      {/* Page title + summary */}
+      {/* Page title + summary + help toggle */}
       <section className="space-y-4 pt-2">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
               Claim Reconciliation
             </h1>
             <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
-              Upload the claims you sent to the insurer and their remittance
-              report, then review matches, underpayments, and outstanding
-              balances.
+              Upload claim and remittance files, then review matches,
+              underpayments, and outstanding balances.
             </p>
           </div>
 
-          <div className="hidden md:flex flex-col items-end text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Reconciliation workspace
-            </span>
+          <div className="flex items-end justify-between md:justify-end gap-2">
             {runsFetching && (
-              <span className="mt-1 text-[11px] uppercase tracking-wide">
+              <span className="hidden md:inline text-[11px] uppercase tracking-wide text-muted-foreground">
                 Refreshing data…
               </span>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setShowHelp((v) => !v)}
+            >
+              <Info className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {showHelp ? "Hide help" : "Show help"}
+              </span>
+            </Button>
           </div>
         </div>
 
@@ -576,35 +588,56 @@ export default function ClaimReconciliation() {
             </div>
           </div>
         </div>
+
+        {/* Collapsible Help Panel */}
+        {showHelp && (
+          <Card className="border border-dashed border-slate-300 bg-slate-50/80">
+            <CardContent className="pt-4 text-sm text-slate-700 space-y-2">
+              <div className="font-medium text-slate-800">
+                How reconciliation works
+              </div>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Upload one Claims Submitted file and one Remittance file.</li>
+                <li>
+                  Only Excel files are supported (<code>.xlsx</code> or{" "}
+                  <code>.xls</code>).
+                </li>
+                <li>
+                  Member numbers and service dates should match between the two
+                  files.
+                </li>
+                <li>
+                  Re-uploading for the same period will create a new run; older
+                  runs stay available for audit.
+                </li>
+                <li>
+                  Use the history table below to open a run, review unmatched
+                  items, or delete test runs.
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       {/* Upload Form */}
       <Card className="border border-slate-200/80 shadow-sm">
-        {/* ====================================================================
-          ✨ FIX: Removed flex wrapper, all text is now left-aligned
-          ====================================================================
-        */}
         <CardHeader className="space-y-1 pb-4">
           <div>
             <CardTitle className="text-lg md:text-xl">
               Upload reconciliation files
             </CardTitle>
             <CardDescription>
-              Step 1 &mdash; choose the period and upload the Claims Submitted
-              and Remittance Advice Excel files.
+              Choose the period and upload the Claims Submitted and Remittance
+              Advice Excel exports.
             </CardDescription>
-          </div>
-          {/* Guidelines are now stacked below the description */}
-          <div className="text-xs text-muted-foreground pt-2">
-            <span>• Only Excel files (.xlsx, .xls).</span>
-            <span className="ml-4">• Member numbers &amp; dates should align.</span>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-6 pt-0">
           <TooltipProvider delayDuration={100}>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Aligned 6-column grid for form fields */}
+              {/* 6-column grid for form fields */}
               <div className="grid grid-cols-1 md:grid-cols-6 gap-x-6 gap-y-6">
                 {/* Row 1: Settings */}
                 <div className="space-y-2 md:col-span-2">
@@ -690,14 +723,10 @@ export default function ClaimReconciliation() {
                 </div>
               </div>
 
-              {/* ====================================================================
-                ✨ FIX: Removed flex-between, button and text are now stacked
-                ====================================================================
-              */}
+              {/* Primary action */}
               <div className="flex flex-col gap-3 pt-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    {/* This div wrapper ensures the button aligns left */}
                     <div className="inline-block">
                       <Button
                         type="submit"
@@ -721,9 +750,7 @@ export default function ClaimReconciliation() {
                   </TooltipTrigger>
                   {isSubmitDisabled && !isUploading && (
                     <TooltipContent>
-                      <p>
-                        Please upload both a Claims and Remittance file.
-                      </p>
+                      <p>Please upload both a Claims and Remittance file.</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -749,7 +776,9 @@ export default function ClaimReconciliation() {
               </CardDescription>
             </div>
             {runsFetching && (
-              <span className="text-xs text-muted-foreground">Refreshing…</span>
+              <span className="text-xs text-muted-foreground">
+                Refreshing…
+              </span>
             )}
           </div>
         </CardHeader>
@@ -760,8 +789,7 @@ export default function ClaimReconciliation() {
             </p>
           ) : runs.length === 0 ? (
             <p className="text-muted-foreground py-6 text-sm">
-              No reconciliation runs yet. Upload your first pair of files
-              above.
+              No reconciliation runs yet. Upload your first pair of files above.
             </p>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -783,11 +811,11 @@ export default function ClaimReconciliation() {
                   {runs.map((run) => (
                     <TableRow
                       key={run.id}
-                      className={
-                        selectedRunId === run.id
-                          ? "bg-slate-50/80 hover:bg-slate-100"
-                          : undefined
-                      }
+                      className={cn(
+                        "odd:bg-slate-50/40",
+                        selectedRunId === run.id &&
+                          "bg-slate-50/80 hover:bg-slate-100"
+                      )}
                     >
                       <TableCell className="font-medium">
                         {run.providerName}
@@ -933,7 +961,7 @@ export default function ClaimReconciliation() {
                   </TableHeader>
                   <TableBody>
                     {claims.map((claim) => (
-                      <TableRow key={claim.id}>
+                      <TableRow key={claim.id} className="odd:bg-slate-50/40">
                         <TableCell className="font-mono">
                           {claim.memberNumber}
                         </TableCell>
