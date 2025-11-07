@@ -2,16 +2,41 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import {
+  Upload,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/queryClient"; // ✅ use shared axios client
+import { API_BASE_URL } from "@/lib/constants";
 
 interface ReconRun {
   id: number;
@@ -36,14 +61,29 @@ interface ClaimDetail {
   status: string;
 }
 
+// keep this key in sync with queryClient.ts
+const SESSION_BACKUP_KEY = "user_session_backup";
+
+function readSessionBackup(): string | null {
+  try {
+    return localStorage.getItem(SESSION_BACKUP_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Form state
   const [providerName, setProviderName] = useState("CIC");
-  const [periodYear, setPeriodYear] = useState(new Date().getFullYear().toString());
-  const [periodMonth, setPeriodMonth] = useState((new Date().getMonth() + 1).toString());
+  const [periodYear, setPeriodYear] = useState(
+    new Date().getFullYear().toString()
+  );
+  const [periodMonth, setPeriodMonth] = useState(
+    (new Date().getMonth() + 1).toString()
+  );
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -59,35 +99,73 @@ export default function ClaimReconciliation() {
     enabled: !!selectedRunId,
   });
 
-  // Upload mutation (✅ now uses axios client with cookies + X-Session-Token)
+  // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await api.post(
+      const uploadUrl = new URL(
         "/api/claim-reconciliation/upload",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+        API_BASE_URL
+      ).toString();
+
+      const headers: Record<string, string> = {};
+
+      // Attach the same backup session that Axios uses (for browsers / setups
+      // where the HttpOnly cookie is not sent cross-site)
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        let message = `Upload failed with status ${response.status}`;
+
+        // Try JSON error body first
+        try {
+          const maybeJson = await response.json();
+          if (maybeJson && typeof maybeJson.error === "string") {
+            message = maybeJson.error;
+          }
+        } catch {
+          // Fallback: read a bit of the text body
+          try {
+            const text = await response.text();
+            if (text) {
+              message = text.slice(0, 200);
+            }
+          } catch {
+            // ignore
+          }
         }
-      );
-      return response.data;
+
+        throw new Error(message);
+      }
+
+      return response.json();
     },
     onSuccess: (data) => {
       toast({
         title: "Success",
         description: `Reconciliation completed. Matched ${data.summary.autoMatched} claims automatically.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/runs"],
+      });
       setSelectedRunId(data.runId);
       // Reset form
       setClaimsFile(null);
       setRemittanceFile(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error?.message || "Upload failed",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -111,7 +189,7 @@ export default function ClaimReconciliation() {
     formData.append("providerName", providerName);
     formData.append("periodYear", periodYear);
     formData.append("periodMonth", periodMonth);
-    // userId is resolved server-side from session / x-session-token
+    // userId is obtained server-side from the authenticated session
 
     uploadMutation.mutate(formData);
   };
@@ -148,7 +226,9 @@ export default function ClaimReconciliation() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Claim Reconciliation</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Claim Reconciliation
+        </h1>
         <p className="text-muted-foreground">
           Upload and reconcile insurance claims with remittance advice
         </p>
@@ -201,7 +281,9 @@ export default function ClaimReconciliation() {
                   <SelectContent>
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                       <SelectItem key={m} value={m.toString()}>
-                        {new Date(2000, m - 1).toLocaleString("default", { month: "long" })}
+                        {new Date(2000, m - 1).toLocaleString("default", {
+                          month: "long",
+                        })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -217,9 +299,13 @@ export default function ClaimReconciliation() {
                     id="claims-file"
                     type="file"
                     accept=".xlsx,.xls"
-                    onChange={(e) => setClaimsFile(e.target.files?.[0] || null)}
+                    onChange={(e) =>
+                      setClaimsFile(e.target.files?.[0] || null)
+                    }
                   />
-                  {claimsFile && <FileSpreadsheet className="w-5 h-5 text-green-500" />}
+                  {claimsFile && (
+                    <FileSpreadsheet className="w-5 h-5 text-green-500" />
+                  )}
                 </div>
               </div>
 
@@ -230,16 +316,22 @@ export default function ClaimReconciliation() {
                     id="remittance-file"
                     type="file"
                     accept=".xlsx,.xls"
-                    onChange={(e) => setRemittanceFile(e.target.files?.[0] || null)}
+                    onChange={(e) =>
+                      setRemittanceFile(e.target.files?.[0] || null)
+                    }
                   />
-                  {remittanceFile && <FileSpreadsheet className="w-5 h-5 text-green-500" />}
+                  {remittanceFile && (
+                    <FileSpreadsheet className="w-5 h-5 text-green-500" />
+                  )}
                 </div>
               </div>
             </div>
 
             <Button
               type="submit"
-              disabled={!claimsFile || !remittanceFile || uploadMutation.isPending}
+              disabled={
+                !claimsFile || !remittanceFile || uploadMutation.isPending
+              }
               className="w-full md:w-auto"
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -278,9 +370,14 @@ export default function ClaimReconciliation() {
               <TableBody>
                 {runs.map((run) => (
                   <TableRow key={run.id}>
-                    <TableCell className="font-medium">{run.providerName}</TableCell>
+                    <TableCell className="font-medium">
+                      {run.providerName}
+                    </TableCell>
                     <TableCell>
-                      {new Date(run.periodYear, run.periodMonth - 1).toLocaleString("default", {
+                      {new Date(
+                        run.periodYear,
+                        run.periodMonth - 1
+                      ).toLocaleString("default", {
                         month: "short",
                         year: "numeric",
                       })}
@@ -291,10 +388,14 @@ export default function ClaimReconciliation() {
                       <Badge variant="default">{run.autoMatched}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className="bg-yellow-500">{run.partialMatched}</Badge>
+                      <Badge className="bg-yellow-500">
+                        {run.partialMatched}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className="bg-orange-500">{run.manualReview}</Badge>
+                      <Badge className="bg-orange-500">
+                        {run.manualReview}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {new Date(run.createdAt).toLocaleDateString()}
@@ -321,7 +422,9 @@ export default function ClaimReconciliation() {
         <Card>
           <CardHeader>
             <CardTitle>Claims Details - Run #{selectedRunId}</CardTitle>
-            <CardDescription>Detailed view of reconciled claims</CardDescription>
+            <CardDescription>
+              Detailed view of reconciled claims
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {claims.length === 0 ? (
@@ -341,13 +444,19 @@ export default function ClaimReconciliation() {
                 <TableBody>
                   {claims.map((claim) => (
                     <TableRow key={claim.id}>
-                      <TableCell className="font-mono">{claim.memberNumber}</TableCell>
+                      <TableCell className="font-mono">
+                        {claim.memberNumber}
+                      </TableCell>
                       <TableCell>{claim.patientName || "N/A"}</TableCell>
                       <TableCell>
                         {new Date(claim.serviceDate).toLocaleDateString()}
                       </TableCell>
-                      <TableCell>SSP {parseFloat(claim.billedAmount).toFixed(2)}</TableCell>
-                      <TableCell>SSP {parseFloat(claim.amountPaid).toFixed(2)}</TableCell>
+                      <TableCell>
+                        SSP {parseFloat(claim.billedAmount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        SSP {parseFloat(claim.amountPaid).toFixed(2)}
+                      </TableCell>
                       <TableCell>{getStatusBadge(claim.status)}</TableCell>
                     </TableRow>
                   ))}
