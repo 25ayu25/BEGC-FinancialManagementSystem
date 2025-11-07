@@ -1,7 +1,22 @@
-// server/src/claimReconciliation/parseCic.ts
-
 import * as XLSX from "xlsx";
 import type { ClaimRow, RemittanceRow } from "./types";
+
+/**
+ * Helper: first non-empty value from a list of possible column names
+ */
+function getCell(row: any, keys: string[]): any {
+  for (const key of keys) {
+    if (key in row && row[key] != null && String(row[key]).trim() !== "") {
+      return row[key];
+    }
+  }
+  return undefined;
+}
+
+function asOptionalString(val: any): string | undefined {
+  const s = String(val ?? "").trim();
+  return s || undefined;
+}
 
 /**
  * Parse date from various formats
@@ -9,24 +24,19 @@ import type { ClaimRow, RemittanceRow } from "./types";
 function parseDate(val: any): Date | null {
   if (!val) return null;
 
-  // If it's already a Date
+  // Already a Date
   if (val instanceof Date) return val;
 
-  // If it's a number (Excel serial date)
+  // Excel serial date (number of days since 1900-01-01)
   if (typeof val === "number") {
-    // Excel dates are days since 1900-01-01 (with adjustments for Excel bug)
     const excelEpoch = new Date(1900, 0, 1);
-    const days = val - 1; // Excel counts from 1, not 0
-    const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
-    return date;
+    const days = val - 1; // Excel counts from 1
+    return new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
-  // If it's a string
+  // String date
   if (typeof val === "string") {
-    const trimmed = val.trim();
-    if (!trimmed) return null;
-
-    const parsed = new Date(trimmed);
+    const parsed = new Date(val);
     if (!isNaN(parsed.getTime())) return parsed;
   }
 
@@ -47,24 +57,24 @@ function parseAmount(val: any): number {
 }
 
 /**
- * Safely read the first non-empty cell for any of the candidate column names.
- * This lets us support both our test files and the real CIC exports.
- */
-function getCell(row: any, keys: string[]): any {
-  for (const key of keys) {
-    if (key in row && row[key] != null && String(row[key]).trim() !== "") {
-      return row[key];
-    }
-  }
-  return undefined;
-}
-
-/**
- * Parse Claims Submitted Excel file (SMART Billing Utility report)
+ * Parse CIC "Claims Submitted" Excel file
  *
- * Supports:
- *  - Test files: "Member Number", "Service Date", "Billed Amount"
- *  - CIC files:  "Member Number", "Billing Date", "Amount"
+ * Real CIC headers (from your screenshot):
+ *  - Billing Date
+ *  - Account Name
+ *  - Scheme Name
+ *  - Benefit Description
+ *  - Member Number
+ *  - Patient Name
+ *  - Patient File No
+ *  - Invoice No
+ *  - Claim Type
+ *  - Amount
+ *
+ * Test file headers:
+ *  - Service Date
+ *  - Billed Amount
+ *  - (similar others)
  */
 export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -74,73 +84,65 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
 
   const claims: ClaimRow[] = [];
 
-  for (const row of data as any[]) {
-    // --- detect "non-empty" rows using either old or new columns ---
-    const rawMemberNumber = getCell(row, [
+  for (const rawRow of data as any[]) {
+    const row = rawRow || {};
+
+    const memberNumberRaw = getCell(row, [
       "Member Number",
       "MEMBER NUMBER",
       "Membership No",
       "MEMBERSHIP NO",
-      "MEMBER NO",
+      "Member No",
     ]);
 
-    const rawService = getCell(row, [
+    const serviceDateRaw = getCell(row, [
       "Service Date",
       "SERVICE DATE",
       "Billing Date",
       "BILLING DATE",
-      "Loss Date",
-      "LOSS DATE",
+      "Bill Date",
+      "BILL DATE",
     ]);
 
-    if (!rawMemberNumber && !rawService) continue;
+    const billedAmountRaw = getCell(row, [
+      "Billed Amount",
+      "BILLED AMOUNT",
+      "Amount",
+      "AMOUNT",
+      "Claim Amount",
+      "CLAIM AMOUNT",
+    ]);
 
-    const serviceDate = parseDate(rawService);
+    // Skip completely empty rows
+    if (!memberNumberRaw && !serviceDateRaw && !billedAmountRaw) continue;
+
+    const serviceDate = parseDate(serviceDateRaw);
     if (!serviceDate) continue;
 
-    const billedAmount = parseAmount(
-      getCell(row, [
-        "Billed Amount",
-        "BILLED AMOUNT",
-        "Amount",
-        "AMOUNT",
-      ]) ?? 0
-    );
+    const billedAmount = parseAmount(billedAmountRaw);
     if (billedAmount <= 0) continue;
 
-    const memberNumber = String(rawMemberNumber ?? "").trim();
-
     claims.push({
-      memberNumber,
-      patientName:
-        (String(
-          getCell(row, ["Patient Name", "PATIENT NAME"]) ?? ""
-        ).trim()) || undefined,
+      memberNumber: String(memberNumberRaw ?? "").trim(),
+      patientName: asOptionalString(
+        getCell(row, ["Patient Name", "PATIENT NAME", "Member Name", "MEMBER NAME"])
+      ),
       serviceDate,
-      invoiceNumber:
-        (String(
-          getCell(row, ["Invoice Number", "Invoice No", "INVOICE NO"]) ?? ""
-        ).trim()) || undefined,
-      claimType:
-        (String(
-          getCell(row, ["Claim Type", "CLAIM TYPE"]) ?? ""
-        ).trim()) || undefined,
-      schemeName:
-        (String(
-          getCell(row, ["Scheme Name", "SCHEME NAME"]) ?? ""
-        ).trim()) || undefined,
-      benefitDesc:
-        (String(
-          getCell(row, [
-            "Benefit Description",
-            "BENEFIT DESCRIPTION",
-            "Benefit",
-            "BENEFIT",
-          ]) ?? ""
-        ).trim()) || undefined,
+      invoiceNumber: asOptionalString(
+        getCell(row, ["Invoice Number", "INVOICE NO", "Invoice No"])
+      ),
+      claimType: asOptionalString(getCell(row, ["Claim Type", "CLAIM TYPE"])),
+      schemeName: asOptionalString(getCell(row, ["Scheme Name", "SCHEME NAME"])),
+      benefitDesc: asOptionalString(
+        getCell(row, [
+          "Benefit Description",
+          "BENEFIT DESCRIPTION",
+          "Benefit",
+          "BENEFIT",
+        ])
+      ),
       billedAmount,
-      currency:
-        String(getCell(row, ["Currency", "CURRENCY"]) ?? "SSP").trim() || "SSP",
+      currency: String(getCell(row, ["Currency", "CURRENCY"]) || "SSP").trim(),
     });
   }
 
@@ -148,14 +150,27 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
 }
 
 /**
- * Parse Remittance Advice Excel file
+ * Parse CIC Remittance Excel file
  *
- * Supports:
- *  - Generic/test:  "Member Number", "Service Date",
- *                   "Paid Amount", "Claim Amount"
- *  - CIC remittance: "MEMBERSHIP NO", "LOSS DATE",
- *                    "PAYABLE AMT.", "CLAIM AMOUNT",
- *                    "CORPORATE NAME", "CLAIM NO", "PAYMENT MODE", etc.
+ * Real CIC headers (from your screenshot):
+ *  - SL#
+ *  - CORPORATE NAME
+ *  - BILL NO
+ *  - MEMBER NAME
+ *  - MEMBERSHIP NO
+ *  - PRIMARY MEMBER
+ *  - CLAIM NO
+ *  - LOSS DATE
+ *  - CLAIM AMOUNT
+ *  - PAY TO
+ *  - PAYEE NAME
+ *  - PAYABLE AMT.
+ *  - IN ADMISSIBLE AMT
+ *  - PAYMENT MODE
+ *  - CHEQUE/EFT NO
+ *  - CHEQUE/EFT DATE
+ *  - REMARKS
+ *  - REASONS
  */
 export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -165,90 +180,90 @@ export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
 
   const remittances: RemittanceRow[] = [];
 
-  for (const row of data as any[]) {
-    const rawMemberNumber = getCell(row, [
+  for (const rawRow of data as any[]) {
+    const row = rawRow || {};
+
+    const memberNumberRaw = getCell(row, [
       "Member Number",
       "MEMBER NUMBER",
       "Membership No",
       "MEMBERSHIP NO",
-      "MEMBER NO",
+      "Member No",
     ]);
 
-    const rawService = getCell(row, [
+    const serviceDateRaw = getCell(row, [
       "Service Date",
       "SERVICE DATE",
       "Loss Date",
       "LOSS DATE",
-      "Billing Date",
-      "BILLING DATE",
+      "Date of Service",
     ]);
 
-    // Skip completely empty lines
-    if (!rawMemberNumber && !rawService) continue;
+    // Skip empty rows
+    if (!memberNumberRaw && !serviceDateRaw) continue;
 
-    const serviceDate = parseDate(rawService);
+    const serviceDate = parseDate(serviceDateRaw);
     if (!serviceDate) continue;
 
-    const claimAmount = parseAmount(
-      getCell(row, [
-        "Claim Amount",
-        "CLAIM AMOUNT",
-        "Claimed Amount",
-        "CLAIMED AMOUNT",
-        "Amount",
-        "AMOUNT",
-      ]) ?? 0
-    );
+    const claimAmountRaw = getCell(row, [
+      "Claim Amount",
+      "CLAIM AMOUNT",
+      "Claimed Amount",
+      "Amount",
+      "AMOUNT",
+    ]);
 
-    const paidAmount = parseAmount(
-      getCell(row, [
-        "Paid Amount",
-        "PAID AMOUNT",
-        "Amount Paid",
-        "AMOUNT PAID",
-        "PAYABLE AMT.",
-        "Payable Amt.",
-        "Payable Amount",
-      ]) ?? 0
-    );
+    const paidAmountRaw = getCell(row, [
+      "Paid Amount",
+      "Amount Paid",
+      "PAYABLE AMT.",
+      "Payable Amt.",
+      "PAYABLE AMT",
+      "Paid Amt",
+      "PAID AMOUNT",
+    ]);
 
-    // If we don't have any meaningful money values, skip
-    if (claimAmount <= 0 && paidAmount <= 0) continue;
-
-    const memberNumber = String(rawMemberNumber ?? "").trim();
+    const claimAmount = parseAmount(claimAmountRaw ?? paidAmountRaw);
+    const paidAmount = parseAmount(paidAmountRaw ?? claimAmountRaw);
 
     remittances.push({
-      employerName:
-        (String(
-          getCell(row, ["Employer Name", "Employer", "CORPORATE NAME"]) ?? ""
-        ).trim()) || undefined,
-      patientName:
-        (String(
-          getCell(row, ["Patient Name", "PATIENT NAME", "MEMBER NAME"]) ?? ""
-        ).trim()) || undefined,
-      memberNumber,
-      claimNumber:
-        (String(
-          getCell(row, ["Claim Number", "Claim No", "CLAIM NO"]) ?? ""
-        ).trim()) || undefined,
-      relationship:
-        (String(getCell(row, ["Relationship"]) ?? "").trim()) || undefined,
+      employerName: asOptionalString(
+        getCell(row, [
+          "Employer Name",
+          "Employer",
+          "CORPORATE NAME",
+          "Corporate Name",
+        ])
+      ),
+      patientName: asOptionalString(
+        getCell(row, [
+          "Patient Name",
+          "PATIENT NAME",
+          "Member Name",
+          "MEMBER NAME",
+          "Primary Member",
+          "PRIMARY MEMBER",
+        ])
+      ),
+      memberNumber: String(memberNumberRaw ?? "").trim(),
+      claimNumber: asOptionalString(
+        getCell(row, ["Claim Number", "Claim No", "CLAIM NO"])
+      ),
+      relationship: asOptionalString(getCell(row, ["Relationship"])),
       serviceDate,
       claimAmount,
       paidAmount,
-      paymentNo:
-        (String(
-          getCell(row, [
-            "Payment No",
-            "Payment Number",
-            "CHEQUE/EFT NO",
-            "Cheque/EFT No",
-          ]) ?? ""
-        ).trim()) || undefined,
-      paymentMode:
-        (String(
-          getCell(row, ["Payment Mode", "Mode", "PAYMENT MODE"]) ?? ""
-        ).trim()) || undefined,
+      paymentNo: asOptionalString(
+        getCell(row, [
+          "Payment No",
+          "Payment Number",
+          "CHEQUE/EFT NO",
+          "Cheque/EFT No",
+        ])
+      ),
+      paymentMode: asOptionalString(
+        getCell(row, ["Payment Mode", "Mode", "PAYMENT MODE"])
+      ),
     });
   }
 
