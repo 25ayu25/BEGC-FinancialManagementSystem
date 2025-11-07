@@ -1,10 +1,22 @@
 // server/src/claimReconciliation/service.ts
 
 import { db } from "../../../server/db";
-import { claimReconRuns, claimReconClaims, claimReconRemittances } from "@shared/schema";
+import {
+  claimReconRuns,
+  claimReconClaims,
+  claimReconRemittances,
+} from "@shared/schema";
 import { eq } from "drizzle-orm";
-import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
-import { buildClaimCompositeKey, buildRemittanceKeyVariants, matchClaimsToRemittances } from "./matching";
+import type {
+  ClaimRow,
+  RemittanceRow,
+  ReconciliationSummary,
+} from "./types";
+import {
+  buildClaimCompositeKey,
+  buildRemittanceKeyVariants,
+  matchClaimsToRemittances,
+} from "./matching";
 
 /**
  * Create a new reconciliation run
@@ -45,7 +57,11 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
     currency: claim.currency || "SSP",
     status: "submitted" as const,
     amountPaid: "0",
-    compositeKey: buildClaimCompositeKey(claim.memberNumber, claim.serviceDate, claim.billedAmount),
+    compositeKey: buildClaimCompositeKey(
+      claim.memberNumber,
+      claim.serviceDate,
+      claim.billedAmount
+    ),
     rawRow: claim as any,
   }));
 
@@ -60,12 +76,19 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
 /**
  * Insert parsed remittances
  */
-export async function insertRemittances(runId: number, remittances: RemittanceRow[]) {
+export async function insertRemittances(
+  runId: number,
+  remittances: RemittanceRow[]
+) {
   const remittancesToInsert = remittances.map((rem) => {
     // For remittances, we store the first variant as the composite key
     // The matching algorithm will generate all variants during matching
-    const keyVariants = buildRemittanceKeyVariants(rem.memberNumber, rem.serviceDate, rem.claimAmount);
-    
+    const keyVariants = buildRemittanceKeyVariants(
+      rem.memberNumber,
+      rem.serviceDate,
+      rem.claimAmount
+    );
+
     return {
       runId,
       employerName: rem.employerName || null,
@@ -207,7 +230,10 @@ export async function getReconRun(runId: number) {
  * Get all reconciliation runs
  */
 export async function getAllReconRuns() {
-  const runs = await db.select().from(claimReconRuns).orderBy(claimReconRuns.createdAt);
+  const runs = await db
+    .select()
+    .from(claimReconRuns)
+    .orderBy(claimReconRuns.createdAt);
   return runs;
 }
 
@@ -233,4 +259,23 @@ export async function getRemittancesForRun(runId: number) {
     .where(eq(claimReconRemittances.runId, runId));
 
   return remittances;
+}
+
+/**
+ * Delete a reconciliation run and its related data
+ */
+export async function deleteReconRun(runId: number): Promise<void> {
+  // If you have ON DELETE CASCADE on FK constraints, the explicit child deletes
+  // are technically optional, but doing them here makes behaviour explicit.
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(claimReconClaims)
+      .where(eq(claimReconClaims.runId, runId));
+
+    await tx
+      .delete(claimReconRemittances)
+      .where(eq(claimReconRemittances.runId, runId));
+
+    await tx.delete(claimReconRuns).where(eq(claimReconRuns.id, runId));
+  });
 }
