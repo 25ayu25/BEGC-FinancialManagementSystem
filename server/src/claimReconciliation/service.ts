@@ -1,5 +1,6 @@
 // server/src/claimReconciliation/service.ts
 
+import * as XLSX from "xlsx";
 import { db } from "../../../server/db";
 import {
   claimReconRuns,
@@ -7,11 +8,7 @@ import {
   claimReconRemittances,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import type {
-  ClaimRow,
-  RemittanceRow,
-  ReconciliationSummary,
-} from "./types";
+import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
 import {
   buildClaimCompositeKey,
   buildRemittanceKeyVariants,
@@ -261,21 +258,141 @@ export async function getRemittancesForRun(runId: number) {
   return remittances;
 }
 
+/* -------------------------------------------------------------------------- */
+/* New helpers: problem claims + Excel export                                 */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Delete a reconciliation run and its related data
+ * Get only claims that are NOT fully paid for a run
  */
-export async function deleteReconRun(runId: number): Promise<void> {
-  // If you have ON DELETE CASCADE on FK constraints, the explicit child deletes
-  // are technically optional, but doing them here makes behaviour explicit.
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(claimReconClaims)
-      .where(eq(claimReconClaims.runId, runId));
+export async function getIssueClaimsForRun(runId: number) {
+  const claims = await getClaimsForRun(runId);
+  const remittances = await getRemittancesForRun(runId);
 
-    await tx
-      .delete(claimReconRemittances)
-      .where(eq(claimReconRemittances.runId, runId));
+  const remitById = new Map<number, (typeof remittances)[number]>();
+  for (const r of remittances) {
+    remitById.set(r.id, r);
+  }
 
-    await tx.delete(claimReconRuns).where(eq(claimReconRuns.id, runId));
+  return claims
+    .filter((c) => c.status !== "paid")
+    .map((c) => {
+      const rem =
+        c.remittanceLineId != null
+          ? remitById.get(c.remittanceLineId as number)
+          : undefined;
+
+      const billed = parseFloat(c.billedAmount ?? "0");
+      const paid = parseFloat(c.amountPaid ?? "0");
+      const difference = Number((billed - paid).toFixed(2));
+
+      let statusLabel = "Unpaid";
+      if (c.status === "partially_paid") {
+        statusLabel = "Partially paid";
+      } else if (c.status === "manual_review") {
+        statusLabel = "Needs review";
+      } else if (c.status === "submitted" && paid === 0) {
+        statusLabel = "No remittance";
+      }
+
+      return {
+        memberNumber: c.memberNumber,
+        patientName: c.patientName ?? "",
+        serviceDate: c.serviceDate,
+        invoiceNumber: c.invoiceNumber ?? "",
+        billedAmount: billed,
+        amountPaid: paid,
+        difference,
+        statusLabel,
+        paymentRef: rem?.paymentNo || rem?.claimNumber || "",
+      };
+    });
+}
+
+/**
+ * Build an Excel workbook (Summary + Problem claims) for a given run.
+ * This is what we send back to the client for CIC.
+ */
+export async function exportIssuesForRun(runId: number): Promise<{
+  fileName: string;
+  buffer: Buffer;
+}> {
+  const run = await getReconRun(runId);
+  if (!run) {
+    throw new Error("Reconciliation run not found");
+  }
+
+  const claims = await getClaimsForRun(runId);
+  const issues = await getIssueClaimsForRun(runId);
+
+  const totalClaims =
+    typeof run.totalClaimRows === "number"
+      ? run.totalClaimRows
+      : claims.length;
+
+  const fullyPaid = claims.filter((c) => c.status === "paid").length;
+  const partiallyPaid = claims.filter(
+    (c) => c.status === "partially_paid"
+  ).length;
+  const unpaid = totalClaims - fullyPaid - partiallyPaid;
+  const problemTotal = issues.length;
+
+  const periodLabel = new Date(
+    run.periodYear,
+    run.periodMonth - 1
+  ).toLocaleString("default", {
+    month: "short",
+    year: "numeric",
   });
+
+  const workbook = XLSX.utils.book_new();
+
+  // Summary sheet
+  const summaryData = [
+    ["Provider", run.providerName],
+    ["Period", periodLabel],
+    [
+      "Run date",
+      new Date(run.createdAt).toISOString().split("T")[0],
+    ],
+    ["Total claims sent", totalClaims],
+    ["Total remittances received", run.totalRemittanceRows ?? ""],
+    ["Fully paid claims", fullyPaid],
+    ["Partially paid claims", partiallyPaid],
+    ["Unpaid / no remittance", unpaid],
+    ["Total problem claims in this file", problemTotal],
+  ];
+
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+
+  // Problem claims sheet
+  const problemRows = issues.map((issue) => ({
+    "Member Number": issue.memberNumber,
+    "Patient Name": issue.patientName,
+    "Service Date": issue.serviceDate,
+    "Invoice / Claim No": issue.invoiceNumber,
+    "Billed Amount (SSP)": issue.billedAmount,
+    "Amount Paid (SSP)": issue.amountPaid,
+    "Difference (SSP)": issue.difference,
+    Status: issue.statusLabel,
+    "Payment Ref": issue.paymentRef,
+  }));
+
+  const problemsSheet = XLSX.utils.json_to_sheet(problemRows);
+  XLSX.utils.book_append_sheet(
+    workbook,
+    problemsSheet,
+    "Problem claims"
+  );
+
+  const buffer = XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "buffer",
+  }) as Buffer;
+
+  const safePeriod = periodLabel.replace(/\s+/g, "_");
+  const fileName = `${run.providerName}_Claim_Issues_${safePeriod}.xlsx`;
+
+  return { fileName, buffer };
 }
