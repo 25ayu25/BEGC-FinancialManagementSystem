@@ -355,6 +355,8 @@ export default function ClaimReconciliation() {
   /* Render                                                                   */
   /* ------------------------------------------------------------------------ */
 
+  const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
       {/* Page title + summary */}
@@ -725,3 +727,80 @@ export default function ClaimReconciliation() {
               <div>
                 <CardTitle className="text-lg">
                   Claims details &mdash; Run #{selectedRunId}
+                </CardTitle>
+                <CardDescription>
+                  Detailed view of reconciled claims for the selected run.
+                </CardDescription>
+              </div>
+
+              {selectedRun && (
+                <div className="text-xs text-muted-foreground text-right">
+                  <div className="font-medium">
+                    {selectedRun.providerName} &middot;{" "}
+                    {new Date(
+                      selectedRun.periodYear,
+                      selectedRun.periodMonth - 1
+                    ).toLocaleString("default", {
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </div>
+                  <div>
+                    {selectedRun.totalClaimRows} claims,{" "}
+                    {selectedRun.totalRemittanceRows} remittances
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {claimsLoading ? (
+              <p className="text-muted-foreground py-6 text-sm">
+                Loading claims…
+              </p>
+            ) : claims.length === 0 ? (
+              <p className="text-muted-foreground py-6 text-sm">
+                No claims found for this run.
+              </p>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Member #</TableHead>
+                      <TableHead>Patient name</TableHead>
+                      <TableHead>Service date</TableHead>
+                      <TableHead>Billed amount</TableHead>
+                      <TableHead>Amount paid</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {claims.map((claim) => (
+                      <TableRow key={claim.id}>
+                        <TableCell className="font-mono">
+                          {claim.memberNumber}
+                        </TableCell>
+                        <TableCell>{claim.patientName || "N/A"}</TableCell>
+                        <TableCell>
+                          {new Date(claim.serviceDate).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          SSP {parseFloat(claim.billedAmount).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          SSP {parseFloat(claim.amountPaid).toFixed(2)}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(claim.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
