@@ -63,6 +63,20 @@ interface ClaimDetail {
   status: string;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Session backup helper (same key as in queryClient.ts)                      */
+/* -------------------------------------------------------------------------- */
+
+const BACKUP_KEY = "user_session_backup";
+
+function readSessionBackup(): string | null {
+  try {
+    return localStorage.getItem(BACKUP_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,9 +93,9 @@ export default function ClaimReconciliation() {
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
 
-  /* -------------------------------------------------------------------------- */
-  /* Data loading                                                               */
-  /* -------------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Data loading                                                             */
+  /* ------------------------------------------------------------------------ */
 
   // All reconciliation runs
   const {
@@ -92,12 +106,6 @@ export default function ClaimReconciliation() {
     queryKey: ["/api/claim-reconciliation/runs"],
   });
 
-  // Sort newest first for a nicer history view
-  const sortedRuns = [...runs].sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
   // Claims for selected run
   const { data: claims = [], isLoading: claimsLoading } = useQuery<
     ClaimDetail[]
@@ -106,9 +114,9 @@ export default function ClaimReconciliation() {
     enabled: !!selectedRunId,
   });
 
-  /* -------------------------------------------------------------------------- */
-  /* Mutations                                                                  */
-  /* -------------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Mutations                                                                */
+  /* ------------------------------------------------------------------------ */
 
   // Upload & reconcile
   const uploadMutation = useMutation({
@@ -118,10 +126,18 @@ export default function ClaimReconciliation() {
         API_BASE_URL
       ).toString();
 
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        // Same fallback header that axios sends
+        headers["x-session-token"] = backup;
+      }
+
       const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers,
       });
 
       if (!response.ok) {
@@ -170,9 +186,16 @@ export default function ClaimReconciliation() {
         API_BASE_URL
       ).toString();
 
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
       const response = await fetch(url, {
         method: "DELETE",
         credentials: "include",
+        headers,
       });
 
       if (!response.ok) {
@@ -218,11 +241,10 @@ export default function ClaimReconciliation() {
 
   const isUploading = uploadMutation.isPending;
   const isDeleting = deleteMutation.isPending;
-  const deletingRunId = deleteMutation.variables;
 
-  /* -------------------------------------------------------------------------- */
-  /* Handlers                                                                   */
-  /* -------------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Handlers                                                                 */
+  /* ------------------------------------------------------------------------ */
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,9 +314,9 @@ export default function ClaimReconciliation() {
     }
   };
 
-  /* -------------------------------------------------------------------------- */
-  /* Render                                                                     */
-  /* -------------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Render                                                                   */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <div className="space-y-6">
@@ -481,7 +503,7 @@ export default function ClaimReconciliation() {
         <CardContent>
           {runsLoading ? (
             <p className="text-muted-foreground">Loading runs…</p>
-          ) : sortedRuns.length === 0 ? (
+          ) : runs.length === 0 ? (
             <p className="text-muted-foreground">
               No reconciliation runs yet. Upload your first pair of files above.
             </p>
@@ -504,7 +526,7 @@ export default function ClaimReconciliation() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedRuns.map((run) => (
+                  {runs.map((run) => (
                     <TableRow
                       key={run.id}
                       className={
@@ -560,7 +582,8 @@ export default function ClaimReconciliation() {
                           onClick={() => handleDeleteRun(run.id)}
                           disabled={isDeleting}
                         >
-                          {isDeleting && deletingRunId === run.id ? (
+                          {isDeleting &&
+                          deleteMutation.variables === run.id ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : (
                             <Trash2 className="w-3 h-3" />
