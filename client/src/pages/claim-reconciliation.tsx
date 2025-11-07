@@ -457,10 +457,6 @@ export default function ClaimReconciliation() {
     deleteMutation.mutate(runId);
   };
 
-  /* ====================================================================
-   * ✨ FIX: Corrected the closing </Data_Card> to </Badge>
-   * ====================================================================
-  */
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
@@ -584,26 +580,31 @@ export default function ClaimReconciliation() {
 
       {/* Upload Form */}
       <Card className="border border-slate-200/80 shadow-sm">
+        {/* ====================================================================
+          ✨ FIX: Removed flex wrapper, all text is now left-aligned
+          ====================================================================
+        */}
         <CardHeader className="space-y-1 pb-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-lg md:text-xl">
-                Upload reconciliation files
-              </CardTitle>
-              <CardDescription>
-                Step 1 &mdash; choose the period and upload the Claims Submitted
-                and Remittance Advice Excel files.
-              </CardDescription>
-            </div>
-            <div className="hidden md:flex flex-col items-end text-xs text-muted-foreground">
-              <span>• Only Excel files (.xlsx, .xls).</span>
-              <span>• Member numbers &amp; dates should align.</span>
-            </div>
+          <div>
+            <CardTitle className="text-lg md:text-xl">
+              Upload reconciliation files
+            </CardTitle>
+            <CardDescription>
+              Step 1 &mdash; choose the period and upload the Claims Submitted
+              and Remittance Advice Excel files.
+            </CardDescription>
+          </div>
+          {/* Guidelines are now stacked below the description */}
+          <div className="text-xs text-muted-foreground pt-2">
+            <span>• Only Excel files (.xlsx, .xls).</span>
+            <span className="ml-4">• Member numbers &amp; dates should align.</span>
           </div>
         </CardHeader>
+
         <CardContent className="space-y-6 pt-0">
           <TooltipProvider delayDuration={100}>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Aligned 6-column grid for form fields */}
               <div className="grid grid-cols-1 md:grid-cols-6 gap-x-6 gap-y-6">
                 {/* Row 1: Settings */}
                 <div className="space-y-2 md:col-span-2">
@@ -689,11 +690,14 @@ export default function ClaimReconciliation() {
                 </div>
               </div>
 
-              {/* Submit Button Row */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
+              {/* ====================================================================
+                ✨ FIX: Removed flex-between, button and text are now stacked
+                ====================================================================
+              */}
+              <div className="flex flex-col gap-3 pt-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    {/* This span wrapper is needed for the tooltip to work on a disabled button */}
+                    {/* This div wrapper ensures the button aligns left */}
                     <div className="inline-block">
                       <Button
                         type="submit"
@@ -724,7 +728,7 @@ export default function ClaimReconciliation() {
                   )}
                 </Tooltip>
 
-                <p className="text-xs text-muted-foreground md:text-right max-w-md">
+                <p className="text-xs text-muted-foreground max-w-md">
                   Uploading again for the same period will create a new run.
                   All runs are kept so you can compare and audit over time.
                 </p>
