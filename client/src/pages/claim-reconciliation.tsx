@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useDropzone } from "react-dropzone"; // <-- ADDED for drag-and-drop
-import { cn } from "@/lib/utils"; // <-- ADDED for conditional classnames
+import { useDropzone } from "react-dropzone";
+import { cn } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
-/* Shadcn/UI Components 
+/* Shadcn/UI Components
 /* -------------------------------------------------------------------------- */
 import {
   Card,
@@ -39,14 +39,14 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // <-- ADDED for smart button
+} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"; // <-- ADDED for kebab menu
+} from "@/components/ui/dropdown-menu";
 
 /* -------------------------------------------------------------------------- */
 /* Icons (from lucide-react)
@@ -59,8 +59,8 @@ import {
   Clock,
   Trash2,
   Loader2,
-  MoreHorizontal, // <-- ADDED for kebab menu
-  X, // <-- ADDED for remove file button
+  MoreHorizontal,
+  X,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -70,7 +70,7 @@ import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
 /* -------------------------------------------------------------------------- */
-/* Types 
+/* Types
 /* -------------------------------------------------------------------------- */
 
 interface ReconRun {
@@ -111,7 +111,7 @@ function readSessionBackup(): string | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✨ NEW: Re-usable FileDropzone Component
+/* Re-usable FileDropzone Component
 /* -------------------------------------------------------------------------- */
 interface FileDropzoneProps {
   file: File | null;
@@ -213,7 +213,7 @@ function FileDropzone({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Main Component 
+/* Main Component
 /* -------------------------------------------------------------------------- */
 
 export default function ClaimReconciliation() {
@@ -233,7 +233,7 @@ export default function ClaimReconciliation() {
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
 
   /* ------------------------------------------------------------------------ */
-  /* Data loading 
+  /* Data loading
   /* ------------------------------------------------------------------------ */
 
   const {
@@ -252,7 +252,7 @@ export default function ClaimReconciliation() {
   });
 
   /* ------------------------------------------------------------------------ */
-  /* Simple derived stats for summary strip 
+  /* Simple derived stats for summary strip
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
@@ -288,7 +288,7 @@ export default function ClaimReconciliation() {
   }, [runs]);
 
   /* ------------------------------------------------------------------------ */
-  /* Mutations 
+  /* Mutations
   /* ------------------------------------------------------------------------ */
 
   // Upload & reconcile
@@ -415,7 +415,7 @@ export default function ClaimReconciliation() {
   const isDeleting = deleteMutation.isPending;
 
   /* ------------------------------------------------------------------------ */
-  /* Handlers 
+  /* Handlers
   /* ------------------------------------------------------------------------ */
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -471,7 +471,7 @@ export default function ClaimReconciliation() {
           <Badge className="bg-yellow-500 text-black">
             <Clock className="w-3 h-3 mr-1" />
             Partial
-          </Badge>
+          </Data_Card>
         );
       case "manual_review":
         return (
@@ -487,7 +487,7 @@ export default function ClaimReconciliation() {
   };
 
   /* ------------------------------------------------------------------------ */
-  /* Render 
+  /* Render
   /* ------------------------------------------------------------------------ */
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
@@ -524,9 +524,13 @@ export default function ClaimReconciliation() {
           </div>
         </div>
 
-        {/* Small KPI strip */}
+        {/* ====================================================================
+          ✨ UPDATED: KPI strip now has a consistent bg-white style
+          ====================================================================
+        */}
         <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-3">
+          {/* Runs Card */}
+          <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-xs font-medium text-slate-500">Runs</div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-semibold">{stats.totalRuns}</span>
@@ -539,6 +543,7 @@ export default function ClaimReconciliation() {
             </div>
           </div>
 
+          {/* Claims Reconciled Card */}
           <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-xs font-medium text-slate-500">
               Claims reconciled
@@ -556,18 +561,21 @@ export default function ClaimReconciliation() {
             </div>
           </div>
 
-          {/* This card can be made clickable */}
-          <div className="rounded-xl border bg-slate-900 text-slate-50 px-4 py-3">
-            <div className="text-xs font-medium text-slate-200">
+          {/* Items Needing Attention Card */}
+          <div className="rounded-xl border bg-white px-4 py-3">
+            <div className="text-xs font-medium text-slate-500">
               Items needing attention
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-semibold">{stats.openItems}</span>
-              <span className="text-[11px] uppercase tracking-wide text-slate-300">
+              {/* Using color to draw attention instead of a dark background */}
+              <span className="text-lg font-semibold text-orange-500">
+                {stats.openItems}
+              </span>
+              <span className="text-[11px] uppercase tracking-wide text-orange-500">
                 open
               </span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-300">
+            <div className="mt-1 text-[11px] text-slate-500">
               Partial or manual-review claims.
             </div>
           </div>
@@ -594,14 +602,16 @@ export default function ClaimReconciliation() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
-          {/* ====================================================================
-            ✨ UPDATED: Form is wrapped in TooltipProvider
-            ====================================================================
-          */}
           <TooltipProvider delayDuration={100}>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
+              {/* ====================================================================
+                ✨ UPDATED: Replaced stacked grids with a single 6-column grid
+                for perfect alignment.
+                ====================================================================
+              */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-x-6 gap-y-6">
+                {/* Row 1: Settings */}
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="provider">Insurance provider</Label>
                   <Select
                     value={providerName}
@@ -623,7 +633,7 @@ export default function ClaimReconciliation() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="year">Period year</Label>
                   <Input
                     id="year"
@@ -637,7 +647,7 @@ export default function ClaimReconciliation() {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="month">Period month</Label>
                   <Select
                     value={periodMonth}
@@ -661,35 +671,31 @@ export default function ClaimReconciliation() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Row 2: Files */}
+                <div className="md:col-span-3">
+                  <FileDropzone
+                    label="Claims submitted file"
+                    description="The billing export you send to CIC (one row per claim)."
+                    file={claimsFile}
+                    onFileChange={setClaimsFile}
+                    disabled={isFormDisabled}
+                  />
+                </div>
+
+                <div className="md:col-span-3">
+                  <FileDropzone
+                    label="Remittance advice file"
+                    description="The payment / remittance report you receive back from CIC."
+                    file={remittanceFile}
+                    onFileChange={setRemittanceFile}
+                    disabled={isFormDisabled}
+                  />
+                </div>
               </div>
 
-              {/* ====================================================================
-                ✨ UPDATED: File inputs replaced with new FileDropzone component
-                ====================================================================
-              */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FileDropzone
-                  label="Claims submitted file"
-                  description="The billing export you send to CIC (one row per claim)."
-                  file={claimsFile}
-                  onFileChange={setClaimsFile}
-                  disabled={isFormDisabled}
-                />
-
-                <FileDropzone
-                  label="Remittance advice file"
-                  description="The payment / remittance report you receive back from CIC."
-                  file={remittanceFile}
-                  onFileChange={setRemittanceFile}
-                  disabled={isFormDisabled}
-                />
-              </div>
-
+              {/* Submit Button Row */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
-                {/* ====================================================================
-                  ✨ UPDATED: Submit button wrapped in Tooltip for smart feedback
-                  ====================================================================
-                */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     {/* This span wrapper is needed for the tooltip to work on a disabled button */}
@@ -771,7 +777,6 @@ export default function ClaimReconciliation() {
                     <TableHead>Partial</TableHead>
                     <TableHead>Review</TableHead>
                     <TableHead>Date</TableHead>
-                    {/* ✨ UPDATED: Actions column is cleaner */}
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -799,10 +804,6 @@ export default function ClaimReconciliation() {
                       </TableCell>
                       <TableCell>{run.totalClaimRows}</TableCell>
                       <TableCell>{run.totalRemittanceRows}</TableCell>
-                      {/* ====================================================================
-                        ✨ UPDATED: Badges are now descriptive
-                        ====================================================================
-                      */}
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -824,10 +825,6 @@ export default function ClaimReconciliation() {
                       <TableCell>
                         {new Date(run.createdAt).toLocaleDateString()}
                       </TableCell>
-                      {/* ====================================================================
-                        ✨ UPDATED: Actions buttons replaced with DropdownMenu
-                        ====================================================================
-                      */}
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
