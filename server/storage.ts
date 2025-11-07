@@ -155,6 +155,15 @@ export interface IStorage {
   >;
 
   getTransactionById(id: string): Promise<Transaction | undefined>;
+  findPotentialDuplicates(params: {
+    date: Date;
+    amount: string;
+    type: string;
+    departmentId?: string | null;
+    insuranceProviderId?: string | null;
+    expenseCategory?: string | null;
+    excludeId?: string;
+  }): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<void>;
@@ -556,6 +565,49 @@ export class DatabaseStorage implements IStorage {
   async getTransactionById(id: string): Promise<Transaction | undefined> {
     const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
     return transaction || undefined;
+  }
+  async findPotentialDuplicates(params: {
+    date: Date;
+    amount: string;
+    type: string;
+    departmentId?: string | null;
+    insuranceProviderId?: string | null;
+    expenseCategory?: string | null;
+    excludeId?: string;
+  }): Promise<Transaction[]> {
+    // Check for transactions on the same date with same amount and type
+    // and same department/category created within the last 24 hours
+    const targetDate = new Date(params.date);
+    const startOfDay = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 0, 0, 0, 0));
+    const endOfDay = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate() + 1, 0, 0, 0, 0));
+    const lookbackTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+    
+    const conditions = [
+      gte(transactions.date, startOfDay),
+      lt(transactions.date, endOfDay),
+      eq(transactions.amount, params.amount),
+      eq(transactions.type, params.type),
+      gte(transactions.createdAt, lookbackTime)
+    ];
+
+    // Add department or insurance provider match
+    if (params.departmentId) {
+      conditions.push(eq(transactions.departmentId, params.departmentId));
+    }
+    if (params.insuranceProviderId) {
+      conditions.push(eq(transactions.insuranceProviderId, params.insuranceProviderId));
+    }
+    if (params.expenseCategory) {
+      conditions.push(eq(transactions.expenseCategory, params.expenseCategory));
+    }
+
+    const duplicates = await db
+      .select()
+      .from(transactions)
+      .where(and(...conditions));
+
+    // Filter out the transaction being edited (if applicable)
+    return duplicates.filter(t => t.id !== params.excludeId);
   }
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const [newTransaction] = await db.insert(transactions).values(transaction).returning();

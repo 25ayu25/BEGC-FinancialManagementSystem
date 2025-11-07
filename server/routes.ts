@@ -555,6 +555,31 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  app.post("/api/transactions/check-duplicate", requireAuth, async (req, res) => {
+    try {
+      const { date, amount, type, departmentId, insuranceProviderId, expenseCategory, excludeId } = req.body;
+      
+      if (!date || !amount || !type) {
+        return res.status(400).json({ error: "Missing required fields for duplicate check" });
+      }
+
+      const duplicates = await storage.findPotentialDuplicates({
+        date: new Date(date),
+        amount: String(amount),
+        type,
+        departmentId: departmentId || null,
+        insuranceProviderId: insuranceProviderId === "no-insurance" ? null : insuranceProviderId || null,
+        expenseCategory: expenseCategory || null,
+        excludeId: excludeId || undefined
+      });
+
+      res.json({ duplicates });
+    } catch (error) {
+      console.error("Error checking for duplicates:", error);
+      res.status(500).json({ error: "Failed to check for duplicates" });
+    }
+  });
+
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       const syncStatus = "synced";

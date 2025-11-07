@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, STAFF_TYPES } from "@/lib/constants";
+import DuplicateWarningDialog from "./duplicate-warning-dialog";
 
 interface AddTransactionModalProps {
   open: boolean;
@@ -38,6 +39,9 @@ export default function AddTransactionModal({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [expenseCategory, setExpenseCategory] = useState("");
   const [staffType, setStaffType] = useState("");
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [potentialDuplicates, setPotentialDuplicates] = useState<any[]>([]);
+  const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,6 +66,9 @@ export default function AddTransactionModal({
     setSelectedDate(new Date());
     setExpenseCategory("");
     setStaffType("");
+    setShowDuplicateWarning(false);
+    setPotentialDuplicates([]);
+    setBypassDuplicateCheck(false);
   };
 
   // Populate when editing
@@ -136,8 +143,27 @@ export default function AddTransactionModal({
   const isSaving = createTransactionMutation.isPending || updateTransactionMutation.isPending;
   const submitGuard = useRef(false);
 
+  // —— Check for duplicates ——
+  const checkDuplicates = async (transactionData: any) => {
+    try {
+      const response = await apiRequest("POST", "/api/transactions/check-duplicate", {
+        date: transactionData.date,
+        amount: transactionData.amount,
+        type: transactionData.type,
+        departmentId: transactionData.departmentId,
+        insuranceProviderId: transactionData.insuranceProviderId,
+        expenseCategory: transactionData.expenseCategory,
+        excludeId: editTransaction?.id
+      });
+      return response.duplicates || [];
+    } catch (error) {
+      console.error("Error checking duplicates:", error);
+      return [];
+    }
+  };
+
   // —— Submit ——
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving || submitGuard.current) return;
     submitGuard.current = true;
@@ -180,11 +206,44 @@ export default function AddTransactionModal({
           : null,
     };
 
+    // Check for duplicates before submitting (unless bypassing)
+    if (!bypassDuplicateCheck) {
+      const duplicates = await checkDuplicates(transactionData);
+      if (duplicates.length > 0) {
+        setPotentialDuplicates(duplicates);
+        setShowDuplicateWarning(true);
+        submitGuard.current = false;
+        return;
+      }
+    }
+
+    // No duplicates or user chose to proceed anyway
     if (editTransaction) {
       updateTransactionMutation.mutate(transactionData);
     } else {
       createTransactionMutation.mutate(transactionData);
     }
+  };
+
+  const handleProceedWithDuplicate = () => {
+    setShowDuplicateWarning(false);
+    setBypassDuplicateCheck(true);
+    // Re-trigger form submission
+    setTimeout(() => {
+      const form = document.querySelector('[data-transaction-form]') as HTMLFormElement;
+      if (form) {
+        form.requestSubmit();
+      }
+    }, 0);
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateWarning(false);
+    submitGuard.current = false;
+    toast({
+      title: "Transaction Cancelled",
+      description: "Please review the existing transaction or modify your entry.",
+    });
   };
 
   if (!open) return null;
@@ -222,7 +281,7 @@ export default function AddTransactionModal({
 
           {/* Body */}
           <div className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-6" aria-busy={isSaving}>
+            <form onSubmit={handleSubmit} className="space-y-6" aria-busy={isSaving} data-transaction-form>
               <fieldset disabled={isSaving} className="space-y-6">
                 {/* Transaction Type */}
                 <div>
@@ -456,6 +515,15 @@ export default function AddTransactionModal({
           </div>
         </div>
       </div>
+
+      {/* Duplicate Warning Dialog */}
+      <DuplicateWarningDialog
+        open={showDuplicateWarning}
+        onOpenChange={setShowDuplicateWarning}
+        duplicates={potentialDuplicates}
+        onProceed={handleProceedWithDuplicate}
+        onCancel={handleCancelDuplicate}
+      />
     </div>
   );
 }
