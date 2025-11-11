@@ -38,7 +38,7 @@ function monthsBetween(start: Date, end: Date) {
   const e = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
   for (
     let d = s;
-    d <= e;
+    d < e;
     d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
   ) {
     out.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
@@ -63,20 +63,20 @@ export function registerInsuranceMonthly(app: Express) {
 
       if (range === "year") {
         start = new Date(Date.UTC(year, 0, 1));
-        end = new Date(Date.UTC(year, 11, 1));
+        end = new Date(Date.UTC(year + 1, 0, 1)); // First day of next year
       } else if (range === "last-3-months") {
         const now = new Date();
-        const endD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        start = new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() - 2, 1));
+        const endD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); // First day of next month
+        start = new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() - 3, 1));
         end = endD;
       } else if (range === "last-month") {
         const now = new Date();
         const lm = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
         start = lm;
-        end = lm;
+        end = new Date(Date.UTC(lm.getUTCFullYear(), lm.getUTCMonth() + 1, 1)); // First day of month after last month
       } else if (range === "current-month") {
         start = firstOfMonthUTC(year, month);
-        end = firstOfMonthUTC(year, month);
+        end = nextMonthUTC(year, month); // First day of next month
       } else {
         // custom
         const sd = String(req.query.startDate);
