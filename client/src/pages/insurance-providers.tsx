@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
   TrendingDown,
   ArrowLeft,
   Calendar as CalendarIcon,
+  AlertCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -111,6 +113,7 @@ export default function InsuranceProvidersPage() {
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(
     endDateParam ? new Date(endDateParam) : undefined
   );
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // month-select choices
   const thisYear = now.getFullYear();
@@ -199,6 +202,16 @@ export default function InsuranceProvidersPage() {
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch dashboard data");
+      
+      // Defensive check: ensure response is JSON, not HTML from misconfigured proxy
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const errorMsg = `API misconfiguration: Expected JSON but received ${contentType || "unknown content type"}. Please check proxy settings.`;
+        setApiError(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      setApiError(null);
       return res.json();
     },
   });
@@ -248,6 +261,16 @@ export default function InsuranceProvidersPage() {
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
+      
+      // Defensive check: ensure response is JSON, not HTML from misconfigured proxy
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const errorMsg = `API misconfiguration: Expected JSON but received ${contentType || "unknown content type"}. Please check proxy settings.`;
+        setApiError(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      setApiError(null);
       return res.json();
     },
   });
@@ -484,6 +507,15 @@ export default function InsuranceProvidersPage() {
           </div>
         </div>
       </header>
+
+      {/* API Error Alert */}
+      {apiError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>API Configuration Error</AlertTitle>
+          <AlertDescription>{apiError}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Overview */}
       <Card className="border-0 shadow-md bg-white">

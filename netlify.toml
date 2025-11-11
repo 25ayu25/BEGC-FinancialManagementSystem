@@ -10,6 +10,13 @@
 [functions]
   directory = "nonexistent"
 
+# Proxy /api/* requests to Render backend (must come before SPA fallback)
+[[redirects]]
+  from = "/api/*"
+  to = "https://bgc-financialmanagementsystem.onrender.com/api/:splat"
+  status = 200
+  force = true
+
 # SPA fallback for client-side routing
 [[redirects]]
   from = "/*"
