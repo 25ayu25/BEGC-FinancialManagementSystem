@@ -632,17 +632,19 @@ export class DatabaseStorage implements IStorage {
           endDateExclusive = nextMonthUTC(year, month);
           break;
         case "last-month": {
-          const d = new Date(Date.UTC(year, month - 2, 1));
-          const y = d.getUTCFullYear();
-          const m = d.getUTCMonth() + 1;
-          startDate = monthStartUTC(y, m);
-          endDateExclusive = nextMonthUTC(y, m);
+          // Frontend already sends the correct target month/year
+          // Just compute start/end of THAT month
+          startDate = monthStartUTC(year, month);
+          endDateExclusive = nextMonthUTC(year, month);
           break;
         }
         case "last-3-months": {
-          const from = new Date(Date.UTC(year, month - 3, 1));
-          startDate = monthStartUTC(from.getUTCFullYear(), from.getUTCMonth() + 1);
-          endDateExclusive = nextMonthUTC(year, month);
+          // For November (month=11), show Aug(8) + Sep(9) + Oct(10)
+          // Start: 3 months back from current = month - 3
+          // End: current month (exclusive) = month
+          const threeMonthsBack = new Date(Date.UTC(year, month - 4, 1));
+          startDate = monthStartUTC(threeMonthsBack.getUTCFullYear(), threeMonthsBack.getUTCMonth() + 1);
+          endDateExclusive = monthStartUTC(year, month);
           break;
         }
         case "year":
