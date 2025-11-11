@@ -1019,6 +1019,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const { start, end } = getDateWindow(req.query);
       const data = await storage.getInsuranceBalances({
         providerId: req.query.providerId as string | undefined,
+        status: req.query.status as string | undefined,
         start, end,
       });
       res.json(data);

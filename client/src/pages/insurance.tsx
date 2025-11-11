@@ -478,6 +478,7 @@ export default function InsurancePage() {
     setLoadingBalances(true);
     const params = windowParams(new URLSearchParams());
     if (providerId) params.set("providerId", providerId);
+    if (status) params.set("status", status);
     api<BalancesResponse>(`/api/insurance-balances?${params.toString()}`)
       .then(setBalances)
       .catch((e: any) => { console.error("balances", e); if (e?.status === 401) setAuthError(true); })
@@ -485,7 +486,7 @@ export default function InsurancePage() {
   };
 
   useEffect(reloadClaims, [providerId, status, start, end]);
-  useEffect(reloadBalances, [providerId, start, end]);
+  useEffect(reloadBalances, [providerId, status, start, end]);
 
   // when opening provider drawer, show full payment history (no window)
   useEffect(() => {
@@ -766,6 +767,8 @@ export default function InsurancePage() {
                 <option value="submitted">Submitted</option>
                 <option value="partially_paid">Partially paid</option>
                 <option value="paid">Paid</option>
+                <option value="rejected">Rejected</option>
+                <option value="written_off">Written off</option>
               </select>
             </div>
 
