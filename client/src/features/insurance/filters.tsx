@@ -48,7 +48,7 @@ function readInitialFromUrl(): InsuranceFilters {
     toMonth: sp.get("to") || thisMonth,
     startDate: sp.get("start") || "",
     endDate: sp.get("end") || "",
-    providerId: sp.get("provider") || "ALL",
+    providerId: sp.get("providerId") || sp.get("provider") || "ALL",
     status: (sp.get("status") as any) || "",
   };
 }
@@ -65,7 +65,7 @@ function writeToUrl(f: InsuranceFilters) {
     if (f.startDate) p.set("start", f.startDate);
     if (f.endDate) p.set("end", f.endDate);
   }
-  if (f.providerId && f.providerId !== "ALL") p.set("provider", f.providerId);
+  if (f.providerId && f.providerId !== "ALL") p.set("providerId", f.providerId);
   if (f.status) p.set("status", f.status);
 
   const qs = p.toString();

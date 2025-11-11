@@ -281,6 +281,7 @@ export interface IStorage {
 
   getInsuranceBalances(filters?: {
     providerId?: string;
+    status?: string;
     start?: string; // YYYY-MM-DD inclusive
     end?: string;   // YYYY-MM-DD inclusive (converted to exclusive)
   }): Promise<{
@@ -1086,8 +1087,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Provider + claim balances (active providers only; add outstanding/credit)
-  async getInsuranceBalances(filters?: { providerId?: string; start?: string; end?: string }) {
-    const { providerId, start, end } = filters || {};
+  async getInsuranceBalances(filters?: { providerId?: string; status?: string; start?: string; end?: string }) {
+    const { providerId, status, start, end } = filters || {};
     const startDate = start ? new Date(start) : undefined;
     const endEx     = end   ? toEndExclusive(new Date(end))! : undefined;
 
@@ -1103,6 +1104,7 @@ export class DatabaseStorage implements IStorage {
     // Billed inside window
     const billedConds: any[] = [];
     if (providerId) billedConds.push(eq(insuranceClaims.providerId, providerId));
+    if (status) billedConds.push(eq(insuranceClaims.status, status));
     if (startDate) billedConds.push(gte(insuranceClaims.periodStart, startDate));
     if (endEx)     billedConds.push(lt(insuranceClaims.periodEnd, endEx));
     const billedRows = await db
@@ -1115,7 +1117,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(insuranceClaims.providerId);
     const billedMap = new Map(billedRows.map(r => [r.providerId, Number(r.billed)]));
 
-    // Paid inside window
+    // Paid inside window (no status filter - payments are not filtered by claim status)
     const paidConds: any[] = [];
     if (providerId) paidConds.push(eq(insurancePayments.providerId, providerId));
     if (startDate)  paidConds.push(gte(insurancePayments.paymentDate, startDate));
@@ -1159,9 +1161,10 @@ export class DatabaseStorage implements IStorage {
       beforePays.forEach(r => carryMap.set(r.providerId, (carryMap.get(r.providerId) || 0) - Number(r.total)));
     }
 
-    // Claims detail within the same window (for the table)
+    // Claims detail within the same window (for the table) - includes status filter
     const claims = await this.listInsuranceClaims({
       providerId,
+      status,
       start,
       end,
     });
