@@ -11,6 +11,7 @@ import {
   X,
   ShieldCheck,   // main insurance ledger
   ListChecks,    // providers sub-link
+  PieChart,      // insurance overview
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
@@ -30,6 +31,7 @@ const navigation: NavItem[] = [
 
   // Insurance section (single main item + one indented sub-link)
   { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
+  { name: "Insurance Overview", href: "/insurance-overview", icon: PieChart, sub: true },
   { name: "Insurance", href: "/insurance-providers", icon: ListChecks, sub: true },
   { name: "Claim Reconciliation", href: "/claim-reconciliation", icon: ListChecks, sub: true },
 
