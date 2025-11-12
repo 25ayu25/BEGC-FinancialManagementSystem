@@ -33,6 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 export default function InsuranceOverview() {
+  // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
   const {
     filters,
     updateFilter,
@@ -42,6 +43,28 @@ export default function InsuranceOverview() {
   } = useAdvancedFilters();
 
   const { data, loading, error, refetch } = useInsuranceOverview(filters);
+
+  // Modal states - MUST be before any conditional returns
+  const [showAddClaimModal, setShowAddClaimModal] = useState(false);
+  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+
+  // Form states for Add Claim modal - MUST be before any conditional returns
+  const [claimForm, setClaimForm] = useState({
+    providerId: "",
+    periodStart: "",
+    periodEnd: "",
+    amount: "",
+    notes: "",
+  });
+
+  // Form states for Record Payment modal - MUST be before any conditional returns
+  const [paymentForm, setPaymentForm] = useState({
+    providerId: "",
+    paymentDate: "",
+    amount: "",
+    reference: "",
+    notes: "",
+  });
 
   // Format data for tables
   const claimsTableData = data.claims.map(claim => {
@@ -200,28 +223,6 @@ export default function InsuranceOverview() {
       </div>
     );
   }
-
-  // Modal states
-  const [showAddClaimModal, setShowAddClaimModal] = useState(false);
-  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
-
-  // Form states for Add Claim modal
-  const [claimForm, setClaimForm] = useState({
-    providerId: "",
-    periodStart: "",
-    periodEnd: "",
-    amount: "",
-    notes: "",
-  });
-
-  // Form states for Record Payment modal
-  const [paymentForm, setPaymentForm] = useState({
-    providerId: "",
-    paymentDate: "",
-    amount: "",
-    reference: "",
-    notes: "",
-  });
 
   // Handle Add Claim
   const handleAddClaim = async (e: React.FormEvent) => {
