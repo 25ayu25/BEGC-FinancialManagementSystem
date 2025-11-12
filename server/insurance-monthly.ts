@@ -32,6 +32,20 @@ function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Subtract months from a given year/month, handling year rollover correctly.
+ * Returns { year, month } where month is 1-based (1..12).
+ */
+function subtractMonths(year: number, month: number, count: number): { year: number; month: number } {
+  let y = year;
+  let m = month - count;
+  while (m < 1) {
+    m += 12;
+    y -= 1;
+  }
+  return { year: y, month: m };
+}
+
 function monthsBetween(start: Date, end: Date) {
   const out: Array<{ y: number; m: number }> = [];
   const s = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
@@ -65,15 +79,17 @@ export function registerInsuranceMonthly(app: Express) {
         start = new Date(Date.UTC(year, 0, 1));
         end = new Date(Date.UTC(year + 1, 0, 1)); // First day of next year
       } else if (range === "last-3-months") {
-        const now = new Date();
-        const endD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); // First day of next month
-        start = new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() - 3, 1));
-        end = endD;
+        // Anchor is the provided year/month
+        // Window: start = first day of month 2 months before anchor, end = first day of month after anchor
+        const startYM = subtractMonths(year, month, 2);
+        start = firstOfMonthUTC(startYM.year, startYM.month);
+        end = nextMonthUTC(year, month); // First day of month after anchor
       } else if (range === "last-month") {
-        const now = new Date();
-        const lm = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-        start = lm;
-        end = new Date(Date.UTC(lm.getUTCFullYear(), lm.getUTCMonth() + 1, 1)); // First day of month after last month
+        // Anchor is the provided year/month
+        // Window: start = first day of previous month, end = first day of anchor month
+        const lastMonthYM = subtractMonths(year, month, 1);
+        start = firstOfMonthUTC(lastMonthYM.year, lastMonthYM.month);
+        end = firstOfMonthUTC(year, month); // First day of anchor month
       } else if (range === "current-month") {
         start = firstOfMonthUTC(year, month);
         end = nextMonthUTC(year, month); // First day of next month

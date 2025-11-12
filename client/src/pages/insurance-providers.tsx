@@ -199,6 +199,10 @@ export default function InsuranceProvidersPage() {
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch dashboard data");
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Expected JSON response but received: " + contentType);
+      }
       return res.json();
     },
   });
@@ -223,6 +227,11 @@ export default function InsuranceProvidersPage() {
       const url = `/api/dashboard?year=${compYear}&month=${compMonth}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.warn("Comparison data: Expected JSON but received:", contentType);
+        return null;
+      }
       return res.json();
     },
     enabled: normalizedRange === "current-month" || normalizedRange === "last-month",
@@ -248,6 +257,10 @@ export default function InsuranceProvidersPage() {
       }
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch insurance monthly data");
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Expected JSON response but received: " + contentType);
+      }
       return res.json();
     },
   });
