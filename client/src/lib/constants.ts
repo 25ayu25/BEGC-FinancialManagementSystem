@@ -9,7 +9,6 @@ export const DEPARTMENTS = {
   XRAY: { name: "X-Ray", code: "XRAY" },
   PHARMACY: { name: "Pharmacy", code: "PHARMACY" },
   PHARMACY_SR: { name: "Pharmacy - Station Road", code: "PHARMACY_SR" },
-  OTHER: { name: "Other", code: "OTHER" },
 } as const;
 
 export const INSURANCE_PROVIDERS = {
