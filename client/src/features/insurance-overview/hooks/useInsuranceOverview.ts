@@ -97,11 +97,11 @@ export function useInsuranceOverview(filters: AdvancedFilters) {
         params.set("providers", filters.providers.join(","));
       }
 
-      // Fetch all data in parallel from USD-only endpoints
+      // Fetch all data in parallel (filter USD on client side)
       const [providersRes, claimsRes, paymentsRes] = await Promise.all([
         api<Provider[]>("/api/insurance-providers"),
-        api<Claim[]>(`/api/insurance-claims?${params}&currency=USD`),
-        api<Payment[]>(`/api/insurance-payments?${params}&currency=USD`),
+        api<Claim[]>(`/api/insurance-claims?${params}`),
+        api<Payment[]>(`/api/insurance-payments?${params}`),
       ]);
 
       // Apply additional client-side filtering
