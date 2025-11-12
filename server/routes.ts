@@ -1025,6 +1025,26 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.json(data);
     } catch (err) { next(err); }
   });
+
+  /** Get monthly insurance income (USD) */
+  app.get("/api/insurance/monthly", requireAuth, async (req, res, next) => {
+    try {
+      const year = Number(req.query.year) || new Date().getUTCFullYear();
+      const month = Number(req.query.month) || new Date().getUTCMonth() + 1;
+      const range = (req.query.range as string) || "current-month";
+      const startDate = (req.query.startDate as string) || undefined;
+      const endDate = (req.query.endDate as string) || undefined;
+
+      const data = await storage.getInsuranceMonthlyIncome({
+        year,
+        month,
+        range,
+        startDate,
+        endDate,
+      });
+      res.json(data);
+    } catch (err) { next(err); }
+  });
   
   /* --------------------------------------------------------------- */
   /* Dashboard & Trends                                              */

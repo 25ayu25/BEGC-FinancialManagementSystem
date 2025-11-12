@@ -298,6 +298,17 @@ export interface IStorage {
       InsuranceClaim & { providerName: string; billedAmount: number; paidToDate: number; balance: number }
     >;
   }>;
+
+  getInsuranceMonthlyIncome(args: {
+    year: number;
+    month: number;
+    range: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{
+    months: Array<{ ym: string; usd: number }>;
+    totals: Record<string, number>;
+  }>;
 }
 
 /* ----------------------------- implementation ----------------------------- */
@@ -1187,6 +1198,97 @@ export class DatabaseStorage implements IStorage {
     });
 
     return { providers, claims: claims as any };
+  }
+
+  /* ---------------- Insurance Monthly Income (USD) ---------------- */
+  
+  async getInsuranceMonthlyIncome(args: {
+    year: number;
+    month: number;
+    range: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    // Build half-open window [start, end) using provided year/month as anchor
+    let startDate: Date;
+    let endDateExclusive: Date;
+
+    if (args.range === "custom" && args.startDate && args.endDate) {
+      startDate = new Date(args.startDate);
+      const endCandidate = new Date(args.endDate);
+      endDateExclusive = toEndExclusive(endCandidate)!;
+    } else {
+      switch (args.range) {
+        case "current-month":
+          // Use provided year/month
+          startDate = monthStartUTC(args.year, args.month);
+          endDateExclusive = nextMonthUTC(args.year, args.month);
+          break;
+        case "last-month":
+          // Use provided year/month (already adjusted by caller if needed)
+          startDate = monthStartUTC(args.year, args.month);
+          endDateExclusive = nextMonthUTC(args.year, args.month);
+          break;
+        case "last-3-months": {
+          // Start 3 months back from provided year/month
+          const threeMonthsBack = new Date(Date.UTC(args.year, args.month - 4, 1));
+          startDate = monthStartUTC(threeMonthsBack.getUTCFullYear(), threeMonthsBack.getUTCMonth() + 1);
+          endDateExclusive = monthStartUTC(args.year, args.month);
+          break;
+        }
+        case "year":
+          // Entire year
+          startDate = new Date(Date.UTC(args.year, 0, 1));
+          endDateExclusive = new Date(Date.UTC(args.year + 1, 0, 1));
+          break;
+        default:
+          // Fallback to current-month
+          startDate = monthStartUTC(args.year, args.month);
+          endDateExclusive = nextMonthUTC(args.year, args.month);
+      }
+    }
+
+    // Fetch all USD income transactions from insurance providers in window
+    const txData = await db
+      .select({
+        date: transactions.date,
+        amount: transactions.amount,
+        providerId: transactions.insuranceProviderId,
+        providerName: insuranceProviders.name,
+      })
+      .from(transactions)
+      .innerJoin(insuranceProviders, eq(transactions.insuranceProviderId, insuranceProviders.id))
+      .where(
+        and(
+          eq(transactions.type, "income"),
+          eq(transactions.currency, "USD"),
+          gte(transactions.date, startDate),
+          lt(transactions.date, endDateExclusive)
+        )
+      );
+
+    // Group by year-month
+    const monthMap = new Map<string, number>();
+    const providerTotals: Record<string, number> = {};
+
+    for (const tx of txData) {
+      const d = new Date(tx.date);
+      const ym = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      const amt = Number(tx.amount || 0);
+      
+      monthMap.set(ym, (monthMap.get(ym) || 0) + amt);
+      
+      if (tx.providerName) {
+        providerTotals[tx.providerName] = (providerTotals[tx.providerName] || 0) + amt;
+      }
+    }
+
+    // Build sorted month array
+    const months = Array.from(monthMap.entries())
+      .map(([ym, usd]) => ({ ym, usd }))
+      .sort((a, b) => a.ym.localeCompare(b.ym));
+
+    return { months, totals: providerTotals };
   }
 }
 
