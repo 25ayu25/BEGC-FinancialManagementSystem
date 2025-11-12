@@ -15,7 +15,7 @@ import { Loader2, X } from "lucide-react";
  * Bulk Income (client-side bulk save)
  * - Cash by department (SSP/USD selectable at top; default SSP)
  * - Insurance totals by provider (defaults to USD; can change)
- * - Prefill 5 departments and common providers
+ * - Prefill 6 departments and common providers
  * - Saves by calling POST /api/transactions per row (same as AddTransaction)
  */
 
@@ -96,6 +96,7 @@ export default function BulkIncomeModal({
       findDeptId("ultrasound"),
       findDeptId("x-ray"),
       findDeptId("pharmacy"),
+      findDeptId("station road"),  // Will match "Pharmacy - Station Road"
     ].filter(Boolean) as string[];
     if (!list.length) {
       toast({ title: "No departments found to prefill", variant: "destructive" });
@@ -280,7 +281,7 @@ export default function BulkIncomeModal({
               </div>
 
               <div className="flex gap-2 flex-wrap">
-                <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 5 Departments</Button>
+                <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 6 Departments</Button>
                 <Button type="button" variant="outline" onClick={prefillProviders}>Prefill Insurances</Button>
                 <div className="ml-auto flex items-center gap-2">
                   <Label className="text-xs text-slate-600">Provider currency</Label>
