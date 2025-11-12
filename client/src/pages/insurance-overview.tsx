@@ -18,9 +18,11 @@ import { AdvancedFilters } from "@/features/insurance-overview/components/Advanc
 import { ExecutiveDashboard } from "@/features/insurance-overview/components/ExecutiveDashboard";
 import { ProviderComparison } from "@/features/insurance-overview/components/ProviderComparison";
 import { PaymentTimeline } from "@/features/insurance-overview/components/PaymentTimeline";
+import { ProviderDailyTimeline } from "@/features/insurance-overview/components/ProviderDailyTimeline";
 import { AgingAnalysis } from "@/features/insurance-overview/components/AgingAnalysis";
 import { SmartTable } from "@/features/insurance-overview/components/SmartTable";
 import { formatCurrency } from "@/features/insurance-overview/utils/calculations";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -32,7 +34,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
-export default function InsuranceOverview() {
+function InsuranceOverviewContent() {
   // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
   const {
     filters,
@@ -383,7 +385,12 @@ export default function InsuranceOverview() {
         <AgingAnalysis claims={data.claims} payments={data.payments} />
       </div>
 
-      {/* Charts Row 2 */}
+      {/* Charts Row 2: Daily Timeline */}
+      <div className="grid grid-cols-1 gap-4">
+        <ProviderDailyTimeline />
+      </div>
+
+      {/* Charts Row 3: Monthly Timeline */}
       <div className="grid grid-cols-1 gap-4">
         <PaymentTimeline claims={data.claims} payments={data.payments} />
       </div>
@@ -609,5 +616,14 @@ export default function InsuranceOverview() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Wrap with ErrorBoundary for production safety
+export default function InsuranceOverview() {
+  return (
+    <ErrorBoundary>
+      <InsuranceOverviewContent />
+    </ErrorBoundary>
   );
 }
