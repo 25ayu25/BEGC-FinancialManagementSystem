@@ -76,18 +76,108 @@ export default function InsuranceOverview() {
     { key: "notes", label: "Notes", sortable: false },
   ];
 
+  // Enhanced error handling
   if (error) {
+    // Check if it's an authentication error (401)
+    const isAuthError = error.includes("401") || error.toLowerCase().includes("authentication");
+    
+    if (isAuthError) {
+      return (
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="text-center">
+              <svg
+                className="mx-auto h-16 w-16 text-red-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+              <h3 className="mt-4 text-xl font-semibold text-gray-900">
+                Authentication Required
+              </h3>
+              <p className="mt-2 text-gray-600">
+                Please log in to view insurance overview data
+              </p>
+              <button
+                onClick={() => (window.location.href = "/login")}
+                className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // General error state
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-900">
-          <h3 className="font-semibold mb-2">Error Loading Data</h3>
-          <p>{error}</p>
-          <button
-            onClick={refetch}
-            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+          <div className="text-center">
+            <svg
+              className="mx-auto h-16 w-16 text-yellow-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <h3 className="mt-4 text-xl font-semibold text-gray-900">
+              Unable to Load Data
+            </h3>
+            <p className="mt-2 text-gray-600">{error}</p>
+            <button
+              onClick={refetch}
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state when no data is available
+  const hasData = data.claims.length > 0 || data.payments.length > 0;
+  if (!loading && !hasData) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+          <div className="text-center">
+            <svg
+              className="mx-auto h-16 w-16 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            <h3 className="mt-4 text-xl font-semibold text-gray-900">
+              No Insurance Data Yet
+            </h3>
+            <p className="mt-2 text-gray-600">
+              Get started by adding your first insurance claim or payment
+            </p>
+          </div>
         </div>
       </div>
     );

@@ -97,16 +97,17 @@ export function useInsuranceOverview(filters: AdvancedFilters) {
         params.set("providers", filters.providers.join(","));
       }
 
-      // Fetch all data in parallel
+      // Fetch all data in parallel from USD-only endpoints
       const [providersRes, claimsRes, paymentsRes] = await Promise.all([
-        api<{ providers: Provider[] }>("/api/insurance-providers"),
-        api<{ claims: Claim[] }>(`/api/insurance-claims?${params}`),
-        api<{ payments: Payment[] }>(`/api/insurance-payments?${params}`),
+        api<Provider[]>("/api/insurance-providers"),
+        api<Claim[]>(`/api/insurance-claims?${params}&currency=USD`),
+        api<Payment[]>(`/api/insurance-payments?${params}&currency=USD`),
       ]);
 
       // Apply additional client-side filtering
-      let filteredClaims = claimsRes.claims || [];
-      let filteredPayments = paymentsRes.payments || [];
+      // Filter USD only (double-check server-side filtering)
+      let filteredClaims = (Array.isArray(claimsRes) ? claimsRes : []).filter(c => c.currency === "USD");
+      let filteredPayments = (Array.isArray(paymentsRes) ? paymentsRes : []).filter(p => p.currency === "USD");
 
       // Amount filters
       if (filters.minAmount !== undefined) {
@@ -178,7 +179,7 @@ export function useInsuranceOverview(filters: AdvancedFilters) {
       }
 
       setData({
-        providers: providersRes.providers || [],
+        providers: Array.isArray(providersRes) ? providersRes : [],
         claims: filteredClaims,
         payments: filteredPayments,
       });

@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
 import { getCookieOptions } from "./utils/cookies";
+import insuranceOverviewRouter from "./routes/insurance-overview";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -1825,6 +1826,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* Claim Reconciliation                                            */
   /* --------------------------------------------------------------- */
   app.use("/api/claim-reconciliation", requireAuth, claimReconciliationRouter);
+
+  /* --------------------------------------------------------------- */
+  /* Insurance Overview - Independent Endpoints                      */
+  /* --------------------------------------------------------------- */
+  app.use("/api/insurance-overview", requireAuth, insuranceOverviewRouter);
 
   /* --------------------------------------------------------------- */
   /* Catch-all for unknown API routes (must be after all routes)    */
