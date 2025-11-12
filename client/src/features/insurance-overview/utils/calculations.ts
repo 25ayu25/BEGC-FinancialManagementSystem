@@ -136,10 +136,10 @@ export function calculateTrendPercentage(current: number, previous: number): num
 }
 
 /**
- * Format currency amount
+ * Format currency amount (USD only for insurance overview)
  */
-export function formatCurrency(amount: number, currency: string = "USD"): string {
-  return `${currency} ${amount.toLocaleString("en-US", {
+export function formatCurrency(amount: number): string {
+  return `USD ${amount.toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
