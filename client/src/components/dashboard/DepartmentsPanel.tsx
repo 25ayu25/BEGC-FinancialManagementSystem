@@ -115,8 +115,11 @@ export default function DepartmentsPanel({
   collapsible = true,
   maxHeight = 420,
 }: DepartmentsPanelProps) {
+  // Filter out 'OTHER' department before processing
+  const filtered = departments.filter(d => d.code !== 'OTHER');
+  
   // Map + sort by amount desc
-  const rows = departments
+  const rows = filtered
     .map((d) => {
       const ssp = Number(departmentBreakdown[d.id] || 0);
       const pct = totalSSP > 0 ? (ssp / totalSSP) * 100 : 0;

@@ -6,7 +6,10 @@ interface DepartmentBreakdownProps {
 }
 
 export default function DepartmentBreakdown({ data, departments }: DepartmentBreakdownProps) {
-  if (!departments?.length) {
+  // Filter out 'OTHER' department
+  const filteredDepartments = departments?.filter(d => d.code !== 'OTHER');
+  
+  if (!filteredDepartments?.length) {
     return (
       <Card className="border border-slate-200 shadow-sm">
         <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
@@ -28,7 +31,7 @@ export default function DepartmentBreakdown({ data, departments }: DepartmentBre
     );
   }
 
-  const total = departments.reduce((sum, dept) => 
+  const total = filteredDepartments.reduce((sum, dept) => 
     sum + parseFloat(data?.[dept.id] || '0'), 0
   );
 
@@ -50,7 +53,7 @@ export default function DepartmentBreakdown({ data, departments }: DepartmentBre
       </CardHeader>
       <CardContent className="p-6">
         <div className="space-y-5" data-testid="department-breakdown">
-          {departments.map((department, index) => {
+          {filteredDepartments.map((department, index) => {
             const amount = parseFloat(data?.[department.id] || '0');
             const percentage = total > 0 ? (amount / total) * 100 : 0;
             const colors = departmentColors[index % departmentColors.length];
