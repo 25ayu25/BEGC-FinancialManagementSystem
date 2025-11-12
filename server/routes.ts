@@ -1415,6 +1415,8 @@ export async function registerRoutes(app: Express): Promise<void> {
             deptMap
           )
         )
+        // Filter out raw 'Other' department rows (keep 'Other / Adjustments' balancing row)
+        .filter(([name]) => name.toLowerCase() !== 'other')
       );
       const insPairs = sortPairsDesc(
         proPairs(

@@ -27,7 +27,10 @@ function DeptIcon({ name, code }: { name: string; code: string }) {
 }
 
 export default function SimpleTopDepartments({ data, departments }: SimpleTopDepartmentsProps) {
-  if (!departments?.length) {
+  // Filter out 'OTHER' department
+  const filteredDepartments = departments?.filter(d => d.code !== 'OTHER');
+  
+  if (!filteredDepartments?.length) {
     return (
       <Card className="border border-slate-200 shadow-sm">
         <CardHeader className="pb-3">
@@ -48,12 +51,12 @@ export default function SimpleTopDepartments({ data, departments }: SimpleTopDep
     );
   }
 
-  const total = departments.reduce(
+  const total = filteredDepartments.reduce(
     (sum, dept) => sum + parseFloat(data?.[dept.id] || "0"),
     0
   );
 
-  const sorted = departments
+  const sorted = filteredDepartments
     .map((dept) => ({
       ...dept,
       amount: parseFloat(data?.[dept.id] || "0"),
