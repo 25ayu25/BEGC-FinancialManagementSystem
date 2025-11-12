@@ -38,7 +38,8 @@ export function getCookieOptions(req: Request): CookieOptions {
   const options: CookieOptions = {
     httpOnly: true,
     secure: isProd,
-    sameSite: "lax", // Changed from "none" to "lax" for better compatibility
+    sameSite: "lax", // "lax" works well with Netlify proxy (appears same-origin to browser)
+                     // If needed, can be changed to "none" for explicit cross-site, but requires secure: true
     path: "/",
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
   };
