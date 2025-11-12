@@ -1,8 +1,17 @@
 /**
- * Insurance Overview Page - Main Dashboard
+ * Insurance Overview Page - 100% Standalone Implementation
+ * 
+ * This page is completely independent from insurance.tsx
+ * - Uses its own data fetching hooks
+ * - Manages its own filter state
+ * - Has its own API endpoints
+ * - USD-only (no multi-currency support)
+ * 
+ * @module InsuranceOverview
  */
 
-import React from "react";
+import React, { useState } from "react";
+import { Plus, DollarSign, RefreshCw, Download } from "lucide-react";
 import { useAdvancedFilters } from "@/features/insurance-overview/hooks/useAdvancedFilters";
 import { useInsuranceOverview } from "@/features/insurance-overview/hooks/useInsuranceOverview";
 import { AdvancedFilters } from "@/features/insurance-overview/components/AdvancedFilters";
@@ -13,6 +22,15 @@ import { AgingAnalysis } from "@/features/insurance-overview/components/AgingAna
 import { SmartTable } from "@/features/insurance-overview/components/SmartTable";
 import { formatCurrency } from "@/features/insurance-overview/utils/calculations";
 import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 export default function InsuranceOverview() {
   const {
@@ -183,15 +201,157 @@ export default function InsuranceOverview() {
     );
   }
 
+  // Modal states
+  const [showAddClaimModal, setShowAddClaimModal] = useState(false);
+  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+
+  // Form states for Add Claim modal
+  const [claimForm, setClaimForm] = useState({
+    providerId: "",
+    periodStart: "",
+    periodEnd: "",
+    amount: "",
+    notes: "",
+  });
+
+  // Form states for Record Payment modal
+  const [paymentForm, setPaymentForm] = useState({
+    providerId: "",
+    paymentDate: "",
+    amount: "",
+    reference: "",
+    notes: "",
+  });
+
+  // Handle Add Claim
+  const handleAddClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch("/api/insurance-claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          providerId: claimForm.providerId,
+          periodStart: claimForm.periodStart,
+          periodEnd: claimForm.periodEnd,
+          currency: "USD",
+          claimedAmount: Number(claimForm.amount),
+          notes: claimForm.notes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to add claim");
+      }
+
+      // Reset form and close modal
+      setClaimForm({ providerId: "", periodStart: "", periodEnd: "", amount: "", notes: "" });
+      setShowAddClaimModal(false);
+      // Refresh data
+      refetch();
+    } catch (error) {
+      console.error("Error adding claim:", error);
+      alert("Failed to add claim. Please try again.");
+    }
+  };
+
+  // Handle Record Payment
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch("/api/insurance-payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          providerId: paymentForm.providerId,
+          paymentDate: paymentForm.paymentDate,
+          currency: "USD",
+          amount: Number(paymentForm.amount),
+          reference: paymentForm.reference,
+          notes: paymentForm.notes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to record payment");
+      }
+
+      // Reset form and close modal
+      setPaymentForm({ providerId: "", paymentDate: "", amount: "", reference: "", notes: "" });
+      setShowRecordPaymentModal(false);
+      // Refresh data
+      refetch();
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      alert("Failed to record payment. Please try again.");
+    }
+  };
+
+  // Handle Export (simple CSV export for now)
+  const handleExport = () => {
+    const csv = [
+      ["Provider", "Period", "Claimed Amount", "Status", "Notes"],
+      ...claimsTableData.map(c => [
+        c.provider,
+        c.period,
+        c.amount.toString(),
+        c.status,
+        c.notes || "",
+      ]),
+    ]
+      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `insurance-overview-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* Page Header */}
+      {/* Page Header with Action Buttons */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Insurance Overview</h1>
           <p className="text-gray-600 mt-1">
-            Comprehensive analytics and insights for insurance claims and payments
+            Comprehensive analytics and insights for insurance claims and payments (USD only)
           </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAddClaimModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Claim
+          </button>
+          <button
+            onClick={() => setShowRecordPaymentModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <DollarSign className="w-4 h-4" />
+            Record Payment
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+          <button
+            onClick={refetch}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -243,6 +403,210 @@ export default function InsuranceOverview() {
           defaultPageSize={25}
         />
       </div>
+
+      {/* Add Claim Modal */}
+      <Dialog open={showAddClaimModal} onOpenChange={setShowAddClaimModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Insurance Claim (USD Only)</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddClaim} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Provider *
+              </label>
+              <select
+                required
+                value={claimForm.providerId}
+                onChange={(e) => setClaimForm({ ...claimForm, providerId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select Provider</option>
+                {data.providers
+                  .filter(p => p.isActive)
+                  .map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Period Start *
+              </label>
+              <input
+                required
+                type="date"
+                value={claimForm.periodStart}
+                onChange={(e) => setClaimForm({ ...claimForm, periodStart: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Period End *
+              </label>
+              <input
+                required
+                type="date"
+                value={claimForm.periodEnd}
+                onChange={(e) => setClaimForm({ ...claimForm, periodEnd: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount (USD) *
+              </label>
+              <input
+                required
+                type="number"
+                step="0.01"
+                min="0"
+                value={claimForm.amount}
+                onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={claimForm.notes}
+                onChange={(e) => setClaimForm({ ...claimForm, notes: e.target.value })}
+                rows={3}
+                placeholder="Optional notes..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setShowAddClaimModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Add Claim
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Modal */}
+      <Dialog open={showRecordPaymentModal} onOpenChange={setShowRecordPaymentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Insurance Payment (USD Only)</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleRecordPayment} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Provider *
+              </label>
+              <select
+                required
+                value={paymentForm.providerId}
+                onChange={(e) => setPaymentForm({ ...paymentForm, providerId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="">Select Provider</option>
+                {data.providers
+                  .filter(p => p.isActive)
+                  .map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Date *
+              </label>
+              <input
+                required
+                type="date"
+                value={paymentForm.paymentDate}
+                onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount (USD) *
+              </label>
+              <input
+                required
+                type="number"
+                step="0.01"
+                min="0"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Reference Number
+              </label>
+              <input
+                type="text"
+                value={paymentForm.reference}
+                onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
+                placeholder="Optional reference number..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                rows={3}
+                placeholder="Optional notes..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setShowRecordPaymentModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Record Payment
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
