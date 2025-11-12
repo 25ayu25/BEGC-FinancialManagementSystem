@@ -11,6 +11,7 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
+import { getCookieOptions } from "./utils/cookies";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -150,6 +151,17 @@ function toPairs(rec: any): Array<[string, number]> {
 /* ------------------------------ Register Routes ------------------------------ */
 
 export async function registerRoutes(app: Express): Promise<void> {
+  /**
+   * Trust proxy is critical for production deployment behind Netlify → Render.
+   * 
+   * Why this is needed:
+   * - Netlify forwards requests to Render with x-forwarded-host, x-forwarded-proto headers
+   * - Express needs to trust these headers to determine the actual host and protocol
+   * - Cookie secure flag and domain calculation depend on correct protocol detection
+   * - Without this, req.protocol returns 'http' even when client used 'https'
+   * 
+   * Setting: 1 means trust the first hop (Netlify proxy)
+   */
   app.set("trust proxy", 1);
 
   app.use((req, res, next) => {
@@ -271,6 +283,14 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   /* Auth routes                                                     */
   /* --------------------------------------------------------------- */
+  /**
+   * Login endpoint - sets secure session cookie using proxy-aware options.
+   * 
+   * The cookie helper (getCookieOptions) ensures proper configuration for:
+   * - Netlify → Render proxy setup
+   * - Cross-origin requests with credentials
+   * - Security (httpOnly, secure in prod, sameSite)
+   */
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -296,14 +316,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         fullName: user.fullName,
       };
 
-      const isProd = process.env.NODE_ENV === "production";
-      res.cookie("user_session", JSON.stringify(userSession), {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "none",
-        path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 30,
-      });
+      // Use centralized cookie helper for consistent, proxy-aware cookie options
+      res.cookie("user_session", JSON.stringify(userSession), getCookieOptions(req));
 
       res.json(userSession);
     } catch (error) {
@@ -312,10 +326,10 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.post("/api/auth/logout", (_req, res) => {
-    const isProd = process.env.NODE_ENV === "production";
-    res.clearCookie("user_session", { httpOnly: true, secure: isProd, sameSite: "none", path: "/" });
-    res.clearCookie("session");
+  app.post("/api/auth/logout", (req, res) => {
+    // Use consistent cookie options when clearing the session cookie
+    res.clearCookie("user_session", getCookieOptions(req));
+    res.clearCookie("session"); // Legacy cookie cleanup
     res.json({ success: true, message: "Logged out successfully" });
   });
 
