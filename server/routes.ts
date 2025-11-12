@@ -11,6 +11,7 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
+import { getCookieOptions } from "./utils/cookies";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -296,12 +297,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         fullName: user.fullName,
       };
 
-      const isProd = process.env.NODE_ENV === "production";
       res.cookie("user_session", JSON.stringify(userSession), {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "none",
-        path: "/",
+        ...getCookieOptions(req),
         maxAge: 1000 * 60 * 60 * 24 * 30,
       });
 
