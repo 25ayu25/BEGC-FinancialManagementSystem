@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-// Import Loader2 for the saving spinner
-import { Loader2, X } from "lucide-react";
+import { format } from "date-fns";
+// Import Loader2 and AlertCircle for the saving spinner and warning banner
+import { Loader2, X, AlertCircle } from "lucide-react";
 
 /**
  * Bulk Income (client-side bulk save)
@@ -39,6 +40,11 @@ export default function BulkIncomeModal({
 
   // ++ ADDITION: State to track saving process
   const [isSaving, setIsSaving] = useState(false);
+  
+  // ++ ADDITION: State for checking date and blocking duplicates
+  const [checkingDate, setCheckingDate] = useState(false);
+  const [dateHasData, setDateHasData] = useState(false);
+  const [existingDataInfo, setExistingDataInfo] = useState<any>(null);
 
   // Fetch choices once (same as AddTransaction)
   const { data: departments = [] as Dept[] } = useQuery({ queryKey: ["/api/departments"] });
@@ -66,6 +72,27 @@ export default function BulkIncomeModal({
   useEffect(() => {
     if (initialDate) setDate(initialDate);
   }, [initialDate]);
+
+  // ++ ADDITION: Function to check if date has existing data
+  const checkDateForExistingData = async (dateStr: string) => {
+    setCheckingDate(true);
+    try {
+      const response = await apiRequest("GET", `/api/transactions/daily-check?date=${dateStr}`);
+      setDateHasData(response.hasTransactions);
+      setExistingDataInfo(response);
+    } catch (error) {
+      console.error("Error checking date:", error);
+    } finally {
+      setCheckingDate(false);
+    }
+  };
+
+  // ++ ADDITION: Check date whenever it changes
+  useEffect(() => {
+    if (date) {
+      checkDateForExistingData(date);
+    }
+  }, [date]);
 
   const addDeptRow = () => setDeptRows((r) => [...r, { departmentId: undefined, amount: "" }]);
   const addProvRow = () => setProvRows((r) => [...r, { insuranceProviderId: undefined, amount: "" }]);
@@ -145,6 +172,16 @@ export default function BulkIncomeModal({
   const savingDisabled = validDeptPayloads.length === 0 && validProvPayloads.length === 0;
 
   const saveAll = async () => {
+    // ++ MODIFICATION: Block if date has existing data
+    if (dateHasData) {
+      toast({ 
+        title: "Cannot Save", 
+        description: "Transactions already exist for this date. Delete them first.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     // ++ MODIFICATION: Add guards for both disabled state and saving state
     if (savingDisabled || isSaving) {
       if (!savingDisabled) toast({ title: "Already saving...", variant: "destructive" });
@@ -198,6 +235,20 @@ export default function BulkIncomeModal({
       const results = await Promise.allSettled(reqs);
       const ok = results.filter((r) => r.status === "fulfilled").length;
       const fail = results.length - ok;
+      
+      // ++ ADDITION: Check for 409 conflict errors
+      const conflictError = results.find((r) => 
+        r.status === "rejected" && r.reason?.message?.includes("409")
+      );
+      
+      if (conflictError) {
+        toast({
+          title: "Duplicate Transaction Blocked",
+          description: "Transactions already exist for this date. Delete them first.",
+          variant: "destructive"
+        });
+        return;
+      }
 
       if (ok) {
         toast({ title: "Saved", description: `${ok} transaction${ok > 1 ? "s" : ""} created.` });
@@ -279,6 +330,26 @@ export default function BulkIncomeModal({
                   <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., ‘Daily totals’" />
                 </div>
               </div>
+
+              {/* ++ ADDITION: Blocking warning banner */}
+              {dateHasData && existingDataInfo && (
+                <div className="p-4 bg-red-50 border-2 border-red-500 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-red-900 text-base mb-1">
+                        ⛔ Cannot Enter Transactions for This Date
+                      </h3>
+                      <p className="text-red-800 text-sm mb-2">
+                        {existingDataInfo.count} transaction{existingDataInfo.count !== 1 ? 's' : ''} already exist for {format(new Date(date), "MMMM d, yyyy")}.
+                      </p>
+                      <p className="text-red-700 text-sm font-medium">
+                        You must delete the existing transactions before entering new data for this date.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 flex-wrap">
                 <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 6 Departments</Button>
@@ -367,10 +438,11 @@ export default function BulkIncomeModal({
             {/* footer */}
             <div className="flex items-center justify-end gap-3 p-4 border-t">
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              {/* ++ MODIFICATION: Update save button to show loading state */}
-              <Button onClick={saveAll} disabled={savingDisabled || isSaving}>
+              {/* ++ MODIFICATION: Update save button to show loading state and disable if date has data */}
+              <Button onClick={saveAll} disabled={savingDisabled || isSaving || dateHasData || checkingDate}>
+                {checkingDate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? "Saving..." : "Save Daily Income"}
+                {checkingDate ? "Checking date..." : isSaving ? "Saving..." : "Save Daily Income"}
               </Button>
             </div>
           </fieldset>

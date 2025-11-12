@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, X } from "lucide-react";
+import { CalendarIcon, Loader2, X, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +38,10 @@ export default function AddTransactionModal({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [expenseCategory, setExpenseCategory] = useState("");
   const [staffType, setStaffType] = useState("");
+  
+  // ++ ADDITION: State for checking duplicates
+  const [checkingDate, setCheckingDate] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,6 +66,48 @@ export default function AddTransactionModal({
     setSelectedDate(new Date());
     setExpenseCategory("");
     setStaffType("");
+    setDuplicateWarning(null);
+  };
+
+  // ++ ADDITION: Function to check for duplicates
+  const checkForDuplicates = async (date: Date, dept: string, provider: string, txType: string) => {
+    // Only check for income transactions
+    if (txType !== "income" || editTransaction) {
+      setDuplicateWarning(null);
+      return;
+    }
+    
+    if (!dept && !provider) {
+      setDuplicateWarning(null);
+      return;
+    }
+
+    setCheckingDate(true);
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const response = await apiRequest("GET", `/api/transactions/daily-check?date=${dateStr}`);
+      
+      if (response.hasTransactions) {
+        // Check if there's a duplicate for this specific department or provider
+        const hasDeptDuplicate = dept && response.departments.includes(dept);
+        const hasProviderDuplicate = provider && provider !== "no-insurance" && response.insuranceProviders.includes(provider);
+        
+        if (hasDeptDuplicate) {
+          setDuplicateWarning("A transaction already exists for this date and department.");
+        } else if (hasProviderDuplicate) {
+          setDuplicateWarning("A transaction already exists for this date and insurance provider.");
+        } else {
+          setDuplicateWarning(null);
+        }
+      } else {
+        setDuplicateWarning(null);
+      }
+    } catch (error) {
+      console.error("Error checking for duplicates:", error);
+      setDuplicateWarning(null);
+    } finally {
+      setCheckingDate(false);
+    }
   };
 
   // Populate when editing
@@ -91,6 +137,14 @@ export default function AddTransactionModal({
     }
   }, [insuranceProviderId]);
 
+  // ++ ADDITION: Check for duplicates when date, department, provider, or type changes
+  useEffect(() => {
+    if (open && selectedDate) {
+      checkForDuplicates(selectedDate, departmentId, insuranceProviderId, type);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, departmentId, insuranceProviderId, type, open]);
+
   // —— Mutations ——
   const createTransactionMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/transactions", data),
@@ -103,9 +157,12 @@ export default function AddTransactionModal({
       submitGuard.current = false;
     },
     onError: (error: any) => {
+      const isDuplicate = error?.message?.includes("409");
       toast({
-        title: "Error",
-        description: error?.message || "Failed to create transaction",
+        title: isDuplicate ? "Duplicate Transaction Blocked" : "Error",
+        description: isDuplicate 
+          ? "Transaction already exists for this date and department/provider. Delete the existing transaction first."
+          : error?.message || "Failed to create transaction",
         variant: "destructive",
       });
       submitGuard.current = false;
@@ -277,6 +334,20 @@ export default function AddTransactionModal({
                   </Popover>
                 </div>
 
+                {/* ++ ADDITION: Duplicate warning banner */}
+                {duplicateWarning && (
+                  <div className="p-3 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-yellow-800 text-sm font-medium">
+                          {duplicateWarning}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Department / Category (label only) */}
                 <div>
                   <Label htmlFor="department" className="text-sm font-medium text-gray-700">
@@ -439,8 +510,13 @@ export default function AddTransactionModal({
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel" disabled={isSaving}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSaving} data-testid="button-save-transaction">
-                  {isSaving ? (
+                <Button type="submit" disabled={isSaving || !!duplicateWarning || checkingDate} data-testid="button-save-transaction">
+                  {checkingDate ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : isSaving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Saving…
