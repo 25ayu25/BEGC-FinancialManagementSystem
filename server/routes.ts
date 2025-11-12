@@ -524,6 +524,33 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   /* Transactions                                                     */
   /* --------------------------------------------------------------- */
+  app.get("/api/transactions/daily-check", requireAuth, async (req, res) => {
+    try {
+      const dateStr = req.query.date as string;
+      if (!dateStr) return res.status(400).json({ error: "Date parameter required" });
+      
+      const date = new Date(dateStr + "T00:00:00.000Z");
+      const nextDay = new Date(date);
+      nextDay.setUTCDate(date.getUTCDate() + 1);
+      
+      const existingTransactions = await storage.getTransactionsBetween(date, nextDay, { type: "income" });
+      
+      const departments = [...new Set(existingTransactions.filter(t => t.departmentId).map(t => t.departmentId))];
+      const insuranceProviders = [...new Set(existingTransactions.filter(t => t.insuranceProviderId).map(t => t.insuranceProviderId))];
+      
+      res.json({
+        hasTransactions: existingTransactions.length > 0,
+        date: dateStr,
+        count: existingTransactions.length,
+        departments,
+        insuranceProviders
+      });
+    } catch (error) {
+      console.error("Error checking daily transactions:", error);
+      res.status(500).json({ error: "Failed to check transactions" });
+    }
+  });
+
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
       const page = parseInt((req.query.page as string) || "1", 10);
@@ -568,6 +595,35 @@ export async function registerRoutes(app: Express): Promise<void> {
       };
 
       const validated = insertTransactionSchema.parse(bodyWithDate);
+      
+      // Check for duplicates if this is an income transaction
+      if (validated.type === "income") {
+        const date = validated.date;
+        const nextDay = new Date(date);
+        nextDay.setUTCDate(date.getUTCDate() + 1);
+        
+        // Check for existing transactions on the same date with same department or provider
+        const existingTransactions = await storage.getTransactionsBetween(date, nextDay, { type: "income" });
+        
+        if (validated.departmentId) {
+          const duplicateDept = existingTransactions.find(t => t.departmentId === validated.departmentId);
+          if (duplicateDept) {
+            return res.status(409).json({ 
+              error: "Transaction already exists for this date and department. Delete the existing transaction first." 
+            });
+          }
+        }
+        
+        if (validated.insuranceProviderId) {
+          const duplicateProvider = existingTransactions.find(t => t.insuranceProviderId === validated.insuranceProviderId);
+          if (duplicateProvider) {
+            return res.status(409).json({ 
+              error: "Transaction already exists for this date and insurance provider. Delete the existing transaction first." 
+            });
+          }
+        }
+      }
+      
       const transaction = await storage.createTransaction(validated);
       res.status(201).json(transaction);
     } catch (error) {
@@ -603,6 +659,20 @@ export async function registerRoutes(app: Express): Promise<void> {
       const payload = BulkSchema.parse(req.body);
       const dateObj = payload.date ? parseYMD(payload.date) : new Date();
       if (!dateObj) return res.status(400).json({ error: "Invalid date format" });
+      
+      // Check for existing transactions on the selected date
+      const nextDay = new Date(dateObj);
+      nextDay.setUTCDate(dateObj.getUTCDate() + 1);
+      const existingTransactions = await storage.getTransactionsBetween(dateObj, nextDay, { type: "income" });
+      
+      if (existingTransactions.length > 0) {
+        return res.status(409).json({
+          error: "Transactions already exist for this date",
+          date: payload.date,
+          existingCount: existingTransactions.length,
+          message: "Cannot enter duplicate daily transactions. Delete existing transactions first if you want to replace them."
+        });
+      }
 
       const [departments, providers] = await Promise.all([
         storage.getDepartments(),

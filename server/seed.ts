@@ -12,7 +12,6 @@ async function seedDatabase() {
       { code: "XRAY", name: "X-Ray" },
       { code: "PHARMACY", name: "Pharmacy" },
       { code: "PHARMACY_SR", name: "Pharmacy - Station Road" },
-      { code: "OTHER", name: "Other" },
     ];
 
     for (const dept of departments) {
