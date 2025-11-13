@@ -19,66 +19,10 @@ import { storage } from "../storage";
 const router = Router();
 
 /* ------------------------------------------------------------------ */
-/* Authentication Middleware                                           */
+/* Authentication                                                       */
 /* ------------------------------------------------------------------ */
-
-/**
- * Middleware to require authentication for all routes in this router.
- * Checks for session cookie or X-Session-Token header and validates user.
- */
-const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    let userSession: any = null;
-
-    // Check for session cookie
-    const sessionCookie = (req as any).cookies?.user_session;
-    if (sessionCookie) {
-      try {
-        userSession = JSON.parse(sessionCookie);
-      } catch (e) {
-        // Ignore invalid JSON
-      }
-    }
-
-    // Fallback to X-Session-Token header
-    if (!userSession) {
-      const header = req.headers["x-session-token"];
-      if (header) {
-        try {
-          userSession = JSON.parse(header as string);
-        } catch (e) {
-          // Ignore invalid JSON
-        }
-      }
-    }
-
-    // Return 401 if no session found
-    if (!userSession) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
-    // Validate user exists and is active
-    const user = await storage.getUser(userSession.id);
-    if (!user || user.status === "inactive") {
-      res.clearCookie("user_session");
-      return res.status(401).json({ error: "Session invalid" });
-    }
-
-    // Populate req.user for downstream handlers
-    (req as any).user = {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      location: user.location,
-      fullName: user.fullName,
-    };
-
-    next();
-  } catch (err) {
-    console.error("Auth middleware error in insurance-overview:", err);
-    res.status(500).json({ error: "Authentication error" });
-  }
-};
+// Authentication is handled at the router level in server/routes.ts
+// All routes in this module are protected by the requireAuth middleware
 
 /* ------------------------------------------------------------------ */
 /* Helper Functions                                                    */
@@ -154,7 +98,7 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
  *   ]
  * }
  */
-router.get("/analytics", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.get("/analytics", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const preset = (req.query.preset as string) || 'current-month';
     const { start, end } = calculateDateRange(preset);
