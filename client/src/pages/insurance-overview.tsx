@@ -1,229 +1,108 @@
 /**
- * Insurance Overview Page - 100% Standalone Implementation
+ * Insurance Overview Page - World-Class Clean Replica
  * 
- * This page is completely independent from insurance.tsx
- * - Uses its own data fetching hooks
- * - Manages its own filter state
- * - Has its own API endpoints
- * - USD-only (no multi-currency support)
- * - Includes ErrorBoundary for resilience
- * - Full CRUD operations with edit/delete modals
+ * Read-only analytics dashboard showing insurance revenue insights.
+ * Fetches data from transactions table where type='income' and currency='USD'.
+ * 
+ * Features:
+ * - Revenue Overview Card (Total Revenue, Active Providers, vs Last Month)
+ * - Share by Provider Chart (Donut chart + legend)
+ * - Provider Performance Cards (Top providers with rank, revenue, share, comparison)
+ * - Independent filter dropdown (Current Month, Last Month, Last 3 Months, YTD, etc.)
  * 
  * @module InsuranceOverview
  */
 
-import React, { useState } from "react";
-import { Plus, DollarSign, RefreshCw, Download, Edit2, Trash2, Eye } from "lucide-react";
-import { useAdvancedFilters } from "@/features/insurance-overview/hooks/useAdvancedFilters";
-import { useInsuranceOverview } from "@/features/insurance-overview/hooks/useInsuranceOverview";
-import { useDailyInsurance } from "@/features/insurance-overview/hooks/useDailyInsurance";
-import { AdvancedFilters } from "@/features/insurance-overview/components/AdvancedFilters";
-import { ExecutiveDashboard } from "@/features/insurance-overview/components/ExecutiveDashboard";
-import { ProviderComparison } from "@/features/insurance-overview/components/ProviderComparison";
-import { PaymentTimeline } from "@/features/insurance-overview/components/PaymentTimeline";
-import { AgingAnalysis } from "@/features/insurance-overview/components/AgingAnalysis";
-import { SmartTable } from "@/features/insurance-overview/components/SmartTable";
-import { ProviderDailyTimeline } from "@/features/insurance-overview/components/ProviderDailyTimeline";
-import { ErrorBoundary } from "@/features/insurance-overview/components/ErrorBoundary";
-import { formatCurrency } from "@/features/insurance-overview/utils/formatters";
-import { format } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import React, { useState, useEffect } from "react";
+import { Filter, RefreshCw } from "lucide-react";
+import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
+import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
+import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
+
+interface AnalyticsData {
+  overview: {
+    totalRevenue: number;
+    activeProviders: number;
+    vsLastMonth: number;
+  };
+  providerShares: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
+  topProviders: Array<{
+    rank: number;
+    name: string;
+    revenue: number;
+    share: number;
+    vsLastMonth: number;
+  }>;
+}
+
+type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'ytd' | 'last-year';
+
+const filterOptions: Array<{ value: FilterPreset; label: string }> = [
+  { value: 'current-month', label: 'Current Month' },
+  { value: 'last-month', label: 'Last Month' },
+  { value: 'last-3-months', label: 'Last 3 Months' },
+  { value: 'ytd', label: 'Year to Date' },
+  { value: 'last-year', label: 'Last Year' },
+];
 
 export default function InsuranceOverview() {
-  // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
-  const {
-    filters,
-    updateFilter,
-    clearFilters,
-    applyFilters,
-    setDatePreset,
-  } = useAdvancedFilters();
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<FilterPreset>('current-month');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
-  const { data, loading, error, refetch } = useInsuranceOverview(filters);
+  const fetchAnalytics = async (preset: FilterPreset) => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Modal states - MUST be before any conditional returns
-  const [showAddClaimModal, setShowAddClaimModal] = useState(false);
-  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
-  const [showEditClaimModal, setShowEditClaimModal] = useState(false);
-  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
-  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
-  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(undefined);
-
-  // Form states for Add Claim modal - MUST be before any conditional returns
-  const [claimForm, setClaimForm] = useState({
-    providerId: "",
-    periodStart: "",
-    periodEnd: "",
-    amount: "",
-    notes: "",
-  });
-
-  // Form states for Record Payment modal - MUST be before any conditional returns
-  const [paymentForm, setPaymentForm] = useState({
-    providerId: "",
-    paymentDate: "",
-    amount: "",
-    reference: "",
-    notes: "",
-  });
-
-  // Format data for tables with IDs and actions
-  const claimsTableData = data.claims.map(claim => {
-    const provider = data.providers.find(p => p.id === claim.providerId);
-    return {
-      id: claim.id,
-      provider: provider?.name || "Unknown",
-      period: `${claim.periodYear}-${String(claim.periodMonth).padStart(2, "0")}`,
-      periodStart: claim.periodStart,
-      periodEnd: claim.periodEnd,
-      amount: Number(claim.claimedAmount),
-      status: claim.status,
-      notes: claim.notes || "",
-      providerId: claim.providerId,
-    };
-  });
-
-  const paymentsTableData = data.payments.map(payment => {
-    const provider = data.providers.find(p => p.id === payment.providerId);
-    const paymentDate = payment.paymentDate || payment.createdAt;
-    return {
-      id: payment.id,
-      provider: provider?.name || "Unknown",
-      date: paymentDate ? format(new Date(paymentDate), "yyyy-MM-dd") : "",
-      amount: Number(payment.amount),
-      reference: payment.reference || "",
-      notes: payment.notes || "",
-      providerId: payment.providerId,
-      claimId: payment.claimId,
-    };
-  });
-
-  const claimsColumns = [
-    { key: "provider", label: "Provider", sortable: true },
-    { key: "period", label: "Period", sortable: true },
-    {
-      key: "amount",
-      label: "Amount",
-      sortable: true,
-      formatter: (v: number) => formatCurrency(v),
-    },
-    { key: "status", label: "Status", sortable: true },
-    { key: "notes", label: "Notes", sortable: false },
-    {
-      key: "actions",
-      label: "Actions",
-      sortable: false,
-      formatter: (_: any, row: any) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleEditClaim(row)}
-            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            title="Edit claim"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDeleteClaim(row.id)}
-            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-            title="Delete claim"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    },
-  ];
-
-  const paymentsColumns = [
-    { key: "provider", label: "Provider", sortable: true },
-    { key: "date", label: "Date", sortable: true },
-    {
-      key: "amount",
-      label: "Amount",
-      sortable: true,
-      formatter: (v: number) => formatCurrency(v),
-    },
-    { key: "reference", label: "Reference", sortable: true },
-    { key: "notes", label: "Notes", sortable: false },
-    {
-      key: "actions",
-      label: "Actions",
-      sortable: false,
-      formatter: (_: any, row: any) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleEditPayment(row)}
-            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            title="Edit payment"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDeletePayment(row.id)}
-            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-            title="Delete payment"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    },
-  ];
-
-  // Enhanced error handling
-  if (error) {
-    // Check if it's an authentication error (401)
-    const isAuthError = error.includes("401") || error.toLowerCase().includes("authentication");
-    
-    if (isAuthError) {
-      return (
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="text-center">
-              <svg
-                className="mx-auto h-16 w-16 text-red-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-              <h3 className="mt-4 text-xl font-semibold text-gray-900">
-                Authentication Required
-              </h3>
-              <p className="mt-2 text-gray-600">
-                Please log in to view insurance overview data
-              </p>
-              <button
-                onClick={() => (window.location.href = "/login")}
-                className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Go to Login
-              </button>
-            </div>
-          </div>
-        </div>
+      const response = await fetch(
+        `/api/insurance-overview/analytics?preset=${preset}`,
+        {
+          credentials: "include",
+        }
       );
-    }
 
-    // General error state
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication required. Please log in.");
+        }
+        throw new Error("Failed to fetch analytics data");
+      }
+
+      const analyticsData = await response.json();
+      setData(analyticsData);
+    } catch (err) {
+      console.error("Error fetching analytics:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalytics(selectedFilter);
+  }, [selectedFilter]);
+
+  const handleFilterChange = (preset: FilterPreset) => {
+    setSelectedFilter(preset);
+    setShowFilterDropdown(false);
+  };
+
+  const handleRefresh = () => {
+    fetchAnalytics(selectedFilter);
+  };
+
+  // Error state
+  if (error) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-12 px-4">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex flex-col items-center justify-center py-12">
           <div className="text-center">
             <svg
               className="mx-auto h-16 w-16 text-yellow-400"
@@ -243,7 +122,7 @@ export default function InsuranceOverview() {
             </h3>
             <p className="mt-2 text-gray-600">{error}</p>
             <button
-              onClick={refetch}
+              onClick={handleRefresh}
               className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Retry
@@ -254,12 +133,25 @@ export default function InsuranceOverview() {
     );
   }
 
-  // Empty state when no data is available
-  const hasData = data.claims.length > 0 || data.payments.length > 0;
-  if (!loading && !hasData) {
+  // Loading state
+  if (loading && !data) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-12 px-4">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="mt-4 text-gray-600">Loading analytics...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No data state
+  if (!data || (data.topProviders.length === 0 && data.overview.totalRevenue === 0)) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex flex-col items-center justify-center py-12">
           <div className="text-center">
             <svg
               className="mx-auto h-16 w-16 text-gray-300"
@@ -275,10 +167,10 @@ export default function InsuranceOverview() {
               />
             </svg>
             <h3 className="mt-4 text-xl font-semibold text-gray-900">
-              No Insurance Data Yet
+              No Insurance Data Available
             </h3>
             <p className="mt-2 text-gray-600">
-              Get started by adding your first insurance claim or payment
+              There are no insurance transactions for the selected period.
             </p>
           </div>
         </div>
@@ -286,673 +178,85 @@ export default function InsuranceOverview() {
     );
   }
 
-  // Handle Add Claim
-  const handleAddClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await fetch("/api/insurance-claims", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          providerId: claimForm.providerId,
-          periodStart: claimForm.periodStart,
-          periodEnd: claimForm.periodEnd,
-          currency: "USD",
-          claimedAmount: Number(claimForm.amount),
-          notes: claimForm.notes,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to add claim");
-      }
-
-      // Reset form and close modal
-      setClaimForm({ providerId: "", periodStart: "", periodEnd: "", amount: "", notes: "" });
-      setShowAddClaimModal(false);
-      // Refresh data
-      refetch();
-    } catch (error) {
-      console.error("Error adding claim:", error);
-      alert("Failed to add claim. Please try again.");
-    }
-  };
-
-  // Handle Record Payment
-  const handleRecordPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await fetch("/api/insurance-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          providerId: paymentForm.providerId,
-          paymentDate: paymentForm.paymentDate,
-          currency: "USD",
-          amount: Number(paymentForm.amount),
-          reference: paymentForm.reference,
-          notes: paymentForm.notes,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to record payment");
-      }
-
-      // Reset form and close modal
-      setPaymentForm({ providerId: "", paymentDate: "", amount: "", reference: "", notes: "" });
-      setShowRecordPaymentModal(false);
-      // Refresh data
-      refetch();
-    } catch (error) {
-      console.error("Error recording payment:", error);
-      alert("Failed to record payment. Please try again.");
-    }
-  };
-
-  // Handle Edit Claim
-  const handleEditClaim = (claim: any) => {
-    setSelectedClaimId(claim.id);
-    setClaimForm({
-      providerId: claim.providerId,
-      periodStart: claim.periodStart,
-      periodEnd: claim.periodEnd,
-      amount: claim.amount.toString(),
-      notes: claim.notes || "",
-    });
-    setShowEditClaimModal(true);
-  };
-
-  // Handle Update Claim
-  const handleUpdateClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedClaimId) return;
-    
-    try {
-      const response = await fetch(`/api/insurance-claims/${selectedClaimId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          claimedAmount: Number(claimForm.amount),
-          notes: claimForm.notes,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update claim");
-      }
-
-      setClaimForm({ providerId: "", periodStart: "", periodEnd: "", amount: "", notes: "" });
-      setShowEditClaimModal(false);
-      setSelectedClaimId(null);
-      refetch();
-    } catch (error) {
-      console.error("Error updating claim:", error);
-      alert("Failed to update claim. Please try again.");
-    }
-  };
-
-  // Handle Delete Claim
-  const handleDeleteClaim = async (claimId: string) => {
-    if (!confirm("Are you sure you want to delete this claim? This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/insurance-claims/${claimId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete claim");
-      }
-
-      refetch();
-    } catch (error) {
-      console.error("Error deleting claim:", error);
-      alert("Failed to delete claim. Please try again.");
-    }
-  };
-
-  // Handle Edit Payment
-  const handleEditPayment = (payment: any) => {
-    setSelectedPaymentId(payment.id);
-    setPaymentForm({
-      providerId: payment.providerId,
-      paymentDate: payment.date,
-      amount: payment.amount.toString(),
-      reference: payment.reference || "",
-      notes: payment.notes || "",
-    });
-    setShowEditPaymentModal(true);
-  };
-
-  // Handle Update Payment
-  const handleUpdatePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPaymentId) return;
-    
-    try {
-      const response = await fetch(`/api/insurance-payments/${selectedPaymentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          paymentDate: paymentForm.paymentDate,
-          amount: Number(paymentForm.amount),
-          reference: paymentForm.reference,
-          notes: paymentForm.notes,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update payment");
-      }
-
-      setPaymentForm({ providerId: "", paymentDate: "", amount: "", reference: "", notes: "" });
-      setShowEditPaymentModal(false);
-      setSelectedPaymentId(null);
-      refetch();
-    } catch (error) {
-      console.error("Error updating payment:", error);
-      alert("Failed to update payment. Please try again.");
-    }
-  };
-
-  // Handle Delete Payment
-  const handleDeletePayment = async (paymentId: string) => {
-    if (!confirm("Are you sure you want to delete this payment? This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/insurance-payments/${paymentId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete payment");
-      }
-
-      refetch();
-    } catch (error) {
-      console.error("Error deleting payment:", error);
-      alert("Failed to delete payment. Please try again.");
-    }
-  };
-
-  // Handle Export (simple CSV export for now)
-  const handleExport = () => {
-    const csv = [
-      ["Provider", "Period", "Claimed Amount", "Status", "Notes"],
-      ...claimsTableData.map(c => [
-        c.provider,
-        c.period,
-        c.amount.toString(),
-        c.status,
-        c.notes || "",
-      ]),
-    ]
-      .map(row => row.map(cell => `"${cell}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `insurance-overview-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const currentFilterLabel = filterOptions.find(opt => opt.value === selectedFilter)?.label || 'Current Month';
 
   return (
-    <ErrorBoundary>
-      <div className="max-w-7xl mx-auto space-y-6">
-      {/* Page Header with Action Buttons */}
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
+      {/* Page Header with Filter */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Insurance Overview</h1>
           <p className="text-gray-600 mt-1">
-            Comprehensive analytics and insights for insurance claims and payments (USD only)
+            Revenue analytics from insurance transactions (USD only)
           </p>
         </div>
+        
         <div className="flex gap-3">
+          {/* Filter Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Filter className="w-4 h-4" />
+              <span>{currentFilterLabel}</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showFilterDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                <div className="py-1">
+                  {filterOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleFilterChange(option.value)}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                        selectedFilter === option.value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Refresh Button */}
           <button
-            onClick={() => setShowAddClaimModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="w-4 h-4" />
-            New Claim
-          </button>
-          <button
-            onClick={() => setShowRecordPaymentModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <DollarSign className="w-4 h-4" />
-            Record Payment
-          </button>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <button
-            onClick={refetch}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Advanced Filters */}
-      <AdvancedFilters
-        filters={filters}
-        providers={data.providers}
-        onFilterChange={updateFilter}
-        onClear={clearFilters}
-        onApply={applyFilters}
-        onDatePreset={setDatePreset}
+      {/* Revenue Overview Card */}
+      <RevenueOverviewCard
+        totalRevenue={data.overview.totalRevenue}
+        activeProviders={data.overview.activeProviders}
+        vsLastMonth={data.overview.vsLastMonth}
       />
 
-      {/* Executive Dashboard KPIs */}
-      <ExecutiveDashboard
-        claims={data.claims}
-        payments={data.payments}
-        loading={loading}
-      />
+      {/* Share by Provider Chart */}
+      {data.providerShares.length > 0 && (
+        <ShareByProviderChart data={data.providerShares} />
+      )}
 
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ProviderComparison
-          claims={data.claims}
-          payments={data.payments}
-          providers={data.providers}
-        />
-        <AgingAnalysis claims={data.claims} payments={data.payments} />
-      </div>
-
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 gap-4">
-        <PaymentTimeline claims={data.claims} payments={data.payments} />
-      </div>
-
-      {/* Charts Row 3 - Provider Daily Timeline */}
-      <ErrorBoundary>
-        <ProviderDailyTimeline
-          claims={data.claims}
-          payments={data.payments}
-          providers={data.providers}
-          selectedProviderId={selectedProviderId}
-          onProviderSelect={setSelectedProviderId}
-        />
-      </ErrorBoundary>
-
-      {/* Data Tables */}
-      <div className="space-y-4">
-        <SmartTable
-          data={claimsTableData}
-          columns={claimsColumns}
-          title="Claims"
-          defaultPageSize={25}
-        />
-
-        <SmartTable
-          data={paymentsTableData}
-          columns={paymentsColumns}
-          title="Payments"
-          defaultPageSize={25}
-        />
-      </div>
-
-      {/* Add Claim Modal */}
-      <Dialog open={showAddClaimModal} onOpenChange={setShowAddClaimModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New Insurance Claim (USD Only)</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddClaim} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Provider *
-              </label>
-              <select
-                required
-                value={claimForm.providerId}
-                onChange={(e) => setClaimForm({ ...claimForm, providerId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select Provider</option>
-                {data.providers
-                  .filter(p => p.isActive)
-                  .map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Period Start *
-              </label>
-              <input
-                required
-                type="date"
-                value={claimForm.periodStart}
-                onChange={(e) => setClaimForm({ ...claimForm, periodStart: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Period End *
-              </label>
-              <input
-                required
-                type="date"
-                value={claimForm.periodEnd}
-                onChange={(e) => setClaimForm({ ...claimForm, periodEnd: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount (USD) *
-              </label>
-              <input
-                required
-                type="number"
-                step="0.01"
-                min="0"
-                value={claimForm.amount}
-                onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
-                value={claimForm.notes}
-                onChange={(e) => setClaimForm({ ...claimForm, notes: e.target.value })}
-                rows={3}
-                placeholder="Optional notes..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <DialogFooter>
-              <button
-                type="button"
-                onClick={() => setShowAddClaimModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add Claim
-              </button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Record Payment Modal */}
-      <Dialog open={showRecordPaymentModal} onOpenChange={setShowRecordPaymentModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Record Insurance Payment (USD Only)</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleRecordPayment} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Provider *
-              </label>
-              <select
-                required
-                value={paymentForm.providerId}
-                onChange={(e) => setPaymentForm({ ...paymentForm, providerId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Select Provider</option>
-                {data.providers
-                  .filter(p => p.isActive)
-                  .map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Payment Date *
-              </label>
-              <input
-                required
-                type="date"
-                value={paymentForm.paymentDate}
-                onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount (USD) *
-              </label>
-              <input
-                required
-                type="number"
-                step="0.01"
-                min="0"
-                value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reference Number
-              </label>
-              <input
-                type="text"
-                value={paymentForm.reference}
-                onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                placeholder="Optional reference number..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
-                value={paymentForm.notes}
-                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                rows={3}
-                placeholder="Optional notes..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <DialogFooter>
-              <button
-                type="button"
-                onClick={() => setShowRecordPaymentModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Record Payment
-              </button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Claim Modal */}
-      <Dialog open={showEditClaimModal} onOpenChange={setShowEditClaimModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Insurance Claim</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdateClaim} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount (USD) *
-              </label>
-              <input
-                required
-                type="number"
-                step="0.01"
-                min="0"
-                value={claimForm.amount}
-                onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
-                value={claimForm.notes}
-                onChange={(e) => setClaimForm({ ...claimForm, notes: e.target.value })}
-                rows={3}
-                placeholder="Optional notes..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <DialogFooter>
-              <button
-                type="button"
-                onClick={() => setShowEditClaimModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Update Claim
-              </button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Payment Modal */}
-      <Dialog open={showEditPaymentModal} onOpenChange={setShowEditPaymentModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Insurance Payment</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdatePayment} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Payment Date *
-              </label>
-              <input
-                required
-                type="date"
-                value={paymentForm.paymentDate}
-                onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount (USD) *
-              </label>
-              <input
-                required
-                type="number"
-                step="0.01"
-                min="0"
-                value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reference Number
-              </label>
-              <input
-                type="text"
-                value={paymentForm.reference}
-                onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                placeholder="Optional reference number..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
-                value={paymentForm.notes}
-                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                rows={3}
-                placeholder="Optional notes..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-
-            <DialogFooter>
-              <button
-                type="button"
-                onClick={() => setShowEditPaymentModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Update Payment
-              </button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Provider Performance Cards */}
+      {data.topProviders.length > 0 && (
+        <ProviderPerformanceCards providers={data.topProviders} />
+      )}
     </div>
-    </ErrorBoundary>
   );
 }
