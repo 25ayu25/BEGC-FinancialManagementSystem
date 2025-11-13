@@ -19,7 +19,7 @@ interface Column {
   key: string;
   label: string;
   sortable?: boolean;
-  formatter?: (value: any) => string;
+  formatter?: (value: any, row?: any) => string | React.ReactNode;
 }
 
 interface SmartTableProps {
@@ -193,7 +193,7 @@ export function SmartTable({
                   {columns.map(column => (
                     <td key={column.key} className="px-4 py-3 text-sm text-gray-900">
                       {column.formatter
-                        ? column.formatter(row[column.key])
+                        ? column.formatter(row[column.key], row)
                         : String(row[column.key] || "")}
                     </td>
                   ))}

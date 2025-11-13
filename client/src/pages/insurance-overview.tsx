@@ -6,21 +6,26 @@
  * - Manages its own filter state
  * - Has its own API endpoints
  * - USD-only (no multi-currency support)
+ * - Includes ErrorBoundary for resilience
+ * - Full CRUD operations with edit/delete modals
  * 
  * @module InsuranceOverview
  */
 
 import React, { useState } from "react";
-import { Plus, DollarSign, RefreshCw, Download } from "lucide-react";
+import { Plus, DollarSign, RefreshCw, Download, Edit2, Trash2, Eye } from "lucide-react";
 import { useAdvancedFilters } from "@/features/insurance-overview/hooks/useAdvancedFilters";
 import { useInsuranceOverview } from "@/features/insurance-overview/hooks/useInsuranceOverview";
+import { useDailyInsurance } from "@/features/insurance-overview/hooks/useDailyInsurance";
 import { AdvancedFilters } from "@/features/insurance-overview/components/AdvancedFilters";
 import { ExecutiveDashboard } from "@/features/insurance-overview/components/ExecutiveDashboard";
 import { ProviderComparison } from "@/features/insurance-overview/components/ProviderComparison";
 import { PaymentTimeline } from "@/features/insurance-overview/components/PaymentTimeline";
 import { AgingAnalysis } from "@/features/insurance-overview/components/AgingAnalysis";
 import { SmartTable } from "@/features/insurance-overview/components/SmartTable";
-import { formatCurrency } from "@/features/insurance-overview/utils/calculations";
+import { ProviderDailyTimeline } from "@/features/insurance-overview/components/ProviderDailyTimeline";
+import { ErrorBoundary } from "@/features/insurance-overview/components/ErrorBoundary";
+import { formatCurrency } from "@/features/insurance-overview/utils/formatters";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -47,6 +52,11 @@ export default function InsuranceOverview() {
   // Modal states - MUST be before any conditional returns
   const [showAddClaimModal, setShowAddClaimModal] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  const [showEditClaimModal, setShowEditClaimModal] = useState(false);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(undefined);
 
   // Form states for Add Claim modal - MUST be before any conditional returns
   const [claimForm, setClaimForm] = useState({
@@ -66,16 +76,19 @@ export default function InsuranceOverview() {
     notes: "",
   });
 
-  // Format data for tables
+  // Format data for tables with IDs and actions
   const claimsTableData = data.claims.map(claim => {
     const provider = data.providers.find(p => p.id === claim.providerId);
     return {
+      id: claim.id,
       provider: provider?.name || "Unknown",
       period: `${claim.periodYear}-${String(claim.periodMonth).padStart(2, "0")}`,
       periodStart: claim.periodStart,
+      periodEnd: claim.periodEnd,
       amount: Number(claim.claimedAmount),
       status: claim.status,
       notes: claim.notes || "",
+      providerId: claim.providerId,
     };
   });
 
@@ -83,11 +96,14 @@ export default function InsuranceOverview() {
     const provider = data.providers.find(p => p.id === payment.providerId);
     const paymentDate = payment.paymentDate || payment.createdAt;
     return {
+      id: payment.id,
       provider: provider?.name || "Unknown",
       date: paymentDate ? format(new Date(paymentDate), "yyyy-MM-dd") : "",
       amount: Number(payment.amount),
       reference: payment.reference || "",
       notes: payment.notes || "",
+      providerId: payment.providerId,
+      claimId: payment.claimId,
     };
   });
 
@@ -102,6 +118,29 @@ export default function InsuranceOverview() {
     },
     { key: "status", label: "Status", sortable: true },
     { key: "notes", label: "Notes", sortable: false },
+    {
+      key: "actions",
+      label: "Actions",
+      sortable: false,
+      formatter: (_: any, row: any) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleEditClaim(row)}
+            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+            title="Edit claim"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleDeleteClaim(row.id)}
+            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+            title="Delete claim"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
   ];
 
   const paymentsColumns = [
@@ -115,6 +154,29 @@ export default function InsuranceOverview() {
     },
     { key: "reference", label: "Reference", sortable: true },
     { key: "notes", label: "Notes", sortable: false },
+    {
+      key: "actions",
+      label: "Actions",
+      sortable: false,
+      formatter: (_: any, row: any) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleEditPayment(row)}
+            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+            title="Edit payment"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleDeletePayment(row.id)}
+            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+            title="Delete payment"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
   ];
 
   // Enhanced error handling
@@ -290,6 +352,140 @@ export default function InsuranceOverview() {
     }
   };
 
+  // Handle Edit Claim
+  const handleEditClaim = (claim: any) => {
+    setSelectedClaimId(claim.id);
+    setClaimForm({
+      providerId: claim.providerId,
+      periodStart: claim.periodStart,
+      periodEnd: claim.periodEnd,
+      amount: claim.amount.toString(),
+      notes: claim.notes || "",
+    });
+    setShowEditClaimModal(true);
+  };
+
+  // Handle Update Claim
+  const handleUpdateClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClaimId) return;
+    
+    try {
+      const response = await fetch(`/api/insurance-claims/${selectedClaimId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          claimedAmount: Number(claimForm.amount),
+          notes: claimForm.notes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update claim");
+      }
+
+      setClaimForm({ providerId: "", periodStart: "", periodEnd: "", amount: "", notes: "" });
+      setShowEditClaimModal(false);
+      setSelectedClaimId(null);
+      refetch();
+    } catch (error) {
+      console.error("Error updating claim:", error);
+      alert("Failed to update claim. Please try again.");
+    }
+  };
+
+  // Handle Delete Claim
+  const handleDeleteClaim = async (claimId: string) => {
+    if (!confirm("Are you sure you want to delete this claim? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/insurance-claims/${claimId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete claim");
+      }
+
+      refetch();
+    } catch (error) {
+      console.error("Error deleting claim:", error);
+      alert("Failed to delete claim. Please try again.");
+    }
+  };
+
+  // Handle Edit Payment
+  const handleEditPayment = (payment: any) => {
+    setSelectedPaymentId(payment.id);
+    setPaymentForm({
+      providerId: payment.providerId,
+      paymentDate: payment.date,
+      amount: payment.amount.toString(),
+      reference: payment.reference || "",
+      notes: payment.notes || "",
+    });
+    setShowEditPaymentModal(true);
+  };
+
+  // Handle Update Payment
+  const handleUpdatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPaymentId) return;
+    
+    try {
+      const response = await fetch(`/api/insurance-payments/${selectedPaymentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          paymentDate: paymentForm.paymentDate,
+          amount: Number(paymentForm.amount),
+          reference: paymentForm.reference,
+          notes: paymentForm.notes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update payment");
+      }
+
+      setPaymentForm({ providerId: "", paymentDate: "", amount: "", reference: "", notes: "" });
+      setShowEditPaymentModal(false);
+      setSelectedPaymentId(null);
+      refetch();
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      alert("Failed to update payment. Please try again.");
+    }
+  };
+
+  // Handle Delete Payment
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm("Are you sure you want to delete this payment? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/insurance-payments/${paymentId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete payment");
+      }
+
+      refetch();
+    } catch (error) {
+      console.error("Error deleting payment:", error);
+      alert("Failed to delete payment. Please try again.");
+    }
+  };
+
   // Handle Export (simple CSV export for now)
   const handleExport = () => {
     const csv = [
@@ -315,7 +511,8 @@ export default function InsuranceOverview() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <ErrorBoundary>
+      <div className="max-w-7xl mx-auto space-y-6">
       {/* Page Header with Action Buttons */}
       <div className="flex justify-between items-center">
         <div>
@@ -387,6 +584,17 @@ export default function InsuranceOverview() {
       <div className="grid grid-cols-1 gap-4">
         <PaymentTimeline claims={data.claims} payments={data.payments} />
       </div>
+
+      {/* Charts Row 3 - Provider Daily Timeline */}
+      <ErrorBoundary>
+        <ProviderDailyTimeline
+          claims={data.claims}
+          payments={data.payments}
+          providers={data.providers}
+          selectedProviderId={selectedProviderId}
+          onProviderSelect={setSelectedProviderId}
+        />
+      </ErrorBoundary>
 
       {/* Data Tables */}
       <div className="space-y-4">
@@ -608,6 +816,143 @@ export default function InsuranceOverview() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Claim Modal */}
+      <Dialog open={showEditClaimModal} onOpenChange={setShowEditClaimModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Insurance Claim</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateClaim} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount (USD) *
+              </label>
+              <input
+                required
+                type="number"
+                step="0.01"
+                min="0"
+                value={claimForm.amount}
+                onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={claimForm.notes}
+                onChange={(e) => setClaimForm({ ...claimForm, notes: e.target.value })}
+                rows={3}
+                placeholder="Optional notes..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setShowEditClaimModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Update Claim
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Modal */}
+      <Dialog open={showEditPaymentModal} onOpenChange={setShowEditPaymentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Insurance Payment</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdatePayment} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Date *
+              </label>
+              <input
+                required
+                type="date"
+                value={paymentForm.paymentDate}
+                onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount (USD) *
+              </label>
+              <input
+                required
+                type="number"
+                step="0.01"
+                min="0"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Reference Number
+              </label>
+              <input
+                type="text"
+                value={paymentForm.reference}
+                onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
+                placeholder="Optional reference number..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                rows={3}
+                placeholder="Optional notes..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setShowEditPaymentModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Update Payment
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
+    </ErrorBoundary>
   );
 }
