@@ -140,7 +140,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
           {/* Insurance collapsible group */}
           <Collapsible open={isInsuranceActive} defaultOpen={isInsuranceActive}>
-            <CollapsibleTrigger className="w-full">
+            <CollapsibleTrigger className="w-full [&[data-state=open]>div>svg:last-child]:rotate-180">
               <div
                 className={cn(
                   "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors min-w-0",
