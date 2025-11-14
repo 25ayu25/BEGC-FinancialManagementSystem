@@ -29,11 +29,11 @@ const navigation: NavItem[] = [
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
 
-  // Insurance section (single main item + one indented sub-link)
-  { name: "Insurance Ledger", href: "/insurance", icon: ShieldCheck },
-  { name: "Insurance Overview", href: "/insurance-overview", icon: PieChart, sub: true },
-  { name: "Insurance", href: "/insurance-providers", icon: ListChecks, sub: true },
-  { name: "Claim Reconciliation", href: "/claim-reconciliation", icon: ListChecks, sub: true },
+  // Insurance section (parent item + three sub-items)
+  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
+  { name: "Overview", href: "/insurance-overview", icon: PieChart, sub: true },
+  { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks, sub: true },
+  { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck, sub: true },
 
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
