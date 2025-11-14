@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Filter, RefreshCw } from "lucide-react";
+import { api } from "@/lib/queryClient";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
@@ -61,25 +62,19 @@ export default function InsuranceOverview() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `/api/insurance-overview/analytics?preset=${preset}`,
-        {
-          credentials: "include",
-        }
+      const response = await api.get(
+        `/api/insurance-overview/analytics?preset=${preset}`
       );
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication required. Please log in.");
-        }
-        throw new Error("Failed to fetch analytics data");
-      }
-
-      const analyticsData = await response.json();
-      setData(analyticsData);
-    } catch (err) {
+      setData(response.data);
+    } catch (err: any) {
       console.error("Error fetching analytics:", err);
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const status = err?.response?.status;
+      if (status === 401) {
+        setError("Authentication required. Please log in.");
+      } else {
+        setError(err?.response?.data?.error || err.message || "Failed to fetch analytics data");
+      }
     } finally {
       setLoading(false);
     }
