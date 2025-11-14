@@ -55,7 +55,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   // Check if any insurance route is active to auto-expand the group
   const isInsuranceActive = insuranceItems.some(item => location === item.href);
   
-  // State to control collapsible open/close
+  // State to control collapsible open/close for user interaction
   const [isInsuranceOpen, setIsInsuranceOpen] = useState(isInsuranceActive);
   
   // Auto-expand when navigating to an insurance route
