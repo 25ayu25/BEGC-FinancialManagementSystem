@@ -15,7 +15,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type NavItem = {
@@ -54,6 +54,16 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   
   // Check if any insurance route is active to auto-expand the group
   const isInsuranceActive = insuranceItems.some(item => location === item.href);
+  
+  // State to control collapsible open/close for user interaction
+  const [isInsuranceOpen, setIsInsuranceOpen] = useState(isInsuranceActive);
+  
+  // Auto-expand when navigating to an insurance route
+  useEffect(() => {
+    if (isInsuranceActive) {
+      setIsInsuranceOpen(true);
+    }
+  }, [isInsuranceActive]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -139,7 +149,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           })}
 
           {/* Insurance collapsible group */}
-          <Collapsible open={isInsuranceActive} defaultOpen={isInsuranceActive}>
+          <Collapsible open={isInsuranceOpen} onOpenChange={setIsInsuranceOpen}>
             <CollapsibleTrigger className="w-full [&[data-state=open]>div>svg:last-child]:rotate-180">
               <div
                 className={cn(
