@@ -12,29 +12,32 @@ import {
   ShieldCheck,   // main insurance ledger
   ListChecks,    // providers sub-link
   PieChart,      // insurance overview
+  ChevronDown,
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-// allow optional "sub" to render an indented sub-item
 type NavItem = {
   name: string;
   href: string;
   icon: React.ComponentType<any>;
-  sub?: boolean;
 };
 
-const navigation: NavItem[] = [
+// Separate navigation items
+const navigationBefore: NavItem[] = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
+];
 
-  // Insurance section (parent item + three sub-items)
-  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
-  { name: "Overview", href: "/insurance-overview", icon: PieChart, sub: true },
-  { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks, sub: true },
-  { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck, sub: true },
+const insuranceItems: NavItem[] = [
+  { name: "Overview", href: "/insurance-overview", icon: PieChart },
+  { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks },
+  { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck },
+];
 
+const navigationAfter: NavItem[] = [
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
   { name: "User Management", href: "/users", icon: Users },
@@ -48,6 +51,9 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
+  
+  // Check if any insurance route is active to auto-expand the group
+  const isInsuranceActive = insuranceItems.some(item => location === item.href);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -109,15 +115,81 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
         {/* Scrollable menu area */}
         <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-          {navigation.map((item) => {
+          {/* Navigation items before Insurance group */}
+          {navigationBefore.map((item) => {
             const isActive = location === item.href;
-            const subClasses = item.sub ? "pl-10 text-sm" : "";
             return (
               <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
-                    subClasses,
+                    isActive
+                      ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
+                      : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                  )}
+                  data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
+                    {item.name}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+
+          {/* Insurance collapsible group */}
+          <Collapsible open={isInsuranceActive} defaultOpen={isInsuranceActive}>
+            <CollapsibleTrigger className="w-full">
+              <div
+                className={cn(
+                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors min-w-0",
+                  isInsuranceActive
+                    ? "text-slate-700 bg-slate-50"
+                    : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                )}
+                data-testid="group-insurance"
+              >
+                <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span className="font-medium flex-1 whitespace-normal break-words leading-snug text-left">
+                  Insurance
+                </span>
+                <ChevronDown className="w-4 h-4 shrink-0 transition-transform duration-200" aria-hidden="true" />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-1 mt-1">
+              {insuranceItems.map((item) => {
+                const isActive = location === item.href;
+                return (
+                  <Link key={item.name} href={item.href}>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors cursor-pointer min-w-0 pl-10 text-sm",
+                        isActive
+                          ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
+                          : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                      )}
+                      data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                      <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
+                        {item.name}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Navigation items after Insurance group */}
+          {navigationAfter.map((item) => {
+            const isActive = location === item.href;
+            return (
+              <Link key={item.name} href={item.href}>
+                <div
+                  className={cn(
+                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
                       ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
                       : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
