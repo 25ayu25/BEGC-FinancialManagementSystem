@@ -12,29 +12,38 @@ import {
   ShieldCheck,   // main insurance ledger
   ListChecks,    // providers sub-link
   PieChart,      // insurance overview
+  ChevronDown,
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import * as Collapsible from "@radix-ui/react-collapsible";
 
-// allow optional "sub" to render an indented sub-item
 type NavItem = {
   name: string;
   href: string;
   icon: React.ComponentType<any>;
-  sub?: boolean;
+};
+
+type NavGroup = {
+  name: string;
+  icon: React.ComponentType<any>;
+  children: NavItem[];
+};
+
+const insuranceGroup: NavGroup = {
+  name: "Insurance",
+  icon: ShieldCheck,
+  children: [
+    { name: "Overview", href: "/insurance-overview", icon: PieChart },
+    { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks },
+    { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck },
+  ],
 };
 
 const navigation: NavItem[] = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
   { name: "Overview", href: "/simple", icon: BarChart3 },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
-
-  // Insurance section (parent item + three sub-items)
-  { name: "Insurance", href: "/insurance", icon: ShieldCheck },
-  { name: "Overview", href: "/insurance-overview", icon: PieChart, sub: true },
-  { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks, sub: true },
-  { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck, sub: true },
-
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
   { name: "User Management", href: "/users", icon: Users },
@@ -48,6 +57,20 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
+  
+  // Check if any Insurance child route is active to auto-expand
+  const isInsuranceChildActive = insuranceGroup.children.some(
+    (child) => location === child.href
+  );
+  
+  const [insuranceOpen, setInsuranceOpen] = useState(isInsuranceChildActive);
+
+  // Update insuranceOpen when location changes
+  useEffect(() => {
+    if (isInsuranceChildActive) {
+      setInsuranceOpen(true);
+    }
+  }, [isInsuranceChildActive]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -109,15 +132,86 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
         {/* Scrollable menu area */}
         <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-          {navigation.map((item) => {
+          {/* Regular navigation items before Insurance */}
+          {navigation.slice(0, 3).map((item) => {
             const isActive = location === item.href;
-            const subClasses = item.sub ? "pl-10 text-sm" : "";
             return (
               <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
-                    subClasses,
+                    isActive
+                      ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
+                      : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                  )}
+                  data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
+                    {item.name}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+
+          {/* Collapsible Insurance Group */}
+          <Collapsible.Root open={insuranceOpen} onOpenChange={setInsuranceOpen}>
+            <Collapsible.Trigger asChild>
+              <div
+                className={cn(
+                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
+                  "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                )}
+                data-testid="insurance-group-header"
+              >
+                <insuranceGroup.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
+                  {insuranceGroup.name}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 shrink-0 transition-transform duration-200",
+                    insuranceOpen ? "transform rotate-180" : ""
+                  )}
+                  aria-hidden="true"
+                />
+              </div>
+            </Collapsible.Trigger>
+            <Collapsible.Content className="space-y-2">
+              {insuranceGroup.children.map((child) => {
+                const isActive = location === child.href;
+                return (
+                  <Link key={child.name} href={child.href}>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
+                        "pl-10 text-sm",
+                        isActive
+                          ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
+                          : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                      )}
+                      data-testid={`link-${child.name.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      <child.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                      <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
+                        {child.name}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </Collapsible.Content>
+          </Collapsible.Root>
+
+          {/* Regular navigation items after Insurance */}
+          {navigation.slice(3).map((item) => {
+            const isActive = location === item.href;
+            return (
+              <Link key={item.name} href={item.href}>
+                <div
+                  className={cn(
+                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
                       ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
                       : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
