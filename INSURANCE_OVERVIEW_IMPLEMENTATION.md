@@ -1,5 +1,15 @@
 # Insurance Overview Page Implementation
 
+> ⚠️ **DOCUMENTATION STATUS**: **PLANNED FEATURES - NOT FULLY IMPLEMENTED**
+> 
+> This document describes planned features that are largely **NOT IMPLEMENTED** in the current codebase.
+> 
+> **For the ACTUAL current implementation**, see: [`INSURANCE_OVERVIEW_ACTUAL_STATE.md`](./INSURANCE_OVERVIEW_ACTUAL_STATE.md)
+> 
+> **Last Verified**: November 14, 2025
+
+---
+
 ## Overview
 This document describes the implementation of the comprehensive Insurance Overview dashboard for the BEGC Financial Management System, as specified in issue #21.
 

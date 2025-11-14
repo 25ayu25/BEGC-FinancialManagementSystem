@@ -1,5 +1,17 @@
 # PR: feat(insurance-overview): add standalone enterprise-grade insurance dashboard (USD-only)
 
+> ⚠️ **DOCUMENTATION STATUS**: **PLANNED FEATURES - NOT FULLY IMPLEMENTED**
+> 
+> This document describes a comprehensive enterprise implementation that was **PLANNED** but only **PARTIALLY IMPLEMENTED**.
+> 
+> **For the ACTUAL current implementation**, see: [`INSURANCE_OVERVIEW_ACTUAL_STATE.md`](./INSURANCE_OVERVIEW_ACTUAL_STATE.md)
+> 
+> **Implementation Gap**: ~73% of documented features are missing from the codebase.
+> 
+> **Last Verified**: November 14, 2025
+
+---
+
 ## Summary
 
 This PR introduces a production-ready, standalone Insurance Overview dashboard that is completely independent from the legacy insurance page. The implementation provides full feature parity with enterprise-grade enhancements including:

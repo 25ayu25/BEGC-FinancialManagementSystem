@@ -1,5 +1,16 @@
 # Insurance Overview Page - Final Implementation Summary
 
+> ⚠️ **DOCUMENTATION STATUS**: **PLANNED FEATURES - NOT FULLY IMPLEMENTED**
+> 
+> This document describes a comprehensive implementation with 6 API endpoints and extensive features.
+> **Reality**: Only 1 endpoint exists, and ~73% of described features are missing.
+> 
+> **For the ACTUAL current implementation**, see: [`INSURANCE_OVERVIEW_ACTUAL_STATE.md`](./INSURANCE_OVERVIEW_ACTUAL_STATE.md)
+> 
+> **Last Verified**: November 14, 2025
+
+---
+
 ## Executive Summary
 
 This document provides a comprehensive overview of the Insurance Overview page implementation, detailing all changes made to create a Fortune 500-ready, USD-only, standalone insurance analytics dashboard.
