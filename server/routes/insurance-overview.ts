@@ -222,8 +222,8 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
       color: colors[index % colors.length],
     }));
 
-    // Top providers with performance cards (limit to top 3)
-    const topProviders = result.rows.slice(0, 3).map((row, index) => {
+    // Top providers with performance cards (show all)
+    const topProviders = result.rows.map((row, index) => {
       const currentRevenue = Number(row.current_revenue);
       const previousRevenue = Number(row.previous_revenue);
       const changePercent = previousRevenue > 0

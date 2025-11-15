@@ -262,7 +262,8 @@ export default function InsuranceOverview() {
                 </span>
               </div>
               <svg
-                className={`w-4 h-4 transition-transform flex-shrink-0 ${showFilterDropdown ? 'rotate-180' : ''}`}
+                className={`w-4 h-4 transition-transform duration-200 ease-in-out flex-shrink-0 ${showFilterDropdown ? 'rotate-180' : 'rotate-0'}`}
+                style={{ willChange: 'transform' }}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -378,6 +379,7 @@ export default function InsuranceOverview() {
                         mode="single"
                         selected={customDateRange.start}
                         onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
+                        disabled={(date) => date > new Date()}
                         initialFocus
                       />
                     </PopoverContent>
@@ -405,7 +407,12 @@ export default function InsuranceOverview() {
                         selected={customDateRange.end}
                         onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
                         initialFocus
-                        disabled={(date) => customDateRange.start ? date < customDateRange.start : false}
+                        disabled={(date) => {
+                          const today = new Date();
+                          if (date > today) return true;
+                          if (customDateRange.start && date < customDateRange.start) return true;
+                          return false;
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
