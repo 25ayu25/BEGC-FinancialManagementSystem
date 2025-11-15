@@ -9,8 +9,8 @@ interface RevenueOverviewCardProps {
   vsLastMonth: number; // percentage change
 }
 
-// Animated counter hook
-function useAnimatedCounter(end: number, duration: number = 1000) {
+// Animated counter hook with faster, smoother animation
+function useAnimatedCounter(end: number, duration: number = 500) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -21,9 +21,9 @@ function useAnimatedCounter(end: number, duration: number = 1000) {
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
       
-      // Easing function for smooth animation
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      setCount(Math.floor(end * easeOutQuart));
+      // Smoother easing function (cubic ease-out)
+      const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(end * easeOutCubic));
 
       if (progress < 1) {
         animationFrame = requestAnimationFrame(animate);
@@ -47,8 +47,8 @@ export function RevenueOverviewCard({
   const isPositive = vsLastMonth >= 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
   
-  // Animated revenue counter
-  const animatedRevenue = useAnimatedCounter(totalRevenue, 1500);
+  // Animated revenue counter with faster speed (500ms)
+  const animatedRevenue = useAnimatedCounter(totalRevenue, 500);
   
   // Generate mock sparkline data (7-day trend)
   // In production, this would come from actual historical data

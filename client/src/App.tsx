@@ -69,7 +69,7 @@ function Router() {
               <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
               {/* Content column: single scroll container */}
-              <div className="flex-1 min-w-0 flex flex-col overflow-y-auto scroll-touch">
+              <div className="flex-1 min-w-0 flex flex-col overflow-y-auto overflow-x-hidden scroll-touch">
                 {/* Mobile header (sticky + safe notch padding) */}
                 <div className="lg:hidden safe-pad sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-200 px-4 py-3 flex items-center justify-between">
                   <button
