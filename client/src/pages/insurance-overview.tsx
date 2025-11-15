@@ -18,7 +18,8 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { Filter, RefreshCw, AlertTriangle, FileX } from "lucide-react";
+import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
@@ -30,6 +31,9 @@ import {
 } from "@/features/insurance-overview/components/LoadingSkeleton";
 import { transitions, fadeIn } from "@/features/insurance-overview/utils/animations";
 import { useIsMobile } from "@/features/insurance-overview/hooks/useMediaQuery";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface AnalyticsData {
   overview: {
@@ -51,7 +55,7 @@ interface AnalyticsData {
   }>;
 }
 
-type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'ytd' | 'last-year';
+type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'ytd' | 'last-year' | 'custom';
 
 const filterOptions: Array<{ value: FilterPreset; label: string }> = [
   { value: 'current-month', label: 'Current Month' },
@@ -59,6 +63,7 @@ const filterOptions: Array<{ value: FilterPreset; label: string }> = [
   { value: 'last-3-months', label: 'Last 3 Months' },
   { value: 'ytd', label: 'Year to Date' },
   { value: 'last-year', label: 'Last Year' },
+  { value: 'custom', label: 'Custom Range' },
 ];
 
 export default function InsuranceOverview() {
@@ -67,15 +72,24 @@ export default function InsuranceOverview() {
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterPreset>('current-month');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<{ start: Date | undefined; end: Date | undefined }>({ 
+    start: undefined, 
+    end: undefined 
+  });
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
 
-  const fetchAnalytics = async (preset: FilterPreset) => {
+  const fetchAnalytics = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await api.get(
-        `/api/insurance-overview/analytics?preset=${preset}`
-      );
+      let url = `/api/insurance-overview/analytics?preset=${preset}`;
+      
+      if (preset === 'custom' && startDate && endDate) {
+        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      }
+
+      const response = await api.get(url);
 
       setData(response.data);
     } catch (err: any) {
@@ -92,16 +106,38 @@ export default function InsuranceOverview() {
   };
 
   useEffect(() => {
-    fetchAnalytics(selectedFilter);
-  }, [selectedFilter]);
+    if (selectedFilter === 'custom') {
+      if (customDateRange.start && customDateRange.end) {
+        fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
+      }
+    } else {
+      fetchAnalytics(selectedFilter);
+    }
+  }, [selectedFilter, customDateRange]);
 
   const handleFilterChange = (preset: FilterPreset) => {
-    setSelectedFilter(preset);
-    setShowFilterDropdown(false);
+    if (preset === 'custom') {
+      setShowCustomDatePicker(true);
+      setShowFilterDropdown(false);
+    } else {
+      setSelectedFilter(preset);
+      setShowFilterDropdown(false);
+    }
+  };
+
+  const handleCustomDateApply = () => {
+    if (customDateRange.start && customDateRange.end) {
+      setSelectedFilter('custom');
+      setShowCustomDatePicker(false);
+    }
   };
 
   const handleRefresh = () => {
-    fetchAnalytics(selectedFilter);
+    if (selectedFilter === 'custom' && customDateRange.start && customDateRange.end) {
+      fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
+    } else {
+      fetchAnalytics(selectedFilter);
+    }
   };
 
   const isMobile = useIsMobile();
@@ -186,7 +222,9 @@ export default function InsuranceOverview() {
     );
   }
 
-  const currentFilterLabel = filterOptions.find(opt => opt.value === selectedFilter)?.label || 'Current Month';
+  const currentFilterLabel = selectedFilter === 'custom' && customDateRange.start && customDateRange.end
+    ? `${format(customDateRange.start, 'MMM d')} - ${format(customDateRange.end, 'MMM d, yyyy')}`
+    : filterOptions.find(opt => opt.value === selectedFilter)?.label || 'Current Month';
 
   return (
     <div className={`max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 ${fadeIn}`}>
@@ -307,6 +345,93 @@ export default function InsuranceOverview() {
           </button>
         </div>
       </div>
+
+      {/* Custom Date Range Picker Modal */}
+      {showCustomDatePicker && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-50"
+            onClick={() => setShowCustomDatePicker(false)}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Custom Date Range</h3>
+              
+              <div className="space-y-4">
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "w-full justify-start text-left font-normal px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50",
+                          !customDateRange.start && "text-gray-500"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 inline" />
+                        {customDateRange.start ? format(customDateRange.start, "PPP") : "Pick a date"}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customDateRange.start}
+                        onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* End Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "w-full justify-start text-left font-normal px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50",
+                          !customDateRange.end && "text-gray-500"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 inline" />
+                        {customDateRange.end ? format(customDateRange.end, "PPP") : "Pick a date"}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customDateRange.end}
+                        onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
+                        initialFocus
+                        disabled={(date) => customDateRange.start ? date < customDateRange.start : false}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowCustomDatePicker(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCustomDateApply}
+                  disabled={!customDateRange.start || !customDateRange.end}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Content with staggered animation */}
       <div className="space-y-4 sm:space-y-6">

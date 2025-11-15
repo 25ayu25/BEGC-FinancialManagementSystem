@@ -82,7 +82,9 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
  * Fetches data from transactions table where type='income' and currency='USD'.
  * 
  * Query params:
- *   - preset: 'current-month', 'last-month', 'last-3-months', 'ytd', 'last-year'
+ *   - preset: 'current-month', 'last-month', 'last-3-months', 'ytd', 'last-year', 'custom'
+ *   - startDate: ISO date string (required when preset='custom')
+ *   - endDate: ISO date string (required when preset='custom')
  * 
  * Response: {
  *   overview: {
@@ -101,75 +103,112 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
 router.get("/analytics", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const preset = (req.query.preset as string) || 'current-month';
-    const { start, end } = calculateDateRange(preset);
+    
+    let start: Date;
+    let end: Date;
+    
+    // Handle custom date range
+    if (preset === 'custom') {
+      const startDateParam = req.query.startDate as string;
+      const endDateParam = req.query.endDate as string;
+      
+      if (!startDateParam || !endDateParam) {
+        return res.status(400).json({ 
+          error: 'startDate and endDate are required for custom preset' 
+        });
+      }
+      
+      start = new Date(startDateParam);
+      end = new Date(endDateParam);
+      
+      // Validate dates
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ 
+          error: 'Invalid date format. Use ISO date strings.' 
+        });
+      }
+      
+      if (start > end) {
+        return res.status(400).json({ 
+          error: 'startDate must be before or equal to endDate' 
+        });
+      }
+    } else {
+      const dateRange = calculateDateRange(preset);
+      start = dateRange.start;
+      end = dateRange.end;
+    }
     
     // Calculate previous period for comparison
     const periodLength = end.getTime() - start.getTime();
     const prevStart = new Date(start.getTime() - periodLength);
     const prevEnd = new Date(start);
 
-    // Query: Get revenue by provider for current period
-    const currentQuery = `
+    // Optimized Query: Get revenue by provider for both current and previous periods in one query
+    const combinedQuery = `
+      WITH current_revenue AS (
+        SELECT 
+          ip.id as provider_id,
+          ip.name as provider_name,
+          COALESCE(SUM(t.amount), 0) as revenue
+        FROM insurance_providers ip
+        LEFT JOIN transactions t ON t.insurance_provider_id = ip.id
+          AND t.type = 'income'
+          AND t.currency = 'USD'
+          AND t.date >= $1
+          AND t.date <= $2
+        WHERE ip.is_active = true
+        GROUP BY ip.id, ip.name
+        HAVING COALESCE(SUM(t.amount), 0) > 0
+      ),
+      previous_revenue AS (
+        SELECT 
+          ip.id as provider_id,
+          COALESCE(SUM(t.amount), 0) as revenue
+        FROM insurance_providers ip
+        LEFT JOIN transactions t ON t.insurance_provider_id = ip.id
+          AND t.type = 'income'
+          AND t.currency = 'USD'
+          AND t.date >= $3
+          AND t.date < $1
+        WHERE ip.is_active = true
+        GROUP BY ip.id
+      ),
+      active_providers AS (
+        SELECT COUNT(DISTINCT insurance_provider_id) as active_count
+        FROM transactions
+        WHERE type = 'income'
+          AND currency = 'USD'
+          AND insurance_provider_id IS NOT NULL
+          AND date >= $1
+          AND date <= $2
+      )
       SELECT 
-        ip.id as provider_id,
-        ip.name as provider_name,
-        COALESCE(SUM(t.amount), 0) as revenue
-      FROM insurance_providers ip
-      LEFT JOIN transactions t ON t.insurance_provider_id = ip.id
-        AND t.type = 'income'
-        AND t.currency = 'USD'
-        AND t.date >= $1
-        AND t.date <= $2
-      WHERE ip.is_active = true
-      GROUP BY ip.id, ip.name
-      HAVING COALESCE(SUM(t.amount), 0) > 0
-      ORDER BY revenue DESC
+        cr.provider_id,
+        cr.provider_name,
+        cr.revenue as current_revenue,
+        COALESCE(pr.revenue, 0) as previous_revenue,
+        ap.active_count
+      FROM current_revenue cr
+      LEFT JOIN previous_revenue pr ON cr.provider_id = pr.provider_id
+      CROSS JOIN active_providers ap
+      ORDER BY cr.revenue DESC
     `;
 
-    // Query: Get revenue by provider for previous period
-    const previousQuery = `
-      SELECT 
-        ip.id as provider_id,
-        COALESCE(SUM(t.amount), 0) as revenue
-      FROM insurance_providers ip
-      LEFT JOIN transactions t ON t.insurance_provider_id = ip.id
-        AND t.type = 'income'
-        AND t.currency = 'USD'
-        AND t.date >= $1
-        AND t.date <= $2
-      WHERE ip.is_active = true
-      GROUP BY ip.id
-    `;
-
-    // Query: Count active providers (with transactions in current period)
-    const activeProvidersQuery = `
-      SELECT COUNT(DISTINCT insurance_provider_id) as active_count
-      FROM transactions
-      WHERE type = 'income'
-        AND currency = 'USD'
-        AND insurance_provider_id IS NOT NULL
-        AND date >= $1
-        AND date <= $2
-    `;
-
-    const [currentResult, previousResult, activeProvidersResult] = await Promise.all([
-      pool.query(currentQuery, [start, end]),
-      pool.query(previousQuery, [prevStart, prevEnd]),
-      pool.query(activeProvidersQuery, [start, end]),
-    ]);
+    const result = await pool.query(combinedQuery, [start, end, prevStart]);
 
     // Calculate total revenue for current period
-    const totalRevenue = currentResult.rows.reduce((sum, row) => sum + Number(row.revenue), 0);
+    const totalRevenue = result.rows.reduce((sum, row) => sum + Number(row.current_revenue), 0);
     
     // Calculate total revenue for previous period
-    const previousTotalRevenue = previousResult.rows.reduce((sum, row) => sum + Number(row.revenue), 0);
+    const previousTotalRevenue = result.rows.reduce((sum, row) => sum + Number(row.previous_revenue), 0);
     
     // Calculate percentage change vs last period
     const vsLastMonth = previousTotalRevenue > 0
       ? ((totalRevenue - previousTotalRevenue) / previousTotalRevenue) * 100
       : 0;
 
-    const activeProviders = Number(activeProvidersResult.rows[0]?.active_count || 0);
+    const activeProviders = Number(result.rows[0]?.active_count || 0);
 
     // Provider shares for donut chart
     const colors = [
@@ -177,20 +216,16 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
       "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"
     ];
     
-    const providerShares = currentResult.rows.map((row, index) => ({
+    const providerShares = result.rows.map((row, index) => ({
       name: row.provider_name,
-      value: Number(row.revenue),
+      value: Number(row.current_revenue),
       color: colors[index % colors.length],
     }));
 
-    // Top providers with performance cards
-    const previousRevenueMap = new Map(
-      previousResult.rows.map(row => [row.provider_id, Number(row.revenue)])
-    );
-
-    const topProviders = currentResult.rows.slice(0, 6).map((row, index) => {
-      const currentRevenue = Number(row.revenue);
-      const previousRevenue = previousRevenueMap.get(row.provider_id) || 0;
+    // Top providers with performance cards (limit to top 3)
+    const topProviders = result.rows.slice(0, 3).map((row, index) => {
+      const currentRevenue = Number(row.current_revenue);
+      const previousRevenue = Number(row.previous_revenue);
       const changePercent = previousRevenue > 0
         ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
         : 0;

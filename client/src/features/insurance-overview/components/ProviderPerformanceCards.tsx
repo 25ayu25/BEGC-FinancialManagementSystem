@@ -50,7 +50,7 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
       
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Top Providers Performance</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Providers Performance</h2>
           
           {/* Mobile navigation controls */}
           {isMobile && providers.length > 1 && (
