@@ -66,22 +66,38 @@ export const REPORT_STATUS = {
   LOCKED: "locked",
 } as const;
 
-/* ---------------- API base URL (new) ---------------- */
+/* ---------------- API base URL (updated) ---------------- */
 
 /**
  * Where the frontend will send API requests.
- * - Uses VITE_API_BASE_URL if provided at build time.
- * - Falls back to localhost:5000 for local dev, or the Render URL in prod.
+ * - Uses VITE_API_URL if provided at build time (Netlify env).
+ * - Falls back to localhost:5000 for local dev, or the Northflank URL in prod.
  */
-const FALLBACK_PROD_API = "https://bgc-financialmanagementsystem.onrender.com";
+const FALLBACK_PROD_API =
+  "https://site--financial-management--2rbpdlgj47wb.code.run";
 const FALLBACK_DEV_API = "http://localhost:5000";
 
-export const API_BASE_URL: string = (() => {
-  const fromEnv = (import.meta as any)?.env?.VITE_API_BASE_URL;
-  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
+function normalizeBaseUrl(url?: string) {
+  if (!url) return "";
+  return String(url).trim().replace(/\/+$/, "");
+}
 
+export const API_BASE_URL: string = (() => {
+  // Primary: VITE_API_URL
+  // Back-compat: also read VITE_API_BASE_URL if present
+  const fromEnv =
+    (import.meta as any)?.env?.VITE_API_URL ??
+    (import.meta as any)?.env?.VITE_API_BASE_URL;
+
+  const chosen = normalizeBaseUrl(
+    typeof fromEnv === "string" ? fromEnv : undefined
+  );
+  if (chosen) return chosen;
+
+  // SSR / static render fallback (treat as prod)
   if (typeof window === "undefined") return FALLBACK_PROD_API;
 
+  // Local dev vs deployed
   const host = window.location.hostname;
   const isLocal =
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
