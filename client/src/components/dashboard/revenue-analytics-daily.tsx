@@ -11,6 +11,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  LabelList, // <-- added
 } from "recharts";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/queryClient";
@@ -36,6 +37,7 @@ type Props = {
 /* ------------------------ Number Formatters ---------------------- */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+// for SSP labels in millions
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -272,6 +274,51 @@ function asUTCWindow(fromISO: string, toISO: string) {
   return { startDateTime, endDateTime };
 }
 
+/* ------------------------- Bar Label renderers ------------------- */
+
+// Render small text above bars; skip zeros and very tiny bars
+const renderSSPLabel = (props: any) => {
+  const { x, y, width, value } = props;
+  const v = Number(value ?? 0);
+  if (!isFinite(v) || v <= 0 || !isFinite(x) || !isFinite(y) || !isFinite(width)) return null;
+  const cx = x + width / 2;
+  const cy = y - 4; // 4px above bar
+  const text = compact.format(v); // e.g., 40M, 50.2M
+  return (
+    <text
+      x={cx}
+      y={cy}
+      fill="#64748b"
+      fontSize={11}
+      textAnchor="middle"
+      pointerEvents="none"
+    >
+      {text}
+    </text>
+  );
+};
+
+const renderUSDLabel = (props: any) => {
+  const { x, y, width, value } = props;
+  const v = Number(value ?? 0);
+  if (!isFinite(v) || v <= 0 || !isFinite(x) || !isFinite(y) || !isFinite(width)) return null;
+  const cx = x + width / 2;
+  const cy = y - 4;
+  const text = nf0.format(Math.round(v)); // e.g., 15,450
+  return (
+    <text
+      x={cx}
+      y={cy}
+      fill="#64748b"
+      fontSize={11}
+      textAnchor="middle"
+      pointerEvents="none"
+    >
+      {text}
+    </text>
+  );
+};
+
 /* ------------------------------- Main ---------------------------- */
 
 export default function RevenueAnalyticsDaily({
@@ -287,7 +334,7 @@ export default function RevenueAnalyticsDaily({
   const { start, end } = computeWindow(timeRange, year, month, customStartDate, customEndDate);
   const wide = isWideRange(timeRange, start, end);
 
-  // NEW: single-year flag to control month tick labels
+  // controls month tick labels
   const singleYear = !!(start && end && start.getFullYear() === end.getFullYear());
 
   const days = daysInMonth(year, month);
@@ -553,6 +600,8 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------------------- UI ---------------------------- */
 
+  const showBarLabels = wide; // labels only in Monthly view to avoid clutter in Daily
+
   return (
     <Card className="border-0 shadow-md bg-white">
       <CardHeader className="pb-0">
@@ -645,7 +694,9 @@ export default function RevenueAnalyticsDaily({
                   maxBarSize={24}
                   onClick={(p: any) => (wide ? onClickMonthlySSP(p?.payload) : onClickDailySSP(p?.payload))}
                   style={{ cursor: "pointer" }}
-                />
+                >
+                  {showBarLabels && <LabelList dataKey="value" content={renderSSPLabel} />}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -731,7 +782,9 @@ export default function RevenueAnalyticsDaily({
                   maxBarSize={24}
                   onClick={(p: any) => (wide ? onClickMonthlyUSD(p?.payload) : onClickDailyUSD(p?.payload))}
                   style={{ cursor: "pointer" }}
-                />
+                >
+                  {showBarLabels && <LabelList dataKey="value" content={renderUSDLabel} />}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
