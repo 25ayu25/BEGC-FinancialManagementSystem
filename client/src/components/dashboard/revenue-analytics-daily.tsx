@@ -287,6 +287,9 @@ export default function RevenueAnalyticsDaily({
   const { start, end } = computeWindow(timeRange, year, month, customStartDate, customEndDate);
   const wide = isWideRange(timeRange, start, end);
 
+  // NEW: single-year flag to control month tick labels
+  const singleYear = !!(start && end && start.getFullYear() === end.getFullYear());
+
   const days = daysInMonth(year, month);
   const isMobile = useIsMobile(768);
 
@@ -439,7 +442,9 @@ export default function RevenueAnalyticsDaily({
 
   const headerLabel = !wide
     ? format(new Date(year, month - 1, 1), "MMM yyyy")
-    : `${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`;
+    : timeRange === "year" && singleYear
+      ? `${format(start, "MMM yyyy")} – ${format(end, "MMM yyyy")}`
+      : `${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`;
 
   /* ------------------- Drilldown (click bars) ------------------- */
 
@@ -598,11 +603,14 @@ export default function RevenueAnalyticsDaily({
                   <XAxis
                     dataKey="label"
                     tick={{ fontSize: 12, fill: "#64748b" }}
-                    tickFormatter={(k: string) =>
-                      /^\d{4}-\d{2}$/.test(k)
-                        ? format(new Date(parseInt(k.slice(0, 4)), parseInt(k.slice(5, 7)) - 1, 1), "MMM yyyy")
-                        : k
-                    }
+                    tickFormatter={(k: string) => {
+                      if (/^\d{4}-\d{2}$/.test(k)) {
+                        const y = parseInt(k.slice(0, 4), 10);
+                        const m = parseInt(k.slice(5, 7), 10) - 1;
+                        return format(new Date(y, m, 1), singleYear ? "MMM" : "MMM ''yy");
+                      }
+                      return k;
+                    }}
                     interval="preserveStartEnd"
                     minTickGap={8}
                     tickMargin={8}
@@ -681,11 +689,14 @@ export default function RevenueAnalyticsDaily({
                   <XAxis
                     dataKey="label"
                     tick={{ fontSize: 12, fill: "#64748b" }}
-                    tickFormatter={(k: string) =>
-                      /^\d{4}-\d{2}$/.test(k)
-                        ? format(new Date(parseInt(k.slice(0, 4)), parseInt(k.slice(5, 7)) - 1, 1), "MMM yyyy")
-                        : k
-                    }
+                    tickFormatter={(k: string) => {
+                      if (/^\d{4}-\d{2}$/.test(k)) {
+                        const y = parseInt(k.slice(0, 4), 10);
+                        const m = parseInt(k.slice(5, 7), 10) - 1;
+                        return format(new Date(y, m, 1), singleYear ? "MMM" : "MMM ''yy");
+                      }
+                      return k;
+                    }}
                     interval="preserveStartEnd"
                     minTickGap={8}
                     tickMargin={8}
