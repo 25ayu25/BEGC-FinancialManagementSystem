@@ -30,12 +30,8 @@ interface SetLabPortionModalProps {
  * For now this just shows a world-class UI and fires a toast.
  * You can later wire the submit handler to a real API endpoint.
  */
-export const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
-  open,
-  onOpenChange,
-  claim,
-}) => {
-  const { toast } = useToast();
+const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({ open, onOpenChange, claim }) => {...}
+export default SetLabPortionModal;
 
   const [labPortion, setLabPortion] = React.useState<string>("");
   const [labTechPaid, setLabTechPaid] = React.useState<string>("");
