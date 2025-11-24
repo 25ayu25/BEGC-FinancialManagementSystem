@@ -1,4 +1,3 @@
-// server/routes.ts
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import {
@@ -13,9 +12,11 @@ import { join } from "path";
 import { claimReconciliationRouter } from "./src/routes/claimReconciliation";
 import { getCookieOptions } from "./utils/cookies";
 import insuranceOverviewRouter from "./routes/insurance-overview";
+// --- NEW IMPORT ---
+import insuranceLabRouter from "./src/routes/insuranceLab";
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                             */
+/* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
 function parseYMD(dateStr?: string | null): Date | undefined {
@@ -154,14 +155,6 @@ function toPairs(rec: any): Array<[string, number]> {
 export async function registerRoutes(app: Express): Promise<void> {
   /**
    * Trust proxy is critical for production deployment behind Netlify → Render.
-   * 
-   * Why this is needed:
-   * - Netlify forwards requests to Render with x-forwarded-host, x-forwarded-proto headers
-   * - Express needs to trust these headers to determine the actual host and protocol
-   * - Cookie secure flag and domain calculation depend on correct protocol detection
-   * - Without this, req.protocol returns 'http' even when client used 'https'
-   * 
-   * Setting: 1 means trust the first hop (Netlify proxy)
    */
   app.set("trust proxy", 1);
 
@@ -177,11 +170,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* --------------------------------------------------------------- */
   /* Global user-session hydration middleware                       */
   /* --------------------------------------------------------------- */
-  /**
-   * Attempt to populate req.user from session cookie or X-Session-Token header.
-   * This middleware runs for all requests but doesn't fail if there's no session.
-   * Individual routes can use requireAuth to enforce authentication.
-   */
   app.use(async (req, _res, next) => {
     try {
       let userSession: any = null;
@@ -220,14 +208,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
     } catch (err) {
       console.error("Error populating req.user:", err);
-      // Don't fail the request, just continue without user
     }
     
     next();
   });
 
   /* --------------------------------------------------------------- */
-  /* Health                                                          */
+  /* Health                                                        */
   /* --------------------------------------------------------------- */
   app.get("/api/health", (_req, res) => {
     res.status(200).json({
@@ -238,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Auth middleware                                                 */
+  /* Auth middleware                                               */
   /* --------------------------------------------------------------- */
   const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -282,16 +269,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   };
 
   /* --------------------------------------------------------------- */
-  /* Auth routes                                                     */
+  /* Auth routes                                                   */
   /* --------------------------------------------------------------- */
-  /**
-   * Login endpoint - sets secure session cookie using proxy-aware options.
-   * 
-   * The cookie helper (getCookieOptions) ensures proper configuration for:
-   * - Netlify → Render proxy setup
-   * - Cross-origin requests with credentials
-   * - Security (httpOnly, secure in prod, sameSite)
-   */
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -403,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* User Management                                                 */
+  /* User Management                                               */
   /* --------------------------------------------------------------- */
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
@@ -514,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Departments & Providers                                         */
+  /* Departments & Providers                                       */
   /* --------------------------------------------------------------- */
   app.get("/api/departments", requireAuth, async (_req, res) => {
     try {
@@ -537,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Transactions                                                     */
+  /* Transactions                                                   */
   /* --------------------------------------------------------------- */
   app.get("/api/transactions/daily-check", requireAuth, async (req, res) => {
     try {
@@ -944,7 +923,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
       /* --------------------------------------------------------------- */
-  /* Insurance Management                                            */
+  /* Insurance Management                                          */
   /* --------------------------------------------------------------- */
 
   // Helper to accept the new window (start/end) and still support old year/month
@@ -992,7 +971,6 @@ export async function registerRoutes(app: Express): Promise<void> {
     notes: z.string().optional(),
   });
 
-  // ✅ this was missing before
   const PaymentPatch = PaymentCreate.partial();
 
   /** Delete a claim */
@@ -1130,7 +1108,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.json(data);
     } catch (err) { next(err); }
   });
-  
+   
   /* --------------------------------------------------------------- */
   /* Dashboard & Trends                                              */
   /* --------------------------------------------------------------- */
@@ -1210,7 +1188,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Monthly Reports                                                 */
+  /* Monthly Reports                                               */
   /* --------------------------------------------------------------- */
   app.get("/api/reports", requireAuth, async (req, res) => {
     try {
@@ -1652,7 +1630,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Receipts (GCS)                                                  */
+  /* Receipts (GCS)                                                */
   /* --------------------------------------------------------------- */
   app.post("/api/receipts/upload", requireAuth, async (_req, res) => {
     try {
@@ -1697,7 +1675,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Patient Volume                                                  */
+  /* Patient Volume                                                */
   /* --------------------------------------------------------------- */
   app.post("/api/patient-volume", requireAuth, async (req, res) => {
     try {
@@ -1823,7 +1801,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   /* --------------------------------------------------------------- */
-  /* Claim Reconciliation                                            */
+  /* Claim Reconciliation                                          */
   /* --------------------------------------------------------------- */
   app.use("/api/claim-reconciliation", requireAuth, claimReconciliationRouter);
 
@@ -1831,6 +1809,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   /* Insurance Overview - Independent Endpoints                      */
   /* --------------------------------------------------------------- */
   app.use("/api/insurance-overview", requireAuth, insuranceOverviewRouter);
+
+  // --- NEW: Insurance Lab Management ---
+  app.use("/api/insurance", requireAuth, insuranceLabRouter);
 
   /* --------------------------------------------------------------- */
   /* Catch-all for unknown API routes (must be after all routes)    */
