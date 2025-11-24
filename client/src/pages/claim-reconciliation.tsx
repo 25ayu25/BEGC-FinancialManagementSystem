@@ -72,7 +72,7 @@ import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
 /* -------------------------------------------------------------------------- */
-/* NEW: Modals (already exist in your repo) */
+/* NEW: Modals (Using Default Imports) */
 /* -------------------------------------------------------------------------- */
 import SetLabPortionModal from "@/components/insurance/modals/SetLabPortionModal";
 import AddLabPaymentModal from "@/components/insurance/modals/AddLabPaymentModal";
@@ -102,6 +102,7 @@ interface ClaimDetail {
   billedAmount: string;
   amountPaid: string;
   status: string;
+  currency?: string; // Added to support currency passing
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1207,10 +1208,11 @@ export default function ClaimReconciliation() {
                               ).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
-                              SSP {parseFloat(claim.billedAmount).toFixed(2)}
+                              {/* Currency fallback to SSP if not available */}
+                              {claim.currency || "SSP"} {parseFloat(claim.billedAmount).toFixed(2)}
                             </TableCell>
                             <TableCell>
-                              SSP {parseFloat(claim.amountPaid).toFixed(2)}
+                              {claim.currency || "SSP"} {parseFloat(claim.amountPaid).toFixed(2)}
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(claim.status)}
@@ -1228,8 +1230,19 @@ export default function ClaimReconciliation() {
       )}
 
       {/* --- Mount modals once (controlled) --- */}
-      <SetLabPortionModal open={openSetLab} onOpenChange={setOpenSetLab} />
-      <AddLabPaymentModal open={openAddLabPay} onOpenChange={setOpenAddLabPay} />
+      <SetLabPortionModal
+        open={openSetLab}
+        onOpenChange={setOpenSetLab}
+        // Pass the first claim to provide context, or null if no claims exist
+        claim={claims.length > 0 ? claims[0] : null}
+      />
+      <AddLabPaymentModal
+        open={openAddLabPay}
+        onOpenChange={setOpenAddLabPay}
+        // Pass year/month from selected run or fallback to form state
+        year={selectedRun ? selectedRun.periodYear : parseInt(periodYear) || new Date().getFullYear()}
+        month={selectedRun ? selectedRun.periodMonth : parseInt(periodMonth) || new Date().getMonth() + 1}
+      />
     </div>
   );
 }
