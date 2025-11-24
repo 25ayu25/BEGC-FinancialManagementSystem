@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { setLabPortion } from "@/lib/api-insurance-lab"; // Using your API helper
+import { setLabPortion } from "@/lib/api-insurance-lab";
 
 interface SetLabPortionModalProps {
   open: boolean;
@@ -35,12 +35,12 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Form State
+  // 1. HOOKS: State
   const [amount, setAmount] = React.useState<string>("");
   const [currency, setCurrency] = React.useState<string>("SSP");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Reset form when modal opens
+  // 2. HOOKS: Effects
   React.useEffect(() => {
     if (open) {
       setAmount("");
@@ -48,18 +48,7 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     }
   }, [open, claim?.id]);
 
-  if (!claim) return null;
-
-  // Calculate display values
-  const billed = Number.parseFloat(claim.billedAmount || "0") || 0;
-  const paid = Number.parseFloat(claim.amountPaid || "0") || 0;
-
-  // Derive period from claim date
-  const serviceDate = claim.serviceDate ? new Date(claim.serviceDate) : new Date();
-  const periodYear = serviceDate.getFullYear();
-  const periodMonth = serviceDate.getMonth() + 1;
-
-  // API Mutation using your helper
+  // 3. HOOKS: Mutation (MOVED UP - must be before any return)
   const mutation = useMutation({
     mutationFn: async (data: { periodYear: number; periodMonth: number; currency: string; amount: number }) => {
       return await setLabPortion(data);
@@ -69,7 +58,6 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
         title: "Success",
         description: "Lab portion updated successfully",
       });
-      // Refresh the summary data
       queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
       onOpenChange(false);
     },
@@ -81,6 +69,16 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
       });
     },
   });
+
+  // --- CONDITIONAL RETURN IS NOW SAFE HERE ---
+  if (!claim) return null;
+
+  // Safe to calculate derived values now
+  const billed = Number.parseFloat(claim.billedAmount || "0") || 0;
+  const paid = Number.parseFloat(claim.amountPaid || "0") || 0;
+  const serviceDate = claim.serviceDate ? new Date(claim.serviceDate) : new Date();
+  const periodYear = serviceDate.getFullYear();
+  const periodMonth = serviceDate.getMonth() + 1;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
