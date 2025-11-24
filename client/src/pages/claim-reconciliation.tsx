@@ -72,6 +72,12 @@ import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
 /* -------------------------------------------------------------------------- */
+/* NEW: Lab % + payout modals */
+/* -------------------------------------------------------------------------- */
+import SetLabPortionModal from "@/components/insurance/modals/SetLabPortionModal";
+import RecordLabPayoutModal from "@/components/insurance/modals/RecordLabPayoutModal";
+
+/* -------------------------------------------------------------------------- */
 /* Types */
 /* -------------------------------------------------------------------------- */
 
@@ -240,6 +246,23 @@ export default function ClaimReconciliation() {
   const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">(
     "issues"
   );
+
+  /* ---------- NEW: More ▾ menu state + window helpers ---------- */
+  const [openSetLab, setOpenSetLab] = useState(false);
+  const [openRecordLab, setOpenRecordLab] = useState(false);
+
+  const windowStart = useMemo(() => {
+    const y = Number(periodYear),
+      m = Number(periodMonth);
+    return `${y}-${String(m).padStart(2, "0")}-01`;
+  }, [periodYear, periodMonth]);
+
+  const windowEnd = useMemo(() => {
+    const y = Number(periodYear),
+      m = Number(periodMonth);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+  }, [periodYear, periodMonth]);
 
   /* ------------------------------------------------------------------------ */
   /* Data loading */
@@ -640,6 +663,8 @@ export default function ClaimReconciliation() {
                 Refreshing data…
               </span>
             )}
+
+            {/* Help toggle */}
             <Button
               type="button"
               variant="outline"
@@ -652,6 +677,38 @@ export default function ClaimReconciliation() {
                 {showHelp ? "Hide help" : "Show help"}
               </span>
             </Button>
+
+            {/* NEW: More ▾ menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MoreHorizontal className="w-4 h-4" />
+                  More
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem onClick={() => setOpenSetLab(true)}>
+                  Set lab % for {providerName} ({windowStart} → {windowEnd})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setOpenRecordLab(true)}>
+                  Record lab payout…
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleExportIssues}
+                  disabled={
+                    !selectedRunId || issuesCountForSelected === 0 || isExporting
+                  }
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-3 h-3 mr-2" />
+                  )}
+                  Export issues for CIC
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -1196,6 +1253,22 @@ export default function ClaimReconciliation() {
           </CardContent>
         </Card>
       )}
+
+      {/* NEW: Modals mounted once */}
+      <SetLabPortionModal
+        open={openSetLab}
+        onOpenChange={setOpenSetLab}
+        defaultProviderName={providerName}
+        defaultStart={windowStart}
+        defaultEnd={windowEnd}
+      />
+      <RecordLabPayoutModal
+        open={openRecordLab}
+        onOpenChange={setOpenRecordLab}
+        defaultProviderName={providerName}
+        defaultStart={windowStart}
+        defaultEnd={windowEnd}
+      />
     </div>
   );
 }
