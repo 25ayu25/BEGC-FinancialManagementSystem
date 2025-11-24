@@ -1,135 +1,198 @@
 // client/src/components/insurance/modals/SetLabPortionModal.tsx
+
 import * as React from "react";
-import { z } from "zod";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast"; // ✅ CORRECT PATH
 
-const FormSchema = z.object({
-  periodYear: z.coerce.number().int().min(2000).max(2100),
-  providerId: z.string().optional().nullable(),          // null = all providers
-  submittedUSD: z.coerce.number().nonnegative(),         // total lab claims submitted (USD) for that year
-  sharePercent: z.coerce.number().min(0).max(100).default(35),
-  paidToLabSSP: z.coerce.number().nonnegative().default(0),
-  notes: z.string().optional(),
-});
-
-type Props = {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  defaultYear?: number;
-  defaultProviderId?: string | null; // pass null for “All providers”
+type ClaimLike = {
+  id: number;
+  memberNumber: string;
+  billedAmount: string;
+  amountPaid: string;
+  serviceDate: string;
+  patientName?: string | null;
 };
 
-export default function SetLabPortionModal({
+interface SetLabPortionModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  claim: ClaimLike | null;
+}
+
+/**
+ * Modal to record how much of an insurance payment belongs to the laboratory,
+ * and how much was actually paid to the lab technician.
+ *
+ * For now this just shows a world-class UI and fires a toast.
+ * You can later wire the submit handler to a real API endpoint.
+ */
+export const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
   open,
   onOpenChange,
-  defaultYear = new Date().getUTCFullYear(),
-  defaultProviderId = null,
-}: Props) {
+  claim,
+}) => {
   const { toast } = useToast();
-  const [submitting, setSubmitting] = React.useState(false);
 
-  const formRef = React.useRef<HTMLFormElement>(null);
+  const [labPortion, setLabPortion] = React.useState<string>("");
+  const [labTechPaid, setLabTechPaid] = React.useState<string>("");
+  const [notes, setNotes] = React.useState<string>("");
 
-  async function onSubmit(e: React.FormEvent) {
+  React.useEffect(() => {
+    if (open) {
+      // reset form each time we open
+      setLabPortion("");
+      setLabTechPaid("");
+      setNotes("");
+    }
+  }, [open, claim?.id]);
+
+  if (!claim) {
+    // If for some reason open=true but no claim is provided, just render nothing.
+    return null;
+  }
+
+  const billed = Number.parseFloat(claim.billedAmount || "0") || 0;
+  const paid = Number.parseFloat(claim.amountPaid || "0") || 0;
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const fd = new FormData(formRef.current!);
-    const raw = Object.fromEntries(fd.entries());
-    // normalize
-    const payload = {
-      periodYear: raw.periodYear,
-      providerId: (raw.providerId as string) || null,
-      submittedUSD: raw.submittedUSD,
-      sharePercent: raw.sharePercent || 35,
-      paidToLabSSP: raw.paidToLabSSP || 0,
-      notes: raw.notes,
-    };
 
-    const parse = FormSchema.safeParse(payload);
-    if (!parse.success) {
-      toast({ title: "Please check the form", description: "Invalid values.", variant: "destructive" });
+    const labPortionNum = Number(labPortion.replace(/,/g, ""));
+    const labTechPaidNum = Number(labTechPaid.replace(/,/g, ""));
+
+    if (!Number.isFinite(labPortionNum) || labPortionNum <= 0) {
+      toast({
+        title: "Invalid lab total",
+        description: "Please enter a valid positive amount for the laboratory total.",
+        variant: "destructive",
+      });
       return;
     }
 
-    try {
-      setSubmitting(true);
-      // Adjust path if you named it slightly differently server-side
-      const res = await fetch("/api/lab-insurance-share/baselines", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parse.data),
+    if (!Number.isFinite(labTechPaidNum) || labTechPaidNum < 0) {
+      toast({
+        title: "Invalid amount paid to lab tech",
+        description: "Please enter a valid amount paid to the lab technician.",
+        variant: "destructive",
       });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || "Failed to save");
-      }
-      toast({ title: "Saved", description: "Lab insurance baseline updated." });
-      onOpenChange(false);
-    } catch (err: any) {
-      toast({ title: "Save failed", description: String(err.message || err), variant: "destructive" });
-    } finally {
-      setSubmitting(false);
+      return;
     }
-  }
+
+    // 🔒 For now we only show a confirmation toast.
+    // Later you can post this to an endpoint like `/api/insurance-overview/lab-portion`.
+    toast({
+      title: "Lab portion saved (local only)",
+      description:
+        "The lab portion and amount paid to the lab tech have been captured in the UI. You can now decide how to persist this in the backend.",
+    });
+
+    onOpenChange(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Set Lab Insurance Baseline</DialogTitle>
+          <DialogTitle>Record laboratory portion</DialogTitle>
           <DialogDescription>
-            Record the yearly <b>Laboratory</b> claims submitted (USD), the agreed share (%), and how much you’ve already paid the lab (SSP).
+            There is no lab column in the insurance files, so the clinic needs to enter the
+            lab total and the amount paid to the lab tech manually.
           </DialogDescription>
         </DialogHeader>
 
-        <form ref={formRef} onSubmit={onSubmit} className="grid gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="periodYear">Year</Label>
-              <Input id="periodYear" name="periodYear" type="number" defaultValue={defaultYear} required />
+        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+          {/* Claim summary */}
+          <div className="rounded-lg border bg-slate-50 px-3 py-2.5 text-xs sm:text-sm space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-medium">
+                {claim.patientName || "Unknown patient"}{" "}
+                <span className="text-slate-500">· {claim.memberNumber}</span>
+              </div>
+              <div className="text-slate-500">
+                Service date:{" "}
+                {new Date(claim.serviceDate).toLocaleDateString()}
+              </div>
             </div>
-            <div>
-              <Label htmlFor="providerId">Provider (optional)</Label>
-              {/* If you have a provider select component, swap this Input out */}
-              <Input id="providerId" name="providerId" placeholder="All providers" defaultValue={defaultProviderId ?? ""} />
+            <div className="flex flex-wrap items-center gap-4 text-[11px] sm:text-xs text-slate-600">
+              <span>
+                Billed:{" "}
+                <span className="font-semibold text-slate-800">
+                  SSP {billed.toLocaleString()}
+                </span>
+              </span>
+              <span>
+                Insurance paid:{" "}
+                <span className="font-semibold text-emerald-700">
+                  SSP {paid.toLocaleString()}
+                </span>
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="submittedUSD">Lab claims submitted (USD)</Label>
-              <Input id="submittedUSD" name="submittedUSD" inputMode="decimal" placeholder="e.g., 5214.50" required />
+          {/* Lab portion fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="labPortion">Total paid to Laboratory (SSP)</Label>
+              <Input
+                id="labPortion"
+                type="number"
+                min={0}
+                step="0.01"
+                value={labPortion}
+                onChange={(e) => setLabPortion(e.target.value)}
+                placeholder="e.g. 15,000"
+              />
+              <p className="text-[11px] text-slate-500">
+                From the total insurance payment, how much belongs to the lab?
+              </p>
             </div>
-            <div>
-              <Label htmlFor="sharePercent">Lab share (%)</Label>
-              <Input id="sharePercent" name="sharePercent" type="number" min={0} max={100} defaultValue={35} required />
+
+            <div className="space-y-1.5">
+              <Label htmlFor="labTechPaid">Amount paid to lab tech (SSP)</Label>
+              <Input
+                id="labTechPaid"
+                type="number"
+                min={0}
+                step="0.01"
+                value={labTechPaid}
+                onChange={(e) => setLabTechPaid(e.target.value)}
+                placeholder="e.g. 10,000"
+              />
+              <p className="text-[11px] text-slate-500">
+                Actual cash you gave to the laboratory technician.
+              </p>
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="paidToLabSSP">Already paid to lab (SSP)</Label>
-            <Input id="paidToLabSSP" name="paidToLabSSP" inputMode="decimal" placeholder="e.g., 350000" defaultValue={0} />
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Internal notes (optional)</Label>
+            <Input
+              id="notes"
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Remaining kept for reagents / rent..."
+            />
           </div>
 
-          <div>
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Input id="notes" name="notes" placeholder="Any context" />
-          </div>
-
-          <DialogFooter className="mt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <DialogFooter className="pt-1 flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving..." : "Save"}
+            <Button type="submit" className="font-semibold">
+              Save lab portion
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
-}
+};
