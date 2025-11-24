@@ -18,12 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast"; // ✅ CORRECT PATH
+import { useToast } from "@/hooks/use-toast";
+import { setLabPortion } from "@/lib/api-insurance-lab"; // Using your API helper
 
 interface SetLabPortionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  claim: any; // Using any to be flexible with the claim object structure
+  claim: any;
 }
 
 const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
@@ -58,19 +59,10 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
   const periodYear = serviceDate.getFullYear();
   const periodMonth = serviceDate.getMonth() + 1;
 
-  // API Mutation
+  // API Mutation using your helper
   const mutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await fetch("/api/insurance/lab-portion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to set portion");
-      }
-      return res.json();
+    mutationFn: async (data: { periodYear: number; periodMonth: number; currency: string; amount: number }) => {
+      return await setLabPortion(data);
     },
     onSuccess: () => {
       toast({
@@ -99,7 +91,6 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
       await mutation.mutateAsync({
         periodYear,
         periodMonth,
-        departmentCode: "LAB",
         currency,
         amount: parseFloat(amount.replace(/,/g, "")),
       });
