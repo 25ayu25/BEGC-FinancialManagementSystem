@@ -1,5 +1,18 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, integer, jsonb, serial, date } from "drizzle-orm/pg-core";
+import { 
+  pgTable, 
+  text, 
+  varchar, 
+  decimal, 
+  numeric, // Added for new tables
+  timestamp, 
+  boolean, 
+  integer, 
+  jsonb, 
+  serial, 
+  date, 
+  uniqueIndex // Added for new tables
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -135,85 +148,33 @@ export const insurancePayments = pgTable("insurance_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
+// --- NEW: monthly lab portion of submitted claims
+export const insuranceDepartmentPortions = pgTable("insurance_department_portions", {
+  id: serial("id").primaryKey(),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month").notNull(), // 1-12
+  departmentCode: varchar("department_code", { length: 32 }).notNull(), // e.g., 'LAB'
+  currency: varchar("currency", { length: 8 }).notNull(), // 'SSP' | 'USD'
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  createdBy: varchar("created_by", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqPeriodDept: uniqueIndex("uniq_lab_portion_period_dept")
+    .on(t.periodYear, t.periodMonth, t.departmentCode),
+}));
+
+// --- NEW: individual payments you make to the lab tech (from insurance share)
+export const insuranceLabPayments = pgTable("insurance_lab_payments", {
+  id: serial("id").primaryKey(),
+  payDate: date("pay_date").notNull(),
+  periodYear: integer("period_year").notNull(),   // which month this payment is applied to
+  periodMonth: integer("period_month").notNull(), // (can pay later and still apply to old month)
+  currency: varchar("currency", { length: 8 }).notNull(), // 'SSP' | 'USD'
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  note: text("note"),
+  createdBy: varchar("created_by", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
-export const insertDepartmentSchema = createInsertSchema(departments).omit({
-  id: true,
-});
-
-export const insertInsuranceProviderSchema = createInsertSchema(insuranceProviders).omit({
-  id: true,
-});
-
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertMonthlyReportSchema = createInsertSchema(monthlyReports).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertReceiptSchema = createInsertSchema(receipts).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertPatientVolumeSchema = createInsertSchema(patientVolume).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  date: z.string().transform((str) => new Date(str)),
-});
-
-// ---- NEW: Insurance insert schemas ----
-export const insertInsuranceClaimSchema = createInsertSchema(insuranceClaims).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertInsurancePaymentSchema = createInsertSchema(insurancePayments).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Types
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-
-export type Department = typeof departments.$inferSelect;
-export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
-
-export type InsuranceProvider = typeof insuranceProviders.$inferSelect;
-export type InsertInsuranceProvider = z.infer<typeof insertInsuranceProviderSchema>;
-
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-
-export type MonthlyReport = typeof monthlyReports.$inferSelect;
-export type InsertMonthlyReport = z.infer<typeof insertMonthlyReportSchema>;
-
-export type Receipt = typeof receipts.$inferSelect;
-export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
-
-export type PatientVolume = typeof patientVolume.$inferSelect;
-export type InsertPatientVolume = z.infer<typeof insertPatientVolumeSchema>;
-
-// ---- NEW: Insurance types ----
-export type InsuranceClaim = typeof insuranceClaims.$inferSelect;
-export type InsertInsuranceClaim = z.infer<typeof insertInsuranceClaimSchema>;
-
-export type InsurancePayment = typeof insurancePayments.$inferSelect;
-export type InsertInsurancePayment = z.infer<typeof insertInsurancePaymentSchema>;
 
 /* =======================
    Claim Reconciliation
@@ -285,7 +246,73 @@ export const claimReconRemittances = pgTable("claim_recon_remittances", {
   rawRow: jsonb("raw_row"),
 });
 
-// Insert schemas for claim reconciliation
+
+/* =======================
+   Insert Schemas (Zod)
+   ======================= */
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDepartmentSchema = createInsertSchema(departments).omit({
+  id: true,
+});
+
+export const insertInsuranceProviderSchema = createInsertSchema(insuranceProviders).omit({
+  id: true,
+});
+
+export const insertTransactionSchema = createInsertSchema(transactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMonthlyReportSchema = createInsertSchema(monthlyReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertReceiptSchema = createInsertSchema(receipts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPatientVolumeSchema = createInsertSchema(patientVolume).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  date: z.string().transform((str) => new Date(str)),
+});
+
+// ---- Insurance insert schemas ----
+export const insertInsuranceClaimSchema = createInsertSchema(insuranceClaims).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInsurancePaymentSchema = createInsertSchema(insurancePayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ---- NEW: Insurance Departments & Payments insert schemas ----
+export const insertInsuranceDepartmentPortionSchema = createInsertSchema(insuranceDepartmentPortions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInsuranceLabPaymentSchema = createInsertSchema(insuranceLabPayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ---- Reconciliation insert schemas ----
 export const insertClaimReconRunSchema = createInsertSchema(claimReconRuns).omit({
   id: true,
   createdAt: true,
@@ -299,7 +326,47 @@ export const insertClaimReconRemittanceSchema = createInsertSchema(claimReconRem
   id: true,
 });
 
-// Types for claim reconciliation
+
+/* =======================
+   Types
+   ======================= */
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Department = typeof departments.$inferSelect;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+
+export type InsuranceProvider = typeof insuranceProviders.$inferSelect;
+export type InsertInsuranceProvider = z.infer<typeof insertInsuranceProviderSchema>;
+
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type MonthlyReport = typeof monthlyReports.$inferSelect;
+export type InsertMonthlyReport = z.infer<typeof insertMonthlyReportSchema>;
+
+export type Receipt = typeof receipts.$inferSelect;
+export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+
+export type PatientVolume = typeof patientVolume.$inferSelect;
+export type InsertPatientVolume = z.infer<typeof insertPatientVolumeSchema>;
+
+// ---- Insurance types ----
+export type InsuranceClaim = typeof insuranceClaims.$inferSelect;
+export type InsertInsuranceClaim = z.infer<typeof insertInsuranceClaimSchema>;
+
+export type InsurancePayment = typeof insurancePayments.$inferSelect;
+export type InsertInsurancePayment = z.infer<typeof insertInsurancePaymentSchema>;
+
+// ---- NEW: Insurance Departments & Payments types ----
+export type InsuranceDepartmentPortion = typeof insuranceDepartmentPortions.$inferSelect;
+export type InsertInsuranceDepartmentPortion = z.infer<typeof insertInsuranceDepartmentPortionSchema>;
+
+export type InsuranceLabPayment = typeof insuranceLabPayments.$inferSelect;
+export type InsertInsuranceLabPayment = z.infer<typeof insertInsuranceLabPaymentSchema>;
+
+// ---- Reconciliation types ----
 export type ClaimReconRun = typeof claimReconRuns.$inferSelect;
 export type InsertClaimReconRun = z.infer<typeof insertClaimReconRunSchema>;
 
