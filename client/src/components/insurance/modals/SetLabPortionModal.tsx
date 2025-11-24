@@ -1,107 +1,125 @@
-// client/src/components/insurance/modals/SetLabPortionModal.tsx
-
 import * as React from "react";
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast"; // ✅ CORRECT PATH
-
-type ClaimLike = {
-  id: number;
-  memberNumber: string;
-  billedAmount: string;
-  amountPaid: string;
-  serviceDate: string;
-  patientName?: string | null;
-};
 
 interface SetLabPortionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  claim: ClaimLike | null;
+  claim: any; // Using any to be flexible with the claim object structure
 }
 
-/**
- * Modal to record how much of an insurance payment belongs to the laboratory,
- * and how much was actually paid to the lab technician.
- *
- * For now this just shows a world-class UI and fires a toast.
- * You can later wire the submit handler to a real API endpoint.
- */
-const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({ open, onOpenChange, claim }) => {...}
-export default SetLabPortionModal;
+const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
+  open,
+  onOpenChange,
+  claim,
+}) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const [labPortion, setLabPortion] = React.useState<string>("");
-  const [labTechPaid, setLabTechPaid] = React.useState<string>("");
-  const [notes, setNotes] = React.useState<string>("");
+  // Form State
+  const [amount, setAmount] = React.useState<string>("");
+  const [currency, setCurrency] = React.useState<string>("SSP");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  // Reset form when modal opens
   React.useEffect(() => {
     if (open) {
-      // reset form each time we open
-      setLabPortion("");
-      setLabTechPaid("");
-      setNotes("");
+      setAmount("");
+      setCurrency("SSP");
     }
   }, [open, claim?.id]);
 
-  if (!claim) {
-    // If for some reason open=true but no claim is provided, just render nothing.
-    return null;
-  }
+  if (!claim) return null;
 
+  // Calculate display values
   const billed = Number.parseFloat(claim.billedAmount || "0") || 0;
   const paid = Number.parseFloat(claim.amountPaid || "0") || 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Derive period from claim date
+  const serviceDate = claim.serviceDate ? new Date(claim.serviceDate) : new Date();
+  const periodYear = serviceDate.getFullYear();
+  const periodMonth = serviceDate.getMonth() + 1;
+
+  // API Mutation
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/insurance/lab-portion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to set portion");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Lab portion updated successfully",
+      });
+      // Refresh the summary data
+      queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
+      onOpenChange(false);
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!amount) return;
 
-    const labPortionNum = Number(labPortion.replace(/,/g, ""));
-    const labTechPaidNum = Number(labTechPaid.replace(/,/g, ""));
-
-    if (!Number.isFinite(labPortionNum) || labPortionNum <= 0) {
-      toast({
-        title: "Invalid lab total",
-        description: "Please enter a valid positive amount for the laboratory total.",
-        variant: "destructive",
+    setIsSubmitting(true);
+    try {
+      await mutation.mutateAsync({
+        periodYear,
+        periodMonth,
+        departmentCode: "LAB",
+        currency,
+        amount: parseFloat(amount.replace(/,/g, "")),
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (!Number.isFinite(labTechPaidNum) || labTechPaidNum < 0) {
-      toast({
-        title: "Invalid amount paid to lab tech",
-        description: "Please enter a valid amount paid to the lab technician.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // 🔒 For now we only show a confirmation toast.
-    // Later you can post this to an endpoint like `/api/insurance-overview/lab-portion`.
-    toast({
-      title: "Lab portion saved (local only)",
-      description:
-        "The lab portion and amount paid to the lab tech have been captured in the UI. You can now decide how to persist this in the backend.",
-    });
-
-    onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Record laboratory portion</DialogTitle>
+          <DialogTitle>Set Laboratory Portion</DialogTitle>
           <DialogDescription>
-            There is no lab column in the insurance files, so the clinic needs to enter the
-            lab total and the amount paid to the lab tech manually.
+            Specify how much of this insurance claim is allocated to the Laboratory.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 pt-2">
-          {/* Claim summary */}
+          {/* Claim Summary Card */}
           <div className="rounded-lg border bg-slate-50 px-3 py-2.5 text-xs sm:text-sm space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="font-medium">
@@ -109,71 +127,60 @@ export default SetLabPortionModal;
                 <span className="text-slate-500">· {claim.memberNumber}</span>
               </div>
               <div className="text-slate-500">
-                Service date:{" "}
-                {new Date(claim.serviceDate).toLocaleDateString()}
+                Service date: {serviceDate.toLocaleDateString()}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-[11px] sm:text-xs text-slate-600">
               <span>
                 Billed:{" "}
                 <span className="font-semibold text-slate-800">
-                  SSP {billed.toLocaleString()}
+                  {claim.currency || "SSP"} {billed.toLocaleString()}
                 </span>
               </span>
               <span>
                 Insurance paid:{" "}
                 <span className="font-semibold text-emerald-700">
-                  SSP {paid.toLocaleString()}
+                  {claim.currency || "SSP"} {paid.toLocaleString()}
                 </span>
               </span>
             </div>
           </div>
 
-          {/* Lab portion fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Currency Select */}
             <div className="space-y-1.5">
-              <Label htmlFor="labPortion">Total paid to Laboratory (SSP)</Label>
+              <Label htmlFor="currency">Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger id="currency">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SSP">SSP</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Amount Input */}
+            <div className="space-y-1.5">
+              <Label htmlFor="labPortion">Allocated Amount</Label>
               <Input
                 id="labPortion"
                 type="number"
                 min={0}
                 step="0.01"
-                value={labPortion}
-                onChange={(e) => setLabPortion(e.target.value)}
-                placeholder="e.g. 15,000"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                required
               />
-              <p className="text-[11px] text-slate-500">
-                From the total insurance payment, how much belongs to the lab?
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="labTechPaid">Amount paid to lab tech (SSP)</Label>
-              <Input
-                id="labTechPaid"
-                type="number"
-                min={0}
-                step="0.01"
-                value={labTechPaid}
-                onChange={(e) => setLabTechPaid(e.target.value)}
-                placeholder="e.g. 10,000"
-              />
-              <p className="text-[11px] text-slate-500">
-                Actual cash you gave to the laboratory technician.
-              </p>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="notes">Internal notes (optional)</Label>
-            <Input
-              id="notes"
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Remaining kept for reagents / rent..."
-            />
-          </div>
+          <p className="text-[11px] text-slate-500">
+            * This sets the total allocated pot for the Lab department for this month. 
+            To record payments made to staff, use the "Add Lab Payment" option.
+          </p>
 
           <DialogFooter className="pt-1 flex flex-col sm:flex-row sm:justify-end gap-2">
             <Button
@@ -183,8 +190,8 @@ export default SetLabPortionModal;
             >
               Cancel
             </Button>
-            <Button type="submit" className="font-semibold">
-              Save lab portion
+            <Button type="submit" className="font-semibold" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Portion"}
             </Button>
           </DialogFooter>
         </form>
@@ -192,3 +199,5 @@ export default SetLabPortionModal;
     </Dialog>
   );
 };
+
+export default SetLabPortionModal;
