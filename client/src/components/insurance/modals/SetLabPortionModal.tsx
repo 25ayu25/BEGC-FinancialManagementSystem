@@ -11,49 +11,33 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { setLabPortion } from "@/lib/api-insurance-lab";
 import { Loader2 } from "lucide-react";
-
 interface SetLabPortionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   year: number;
   month: number;
   currentAmount?: number;
-  currentCurrency?: string;
 }
-
 const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
   open,
   onOpenChange,
   year,
   month,
   currentAmount = 0,
-  currentCurrency = "SSP",
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
   const [amount, setAmount] = React.useState("");
-  const [currency, setCurrency] = React.useState("SSP");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-
   // Pre-fill data when modal opens
   React.useEffect(() => {
     if (open) {
       setAmount(currentAmount ? currentAmount.toString() : "");
-      setCurrency(currentCurrency || "SSP");
     }
-  }, [open, currentAmount, currentCurrency]);
-
+  }, [open, currentAmount]);
   const mutation = useMutation({
     mutationFn: async (data: {
       periodYear: number;
@@ -79,32 +63,27 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
       });
     },
   });
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (amount === "") return;
-
     setIsSubmitting(true);
     try {
       await mutation.mutateAsync({
         periodYear: year,
         periodMonth: month,
-        currency,
+        currency: "USD",
         amount: parseFloat(amount.replace(/,/g, "")),
       });
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const periodLabel = new Date(year, month - 1).toLocaleString("default", {
     month: "long",
     year: "numeric",
   });
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Added bg-white to fix transparency issues */}
       <DialogContent className="sm:max-w-[425px] bg-white text-slate-900">
         <DialogHeader>
           <DialogTitle>Set Lab Insurance Revenue</DialogTitle>
@@ -113,24 +92,10 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
             <strong>{periodLabel}</strong>.
           </DialogDescription>
         </DialogHeader>
-
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <div className="grid gap-5">
             <div className="grid gap-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger id="currency" className="bg-slate-50">
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="SSP">SSP</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Total Lab Revenue</Label>
+              <Label htmlFor="amount">Total Lab Revenue (USD)</Label>
               <Input
                 id="amount"
                 type="number"
@@ -145,7 +110,6 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
               </p>
             </div>
           </div>
-
           <DialogFooter>
             <Button
               type="button"
@@ -165,5 +129,4 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     </Dialog>
   );
 };
-
 export default SetLabPortionModal;
