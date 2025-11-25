@@ -24,40 +24,50 @@ import { setLabPortion } from "@/lib/api-insurance-lab";
 interface SetLabPortionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  claim: any;
+  year: number;
+  month: number;
+  currentAmount?: number;
+  currentCurrency?: string;
 }
 
 const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
   open,
   onOpenChange,
-  claim,
+  year,
+  month,
+  currentAmount = 0,
+  currentCurrency = "SSP",
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 1. HOOKS: State
-  const [amount, setAmount] = React.useState<string>("");
-  const [currency, setCurrency] = React.useState<string>("SSP");
+  const [amount, setAmount] = React.useState("");
+  const [currency, setCurrency] = React.useState("SSP");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // 2. HOOKS: Effects
+  // Pre-fill data when modal opens
   React.useEffect(() => {
     if (open) {
-      setAmount("");
-      setCurrency("SSP");
+      setAmount(currentAmount ? currentAmount.toString() : "");
+      setCurrency(currentCurrency || "SSP");
     }
-  }, [open, claim?.id]);
+  }, [open, currentAmount, currentCurrency]);
 
-  // 3. HOOKS: Mutation (MOVED UP - must be before any return)
   const mutation = useMutation({
-    mutationFn: async (data: { periodYear: number; periodMonth: number; currency: string; amount: number }) => {
+    mutationFn: async (data: {
+      periodYear: number;
+      periodMonth: number;
+      currency: string;
+      amount: number;
+    }) => {
       return await setLabPortion(data);
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Lab portion updated successfully",
+        description: "Monthly lab allocation updated successfully",
       });
+      // Refresh the summary data on the dashboard
       queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
       onOpenChange(false);
     },
@@ -70,25 +80,16 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     },
   });
 
-  // --- CONDITIONAL RETURN IS NOW SAFE HERE ---
-  if (!claim) return null;
-
-  // Safe to calculate derived values now
-  const billed = Number.parseFloat(claim.billedAmount || "0") || 0;
-  const paid = Number.parseFloat(claim.amountPaid || "0") || 0;
-  const serviceDate = claim.serviceDate ? new Date(claim.serviceDate) : new Date();
-  const periodYear = serviceDate.getFullYear();
-  const periodMonth = serviceDate.getMonth() + 1;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount) return;
+    // Allow 0 to clear the allocation if needed
+    if (amount === "") return;
 
     setIsSubmitting(true);
     try {
       await mutation.mutateAsync({
-        periodYear,
-        periodMonth,
+        periodYear: year,
+        periodMonth: month,
         currency,
         amount: parseFloat(amount.replace(/,/g, "")),
       });
@@ -97,51 +98,29 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     }
   };
 
+  const periodLabel = new Date(year, month - 1).toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Set Laboratory Portion</DialogTitle>
+          <DialogTitle>Set Monthly Lab Allocation</DialogTitle>
           <DialogDescription>
-            Specify how much of this insurance claim is allocated to the Laboratory.
+            Define the total insurance amount allocated to the Laboratory for{" "}
+            <strong>{periodLabel}</strong>.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
-          {/* Claim Summary Card */}
-          <div className="rounded-lg border bg-slate-50 px-3 py-2.5 text-xs sm:text-sm space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-medium">
-                {claim.patientName || "Unknown patient"}{" "}
-                <span className="text-slate-500">· {claim.memberNumber}</span>
-              </div>
-              <div className="text-slate-500">
-                Service date: {serviceDate.toLocaleDateString()}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-[11px] sm:text-xs text-slate-600">
-              <span>
-                Billed:{" "}
-                <span className="font-semibold text-slate-800">
-                  {claim.currency || "SSP"} {billed.toLocaleString()}
-                </span>
-              </span>
-              <span>
-                Insurance paid:{" "}
-                <span className="font-semibold text-emerald-700">
-                  {claim.currency || "SSP"} {paid.toLocaleString()}
-                </span>
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Currency Select */}
-            <div className="space-y-1.5">
+        <form onSubmit={handleSubmit} className="space-y-6 py-2">
+          <div className="grid gap-4">
+            <div className="grid gap-2">
               <Label htmlFor="currency">Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger id="currency">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SSP">SSP</SelectItem>
@@ -150,28 +129,24 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
               </Select>
             </div>
 
-            {/* Amount Input */}
-            <div className="space-y-1.5">
-              <Label htmlFor="labPortion">Allocated Amount</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Total Allocation (100%)</Label>
               <Input
-                id="labPortion"
+                id="amount"
                 type="number"
-                min={0}
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                required
+                placeholder="e.g. 50000"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Enter the total Lab value submitted. The tech's 35% share will
+                be calculated automatically on the dashboard.
+              </p>
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-500">
-            * This sets the total allocated pot for the Lab department for this month. 
-            To record payments made to staff, use the "Add Lab Payment" option.
-          </p>
-
-          <DialogFooter className="pt-1 flex flex-col sm:flex-row sm:justify-end gap-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -179,8 +154,8 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
             >
               Cancel
             </Button>
-            <Button type="submit" className="font-semibold" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Portion"}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Allocation"}
             </Button>
           </DialogFooter>
         </form>
