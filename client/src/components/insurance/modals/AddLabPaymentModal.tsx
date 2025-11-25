@@ -10,16 +10,31 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addLabPayment } from "@/lib/api-insurance-lab";
+import { addLabPayment, updateLabPayment } from "@/lib/api-insurance-lab";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+
+type EditPayment = {
+  id?: string | number;
+  payDate: string;
+  amount: number;
+  note?: string;
+  currency?: string;
+  periodYear?: number;
+  periodMonth?: number;
+};
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   year: number;
   month: number;
+  /** Optional, still defaults to USD */
   defaultCurrency?: "SSP" | "USD" | string;
+  /** When provided, modal works in "edit" mode */
+  paymentToEdit?: EditPayment | null;
+  /** Called after a successful save (create or edit) */
+  onSaved?: () => void;
 };
 
 export default function AddLabPaymentModal({
@@ -28,6 +43,8 @@ export default function AddLabPaymentModal({
   year,
   month,
   defaultCurrency,
+  paymentToEdit,
+  onSaved,
 }: Props) {
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
@@ -37,16 +54,36 @@ export default function AddLabPaymentModal({
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const currency = defaultCurrency || "USD";
+  const isEdit = !!paymentToEdit?.id;
+  const currency = paymentToEdit?.currency || defaultCurrency || "USD";
 
-  // Reset defaults whenever the modal opens
+  // Period to send to the API (use payment's period when editing, otherwise current filters)
+  const periodYear = paymentToEdit?.periodYear ?? year;
+  const periodMonth = paymentToEdit?.periodMonth ?? month;
+
+  // When modal opens or paymentToEdit changes, pre-fill fields
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+
+    if (paymentToEdit && paymentToEdit.id != null) {
+      setAmount(
+        paymentToEdit.amount !== undefined
+          ? String(paymentToEdit.amount)
+          : ""
+      );
+      // keep only YYYY-MM-DD part if it's ISO
+      const datePart =
+        paymentToEdit.payDate?.slice(0, 10) ||
+        new Date().toISOString().slice(0, 10);
+      setPayDate(datePart);
+      setNote(paymentToEdit.note || "");
+    } else {
+      // create mode defaults
       setAmount("");
       setPayDate(new Date().toISOString().slice(0, 10));
       setNote("");
     }
-  }, [open]);
+  }, [open, paymentToEdit]);
 
   const save = async () => {
     const val = Number(amount);
@@ -61,20 +98,29 @@ export default function AddLabPaymentModal({
 
     setIsSubmitting(true);
     try {
-      await addLabPayment({
+      const payload = {
         payDate,
-        periodYear: year,
-        periodMonth: month,
+        periodYear,
+        periodMonth,
         currency,
         amount: +val.toFixed(2),
         note,
-      });
-      toast({ title: "Payment recorded" });
+      };
+
+      if (isEdit && paymentToEdit?.id != null) {
+        await updateLabPayment(paymentToEdit.id, payload);
+        toast({ title: "Payment updated" });
+      } else {
+        await addLabPayment(payload);
+        toast({ title: "Payment recorded" });
+      }
+
+      onSaved?.();
       onOpenChange(false);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error?.message || "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -86,11 +132,16 @@ export default function AddLabPaymentModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-white text-slate-900">
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Edit Payment" : "Record Payment to Technician"}
+          </DialogTitle>
           <DialogDescription>
-            Record a cash payment given to the Lab Technician.
+            {isEdit
+              ? "Update a cash payment given to the Lab Technician."
+              : "Record a cash payment given to the Lab Technician."}
           </DialogDescription>
         </DialogHeader>
+
         <div className="grid gap-4 py-4">
           {/* Date Row */}
           <div className="grid gap-2">
@@ -102,6 +153,7 @@ export default function AddLabPaymentModal({
               onChange={(e) => setPayDate(e.target.value)}
             />
           </div>
+
           {/* Amount Row */}
           <div className="grid gap-2">
             <Label htmlFor="amount">Amount ({currency})</Label>
@@ -115,6 +167,7 @@ export default function AddLabPaymentModal({
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
+
           {/* Note Row */}
           <div className="grid gap-2">
             <Label htmlFor="note">Note (Optional)</Label>
@@ -126,6 +179,7 @@ export default function AddLabPaymentModal({
             />
           </div>
         </div>
+
         <DialogFooter>
           <Button
             variant="outline"
@@ -138,7 +192,7 @@ export default function AddLabPaymentModal({
             {isSubmitting && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Save Payment
+            {isEdit ? "Save Changes" : "Save Payment"}
           </Button>
         </DialogFooter>
       </DialogContent>
