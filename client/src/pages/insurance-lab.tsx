@@ -219,6 +219,11 @@ export default function InsuranceLabPage() {
 
   const anyLoading = usingYear ? isYearLoading : isMonthlyLoading;
 
+  const showingLabel =
+    viewMode === "monthly"
+      ? `Showing: ${periodLabel} (Monthly)`
+      : `Showing: Year to date ${year}`;
+
   /* ---------------------------------------------------------------------- */
   /* Render                                                                 */
   /* ---------------------------------------------------------------------- */
@@ -227,52 +232,68 @@ export default function InsuranceLabPage() {
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
       {/* Header & Filters */}
       <div className="flex flex-col space-y-4 pt-2">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div className="space-y-1">
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
               Lab Finance
             </h1>
             <p className="text-muted-foreground">
               Manage allocations and staff payments for the Laboratory.
             </p>
+            <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
+            <span className="text-xs text-muted-foreground">
+              Change year and month, or switch between Monthly and Year to date.
+            </span>
             <div className="flex gap-3">
-              <Select
-                value={year.toString()}
-                onValueChange={(v) => setYear(parseInt(v))}
-              >
-                <SelectTrigger className="w-[100px] bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2023, 2024, 2025, 2026].map((y) => (
-                    <SelectItem key={y} value={y.toString()}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Year selector */}
+              <div className="flex flex-col">
+                <span className="text-[11px] text-muted-foreground mb-1">
+                  Year
+                </span>
+                <Select
+                  value={year.toString()}
+                  onValueChange={(v) => setYear(parseInt(v))}
+                >
+                  <SelectTrigger className="w-[100px] bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2023, 2024, 2025, 2026].map((y) => (
+                      <SelectItem key={y} value={y.toString()}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select
-                value={month.toString()}
-                onValueChange={(v) => setMonth(parseInt(v))}
-                disabled={viewMode === "year"}
-              >
-                <SelectTrigger className="w-[140px] bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <SelectItem key={m} value={m.toString()}>
-                      {new Date(2000, m - 1).toLocaleString("default", {
-                        month: "long",
-                      })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Month selector */}
+              <div className="flex flex-col">
+                <span className="text-[11px] text-muted-foreground mb-1">
+                  Month
+                </span>
+                <Select
+                  value={month.toString()}
+                  onValueChange={(v) => setMonth(parseInt(v))}
+                  disabled={viewMode === "year"}
+                >
+                  <SelectTrigger className="w-[140px] bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={m.toString()}>
+                        {new Date(2000, m - 1).toLocaleString("default", {
+                          month: "long",
+                        })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* View mode toggle */}
@@ -306,13 +327,20 @@ export default function InsuranceLabPage() {
         {/* Primary Actions Toolbar */}
         <div className="flex flex-col items-end gap-1 border-b border-gray-200 pb-4">
           <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpenSetPortion(true)}>
+            <Button
+              variant="outline"
+              onClick={() => setOpenSetPortion(true)}
+              title="Set how much insurance paid for lab this month."
+            >
               <Settings2 className="w-4 h-4 mr-2" />
               Enter Monthly Total
             </Button>
-            <Button onClick={() => setOpenAddPayment(true)}>
+            <Button
+              onClick={() => setOpenAddPayment(true)}
+              title="Save a cash payment you gave to the Lab Technician."
+            >
               <Plus className="w-4 h-4 mr-2" />
-              Record Payment
+              Record Payment to Technician
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
@@ -327,11 +355,11 @@ export default function InsuranceLabPage() {
 
       {/* KPIs */}
       <div className="grid gap-4 md:grid-cols-4">
-        {/* 1. Total Submitted */}
+        {/* 1. Total sent to insurance */}
         <Card className="border-l-4 border-l-blue-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Lab Submitted
+              Total sent to insurance
             </CardTitle>
             <Wallet className="h-4 w-4 text-blue-500" />
           </CardHeader>
@@ -344,16 +372,18 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {usingYear ? "Across all months this year" : "100% of Lab Claims"}
+              {usingYear
+                ? "All lab claims for this year (100%)"
+                : "All lab claims for this period (100%)"}
             </p>
           </CardContent>
         </Card>
 
-        {/* 2. Tech Share (35%) */}
+        {/* 2. Lab Technician share (35%) */}
         <Card className="border-l-4 border-l-purple-500 shadow-sm bg-purple-50/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-purple-900">
-              Tech Share (35%)
+              Lab Technician share (35%)
             </CardTitle>
             <Percent className="h-4 w-4 text-purple-700" />
           </CardHeader>
@@ -366,7 +396,9 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-purple-600 mt-1">
-              {usingYear ? "Total owed for the year" : "Total owed to Tech"}
+              {usingYear
+                ? "Total owed to the Lab Technician for this year"
+                : "What we should pay the Lab Technician"}
             </p>
           </CardContent>
         </Card>
@@ -375,7 +407,7 @@ export default function InsuranceLabPage() {
         <Card className="border-l-4 border-l-emerald-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Paid
+              Already paid to technician
             </CardTitle>
             <ArrowRightLeft className="h-4 w-4 text-emerald-500" />
           </CardHeader>
@@ -389,13 +421,13 @@ export default function InsuranceLabPage() {
             )}
             <p className="text-xs text-muted-foreground mt-1">
               {usingYear
-                ? "Disbursed during this year"
-                : "Already disbursed"}
+                ? "Cash already given this year"
+                : "Cash already given for this period"}
             </p>
           </CardContent>
         </Card>
 
-        {/* 4. Balance Due */}
+        {/* 4. Remaining Balance */}
         <Card
           className={cn(
             "border-l-4 shadow-sm",
@@ -404,7 +436,7 @@ export default function InsuranceLabPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Remaining Balance
+              Still owed to technician
             </CardTitle>
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -422,9 +454,11 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {usingYear
-                ? "Still owed for this year"
-                : "Available to pay"}
+              {balance < 0
+                ? "Overpaid to technician"
+                : usingYear
+                ? "Remaining amount to pay this year"
+                : "Remaining amount to pay for this period"}
             </p>
           </CardContent>
         </Card>
@@ -452,14 +486,23 @@ export default function InsuranceLabPage() {
 
             {/* Submitted totals (per month for the selected year) */}
             <TabsContent value="submitted">
+              <p className="text-xs text-muted-foreground mb-3">
+                For each month: how much we sent to insurance, the Lab Technician
+                share (35%), how much we already paid, and the remaining
+                balance.
+              </p>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Period</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>Tech share (35%)</TableHead>
-                    <TableHead>Paid</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="text-right">
+                      Submitted (USD)
+                    </TableHead>
+                    <TableHead className="text-right">
+                      Lab share (35%) (USD)
+                    </TableHead>
+                    <TableHead className="text-right">Paid (USD)</TableHead>
+                    <TableHead className="text-right">Balance (USD)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -482,36 +525,102 @@ export default function InsuranceLabPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    submittedRowsForYear.map((row) => (
-                      <TableRow key={row.month}>
-                        <TableCell>
-                          {new Date(year, row.month - 1).toLocaleString(
-                            "default",
-                            { month: "short" }
-                          )}{" "}
-                          {year}
-                        </TableCell>
-                        <TableCell>
-                          {row.currency} {row.submitted.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          {row.currency} {row.due.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          {row.currency} {row.paid.toLocaleString()}
+                    <>
+                      {submittedRowsForYear.map((row) => {
+                        const isCurrentMonth = row.month === month;
+                        const monthLabelShort = new Date(
+                          year,
+                          row.month - 1
+                        ).toLocaleString("default", {
+                          month: "short",
+                        });
+
+                        return (
+                          <TableRow
+                            key={row.month}
+                            className={cn(
+                              isCurrentMonth && "bg-slate-50"
+                            )}
+                          >
+                            <TableCell className="whitespace-nowrap">
+                              {monthLabelShort} {year}
+                              {isCurrentMonth && (
+                                <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                                  Current month
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {row.currency} {row.submitted.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {row.currency} {row.due.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {row.currency} {row.paid.toLocaleString()}
+                            </TableCell>
+                            <TableCell
+                              className={cn(
+                                "text-right",
+                                row.balance > 0
+                                  ? "text-amber-600"
+                                  : row.balance < 0
+                                  ? "text-red-600"
+                                  : "text-slate-700"
+                              )}
+                            >
+                              {row.currency} {row.balance.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+
+                      {/* Total row for the year */}
+                      <TableRow className="font-semibold border-t">
+                        <TableCell>Total for {year}</TableCell>
+                        <TableCell className="text-right">
+                          {displayCurrency}{" "}
+                          {yearTotals.submitted.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          {row.currency} {row.balance.toLocaleString()}
+                          {displayCurrency} {yearTotals.due.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {displayCurrency} {yearTotals.paid.toLocaleString()}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            "text-right",
+                            yearTotals.balance > 0
+                              ? "text-amber-600"
+                              : yearTotals.balance < 0
+                              ? "text-red-600"
+                              : "text-slate-700"
+                          )}
+                        >
+                          {displayCurrency}{" "}
+                          {yearTotals.balance.toLocaleString()}
                         </TableCell>
                       </TableRow>
-                    ))
+                    </>
                   )}
                 </TableBody>
               </Table>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Legend:{" "}
+                <span className="font-medium text-amber-600">Orange</span> =
+                amount we still owe the Lab Technician.{" "}
+                <span className="font-medium text-red-600">Red</span> = we paid
+                more than required.
+              </p>
             </TabsContent>
 
             {/* Payment history */}
             <TabsContent value="payments">
+              <p className="text-xs text-muted-foreground mb-3">
+                List of all cash payments to the Lab Technician for{" "}
+                {viewMode === "monthly" ? periodLabel : year}.
+              </p>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -519,7 +628,7 @@ export default function InsuranceLabPage() {
                     {viewMode === "year" && <TableHead>Period</TableHead>}
                     <TableHead>Note</TableHead>
                     <TableHead>Created By</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Amount (USD)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -583,7 +692,6 @@ export default function InsuranceLabPage() {
         year={year}
         month={month}
         currentAmount={allocated}
-        currentCurrency={displayCurrency}
       />
 
       <AddLabPaymentModal
@@ -591,7 +699,6 @@ export default function InsuranceLabPage() {
         onOpenChange={setOpenAddPayment}
         year={year}
         month={month}
-        defaultCurrency={displayCurrency as "SSP" | "USD"}
       />
     </div>
   );
