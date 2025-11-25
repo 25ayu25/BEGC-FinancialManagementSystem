@@ -1,71 +1,171 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { addLabPayment } from "@/lib/api-insurance-lab";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 type Props = {
-  open: boolean; onOpenChange: (v: boolean) => void;
-  year: number; month: number;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  year: number;
+  month: number;
   defaultCurrency?: "SSP" | "USD";
 };
 
-export default function AddLabPaymentModal({ open, onOpenChange, year, month, defaultCurrency="SSP" }: Props) {
+export default function AddLabPaymentModal({
+  open,
+  onOpenChange,
+  year,
+  month,
+  defaultCurrency = "SSP",
+}: Props) {
   const { toast } = useToast();
   const [currency, setCurrency] = useState<"SSP" | "USD">(defaultCurrency);
   const [amount, setAmount] = useState("");
-  const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0,10));
+  const [payDate, setPayDate] = useState<string>(
+    new Date().toISOString().slice(0, 10)
+  );
   const [note, setNote] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset defaults whenever the modal opens
+  useEffect(() => {
+    if (open) {
+      setCurrency(defaultCurrency);
+      setAmount("");
+      setPayDate(new Date().toISOString().slice(0, 10));
+      setNote("");
+    }
+  }, [open, defaultCurrency]);
 
   const save = async () => {
     const val = Number(amount);
-    if (!val || val < 0) {
-      toast({ title: "Enter a valid amount", variant: "destructive" });
+    if (!val || val <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a value greater than 0",
+        variant: "destructive",
+      });
       return;
     }
-    await addLabPayment({ payDate, periodYear: year, periodMonth: month, currency, amount: +val.toFixed(2), note });
-    toast({ title: "Payment recorded" });
-    onOpenChange(false);
+
+    setIsSubmitting(true);
+    try {
+      await addLabPayment({
+        payDate,
+        periodYear: year,
+        periodMonth: month,
+        currency,
+        amount: +val.toFixed(2),
+        note,
+      });
+      toast({ title: "Payment recorded" });
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Record payment to Lab Tech</DialogTitle>
+          <DialogTitle>Record Payment</DialogTitle>
+          <DialogDescription>
+            Record a cash payment given to the Lab Technician.
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <Label>Date</Label>
-              <Input type="date" value={payDate} onChange={(e)=>setPayDate(e.target.value)} />
-            </div>
-            <div className="col-span-1">
-              <Label>Currency</Label>
-              <Select value={currency} onValueChange={(v:any)=>setCurrency(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+
+        <div className="grid gap-4 py-4">
+          {/* Date Row */}
+          <div className="grid gap-2">
+            <Label htmlFor="date">Payment Date</Label>
+            <Input
+              id="date"
+              type="date"
+              value={payDate}
+              onChange={(e) => setPayDate(e.target.value)}
+            />
+          </div>
+
+          {/* Currency & Amount Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Select
+                value={currency}
+                onValueChange={(v: "SSP" | "USD") => setCurrency(v)}
+              >
+                <SelectTrigger id="currency">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SSP">SSP</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-1">
-              <Label>Amount</Label>
-              <Input placeholder="0.00" inputMode="decimal" value={amount} onChange={(e)=>setAmount(e.target.value)} />
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Amount</Label>
+              <Input
+                id="amount"
+                placeholder="0.00"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
             </div>
           </div>
-          <div>
-            <Label>Note (optional)</Label>
-            <Input placeholder="e.g., advance for CIC payment" value={note} onChange={(e)=>setNote(e.target.value)} />
+
+          {/* Note Row */}
+          <div className="grid gap-2">
+            <Label htmlFor="note">Note (Optional)</Label>
+            <Input
+              id="note"
+              placeholder="e.g., Advance for CIC payment"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </div>
         </div>
+
         <DialogFooter>
-          <Button variant="ghost" onClick={()=>onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save}>Save</Button>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Payment
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
