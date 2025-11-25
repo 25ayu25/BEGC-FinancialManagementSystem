@@ -23,7 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Plus, Wallet, ArrowRightLeft, Banknote, Percent } from "lucide-react";
+import { 
+  Loader2, 
+  Plus, 
+  Wallet, 
+  ArrowRightLeft, 
+  Banknote, 
+  Percent, 
+  Settings2 
+} from "lucide-react";
 
 // Modals
 import SetLabPortionModal from "@/components/insurance/modals/SetLabPortionModal";
@@ -49,63 +57,77 @@ export default function InsuranceLabPage() {
   // 1. The Portion (Total Lab Submitted)
   const portion = summary.portion;
   const currency = portion?.currency || "SSP"; // Default to SSP if nothing set
-  const allocated = portion?.amount || 0; // This is the 100%
+  const allocated = portion?.amount ? Number(portion.amount) : 0; // This is the 100%
 
   // 2. The Due (35% Share)
-  const dueAmount = summary.due?.amount || 0;
+  const dueAmount = summary.due?.amount ? Number(summary.due.amount) : 0;
 
   // 3. Paid & Balance
-  const paid = summary.paid?.amount || 0;
-  const balance = summary.balance?.amount || 0;
+  const paid = summary.paid?.amount ? Number(summary.paid.amount) : 0;
+  const balance = summary.balance?.amount ? Number(summary.balance.amount) : 0;
   const payments = summary.payments || [];
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
       {/* Header & Filters */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pt-2">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-            Lab Finance Management
-          </h1>
-          <p className="text-muted-foreground">
-            Manage insurance allocations (35%) and staff payments for the Laboratory.
-          </p>
+      <div className="flex flex-col space-y-4 pt-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+              Lab Finance
+            </h1>
+            <p className="text-muted-foreground">
+              Manage allocations and staff payments for the Laboratory.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Select
+              value={year.toString()}
+              onValueChange={(v) => setYear(parseInt(v))}
+            >
+              <SelectTrigger className="w-[100px] bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2023, 2024, 2025, 2026].map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={month.toString()}
+              onValueChange={(v) => setMonth(parseInt(v))}
+            >
+              <SelectTrigger className="w-[140px] bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <SelectItem key={m} value={m.toString()}>
+                    {new Date(2000, m - 1).toLocaleString("default", {
+                      month: "long",
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex gap-3">
-          <Select
-            value={year.toString()}
-            onValueChange={(v) => setYear(parseInt(v))}
-          >
-            <SelectTrigger className="w-[100px] bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[2024, 2025, 2026].map((y) => (
-                <SelectItem key={y} value={y.toString()}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={month.toString()}
-            onValueChange={(v) => setMonth(parseInt(v))}
-          >
-            <SelectTrigger className="w-[140px] bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <SelectItem key={m} value={m.toString()}>
-                  {new Date(2000, m - 1).toLocaleString("default", {
-                    month: "long",
-                  })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Primary Actions Toolbar */}
+        <div className="flex items-center justify-end gap-2 border-b border-gray-200 pb-4">
+          <Button variant="outline" onClick={() => setOpenSetPortion(true)}>
+            <Settings2 className="w-4 h-4 mr-2" />
+            Set Monthly Total
+          </Button>
+          <Button onClick={() => setOpenAddPayment(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Record Payment
+          </Button>
         </div>
       </div>
 
@@ -117,7 +139,7 @@ export default function InsuranceLabPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Lab Submitted
             </CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+            <Wallet className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -127,13 +149,9 @@ export default function InsuranceLabPage() {
                 {currency} {allocated.toLocaleString()}
               </div>
             )}
-            <Button
-              variant="link"
-              className="px-0 h-auto text-xs mt-2 text-blue-600"
-              onClick={() => setOpenSetPortion(true)}
-            >
-              Set Monthly Total
-            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              100% of Lab Claims
+            </p>
           </CardContent>
         </Card>
 
@@ -154,7 +172,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-purple-600 mt-1">
-              Calculated automatically
+              Total owed to Tech
             </p>
           </CardContent>
         </Card>
@@ -163,7 +181,7 @@ export default function InsuranceLabPage() {
         <Card className="border-l-4 border-l-emerald-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Paid</CardTitle>
-            <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowRightLeft className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -173,13 +191,9 @@ export default function InsuranceLabPage() {
                 {currency} {paid.toLocaleString()}
               </div>
             )}
-            <Button
-              variant="link"
-              className="px-0 h-auto text-xs mt-2 text-emerald-600"
-              onClick={() => setOpenAddPayment(true)}
-            >
-              Record Payment
-            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              Already disbursed
+            </p>
           </CardContent>
         </Card>
 
@@ -206,7 +220,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Owed to Lab Tech
+              Available to pay
             </p>
           </CardContent>
         </Card>
@@ -222,10 +236,6 @@ export default function InsuranceLabPage() {
                 Staff payments recorded for {new Date(year, month-1).toLocaleString('default', { month: 'long' })} {year}.
               </p>
             </div>
-            <Button size="sm" onClick={() => setOpenAddPayment(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Payment
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
