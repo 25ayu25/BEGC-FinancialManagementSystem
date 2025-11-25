@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { setLabPortion } from "@/lib/api-insurance-lab";
+import { Loader2 } from "lucide-react";
 
 interface SetLabPortionModalProps {
   open: boolean;
@@ -65,9 +66,8 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Monthly lab allocation updated successfully",
+        description: "Lab monthly total updated.",
       });
-      // Refresh the summary data on the dashboard
       queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
       onOpenChange(false);
     },
@@ -82,7 +82,6 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Allow 0 to clear the allocation if needed
     if (amount === "") return;
 
     setIsSubmitting(true);
@@ -105,24 +104,25 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      {/* Added bg-white to fix transparency issues */}
+      <DialogContent className="sm:max-w-[425px] bg-white text-slate-900">
         <DialogHeader>
-          <DialogTitle>Set Monthly Lab Allocation</DialogTitle>
+          <DialogTitle>Set Lab Insurance Revenue</DialogTitle>
           <DialogDescription>
-            Define the total insurance amount allocated to the Laboratory for{" "}
+            Enter the total amount submitted to insurance for the Laboratory for{" "}
             <strong>{periodLabel}</strong>.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 py-2">
-          <div className="grid gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <div className="grid gap-5">
             <div className="grid gap-2">
               <Label htmlFor="currency">Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger id="currency">
+                <SelectTrigger id="currency" className="bg-slate-50">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="SSP">SSP</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                 </SelectContent>
@@ -130,7 +130,7 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="amount">Total Allocation (100%)</Label>
+              <Label htmlFor="amount">Total Lab Revenue</Label>
               <Input
                 id="amount"
                 type="number"
@@ -138,10 +138,10 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="e.g. 50000"
+                className="bg-slate-50 text-lg font-medium"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Enter the total Lab value submitted. The tech's 35% share will
-                be calculated automatically on the dashboard.
+              <p className="text-xs text-slate-500">
+                The technician will receive 35% of this amount.
               </p>
             </div>
           </div>
@@ -151,11 +151,13 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Allocation"}
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Total
             </Button>
           </DialogFooter>
         </form>
