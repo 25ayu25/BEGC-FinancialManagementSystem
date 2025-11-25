@@ -1,5 +1,3 @@
-// client/src/pages/claim-reconciliation.tsx
-
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
@@ -72,12 +70,6 @@ import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 
 /* -------------------------------------------------------------------------- */
-/* NEW: Modals (Using Default Imports) */
-/* -------------------------------------------------------------------------- */
-import SetLabPortionModal from "@/components/insurance/modals/SetLabPortionModal";
-import AddLabPaymentModal from "@/components/insurance/modals/AddLabPaymentModal";
-
-/* -------------------------------------------------------------------------- */
 /* Types */
 /* -------------------------------------------------------------------------- */
 
@@ -102,7 +94,7 @@ interface ClaimDetail {
   billedAmount: string;
   amountPaid: string;
   status: string;
-  currency?: string; // Added to support currency passing
+  currency?: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -247,10 +239,6 @@ export default function ClaimReconciliation() {
   const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">(
     "issues"
   );
-
-  // NEW: modal open state
-  const [openSetLab, setOpenSetLab] = useState(false);
-  const [openAddLabPay, setOpenAddLabPay] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /* Data loading */
@@ -1150,24 +1138,6 @@ export default function ClaimReconciliation() {
                       )}
                       Export for CIC
                     </Button>
-
-                    {/* NEW: More ▾ menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button type="button" variant="outline" size="sm" className="gap-2">
-                          <MoreHorizontal className="w-4 h-4" />
-                          More
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => setOpenSetLab(true)}>
-                          Set Lab Share %
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setOpenAddLabPay(true)}>
-                          Record Lab Payment
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </div>
 
@@ -1228,21 +1198,6 @@ export default function ClaimReconciliation() {
           </CardContent>
         </Card>
       )}
-
-      {/* --- Mount modals once (controlled) --- */}
-      <SetLabPortionModal
-        open={openSetLab}
-        onOpenChange={setOpenSetLab}
-        // Pass the first claim to provide context, or null if no claims exist
-        claim={claims.length > 0 ? claims[0] : null}
-      />
-      <AddLabPaymentModal
-        open={openAddLabPay}
-        onOpenChange={setOpenAddLabPay}
-        // Pass year/month from selected run or fallback to form state
-        year={selectedRun ? selectedRun.periodYear : parseInt(periodYear) || new Date().getFullYear()}
-        month={selectedRun ? selectedRun.periodMonth : parseInt(periodMonth) || new Date().getMonth() + 1}
-      />
     </div>
   );
 }
