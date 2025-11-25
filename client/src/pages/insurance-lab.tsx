@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
-import { getLabSummary } from "@/lib/api-insurance-lab";
+import {
+  useQuery,
+  useQueries,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { getLabSummary, deleteLabPayment } from "@/lib/api-insurance-lab";
 import {
   Card,
   CardContent,
@@ -31,6 +35,9 @@ import {
   Banknote,
   Percent,
   Settings2,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   Tabs,
@@ -38,7 +45,15 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
+import { DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 // Modals
 import SetLabPortionModal from "@/components/insurance/modals/SetLabPortionModal";
@@ -55,6 +70,13 @@ export default function InsuranceLabPage() {
   // Modal state
   const [openSetPortion, setOpenSetPortion] = useState(false);
   const [openAddPayment, setOpenAddPayment] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any | null>(null);
+  const [isDeleteLoadingId, setIsDeleteLoadingId] = useState<
+    string | number | null
+  >(null);
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   /* ---------------------------------------------------------------------- */
   /* Data loading                                                           */
@@ -225,6 +247,58 @@ export default function InsuranceLabPage() {
       : `Showing: Year to date ${year}`;
 
   /* ---------------------------------------------------------------------- */
+  /* Handlers: edit / delete payments                                      */
+  /* ---------------------------------------------------------------------- */
+
+  const handlePaymentSaved = () => {
+    queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
+  };
+
+  const handleEditPayment = (p: any) => {
+    setEditingPayment({
+      id: p.id,
+      payDate: p.payDate,
+      amount: Number(p.amount),
+      note: p.note,
+      currency: p.currency,
+      periodYear: year,
+      periodMonth: p.periodMonth ?? month,
+    });
+    setOpenAddPayment(true);
+  };
+
+  const handleDeletePayment = async (p: any) => {
+    if (!p.id) {
+      toast({
+        title: "Cannot delete payment",
+        description: "This payment has no ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this payment record? This will reduce the 'Total Paid' amount."
+    );
+    if (!confirmed) return;
+
+    setIsDeleteLoadingId(p.id);
+    try {
+      await deleteLabPayment(p.id);
+      toast({ title: "Payment deleted" });
+      queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete payment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteLoadingId(null);
+    }
+  };
+
+  /* ---------------------------------------------------------------------- */
   /* Render                                                                 */
   /* ---------------------------------------------------------------------- */
 
@@ -336,7 +410,10 @@ export default function InsuranceLabPage() {
               Enter Monthly Total
             </Button>
             <Button
-              onClick={() => setOpenAddPayment(true)}
+              onClick={() => {
+                setEditingPayment(null);
+                setOpenAddPayment(true);
+              }}
               title="Save a cash payment you gave to the Lab Technician."
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -629,13 +706,14 @@ export default function InsuranceLabPage() {
                     <TableHead>Note</TableHead>
                     <TableHead>Created By</TableHead>
                     <TableHead className="text-right">Amount (USD)</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {anyLoading && payments.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={viewMode === "year" ? 5 : 4}
+                        colSpan={viewMode === "year" ? 6 : 5}
                         className="text-center py-8 text-muted-foreground"
                       >
                         Loading...
@@ -644,7 +722,7 @@ export default function InsuranceLabPage() {
                   ) : payments.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={viewMode === "year" ? 5 : 4}
+                        colSpan={viewMode === "year" ? 6 : 5}
                         className="text-center py-8 text-muted-foreground"
                       >
                         No payments recorded for{" "}
@@ -675,6 +753,39 @@ export default function InsuranceLabPage() {
                         <TableCell className="text-right font-medium">
                           {p.currency} {Number(p.amount).toLocaleString()}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => handleEditPayment(p)}
+                              >
+                                <Pencil className="mr-2 h-3 w-3" />
+                                Edit payment
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDeletePayment(p)}
+                                disabled={isDeleteLoadingId === p.id}
+                                className="text-red-600 focus:text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-3 w-3" />
+                                {isDeleteLoadingId === p.id
+                                  ? "Deleting..."
+                                  : "Delete payment"}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -696,9 +807,15 @@ export default function InsuranceLabPage() {
 
       <AddLabPaymentModal
         open={openAddPayment}
-        onOpenChange={setOpenAddPayment}
+        onOpenChange={(open) => {
+          if (!open) setEditingPayment(null);
+          setOpenAddPayment(open);
+        }}
         year={year}
         month={month}
+        defaultCurrency={displayCurrency}
+        paymentToEdit={editingPayment}
+        onSaved={handlePaymentSaved}
       />
     </div>
   );
