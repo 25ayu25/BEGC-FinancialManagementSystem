@@ -14,6 +14,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { setLabPortion } from "@/lib/api-insurance-lab";
 import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SetLabPortionModalProps {
   open: boolean;
@@ -37,14 +44,19 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
   const [amount, setAmount] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const [periodYear, setPeriodYear] = React.useState(year);
+  const [periodMonth, setPeriodMonth] = React.useState(month);
+
   const currency = currentCurrency || "USD";
 
-  // Pre-fill data when modal opens
+  // Pre-fill data & period when modal opens
   React.useEffect(() => {
     if (open) {
+      setPeriodYear(year);
+      setPeriodMonth(month);
       setAmount(currentAmount ? currentAmount.toString() : "");
     }
-  }, [open, currentAmount]);
+  }, [open, year, month, currentAmount]);
 
   const mutation = useMutation({
     mutationFn: async (data: {
@@ -79,8 +91,8 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     setIsSubmitting(true);
     try {
       await mutation.mutateAsync({
-        periodYear: year,
-        periodMonth: month,
+        periodYear,
+        periodMonth,
         currency,
         amount: parseFloat(amount.replace(/,/g, "")),
       });
@@ -89,10 +101,13 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
     }
   };
 
-  const periodLabel = new Date(year, month - 1).toLocaleString("default", {
-    month: "long",
-    year: "numeric",
-  });
+  const periodLabel = new Date(periodYear, periodMonth - 1).toLocaleString(
+    "default",
+    {
+      month: "long",
+      year: "numeric",
+    }
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -105,6 +120,48 @@ const SetLabPortionModal: React.FC<SetLabPortionModalProps> = ({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          {/* Month & Year selection inside modal */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Month</Label>
+              <Select
+                value={periodMonth.toString()}
+                onValueChange={(v) => setPeriodMonth(parseInt(v))}
+              >
+                <SelectTrigger className="bg-slate-50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <SelectItem key={m} value={m.toString()}>
+                      {new Date(2000, m - 1).toLocaleString("default", {
+                        month: "long",
+                      })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Year</Label>
+              <Select
+                value={periodYear.toString()}
+                onValueChange={(v) => setPeriodYear(parseInt(v))}
+              >
+                <SelectTrigger className="bg-slate-50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2023, 2024, 2025, 2026].map((y) => (
+                    <SelectItem key={y} value={y.toString()}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="grid gap-5">
             <div className="grid gap-2">
               <Label htmlFor="amount">
