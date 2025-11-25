@@ -1,4 +1,3 @@
-// client/src/App.tsx
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -32,6 +31,9 @@ import ClaimReconciliation from "@/pages/claim-reconciliation";
 
 // Insurance Overview page
 import InsuranceOverview from "@/pages/insurance-overview";
+
+// --- NEW: Insurance Lab Page ---
+import InsuranceLabPage from "@/pages/insurance-lab";
 
 function Router() {
   return (
@@ -101,6 +103,10 @@ function Router() {
                     <Route path="/insurance-providers" component={InsuranceProviders} />
                     <Route path="/insurance" component={Insurance} />
                     <Route path="/insurance-overview" component={InsuranceOverview} />
+                    
+                    {/* --- NEW ROUTE for Lab Finance --- */}
+                    <Route path="/insurance/lab" component={InsuranceLabPage} />
+                    
                     <Route path="/claim-reconciliation" component={ClaimReconciliation} />
                     <Route path="/settings" component={Settings} />
                     <Route path="/security" component={Security} />
