@@ -13,17 +13,21 @@ import { Label } from "@/components/ui/label";
 import { addLabPayment } from "@/lib/api-insurance-lab";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   year: number;
   month: number;
+  defaultCurrency?: "SSP" | "USD" | string;
 };
+
 export default function AddLabPaymentModal({
   open,
   onOpenChange,
   year,
   month,
+  defaultCurrency,
 }: Props) {
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
@@ -32,6 +36,9 @@ export default function AddLabPaymentModal({
   );
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const currency = defaultCurrency || "USD";
+
   // Reset defaults whenever the modal opens
   useEffect(() => {
     if (open) {
@@ -40,6 +47,7 @@ export default function AddLabPaymentModal({
       setNote("");
     }
   }, [open]);
+
   const save = async () => {
     const val = Number(amount);
     if (!val || val <= 0) {
@@ -50,13 +58,14 @@ export default function AddLabPaymentModal({
       });
       return;
     }
+
     setIsSubmitting(true);
     try {
       await addLabPayment({
         payDate,
         periodYear: year,
         periodMonth: month,
-        currency: "USD",
+        currency,
         amount: +val.toFixed(2),
         note,
       });
@@ -72,6 +81,7 @@ export default function AddLabPaymentModal({
       setIsSubmitting(false);
     }
   };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-white text-slate-900">
@@ -92,9 +102,9 @@ export default function AddLabPaymentModal({
               onChange={(e) => setPayDate(e.target.value)}
             />
           </div>
-          {/* Amount Row (Currency hardcoded to USD) */}
+          {/* Amount Row */}
           <div className="grid gap-2">
-            <Label htmlFor="amount">Amount (USD)</Label>
+            <Label htmlFor="amount">Amount ({currency})</Label>
             <Input
               id="amount"
               placeholder="0.00"
@@ -125,7 +135,9 @@ export default function AddLabPaymentModal({
             Cancel
           </Button>
           <Button onClick={save} disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Save Payment
           </Button>
         </DialogFooter>
