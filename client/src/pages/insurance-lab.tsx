@@ -4,7 +4,11 @@ import {
   useQueries,
   useQueryClient,
 } from "@tanstack/react-query";
-import { getLabSummary, deleteLabPayment } from "@/lib/api-insurance-lab";
+import {
+  getLabSummary,
+  deleteLabPayment,
+  setLabPortion,
+} from "@/lib/api-insurance-lab";
 import {
   Card,
   CardContent,
@@ -45,7 +49,8 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
-import { DropdownMenu,
+import {
+  DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -62,15 +67,30 @@ import AddLabPaymentModal from "@/components/insurance/modals/AddLabPaymentModal
 type ViewMode = "monthly" | "year";
 
 export default function InsuranceLabPage() {
-  // State for filters
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  /* ---------------------------------------------------------------------- */
+  /* Filters & state                                                        */
+  /* ---------------------------------------------------------------------- */
+
+  // Main filters (month first, then year)
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [year, setYear] = useState<number>(new Date().getFullYear());
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
 
   // Modal state
   const [openSetPortion, setOpenSetPortion] = useState(false);
   const [openAddPayment, setOpenAddPayment] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
+
+  // For editing submitted totals (portion)
+  const [portionYear, setPortionYear] = useState<number>(year);
+  const [portionMonth, setPortionMonth] = useState<number>(month);
+  const [portionAmount, setPortionAmount] = useState<number>(0);
+  const [portionCurrency, setPortionCurrency] = useState<string | undefined>(
+    undefined
+  );
+  const [clearingMonth, setClearingMonth] = useState<number | null>(null);
+
+  // Delete payment loading indicator
   const [isDeleteLoadingId, setIsDeleteLoadingId] = useState<
     string | number | null
   >(null);
@@ -247,6 +267,77 @@ export default function InsuranceLabPage() {
       : `Showing: Year to date ${year}`;
 
   /* ---------------------------------------------------------------------- */
+  /* Helpers: open / edit / clear submitted totals                          */
+  /* ---------------------------------------------------------------------- */
+
+  const openSetPortionForMonth = (
+    targetMonth: number,
+    amount: number,
+    currency?: string
+  ) => {
+    setPortionYear(year);
+    setPortionMonth(targetMonth);
+    setPortionAmount(amount);
+    setPortionCurrency(currency || displayCurrency || "USD");
+    setOpenSetPortion(true);
+  };
+
+  const handleToolbarOpenSetPortion = () => {
+    let amount = 0;
+    let currency = displayCurrency || "USD";
+
+    if (usingYear) {
+      const row = perMonthRows.find((r) => r.month === month);
+      if (row) {
+        amount = row.submitted;
+        currency = row.currency;
+      }
+    } else {
+      amount = allocated;
+    }
+
+    openSetPortionForMonth(month, amount, currency);
+  };
+
+  const handleEditSubmittedRow = (row: {
+    month: number;
+    submitted: number;
+    currency: string;
+  }) => {
+    openSetPortionForMonth(row.month, row.submitted, row.currency);
+  };
+
+  const handleClearSubmittedRow = async (row: {
+    month: number;
+    currency: string;
+  }) => {
+    const confirmed = window.confirm(
+      "Clear this month's submitted total? This will set the amount to 0 and recalculate balances."
+    );
+    if (!confirmed) return;
+
+    setClearingMonth(row.month);
+    try {
+      await setLabPortion({
+        periodYear: year,
+        periodMonth: row.month,
+        currency: row.currency || (displayCurrency || "USD"),
+        amount: 0,
+      });
+      toast({ title: "Monthly total cleared" });
+      queryClient.invalidateQueries({ queryKey: ["lab-summary"] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to clear monthly total",
+        variant: "destructive",
+      });
+    } finally {
+      setClearingMonth(null);
+    }
+  };
+
+  /* ---------------------------------------------------------------------- */
   /* Handlers: edit / delete payments                                      */
   /* ---------------------------------------------------------------------- */
 
@@ -319,32 +410,11 @@ export default function InsuranceLabPage() {
 
           <div className="flex flex-col items-end gap-2">
             <span className="text-xs text-muted-foreground">
-              Change year and month, or switch between Monthly and Year to date.
+              Change month and year. The table below shows totals for the whole
+              year; actions apply to the selected month.
             </span>
             <div className="flex gap-3">
-              {/* Year selector */}
-              <div className="flex flex-col">
-                <span className="text-[11px] text-muted-foreground mb-1">
-                  Year
-                </span>
-                <Select
-                  value={year.toString()}
-                  onValueChange={(v) => setYear(parseInt(v))}
-                >
-                  <SelectTrigger className="w-[100px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2023, 2024, 2025, 2026].map((y) => (
-                      <SelectItem key={y} value={y.toString()}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Month selector */}
+              {/* Month selector (first) */}
               <div className="flex flex-col">
                 <span className="text-[11px] text-muted-foreground mb-1">
                   Month
@@ -363,6 +433,28 @@ export default function InsuranceLabPage() {
                         {new Date(2000, m - 1).toLocaleString("default", {
                           month: "long",
                         })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Year selector (second) */}
+              <div className="flex flex-col">
+                <span className="text-[11px] text-muted-foreground mb-1">
+                  Year
+                </span>
+                <Select
+                  value={year.toString()}
+                  onValueChange={(v) => setYear(parseInt(v))}
+                >
+                  <SelectTrigger className="w-[100px] bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2023, 2024, 2025, 2026].map((y) => (
+                      <SelectItem key={y} value={y.toString()}>
+                        {y}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -403,13 +495,14 @@ export default function InsuranceLabPage() {
           <div className="flex items-center justify-end gap-2">
             <Button
               variant="outline"
-              onClick={() => setOpenSetPortion(true)}
+              onClick={handleToolbarOpenSetPortion}
               title="Set how much insurance paid for lab this month."
             >
               <Settings2 className="w-4 h-4 mr-2" />
               Enter Monthly Total
             </Button>
             <Button
+              variant="outline"
               onClick={() => {
                 setEditingPayment(null);
                 setOpenAddPayment(true);
@@ -548,8 +641,7 @@ export default function InsuranceLabPage() {
             <div>
               <CardTitle className="text-lg">Lab Insurance Activity</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Submitted totals and payments for{" "}
-                {viewMode === "monthly" ? periodLabel : `the year ${year}`}.
+                Submitted totals and payments for the year {year}.
               </p>
             </div>
           </div>
@@ -564,9 +656,9 @@ export default function InsuranceLabPage() {
             {/* Submitted totals (per month for the selected year) */}
             <TabsContent value="submitted">
               <p className="text-xs text-muted-foreground mb-3">
-                For each month: how much we sent to insurance, the Lab Technician
-                share (35%), how much we already paid, and the remaining
-                balance.
+                For each month: how much we sent to insurance, the Lab
+                Technician share (35%), how much we already paid, and the
+                remaining balance.
               </p>
               <Table>
                 <TableHeader>
@@ -580,13 +672,14 @@ export default function InsuranceLabPage() {
                     </TableHead>
                     <TableHead className="text-right">Paid (USD)</TableHead>
                     <TableHead className="text-right">Balance (USD)</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isYearLoading && submittedRowsForYear.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={6}
                         className="text-center py-8 text-muted-foreground"
                       >
                         Loading...
@@ -595,7 +688,7 @@ export default function InsuranceLabPage() {
                   ) : submittedRowsForYear.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={6}
                         className="text-center py-8 text-muted-foreground"
                       >
                         No lab submissions recorded for {year}.
@@ -648,6 +741,41 @@ export default function InsuranceLabPage() {
                             >
                               {row.currency} {row.balance.toLocaleString()}
                             </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>
+                                    Submitted total
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditSubmittedRow(row)}
+                                  >
+                                    <Pencil className="mr-2 h-3 w-3" />
+                                    Edit monthly total
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleClearSubmittedRow(row)}
+                                    disabled={clearingMonth === row.month}
+                                    className="text-red-600 focus:text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-3 w-3" />
+                                    {clearingMonth === row.month
+                                      ? "Clearing..."
+                                      : "Clear monthly total"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -678,6 +806,7 @@ export default function InsuranceLabPage() {
                           {displayCurrency}{" "}
                           {yearTotals.balance.toLocaleString()}
                         </TableCell>
+                        <TableCell />
                       </TableRow>
                     </>
                   )}
@@ -717,8 +846,7 @@ export default function InsuranceLabPage() {
                         className="text-center py-8 text-muted-foreground"
                       >
                         Loading...
-                      </TableCell>
-                    </TableRow>
+                      </TableRow>
                   ) : payments.length === 0 ? (
                     <TableRow>
                       <TableCell
@@ -800,9 +928,10 @@ export default function InsuranceLabPage() {
       <SetLabPortionModal
         open={openSetPortion}
         onOpenChange={setOpenSetPortion}
-        year={year}
-        month={month}
-        currentAmount={allocated}
+        year={portionYear}
+        month={portionMonth}
+        currentAmount={portionAmount}
+        currentCurrency={portionCurrency}
       />
 
       <AddLabPaymentModal
