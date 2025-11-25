@@ -13,6 +13,7 @@ import {
   ListChecks,    // providers sub-link
   PieChart,      // insurance overview
   ChevronDown,
+  FlaskConical,  // <--- NEW ICON for Lab Finance
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect, useState } from "react";
@@ -34,6 +35,8 @@ const navigationBefore: NavItem[] = [
 const insuranceItems: NavItem[] = [
   { name: "Overview", href: "/insurance-overview", icon: PieChart },
   { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks },
+  // --- NEW ITEM ADDED HERE ---
+  { name: "Lab Finance", href: "/insurance/lab", icon: FlaskConical },
   { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck },
 ];
 
