@@ -10,51 +10,36 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { addLabPayment } from "@/lib/api-insurance-lab";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   year: number;
   month: number;
-  defaultCurrency?: "SSP" | "USD";
 };
-
 export default function AddLabPaymentModal({
   open,
   onOpenChange,
   year,
   month,
-  defaultCurrency = "SSP",
 }: Props) {
   const { toast } = useToast();
-  const [currency, setCurrency] = useState<"SSP" | "USD">(defaultCurrency);
   const [amount, setAmount] = useState("");
   const [payDate, setPayDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   // Reset defaults whenever the modal opens
   useEffect(() => {
     if (open) {
-      setCurrency(defaultCurrency);
       setAmount("");
       setPayDate(new Date().toISOString().slice(0, 10));
       setNote("");
     }
-  }, [open, defaultCurrency]);
-
+  }, [open]);
   const save = async () => {
     const val = Number(amount);
     if (!val || val <= 0) {
@@ -65,14 +50,13 @@ export default function AddLabPaymentModal({
       });
       return;
     }
-
     setIsSubmitting(true);
     try {
       await addLabPayment({
         payDate,
         periodYear: year,
         periodMonth: month,
-        currency,
+        currency: "USD",
         amount: +val.toFixed(2),
         note,
       });
@@ -88,17 +72,15 @@ export default function AddLabPaymentModal({
       setIsSubmitting(false);
     }
   };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-white text-slate-900">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>
             Record a cash payment given to the Lab Technician.
           </DialogDescription>
         </DialogHeader>
-
         <div className="grid gap-4 py-4">
           {/* Date Row */}
           <div className="grid gap-2">
@@ -110,38 +92,19 @@ export default function AddLabPaymentModal({
               onChange={(e) => setPayDate(e.target.value)}
             />
           </div>
-
-          {/* Currency & Amount Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={currency}
-                onValueChange={(v: "SSP" | "USD") => setCurrency(v)}
-              >
-                <SelectTrigger id="currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SSP">SSP</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                placeholder="0.00"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
+          {/* Amount Row (Currency hardcoded to USD) */}
+          <div className="grid gap-2">
+            <Label htmlFor="amount">Amount (USD)</Label>
+            <Input
+              id="amount"
+              placeholder="0.00"
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
           </div>
-
           {/* Note Row */}
           <div className="grid gap-2">
             <Label htmlFor="note">Note (Optional)</Label>
@@ -153,7 +116,6 @@ export default function AddLabPaymentModal({
             />
           </div>
         </div>
-
         <DialogFooter>
           <Button
             variant="outline"
