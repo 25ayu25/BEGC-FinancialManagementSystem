@@ -247,11 +247,6 @@ export default function InsuranceLabPage() {
     ? yearPayments
     : ((monthlySummary as any)?.payments || []);
 
-  const paymentTotal = payments.reduce(
-    (sum: number, p: any) => sum + Number(p.amount || 0),
-    0
-  );
-
   const submittedRowsForYear = perMonthRows.filter(
     (row) =>
       row.submitted !== 0 || row.due !== 0 || row.paid !== 0 || row.balance !== 0
@@ -268,27 +263,27 @@ export default function InsuranceLabPage() {
 
   const showingLabel =
     viewMode === "monthly"
-      ? `Showing ${periodLabel} (Monthly)`
+      ? `Showing ${periodLabel}`
       : `Showing year to date ${year}`;
 
-  // Dynamic wording for the balance card
-  const balanceTitle =
-    balance < 0
-      ? "Overpaid to technician"
-      : balance === 0
-      ? "All paid to technician"
-      : "Still owed to technician";
+  const paymentsTotal = payments.reduce(
+    (sum: number, p: any) => sum + Number(p.amount ?? 0),
+    0
+  );
+  const paymentsCurrency =
+    (payments[0] && payments[0].currency) || displayCurrency;
 
-  const balanceSubtitle =
-    balance < 0
-      ? "We paid more than required"
-      : usingYear
-      ? balance === 0
-        ? "Nothing owed for this year"
-        : "Still to pay this year"
-      : balance === 0
-      ? "Nothing owed for this period"
-      : "Still to pay for this period";
+  const balanceIsNegative = balance < 0;
+  const balanceCardTitle = balanceIsNegative
+    ? "Overpaid technician"
+    : "Still owed to technician";
+  const balanceCardSubtitle = balanceIsNegative
+    ? usingYear
+      ? "We paid more than required this year"
+      : "We paid more than required for this period"
+    : usingYear
+    ? "Still to pay this year"
+    : "Still to pay for this period";
 
   /* ---------------------------------------------------------------------- */
   /* Helpers: open / edit / clear submitted totals                          */
@@ -393,7 +388,7 @@ export default function InsuranceLabPage() {
     }
 
     const confirmed = window.confirm(
-      "Delete this payment? This will reduce the 'Already paid' amount."
+      "Delete this payment? This will reduce the paid total."
     );
     if (!confirmed) return;
 
@@ -406,8 +401,7 @@ export default function InsuranceLabPage() {
       toast({
         title: "Error",
         description:
-          error?.message ||
-          "Delete API not available yet. Ask a developer to add the delete endpoint.",
+          error?.message || "Failed to delete payment. Check the API route.",
         variant: "destructive",
       });
     } finally {
@@ -429,15 +423,14 @@ export default function InsuranceLabPage() {
               Lab Finance
             </h1>
             <p className="text-muted-foreground">
-              Track lab insurance and payments to the Lab Technician.
+              Track lab insurance and technician payments.
             </p>
             <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             <span className="text-xs text-muted-foreground">
-              Pick month & year. KPIs follow the view; tables show the whole
-              year. Actions always use the selected month.
+              Month & year control the cards and tables below.
             </span>
             <div className="flex gap-3">
               {/* Month selector (first) */}
@@ -522,7 +515,6 @@ export default function InsuranceLabPage() {
             <Button
               variant="outline"
               onClick={handleToolbarOpenSetPortion}
-              title="Set how much insurance paid for lab this month."
             >
               <Settings2 className="w-4 h-4 mr-2" />
               Enter Monthly Total
@@ -533,7 +525,6 @@ export default function InsuranceLabPage() {
                 setEditingPayment(null);
                 setOpenAddPayment(true);
               }}
-              title="Save a cash payment you gave to the Lab Technician."
             >
               <Plus className="w-4 h-4 mr-2" />
               Record Payment to Technician
@@ -592,7 +583,9 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-purple-600 mt-1">
-              Total owed to the Lab Technician
+              {usingYear
+                ? "Total owed to the Lab Technician"
+                : "What we should pay the Lab Technician"}
             </p>
           </CardContent>
         </Card>
@@ -628,7 +621,7 @@ export default function InsuranceLabPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {balanceTitle}
+              {balanceCardTitle}
             </CardTitle>
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -646,7 +639,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {balanceSubtitle}
+              {balanceCardSubtitle}
             </p>
           </CardContent>
         </Card>
@@ -669,13 +662,13 @@ export default function InsuranceLabPage() {
             <TabsList className="mb-4 inline-flex rounded-full bg-slate-100 p-1">
               <TabsTrigger
                 value="submitted"
-                className="px-4 py-1 rounded-full text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="px-4 py-1 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 Submitted totals
               </TabsTrigger>
               <TabsTrigger
                 value="payments"
-                className="px-4 py-1 rounded-full text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="px-4 py-1 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 Payment history
               </TabsTrigger>
@@ -684,8 +677,7 @@ export default function InsuranceLabPage() {
             {/* Submitted totals (per month for the selected year) */}
             <TabsContent value="submitted">
               <p className="text-xs text-muted-foreground mb-3">
-                Monthly totals: sent to insurance, technician share, paid, and
-                balance.
+                Monthly totals: sent to insurance, technician share, paid, and balance.
               </p>
               <Table>
                 <TableHeader>
@@ -735,7 +727,9 @@ export default function InsuranceLabPage() {
                         return (
                           <TableRow
                             key={row.month}
-                            className={cn(isCurrentMonth && "bg-slate-50")}
+                            className={cn(
+                              isCurrentMonth && "bg-slate-50"
+                            )}
                           >
                             <TableCell className="whitespace-nowrap">
                               {monthLabelShort} {year}
@@ -838,7 +832,6 @@ export default function InsuranceLabPage() {
                 </TableBody>
               </Table>
               <p className="mt-3 text-xs text-muted-foreground">
-                Legend:{" "}
                 <span className="font-medium text-amber-600">Orange</span> =
                 still owed to the Lab Technician.{" "}
                 <span className="font-medium text-red-600">Red</span> =
@@ -849,7 +842,8 @@ export default function InsuranceLabPage() {
             {/* Payment history */}
             <TabsContent value="payments">
               <p className="text-xs text-muted-foreground mb-3">
-                All cash payments to the Lab Technician in {year}.
+                All cash payments to the Lab Technician in{" "}
+                {viewMode === "monthly" ? periodLabel : year}.
               </p>
               <Table>
                 <TableHeader>
@@ -878,7 +872,8 @@ export default function InsuranceLabPage() {
                         colSpan={viewMode === "year" ? 6 : 5}
                         className="text-center py-8 text-muted-foreground"
                       >
-                        No payments recorded for {year}.
+                        No payments recorded for{" "}
+                        {viewMode === "monthly" ? periodLabel : year}.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -946,11 +941,15 @@ export default function InsuranceLabPage() {
 
                       {/* Total row for payments */}
                       <TableRow className="font-semibold border-t">
-                        <TableCell colSpan={viewMode === "year" ? 4 : 3}>
-                          Total payments {year}
+                        <TableCell
+                          colSpan={viewMode === "year" ? 4 : 3}
+                        >
+                          {viewMode === "monthly"
+                            ? `Total for ${periodLabel}`
+                            : `Total for ${year}`}
                         </TableCell>
                         <TableCell className="text-right">
-                          {displayCurrency} {paymentTotal.toLocaleString()}
+                          {paymentsCurrency} {paymentsTotal.toLocaleString()}
                         </TableCell>
                         <TableCell />
                       </TableRow>
