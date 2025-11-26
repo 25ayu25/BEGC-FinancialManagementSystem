@@ -263,8 +263,8 @@ export default function InsuranceLabPage() {
 
   const showingLabel =
     viewMode === "monthly"
-      ? `Showing: ${periodLabel} (Monthly)`
-      : `Showing: Year to date ${year}`;
+      ? `Showing: ${periodLabel}`
+      : `Showing: ${year} year to date`;
 
   /* ---------------------------------------------------------------------- */
   /* Helpers: open / edit / clear submitted totals                          */
@@ -312,7 +312,7 @@ export default function InsuranceLabPage() {
     currency: string;
   }) => {
     const confirmed = window.confirm(
-      "Clear this month's submitted total? This will set the amount to 0 and recalculate balances."
+      "Clear this month's total? This sets it to 0 and updates the balance."
     );
     if (!confirmed) return;
 
@@ -369,7 +369,7 @@ export default function InsuranceLabPage() {
     }
 
     const confirmed = window.confirm(
-      "Delete this payment record? This will reduce the 'Total Paid' amount."
+      "Delete this payment? This will reduce the 'Paid' total."
     );
     if (!confirmed) return;
 
@@ -403,15 +403,14 @@ export default function InsuranceLabPage() {
               Lab Finance
             </h1>
             <p className="text-muted-foreground">
-              Manage allocations and staff payments for the Laboratory.
+              Track lab insurance and technician payments.
             </p>
             <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             <span className="text-xs text-muted-foreground">
-              Change month and year. The table below shows totals for the whole
-              year; actions apply to the selected month.
+              Pick month & year. Actions use the selected month.
             </span>
             <div className="flex gap-3">
               {/* Month selector (first) */}
@@ -496,7 +495,7 @@ export default function InsuranceLabPage() {
             <Button
               variant="outline"
               onClick={handleToolbarOpenSetPortion}
-              title="Set how much insurance paid for lab this month."
+              title="Set total for this month."
             >
               <Settings2 className="w-4 h-4 mr-2" />
               Enter Monthly Total
@@ -507,7 +506,7 @@ export default function InsuranceLabPage() {
                 setEditingPayment(null);
                 setOpenAddPayment(true);
               }}
-              title="Save a cash payment you gave to the Lab Technician."
+              title="Record a payment for this month."
             >
               <Plus className="w-4 h-4 mr-2" />
               Record Payment to Technician
@@ -543,8 +542,8 @@ export default function InsuranceLabPage() {
             )}
             <p className="text-xs text-muted-foreground mt-1">
               {usingYear
-                ? "All lab claims for this year (100%)"
-                : "All lab claims for this period (100%)"}
+                ? "All claims this year (100%)"
+                : "All claims this period (100%)"}
             </p>
           </CardContent>
         </Card>
@@ -567,7 +566,7 @@ export default function InsuranceLabPage() {
             )}
             <p className="text-xs text-purple-600 mt-1">
               {usingYear
-                ? "Total owed to the Lab Technician for this year"
+                ? "Total owed to the Lab Technician"
                 : "What we should pay the Lab Technician"}
             </p>
           </CardContent>
@@ -590,9 +589,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {usingYear
-                ? "Cash already given this year"
-                : "Cash already given for this period"}
+              {usingYear ? "Paid this year" : "Paid this period"}
             </p>
           </CardContent>
         </Card>
@@ -625,10 +622,10 @@ export default function InsuranceLabPage() {
             )}
             <p className="text-xs text-muted-foreground mt-1">
               {balance < 0
-                ? "Overpaid to technician"
+                ? "Overpaid"
                 : usingYear
-                ? "Remaining amount to pay this year"
-                : "Remaining amount to pay for this period"}
+                ? "Still to pay this year"
+                : "Still to pay this period"}
             </p>
           </CardContent>
         </Card>
@@ -641,24 +638,41 @@ export default function InsuranceLabPage() {
             <div>
               <CardTitle className="text-lg">Lab Insurance Activity</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Submitted totals and payments for the year {year}.
+                Year overview for {year}.
               </p>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="submitted" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="submitted">Submitted totals</TabsTrigger>
-              <TabsTrigger value="payments">Payment history</TabsTrigger>
+            <TabsList className="mb-4 inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+              <TabsTrigger
+                value="submitted"
+                className="px-4 py-2 text-sm rounded-lg
+                           data-[state=active]:bg-white
+                           data-[state=active]:shadow-sm
+                           data-[state=active]:text-slate-900
+                           data-[state=inactive]:text-slate-600"
+              >
+                Submitted totals
+              </TabsTrigger>
+              <TabsTrigger
+                value="payments"
+                className="px-4 py-2 text-sm rounded-lg
+                           data-[state=active]:bg-white
+                           data-[state=active]:shadow-sm
+                           data-[state=active]:text-slate-900
+                           data-[state=inactive]:text-slate-600"
+              >
+                Payment history
+              </TabsTrigger>
             </TabsList>
 
             {/* Submitted totals (per month for the selected year) */}
             <TabsContent value="submitted">
               <p className="text-xs text-muted-foreground mb-3">
-                For each month: how much we sent to insurance, the Lab
-                Technician share (35%), how much we already paid, and the
-                remaining balance.
+                Monthly totals: sent to insurance, technician share, paid, and
+                balance.
               </p>
               <Table>
                 <TableHeader>
@@ -708,9 +722,7 @@ export default function InsuranceLabPage() {
                         return (
                           <TableRow
                             key={row.month}
-                            className={cn(
-                              isCurrentMonth && "bg-slate-50"
-                            )}
+                            className={cn(isCurrentMonth && "bg-slate-50")}
                           >
                             <TableCell className="whitespace-nowrap">
                               {monthLabelShort} {year}
@@ -815,17 +827,16 @@ export default function InsuranceLabPage() {
               <p className="mt-3 text-xs text-muted-foreground">
                 Legend:{" "}
                 <span className="font-medium text-amber-600">Orange</span> =
-                amount we still owe the Lab Technician.{" "}
-                <span className="font-medium text-red-600">Red</span> = we paid
-                more than required.
+                still owe.{" "}
+                <span className="font-medium text-red-600">Red</span> =
+                overpaid.
               </p>
             </TabsContent>
 
             {/* Payment history */}
             <TabsContent value="payments">
               <p className="text-xs text-muted-foreground mb-3">
-                List of all cash payments to the Lab Technician for{" "}
-                {viewMode === "monthly" ? periodLabel : year}.
+                All cash payments to the Lab Technician in {year}.
               </p>
               <Table>
                 <TableHeader>
@@ -854,8 +865,7 @@ export default function InsuranceLabPage() {
                         colSpan={viewMode === "year" ? 6 : 5}
                         className="text-center py-8 text-muted-foreground"
                       >
-                        No payments recorded for{" "}
-                        {viewMode === "monthly" ? periodLabel : year}.
+                        No payments recorded for {year}.
                       </TableCell>
                     </TableRow>
                   ) : (
