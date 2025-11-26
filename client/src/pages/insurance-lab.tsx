@@ -71,9 +71,9 @@ export default function InsuranceLabPage() {
   /* Filters & state                                                        */
   /* ---------------------------------------------------------------------- */
 
-  // Main filters (month first, then year)
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const today = new Date();
+  const [month, setMonth] = useState<number>(today.getMonth() + 1);
+  const [year, setYear] = useState<number>(today.getFullYear());
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
 
   // Modal state
@@ -214,8 +214,7 @@ export default function InsuranceLabPage() {
   const usingYear = viewMode === "year";
 
   const baseCurrency =
-    (monthlySummary as any)?.portion?.currency ??
-    (yearCurrency ?? "USD");
+    (monthlySummary as any)?.portion?.currency ?? (yearCurrency ?? "USD");
 
   const displayCurrency = usingYear ? yearCurrency || baseCurrency : baseCurrency;
 
@@ -247,6 +246,11 @@ export default function InsuranceLabPage() {
     ? yearPayments
     : ((monthlySummary as any)?.payments || []);
 
+  const paymentsTotal = payments.reduce(
+    (sum: number, p: any) => sum + Number(p.amount || 0),
+    0
+  );
+
   const submittedRowsForYear = perMonthRows.filter(
     (row) =>
       row.submitted !== 0 || row.due !== 0 || row.paid !== 0 || row.balance !== 0
@@ -263,27 +267,10 @@ export default function InsuranceLabPage() {
 
   const showingLabel =
     viewMode === "monthly"
-      ? `Showing ${periodLabel}`
-      : `Showing year to date ${year}`;
+      ? `Showing ${periodLabel} (Monthly)`
+      : `Showing ${year} (Year to date)`;
 
-  const paymentsTotal = payments.reduce(
-    (sum: number, p: any) => sum + Number(p.amount ?? 0),
-    0
-  );
-  const paymentsCurrency =
-    (payments[0] && payments[0].currency) || displayCurrency;
-
-  const balanceIsNegative = balance < 0;
-  const balanceCardTitle = balanceIsNegative
-    ? "Overpaid technician"
-    : "Still owed to technician";
-  const balanceCardSubtitle = balanceIsNegative
-    ? usingYear
-      ? "We paid more than required this year"
-      : "We paid more than required for this period"
-    : usingYear
-    ? "Still to pay this year"
-    : "Still to pay for this period";
+  const isOverpaid = balance < 0;
 
   /* ---------------------------------------------------------------------- */
   /* Helpers: open / edit / clear submitted totals                          */
@@ -388,7 +375,7 @@ export default function InsuranceLabPage() {
     }
 
     const confirmed = window.confirm(
-      "Delete this payment? This will reduce the paid total."
+      "Delete this payment record? This will reduce the total paid amount."
     );
     if (!confirmed) return;
 
@@ -400,8 +387,7 @@ export default function InsuranceLabPage() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description:
-          error?.message || "Failed to delete payment. Check the API route.",
+        description: error?.message || "Failed to delete payment",
         variant: "destructive",
       });
     } finally {
@@ -409,80 +395,84 @@ export default function InsuranceLabPage() {
     }
   };
 
+  const paymentTotalLabel =
+    viewMode === "monthly" ? `Total for ${periodLabel}` : `Total for ${year}`;
+
+  const paymentLabelColSpan = viewMode === "year" ? 4 : 3;
+
   /* ---------------------------------------------------------------------- */
   /* Render                                                                 */
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-10">
+    <div className="max-w-6xl mx-auto space-y-6 pb-10 px-4 sm:px-6">
       {/* Header & Filters */}
-      <div className="flex flex-col space-y-4 pt-2">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Lab Finance
-            </h1>
-            <p className="text-muted-foreground">
-              Track lab insurance and technician payments.
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
-          </div>
+      <div className="flex flex-col gap-4 pt-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+            Lab Finance
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Track lab insurance and technician payments.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
+        </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <span className="text-xs text-muted-foreground">
-              Month & year control the cards and tables below.
-            </span>
-            <div className="flex gap-3">
-              {/* Month selector (first) */}
-              <div className="flex flex-col">
-                <span className="text-[11px] text-muted-foreground mb-1">
-                  Month
-                </span>
-                <Select
-                  value={month.toString()}
-                  onValueChange={(v) => setMonth(parseInt(v))}
-                  disabled={viewMode === "year"}
-                >
-                  <SelectTrigger className="w-[140px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <SelectItem key={m} value={m.toString()}>
-                        {new Date(2000, m - 1).toLocaleString("default", {
-                          month: "long",
-                        })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm px-4 py-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <p className="text-[11px] text-muted-foreground max-w-xs">
+            Month &amp; year control the cards and tables below.
+          </p>
 
-              {/* Year selector (second) */}
-              <div className="flex flex-col">
-                <span className="text-[11px] text-muted-foreground mb-1">
-                  Year
-                </span>
-                <Select
-                  value={year.toString()}
-                  onValueChange={(v) => setYear(parseInt(v))}
-                >
-                  <SelectTrigger className="w-[100px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2023, 2024, 2025, 2026].map((y) => (
-                      <SelectItem key={y} value={y.toString()}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="flex flex-col gap-3 w-full md:w-auto sm:flex-row sm:items-end sm:justify-end">
+            {/* Month selector */}
+            <div className="flex-1 sm:flex-none flex flex-col">
+              <span className="text-[11px] text-muted-foreground mb-1">
+                Month
+              </span>
+              <Select
+                value={month.toString()}
+                onValueChange={(v) => setMonth(parseInt(v))}
+                disabled={viewMode === "year"}
+              >
+                <SelectTrigger className="w-full sm:w-[140px] bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <SelectItem key={m} value={m.toString()}>
+                      {new Date(2000, m - 1).toLocaleString("default", {
+                        month: "long",
+                      })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Year selector */}
+            <div className="flex-1 sm:flex-none flex flex-col">
+              <span className="text-[11px] text-muted-foreground mb-1">
+                Year
+              </span>
+              <Select
+                value={year.toString()}
+                onValueChange={(v) => setYear(parseInt(v))}
+              >
+                <SelectTrigger className="w-full sm:w-[100px] bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2023, 2024, 2025, 2026].map((y) => (
+                    <SelectItem key={y} value={y.toString()}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* View mode toggle */}
-            <div className="inline-flex rounded-full bg-slate-100 p-1 text-xs">
+            <div className="inline-flex rounded-full bg-slate-100 p-1 text-xs self-start sm:self-auto">
               <button
                 type="button"
                 className={cn(
@@ -510,33 +500,39 @@ export default function InsuranceLabPage() {
         </div>
 
         {/* Primary Actions Toolbar */}
-        <div className="flex flex-col items-end gap-1 border-b border-gray-200 pb-4">
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleToolbarOpenSetPortion}
-            >
-              <Settings2 className="w-4 h-4 mr-2" />
-              Enter Monthly Total
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditingPayment(null);
-                setOpenAddPayment(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Record Payment to Technician
-            </Button>
+        <div className="flex flex-col gap-2 border-b border-gray-200 pb-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] text-muted-foreground">
+              Actions apply to{" "}
+              {new Date(year, month - 1).toLocaleString("default", {
+                month: "long",
+              })}{" "}
+              {year}.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end w-full sm:w-auto">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={handleToolbarOpenSetPortion}
+                title="Set how much insurance paid for lab this month."
+              >
+                <Settings2 className="w-4 h-4 mr-2" />
+                Enter Monthly Total
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  setEditingPayment(null);
+                  setOpenAddPayment(true);
+                }}
+                title="Save a cash payment you gave to the Lab Technician."
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Record Payment to Technician
+              </Button>
+            </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Actions apply to{" "}
-            {new Date(year, month - 1).toLocaleString("default", {
-              month: "long",
-            })}{" "}
-            {year}.
-          </p>
         </div>
       </div>
 
@@ -559,9 +555,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {usingYear
-                ? "All claims this year (100%)"
-                : "All claims this period (100%)"}
+              {usingYear ? "All claims this year (100%)" : "All claims this period (100%)"}
             </p>
           </CardContent>
         </Card>
@@ -584,7 +578,7 @@ export default function InsuranceLabPage() {
             )}
             <p className="text-xs text-purple-600 mt-1">
               {usingYear
-                ? "Total owed to the Lab Technician"
+                ? "Total owed to the Lab Technician this year"
                 : "What we should pay the Lab Technician"}
             </p>
           </CardContent>
@@ -612,16 +606,16 @@ export default function InsuranceLabPage() {
           </CardContent>
         </Card>
 
-        {/* 4. Remaining Balance / Overpaid */}
+        {/* 4. Balance / Overpaid */}
         <Card
           className={cn(
             "border-l-4 shadow-sm",
-            balance < 0 ? "border-l-red-500 bg-red-50/30" : "border-l-gray-500"
+            isOverpaid ? "border-l-red-500 bg-red-50/40" : "border-l-gray-500"
           )}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {balanceCardTitle}
+              {isOverpaid ? "Overpaid technician" : "Still owed to technician"}
             </CardTitle>
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -632,14 +626,20 @@ export default function InsuranceLabPage() {
               <div
                 className={cn(
                   "text-2xl font-bold",
-                  balance < 0 ? "text-red-600" : "text-gray-900"
+                  isOverpaid ? "text-red-600" : "text-gray-900"
                 )}
               >
                 {displayCurrency} {balance.toLocaleString()}
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {balanceCardSubtitle}
+              {isOverpaid
+                ? `We paid more than required this ${
+                    usingYear ? "year" : "period"
+                  }`
+                : usingYear
+                ? "Still to pay this year"
+                : "Still to pay this period"}
             </p>
           </CardContent>
         </Card>
@@ -662,13 +662,13 @@ export default function InsuranceLabPage() {
             <TabsList className="mb-4 inline-flex rounded-full bg-slate-100 p-1">
               <TabsTrigger
                 value="submitted"
-                className="px-4 py-1 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="rounded-full px-4 py-1 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 Submitted totals
               </TabsTrigger>
               <TabsTrigger
                 value="payments"
-                className="px-4 py-1 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="rounded-full px-4 py-1 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 Payment history
               </TabsTrigger>
@@ -677,160 +677,174 @@ export default function InsuranceLabPage() {
             {/* Submitted totals (per month for the selected year) */}
             <TabsContent value="submitted">
               <p className="text-xs text-muted-foreground mb-3">
-                Monthly totals: sent to insurance, technician share, paid, and balance.
+                Monthly totals: sent to insurance, technician share, paid, and
+                balance.
               </p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-right">
-                      Submitted (USD)
-                    </TableHead>
-                    <TableHead className="text-right">
-                      Lab share (35%) (USD)
-                    </TableHead>
-                    <TableHead className="text-right">Paid (USD)</TableHead>
-                    <TableHead className="text-right">Balance (USD)</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isYearLoading && submittedRowsForYear.length === 0 ? (
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-[720px]">
+                  <TableHeader>
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-8 text-muted-foreground"
-                      >
-                        Loading...
-                      </TableCell>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">
+                        Submitted (USD)
+                      </TableHead>
+                      <TableHead className="text-right">
+                        Lab share (35%) (USD)
+                      </TableHead>
+                      <TableHead className="text-right">Paid (USD)</TableHead>
+                      <TableHead className="text-right">
+                        Balance (USD)
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : submittedRowsForYear.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-8 text-muted-foreground"
-                      >
-                        No lab submissions recorded for {year}.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    <>
-                      {submittedRowsForYear.map((row) => {
-                        const isCurrentMonth = row.month === month;
-                        const monthLabelShort = new Date(
-                          year,
-                          row.month - 1
-                        ).toLocaleString("default", {
-                          month: "short",
-                        });
+                  </TableHeader>
+                  <TableBody>
+                    {isYearLoading && submittedRowsForYear.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          Loading...
+                        </TableCell>
+                      </TableRow>
+                    ) : submittedRowsForYear.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          No lab submissions recorded for {year}.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <>
+                        {submittedRowsForYear.map((row) => {
+                          const isCurrentMonth = row.month === month;
+                          const monthLabelShort = new Date(
+                            year,
+                            row.month - 1
+                          ).toLocaleString("default", {
+                            month: "short",
+                          });
 
-                        return (
-                          <TableRow
-                            key={row.month}
+                          return (
+                            <TableRow
+                              key={row.month}
+                              className={cn(isCurrentMonth && "bg-slate-50")}
+                            >
+                              <TableCell className="whitespace-nowrap">
+                                {monthLabelShort} {year}
+                                {isCurrentMonth && (
+                                  <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                                    Current month
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {row.currency}{" "}
+                                {row.submitted.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {row.currency} {row.due.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {row.currency} {row.paid.toLocaleString()}
+                              </TableCell>
+                              <TableCell
+                                className={cn(
+                                  "text-right",
+                                  row.balance > 0
+                                    ? "text-amber-600"
+                                    : row.balance < 0
+                                    ? "text-red-600"
+                                    : "text-slate-700"
+                                )}
+                              >
+                                {row.currency} {row.balance.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    sideOffset={4}
+                                    className="bg-white shadow-lg border border-slate-200 rounded-md min-w-[190px]"
+                                  >
+                                    <DropdownMenuLabel className="text-xs text-slate-500">
+                                      Submitted total
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleEditSubmittedRow(row)
+                                      }
+                                    >
+                                      <Pencil className="mr-2 h-3 w-3" />
+                                      Edit monthly total
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleClearSubmittedRow(row)
+                                      }
+                                      disabled={clearingMonth === row.month}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-3 w-3" />
+                                      {clearingMonth === row.month
+                                        ? "Clearing..."
+                                        : "Clear monthly total"}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+
+                        {/* Total row for the year */}
+                        <TableRow className="font-semibold border-t">
+                          <TableCell>Total for {year}</TableCell>
+                          <TableCell className="text-right">
+                            {displayCurrency}{" "}
+                            {yearTotals.submitted.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {displayCurrency}{" "}
+                            {yearTotals.due.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {displayCurrency}{" "}
+                            {yearTotals.paid.toLocaleString()}
+                          </TableCell>
+                          <TableCell
                             className={cn(
-                              isCurrentMonth && "bg-slate-50"
+                              "text-right",
+                              yearTotals.balance > 0
+                                ? "text-amber-600"
+                                : yearTotals.balance < 0
+                                ? "text-red-600"
+                                : "text-slate-700"
                             )}
                           >
-                            <TableCell className="whitespace-nowrap">
-                              {monthLabelShort} {year}
-                              {isCurrentMonth && (
-                                <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                                  Current month
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {row.currency} {row.submitted.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {row.currency} {row.due.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {row.currency} {row.paid.toLocaleString()}
-                            </TableCell>
-                            <TableCell
-                              className={cn(
-                                "text-right",
-                                row.balance > 0
-                                  ? "text-amber-600"
-                                  : row.balance < 0
-                                  ? "text-red-600"
-                                  : "text-slate-700"
-                              )}
-                            >
-                              {row.currency} {row.balance.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>
-                                    Submitted total
-                                  </DropdownMenuLabel>
-                                  <DropdownMenuItem
-                                    onClick={() => handleEditSubmittedRow(row)}
-                                  >
-                                    <Pencil className="mr-2 h-3 w-3" />
-                                    Edit monthly total
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleClearSubmittedRow(row)}
-                                    disabled={clearingMonth === row.month}
-                                    className="text-red-600 focus:text-red-600"
-                                  >
-                                    <Trash2 className="mr-2 h-3 w-3" />
-                                    {clearingMonth === row.month
-                                      ? "Clearing..."
-                                      : "Clear monthly total"}
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-
-                      {/* Total row for the year */}
-                      <TableRow className="font-semibold border-t">
-                        <TableCell>Total for {year}</TableCell>
-                        <TableCell className="text-right">
-                          {displayCurrency}{" "}
-                          {yearTotals.submitted.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {displayCurrency} {yearTotals.due.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {displayCurrency} {yearTotals.paid.toLocaleString()}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            "text-right",
-                            yearTotals.balance > 0
-                              ? "text-amber-600"
-                              : yearTotals.balance < 0
-                              ? "text-red-600"
-                              : "text-slate-700"
-                          )}
-                        >
-                          {displayCurrency}{" "}
-                          {yearTotals.balance.toLocaleString()}
-                        </TableCell>
-                        <TableCell />
-                      </TableRow>
-                    </>
-                  )}
-                </TableBody>
-              </Table>
+                            {displayCurrency}{" "}
+                            {yearTotals.balance.toLocaleString()}
+                          </TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
               <p className="mt-3 text-xs text-muted-foreground">
                 <span className="font-medium text-amber-600">Orange</span> =
                 still owed to the Lab Technician.{" "}
@@ -845,118 +859,128 @@ export default function InsuranceLabPage() {
                 All cash payments to the Lab Technician in{" "}
                 {viewMode === "monthly" ? periodLabel : year}.
               </p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Payment date</TableHead>
-                    {viewMode === "year" && <TableHead>Period</TableHead>}
-                    <TableHead>Note</TableHead>
-                    <TableHead>Created By</TableHead>
-                    <TableHead className="text-right">Amount (USD)</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {anyLoading && payments.length === 0 ? (
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-[640px]">
+                  <TableHeader>
                     <TableRow>
-                      <TableCell
-                        colSpan={viewMode === "year" ? 6 : 5}
-                        className="text-center py-8 text-muted-foreground"
-                      >
-                        Loading...
-                      </TableCell>
+                      <TableHead>Payment date</TableHead>
+                      {viewMode === "year" && <TableHead>Period</TableHead>}
+                      <TableHead>Note</TableHead>
+                      <TableHead>Created By</TableHead>
+                      <TableHead className="text-right">
+                        Amount (USD)
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : payments.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={viewMode === "year" ? 6 : 5}
-                        className="text-center py-8 text-muted-foreground"
-                      >
-                        No payments recorded for{" "}
-                        {viewMode === "monthly" ? periodLabel : year}.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    <>
-                      {payments.map((p: any) => (
-                        <TableRow
-                          key={p.id ?? `${p.payDate}-${p.periodMonth}`}
+                  </TableHeader>
+                  <TableBody>
+                    {anyLoading && payments.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={viewMode === "year" ? 6 : 5}
+                          className="text-center py-8 text-muted-foreground"
                         >
-                          <TableCell>
-                            {new Date(p.payDate).toLocaleDateString()}
-                          </TableCell>
-                          {viewMode === "year" && (
+                          Loading...
+                        </TableCell>
+                      </TableRow>
+                    ) : payments.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={viewMode === "year" ? 6 : 5}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          No payments recorded for{" "}
+                          {viewMode === "monthly" ? periodLabel : year}.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <>
+                        {payments.map((p: any) => (
+                          <TableRow
+                            key={p.id ?? `${p.payDate}-${p.periodMonth}`}
+                          >
                             <TableCell>
-                              {new Date(year, (p.periodMonth ?? month) - 1)
-                                .toLocaleString("default", {
+                              {new Date(p.payDate).toLocaleDateString()}
+                            </TableCell>
+                            {viewMode === "year" && (
+                              <TableCell>
+                                {new Date(
+                                  year,
+                                  (p.periodMonth ?? month) - 1
+                                ).toLocaleString("default", {
                                   month: "short",
                                 })}{" "}
-                              {year}
+                                {year}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-muted-foreground">
+                              {p.note || "—"}
                             </TableCell>
-                          )}
-                          <TableCell className="text-muted-foreground">
-                            {p.note || "—"}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {p.createdBy}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {p.currency} {Number(p.amount).toLocaleString()}
+                            <TableCell className="text-xs text-muted-foreground">
+                              {p.createdBy}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {p.currency}{" "}
+                              {Number(p.amount).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  sideOffset={4}
+                                  className="bg-white shadow-lg border border-slate-200 rounded-md min-w-[170px]"
+                                >
+                                  <DropdownMenuLabel className="text-xs text-slate-500">
+                                    Actions
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditPayment(p)}
+                                  >
+                                    <Pencil className="mr-2 h-3 w-3" />
+                                    Edit payment
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeletePayment(p)}
+                                    disabled={isDeleteLoadingId === p.id}
+                                    className="text-red-600 focus:text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-3 w-3" />
+                                    {isDeleteLoadingId === p.id
+                                      ? "Deleting..."
+                                      : "Delete payment"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+
+                        {/* Total row */}
+                        <TableRow className="font-semibold border-t">
+                          <TableCell colSpan={paymentLabelColSpan}>
+                            {paymentTotalLabel}
                           </TableCell>
                           <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem
-                                  onClick={() => handleEditPayment(p)}
-                                >
-                                  <Pencil className="mr-2 h-3 w-3" />
-                                  Edit payment
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleDeletePayment(p)}
-                                  disabled={isDeleteLoadingId === p.id}
-                                  className="text-red-600 focus:text-red-600"
-                                >
-                                  <Trash2 className="mr-2 h-3 w-3" />
-                                  {isDeleteLoadingId === p.id
-                                    ? "Deleting..."
-                                    : "Delete payment"}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {displayCurrency}{" "}
+                            {paymentsTotal.toLocaleString()}
                           </TableCell>
+                          <TableCell />
                         </TableRow>
-                      ))}
-
-                      {/* Total row for payments */}
-                      <TableRow className="font-semibold border-t">
-                        <TableCell
-                          colSpan={viewMode === "year" ? 4 : 3}
-                        >
-                          {viewMode === "monthly"
-                            ? `Total for ${periodLabel}`
-                            : `Total for ${year}`}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {paymentsCurrency} {paymentsTotal.toLocaleString()}
-                        </TableCell>
-                        <TableCell />
-                      </TableRow>
-                    </>
-                  )}
-                </TableBody>
-              </Table>
+                      </>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
