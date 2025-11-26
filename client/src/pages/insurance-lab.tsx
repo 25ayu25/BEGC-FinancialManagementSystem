@@ -846,7 +846,8 @@ export default function InsuranceLabPage() {
                         className="text-center py-8 text-muted-foreground"
                       >
                         Loading...
-                      </TableRow>
+                      </TableCell>
+                    </TableRow>
                   ) : payments.length === 0 ? (
                     <TableRow>
                       <TableCell
