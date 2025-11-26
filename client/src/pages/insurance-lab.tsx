@@ -247,6 +247,11 @@ export default function InsuranceLabPage() {
     ? yearPayments
     : ((monthlySummary as any)?.payments || []);
 
+  const paymentTotal = payments.reduce(
+    (sum: number, p: any) => sum + Number(p.amount || 0),
+    0
+  );
+
   const submittedRowsForYear = perMonthRows.filter(
     (row) =>
       row.submitted !== 0 || row.due !== 0 || row.paid !== 0 || row.balance !== 0
@@ -263,8 +268,27 @@ export default function InsuranceLabPage() {
 
   const showingLabel =
     viewMode === "monthly"
-      ? `Showing: ${periodLabel}`
-      : `Showing: ${year} year to date`;
+      ? `Showing ${periodLabel} (Monthly)`
+      : `Showing year to date ${year}`;
+
+  // Dynamic wording for the balance card
+  const balanceTitle =
+    balance < 0
+      ? "Overpaid to technician"
+      : balance === 0
+      ? "All paid to technician"
+      : "Still owed to technician";
+
+  const balanceSubtitle =
+    balance < 0
+      ? "We paid more than required"
+      : usingYear
+      ? balance === 0
+        ? "Nothing owed for this year"
+        : "Still to pay this year"
+      : balance === 0
+      ? "Nothing owed for this period"
+      : "Still to pay for this period";
 
   /* ---------------------------------------------------------------------- */
   /* Helpers: open / edit / clear submitted totals                          */
@@ -312,7 +336,7 @@ export default function InsuranceLabPage() {
     currency: string;
   }) => {
     const confirmed = window.confirm(
-      "Clear this month's total? This sets it to 0 and updates the balance."
+      "Clear this month's submitted total? This will set the amount to 0 and recalculate balances."
     );
     if (!confirmed) return;
 
@@ -369,7 +393,7 @@ export default function InsuranceLabPage() {
     }
 
     const confirmed = window.confirm(
-      "Delete this payment? This will reduce the 'Paid' total."
+      "Delete this payment? This will reduce the 'Already paid' amount."
     );
     if (!confirmed) return;
 
@@ -381,7 +405,9 @@ export default function InsuranceLabPage() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error?.message || "Failed to delete payment",
+        description:
+          error?.message ||
+          "Delete API not available yet. Ask a developer to add the delete endpoint.",
         variant: "destructive",
       });
     } finally {
@@ -403,14 +429,15 @@ export default function InsuranceLabPage() {
               Lab Finance
             </h1>
             <p className="text-muted-foreground">
-              Track lab insurance and technician payments.
+              Track lab insurance and payments to the Lab Technician.
             </p>
             <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             <span className="text-xs text-muted-foreground">
-              Pick month & year. Actions use the selected month.
+              Pick month & year. KPIs follow the view; tables show the whole
+              year. Actions always use the selected month.
             </span>
             <div className="flex gap-3">
               {/* Month selector (first) */}
@@ -495,7 +522,7 @@ export default function InsuranceLabPage() {
             <Button
               variant="outline"
               onClick={handleToolbarOpenSetPortion}
-              title="Set total for this month."
+              title="Set how much insurance paid for lab this month."
             >
               <Settings2 className="w-4 h-4 mr-2" />
               Enter Monthly Total
@@ -506,7 +533,7 @@ export default function InsuranceLabPage() {
                 setEditingPayment(null);
                 setOpenAddPayment(true);
               }}
-              title="Record a payment for this month."
+              title="Save a cash payment you gave to the Lab Technician."
             >
               <Plus className="w-4 h-4 mr-2" />
               Record Payment to Technician
@@ -565,9 +592,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-purple-600 mt-1">
-              {usingYear
-                ? "Total owed to the Lab Technician"
-                : "What we should pay the Lab Technician"}
+              Total owed to the Lab Technician
             </p>
           </CardContent>
         </Card>
@@ -594,7 +619,7 @@ export default function InsuranceLabPage() {
           </CardContent>
         </Card>
 
-        {/* 4. Remaining Balance */}
+        {/* 4. Remaining Balance / Overpaid */}
         <Card
           className={cn(
             "border-l-4 shadow-sm",
@@ -603,7 +628,7 @@ export default function InsuranceLabPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Still owed to technician
+              {balanceTitle}
             </CardTitle>
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -621,11 +646,7 @@ export default function InsuranceLabPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {balance < 0
-                ? "Overpaid"
-                : usingYear
-                ? "Still to pay this year"
-                : "Still to pay this period"}
+              {balanceSubtitle}
             </p>
           </CardContent>
         </Card>
@@ -645,24 +666,16 @@ export default function InsuranceLabPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="submitted" className="w-full">
-            <TabsList className="mb-4 inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+            <TabsList className="mb-4 inline-flex rounded-full bg-slate-100 p-1">
               <TabsTrigger
                 value="submitted"
-                className="px-4 py-2 text-sm rounded-lg
-                           data-[state=active]:bg-white
-                           data-[state=active]:shadow-sm
-                           data-[state=active]:text-slate-900
-                           data-[state=inactive]:text-slate-600"
+                className="px-4 py-1 rounded-full text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 Submitted totals
               </TabsTrigger>
               <TabsTrigger
                 value="payments"
-                className="px-4 py-2 text-sm rounded-lg
-                           data-[state=active]:bg-white
-                           data-[state=active]:shadow-sm
-                           data-[state=active]:text-slate-900
-                           data-[state=inactive]:text-slate-600"
+                className="px-4 py-1 rounded-full text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 Payment history
               </TabsTrigger>
@@ -827,7 +840,7 @@ export default function InsuranceLabPage() {
               <p className="mt-3 text-xs text-muted-foreground">
                 Legend:{" "}
                 <span className="font-medium text-amber-600">Orange</span> =
-                still owe.{" "}
+                still owed to the Lab Technician.{" "}
                 <span className="font-medium text-red-600">Red</span> =
                 overpaid.
               </p>
@@ -869,64 +882,79 @@ export default function InsuranceLabPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    payments.map((p: any) => (
-                      <TableRow key={p.id ?? `${p.payDate}-${p.periodMonth}`}>
-                        <TableCell>
-                          {new Date(p.payDate).toLocaleDateString()}
-                        </TableCell>
-                        {viewMode === "year" && (
+                    <>
+                      {payments.map((p: any) => (
+                        <TableRow
+                          key={p.id ?? `${p.payDate}-${p.periodMonth}`}
+                        >
                           <TableCell>
-                            {new Date(year, (p.periodMonth ?? month) - 1)
-                              .toLocaleString("default", {
-                                month: "short",
-                              })}{" "}
-                            {year}
+                            {new Date(p.payDate).toLocaleDateString()}
                           </TableCell>
-                        )}
-                        <TableCell className="text-muted-foreground">
-                          {p.note || "—"}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {p.createdBy}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {p.currency} {Number(p.amount).toLocaleString()}
+                          {viewMode === "year" && (
+                            <TableCell>
+                              {new Date(year, (p.periodMonth ?? month) - 1)
+                                .toLocaleString("default", {
+                                  month: "short",
+                                })}{" "}
+                              {year}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-muted-foreground">
+                            {p.note || "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {p.createdBy}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {p.currency} {Number(p.amount).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  onClick={() => handleEditPayment(p)}
+                                >
+                                  <Pencil className="mr-2 h-3 w-3" />
+                                  Edit payment
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDeletePayment(p)}
+                                  disabled={isDeleteLoadingId === p.id}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-3 w-3" />
+                                  {isDeleteLoadingId === p.id
+                                    ? "Deleting..."
+                                    : "Delete payment"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {/* Total row for payments */}
+                      <TableRow className="font-semibold border-t">
+                        <TableCell colSpan={viewMode === "year" ? 4 : 3}>
+                          Total payments {year}
                         </TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => handleEditPayment(p)}
-                              >
-                                <Pencil className="mr-2 h-3 w-3" />
-                                Edit payment
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDeletePayment(p)}
-                                disabled={isDeleteLoadingId === p.id}
-                                className="text-red-600 focus:text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-3 w-3" />
-                                {isDeleteLoadingId === p.id
-                                  ? "Deleting..."
-                                  : "Delete payment"}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {displayCurrency} {paymentTotal.toLocaleString()}
                         </TableCell>
+                        <TableCell />
                       </TableRow>
-                    ))
+                    </>
                   )}
                 </TableBody>
               </Table>
