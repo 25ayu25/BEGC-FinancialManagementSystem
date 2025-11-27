@@ -57,10 +57,6 @@ export default function AddLabPaymentModal({
   const isEdit = !!paymentToEdit?.id;
   const currency = paymentToEdit?.currency || defaultCurrency || "USD";
 
-  // Period to send to the API (use payment's period when editing, otherwise current filters)
-  const periodYear = paymentToEdit?.periodYear ?? year;
-  const periodMonth = paymentToEdit?.periodMonth ?? month;
-
   // When modal opens or paymentToEdit changes, pre-fill fields
   useEffect(() => {
     if (!open) return;
@@ -96,12 +92,18 @@ export default function AddLabPaymentModal({
       return;
     }
 
+    // FIX: Derive the period directly from the selected payDate.
+    // This prevents the bug where the dashboard's current month overrides the actual payment date.
+    const [yStr, mStr] = payDate.split("-");
+    const derivedYear = parseInt(yStr);
+    const derivedMonth = parseInt(mStr);
+
     setIsSubmitting(true);
     try {
       const payload = {
         payDate,
-        periodYear,
-        periodMonth,
+        periodYear: derivedYear,
+        periodMonth: derivedMonth,
         currency,
         amount: +val.toFixed(2),
         note,
