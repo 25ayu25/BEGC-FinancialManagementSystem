@@ -99,31 +99,13 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 /* --------------------- **Payment date normalizer** --------------------- */
 /* Some APIs return snake_case. Always display payment_date if present.    */
 function getPaymentDate(p: Payment | any): string | undefined {
-  // Try all possible casing variations
-  const val = p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined;
-  
-  // DEBUGGING: Log if the 45k payment is still missing a date
-  if (!val && Number(p?.amount) === 45000) {
-    console.log("DEBUG: 45k payment object:", p); 
-  }
-  
-  return val || undefined;
+  return (p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined) || undefined;
 }
-
 function getCreatedAt(p: Payment | any): string | undefined {
   return (p?.createdAt ?? p?.created_at ?? undefined) || undefined;
 }
-
 function displayPaymentDate(p: Payment): string {
-  // If we have a real payment date, use it. 
-  const realDate = getPaymentDate(p);
-  
-  if (realDate) {
-    return fmtDate(realDate);
-  }
-  
-  // Otherwise, fallback to 'Entered' date
-  return fmtDate(getCreatedAt(p));
+  return fmtDate(getPaymentDate(p) || getCreatedAt(p));
 }
 
 /* ----------------------------- provider order ----------------------------- */
@@ -165,7 +147,7 @@ function HelpPopover() {
         className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
         title="What do these numbers mean?"
       >
-        ? Help
+        ︎Help
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
@@ -373,8 +355,7 @@ export default function InsurancePage() {
 
   // Payment form
   const [pProviderId, setPProviderId] = useState<string>("");
-  // CHANGED: Default pDate to empty string so user MUST select date
-  const [pDate, setPDate] = useState<string>("");
+  const [pDate, setPDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
   const [pNotes, setPNotes] = useState<string>("");
@@ -693,8 +674,7 @@ export default function InsurancePage() {
               onClick={() => {
                 setEditingPaymentId("");
                 setPProviderId(providerId || "");
-                // CHANGED: Force empty date to require user selection
-                setPDate("");
+                setPDate(new Date().toISOString().slice(0, 10));
                 setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
               }}
@@ -740,8 +720,7 @@ export default function InsurancePage() {
                     setShowActions(false);
                     setEditingPaymentId("");
                     setPProviderId(providerId || "");
-                    // CHANGED: Force empty date to require user selection
-                    setPDate("");
+                    setPDate(new Date().toISOString().slice(0, 10));
                     setPAmount("0"); setPCurrency("USD"); setPNotes("");
                     setShowPayment(true);
                   }}
@@ -1008,8 +987,7 @@ export default function InsurancePage() {
                           <div className="text-xs text-slate-500">{c.notes || ""}</div>
                           <button className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50" onClick={() => {
                             setPProviderId(c.providerId);
-                            // CHANGED: Force empty date to require user selection
-                            setPDate("");
+                            setPDate(new Date().toISOString().slice(0,10));
                             setEditingPaymentId("");
                             setShowPayment(true);
                           }}>
@@ -1320,15 +1298,9 @@ export default function InsurancePage() {
             <div className="px-4 py-3 border-t flex justify-end gap-2">
               <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
               <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={async () => {
-                // CHANGED: Enforce mandatory date selection
-                if (!pDate) {
-                  alert("Please select the date the payment was actually made.");
-                  return;
-                }
-
                 const body = {
                   providerId: pProviderId || providerId,
-                  paymentDate: pDate, // Now guaranteed to exist
+                  paymentDate: pDate || undefined,
                   amount: Number(pAmount),
                   currency: pCurrency,
                   notes: pNotes || undefined,
@@ -1337,8 +1309,7 @@ export default function InsurancePage() {
                   await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
                   setShowPayment(false);
                   setEditingPaymentId("");
-                  // CHANGED: Reset to empty so next payment forces a new date selection
-                  setPProviderId(""); setPDate(""); setPAmount("0"); setPCurrency("USD"); setPNotes("");
+                  setPProviderId(""); setPDate(new Date().toISOString().slice(0,10)); setPAmount("0"); setPCurrency("USD"); setPNotes("");
                   reloadBalances();
                   if (detailProviderId) {
                     const qs = new URLSearchParams({ providerId: detailProviderId });
