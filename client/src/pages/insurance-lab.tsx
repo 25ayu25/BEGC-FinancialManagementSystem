@@ -344,7 +344,7 @@ export default function InsuranceLabPage() {
   };
 
   /* ---------------------------------------------------------------------- */
-  /* Handlers: edit / delete payments                                      */
+  /* Handlers: edit / delete payments                                       */
   /* ---------------------------------------------------------------------- */
 
   const handlePaymentSaved = () => {
@@ -420,7 +420,7 @@ export default function InsuranceLabPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm px-4 py-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <p className="text-[11px] text-muted-foreground max-w-xs">
-            Month &amp; year control the cards and tables below.
+            Month controls the cards; Year controls the table below.
           </p>
 
           <div className="flex flex-col gap-3 w-full md:w-auto sm:flex-row sm:items-end sm:justify-end">
