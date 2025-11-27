@@ -135,10 +135,12 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
       where.push(`p.payment_date >= $${vals.length - 1} AND p.payment_date <= $${vals.length}`);
     }
 
+    // DEBUG: We are selecting * to see what the REAL column names are in the logs
     const sql = `
       SELECT
         p.id, p.provider_id as "providerId", p.claim_id as "claimId",
-        p.payment_date as "paymentDate", p.amount, p.currency,
+        p.payment_date as "paymentDate", 
+        p.amount, p.currency,
         p.reference, p.notes, p.created_at as "createdAt"
       FROM insurance_payments p
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
@@ -146,6 +148,15 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
     `;
 
     const rows = await query(sql, vals);
+    
+    // --- DEBUGGING LOG ---
+    // Look at your terminal when you refresh the page. 
+    // If "paymentDate" is null here, the database column is empty or named wrong.
+    if (rows.length > 0) {
+      console.log("DEBUG: First payment row from DB:", rows[0]);
+    }
+    // ---------------------
+
     res.json(rows);
   } catch (e: any) {
     console.error("GET /insurance-payments", e);
@@ -155,12 +166,11 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
 
 /**
  * GET /api/insurance-balances
- * Supports: ?providerId= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
  * Returns:
- *  {
- *    providers: [{ providerId, providerName, claimed, paid, balance, openingBalance, openingBalanceAsOf }],
- *    claims: [{...claim, providerName, paidToDate, balance }]
- *  }
+ * {
+ * providers: [{ providerId, providerName, claimed, paid, balance, openingBalance, openingBalanceAsOf }],
+ * claims: [{...claim, providerName, paidToDate, balance }]
+ * }
  */
 router.get("/insurance-balances", async (req: Request, res: Response) => {
   try {
