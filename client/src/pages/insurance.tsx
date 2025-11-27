@@ -99,14 +99,31 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 /* --------------------- **Payment date normalizer** --------------------- */
 /* Some APIs return snake_case. Always display payment_date if present.    */
 function getPaymentDate(p: Payment | any): string | undefined {
-  return (p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined) || undefined;
+  // Try all possible casing variations
+  const val = p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined;
+  
+  // DEBUGGING: Log if the 45k payment is still missing a date
+  if (!val && Number(p?.amount) === 45000) {
+    console.log("DEBUG: 45k payment object:", p); 
+  }
+  
+  return val || undefined;
 }
+
 function getCreatedAt(p: Payment | any): string | undefined {
   return (p?.createdAt ?? p?.created_at ?? undefined) || undefined;
 }
+
 function displayPaymentDate(p: Payment): string {
-  // If paymentDate exists, use it. Otherwise fall back to createdAt
-  return fmtDate(getPaymentDate(p) || getCreatedAt(p));
+  // If we have a real payment date, use it. 
+  const realDate = getPaymentDate(p);
+  
+  if (realDate) {
+    return fmtDate(realDate);
+  }
+  
+  // Otherwise, fallback to 'Entered' date
+  return fmtDate(getCreatedAt(p));
 }
 
 /* ----------------------------- provider order ----------------------------- */
