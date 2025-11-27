@@ -108,16 +108,47 @@ router.post("/lab-portion", async (req, res) => {
 });
 
 /** POST record a payment to lab tech */
-router.post("/lab-payment", async (req, res) => {
+// NOTE: Changed from "/lab-payment" to "/lab-payments" to match frontend API client
+router.post("/lab-payments", async (req, res) => {
   try {
     const { payDate, periodYear, periodMonth, currency, amount, note } =
       req.body;
-    if (!payDate || !periodYear || !periodMonth || !currency || amount == null) {
+    if (
+      !payDate ||
+      !periodYear ||
+      !periodMonth ||
+      !currency ||
+      amount == null
+    ) {
       return res.status(400).json({ error: "Missing fields" });
     }
 
     const user = (req as any).user;
     const username = user?.username ?? "system";
+
+    // --- SAFETY CHECK: Prevent Duplicate Payments ---
+    // If a payment exists with the EXACT same date, amount, and note, reject it.
+    // This prevents accidental double-clicks or duplicate entries.
+    const [existing] = await db
+      .select()
+      .from(insuranceLabPayments)
+      .where(
+        and(
+          eq(insuranceLabPayments.payDate, payDate),
+          eq(insuranceLabPayments.amount, String(amount)), // Amount is stored as string/decimal
+          eq(insuranceLabPayments.periodYear, periodYear),
+          eq(insuranceLabPayments.periodMonth, periodMonth),
+          note ? eq(insuranceLabPayments.note, note) : undefined
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return res.status(409).json({
+        message: "Duplicate Payment: A payment with this date and amount already exists.",
+      });
+    }
+    // -----------------------------------------------
 
     const [row] = await db
       .insert(insuranceLabPayments)
@@ -162,7 +193,8 @@ router.get("/lab-payments", async (req, res) => {
 });
 
 /** PUT update a lab payment */
-router.put("/lab-payment/:id", async (req, res) => {
+// NOTE: Changed from "/lab-payment/:id" to "/lab-payments/:id"
+router.put("/lab-payments/:id", async (req, res) => {
   try {
     const rawId = req.params.id;
     const id = Number(rawId);
@@ -173,7 +205,13 @@ router.put("/lab-payment/:id", async (req, res) => {
 
     const { payDate, periodYear, periodMonth, currency, amount, note } =
       req.body;
-    if (!payDate || !periodYear || !periodMonth || !currency || amount == null) {
+    if (
+      !payDate ||
+      !periodYear ||
+      !periodMonth ||
+      !currency ||
+      amount == null
+    ) {
       return res.status(400).json({ error: "Missing fields" });
     }
 
@@ -204,7 +242,8 @@ router.put("/lab-payment/:id", async (req, res) => {
 });
 
 /** DELETE a lab payment */
-router.delete("/lab-payment/:id", async (req, res) => {
+// NOTE: Changed from "/lab-payment/:id" to "/lab-payments/:id"
+router.delete("/lab-payments/:id", async (req, res) => {
   try {
     const rawId = req.params.id;
     const id = Number(rawId);
