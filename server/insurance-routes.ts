@@ -55,11 +55,6 @@ function getWindow(req: Request): Window {
   return {};
 }
 
-function paramsIndex(startAt: number, list: unknown[]) {
-  // helper to generate $1, $2, ... starting from startAt
-  return list.map((_, i) => `$${startAt + i}`).join(", ");
-}
-
 /* ------------------------------ QUERIES ------------------------------ */
 
 async function query<T = any>(text: string, values: any[] = []): Promise<T[]> {
@@ -71,7 +66,6 @@ async function query<T = any>(text: string, values: any[] = []): Promise<T[]> {
 
 /**
  * GET /api/insurance-claims
- * Supports: ?providerId= & ?status= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
  */
 router.get("/insurance-claims", async (req: Request, res: Response) => {
   try {
@@ -116,7 +110,6 @@ router.get("/insurance-claims", async (req: Request, res: Response) => {
 
 /**
  * GET /api/insurance-payments
- * Supports: ?providerId= & ?start=YYYY-MM-DD & ?end=YYYY-MM-DD
  */
 router.get("/insurance-payments", async (req: Request, res: Response) => {
   try {
@@ -135,11 +128,11 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
       where.push(`p.payment_date >= $${vals.length - 1} AND p.payment_date <= $${vals.length}`);
     }
 
-    // DEBUG: We are selecting * to see what the REAL column names are in the logs
+    // FIX APPLIED HERE: TO_CHAR ensures format is YYYY-MM-DD string
     const sql = `
       SELECT
         p.id, p.provider_id as "providerId", p.claim_id as "claimId",
-        p.payment_date as "paymentDate", 
+        TO_CHAR(p.payment_date, 'YYYY-MM-DD') as "paymentDate",
         p.amount, p.currency,
         p.reference, p.notes, p.created_at as "createdAt"
       FROM insurance_payments p
@@ -148,15 +141,6 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
     `;
 
     const rows = await query(sql, vals);
-    
-    // --- DEBUGGING LOG ---
-    // Look at your terminal when you refresh the page. 
-    // If "paymentDate" is null here, the database column is empty or named wrong.
-    if (rows.length > 0) {
-      console.log("DEBUG: First payment row from DB:", rows[0]);
-    }
-    // ---------------------
-
     res.json(rows);
   } catch (e: any) {
     console.error("GET /insurance-payments", e);
@@ -166,11 +150,6 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
 
 /**
  * GET /api/insurance-balances
- * Returns:
- * {
- * providers: [{ providerId, providerName, claimed, paid, balance, openingBalance, openingBalanceAsOf }],
- * claims: [{...claim, providerName, paidToDate, balance }]
- * }
  */
 router.get("/insurance-balances", async (req: Request, res: Response) => {
   try {
@@ -327,8 +306,6 @@ router.get("/insurance-balances", async (req: Request, res: Response) => {
 
 /**
  * POST /api/insurance-claims
- * Body: { providerId, periodStart, periodEnd, currency, claimedAmount, notes? }
- * Computes period_year/month server-side.
  */
 router.post("/insurance-claims", async (req: Request, res: Response) => {
   try {
@@ -372,7 +349,6 @@ router.patch("/insurance-claims/:id", async (req: Request, res: Response) => {
     const id = req.params.id;
     const data = ClaimPatch.parse(req.body);
 
-    // Build dynamic patch
     const sets: string[] = [];
     const vals: any[] = [];
     const add = (col: string, val: any) => {
@@ -387,7 +363,6 @@ router.patch("/insurance-claims/:id", async (req: Request, res: Response) => {
     if (typeof data.claimedAmount === "number") add("claimed_amount", data.claimedAmount);
     if (typeof data.notes === "string") add("notes", data.notes);
 
-    // If periodStart changed, recompute year/month
     if (data.periodStart) {
       const d = new Date(data.periodStart + "T00:00:00Z");
       add("period_year", d.getUTCFullYear());
@@ -471,7 +446,7 @@ router.patch("/insurance-payments/:id", async (req: Request, res: Response) => {
 });
 
 /**
- * DELETE endpoints (used by the UI)
+ * DELETE endpoints
  */
 router.delete("/insurance-claims/:id", async (req, res) => {
   try {
