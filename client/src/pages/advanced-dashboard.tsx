@@ -94,7 +94,12 @@ function InsuranceProvidersUSD({
 }: {
   breakdown?:
     | Record<string, number>
-    | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
+    | Array<{
+        name?: string;
+        provider?: string;
+        amount?: number;
+        total?: number;
+      }>;
   totalUSD: number;
   timeRange: string;
   selectedYear?: number | null;
@@ -103,8 +108,7 @@ function InsuranceProvidersUSD({
   customEndDate?: Date;
 }) {
   const rows = useMemo(() => {
-    if (!breakdown)
-      return [] as { name: string; amount: number }[];
+    if (!breakdown) return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
       return breakdown
         .map((r) => ({
@@ -158,7 +162,9 @@ function InsuranceProvidersUSD({
       <CardContent className="space-y-3">
         <div className="text-xs text-slate-500">
           Totals in period:{" "}
-          <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
+          <span className="font-mono">
+            USD {fmtUSD(displayTotal)}
+          </span>
         </div>
 
         {sorted.length === 0 ? (
@@ -168,8 +174,7 @@ function InsuranceProvidersUSD({
         ) : (
           <div className="space-y-3">
             {sorted.map((item, idx) => {
-              const pct =
-                displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
+              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
               const color = palette[idx % palette.length];
               return (
                 <div key={`${item.name}-${idx}`} className="space-y-1.5">
@@ -179,9 +184,7 @@ function InsuranceProvidersUSD({
                         className="inline-block w-2.5 h-2.5 rounded-sm"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-sm text-slate-700">
-                        {item.name}
-                      </span>
+                      <span className="text-sm text-slate-700">{item.name}</span>
                     </div>
                     <div className="text-xs font-medium text-slate-600">
                       USD {fmtUSD(item.amount)}
@@ -219,7 +222,7 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // Normalize the range for API/links (key fix for "Last Month")
+  // Normalize the range for API/links
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
     timeRange,
     selectedYear ?? null,
@@ -257,7 +260,7 @@ export default function AdvancedDashboard() {
     { label: "December", value: 12 },
   ];
 
-  // ---------- queries ----------
+  /* ---------- main dashboard data ---------- */
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
@@ -282,6 +285,7 @@ export default function AdvancedDashboard() {
 
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
+  /* ---------- current-period income trends ---------- */
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
@@ -304,7 +308,32 @@ export default function AdvancedDashboard() {
     },
   });
 
-  // ---------- build income series ----------
+  /* ---------- previous-month income trends (for MTD comparison) ---------- */
+  const { data: prevRawIncome } = useQuery({
+    queryKey: [
+      "/api/income-trends",
+      "prev-month",
+      yearToSend,
+      monthToSend,
+    ],
+    enabled: timeRange === "current-month",
+    queryFn: async () => {
+      const currentMonthDate = new Date(yearToSend, monthToSend - 1, 1);
+      const prevMonthDate = new Date(
+        currentMonthDate.getFullYear(),
+        currentMonthDate.getMonth() - 1,
+        1
+      );
+      const prevYear = prevMonthDate.getFullYear();
+      const prevMonth = prevMonthDate.getMonth() + 1;
+
+      const url = `/api/income-trends/${prevYear}/${prevMonth}?range=current-month`;
+      const { data } = await api.get(url);
+      return data;
+    },
+  });
+
+  /* ---------- build income series for current period ---------- */
   let incomeSeries: Array<{
     day: number;
     amount: number;
@@ -313,6 +342,7 @@ export default function AdvancedDashboard() {
     label: string;
     fullDate: string;
   }> = [];
+
   if (
     timeRange === "custom" &&
     customStartDate &&
@@ -323,7 +353,7 @@ export default function AdvancedDashboard() {
       day: i + 1,
       amount: Number(r.income ?? r.amount ?? 0),
       amountUSD: Number(r.incomeUSD ?? 0),
-      amountSSP: Number(r.incomeSSP ?? (r.income ?? r.amount ?? 0)),
+      amountSSP: Number(r.incomeSSP ?? r.income ?? r.amount ?? 0),
       label: r.date,
       fullDate: r.date,
     }));
@@ -351,7 +381,9 @@ export default function AdvancedDashboard() {
         if (!d && (r as any).date) d = new Date((r as any).date).getDate();
         if (d >= 1 && d <= daysInMonth) {
           incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
-          incomeSeries[d - 1].amountSSP += Number((r as any).incomeSSP ?? 0);
+          incomeSeries[d - 1].amountSSP += Number(
+            (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
+          );
           incomeSeries[d - 1].amount += Number(
             (r as any).income ?? (r as any).amount ?? 0
           );
@@ -360,19 +392,131 @@ export default function AdvancedDashboard() {
     }
   }
 
-  // ---------- totals & metrics ----------
+  /* ---------- Month-to-date vs same days last month (Option B) ---------- */
+  const isCurrentMonthRange = timeRange === "current-month";
+
+  // Determine how many days of data we have this month
+  const daysInCurrentMonth = new Date(yearToSend, monthToSend, 0).getDate();
+  const lastDayWithIncome = incomeSeries.reduce(
+    (max, d) =>
+      d.amountSSP !== 0 || d.amountUSD !== 0 ? Math.max(max, d.day) : max,
+    0
+  );
+
+  const today = new Date();
+  const isThisCalendarMonth =
+    yearToSend === today.getFullYear() &&
+    monthToSend === today.getMonth() + 1;
+
+  const effectiveCurrentDay =
+    lastDayWithIncome > 0
+      ? lastDayWithIncome
+      : isThisCalendarMonth
+      ? Math.min(today.getDate(), daysInCurrentMonth)
+      : daysInCurrentMonth;
+
+  const currentMonthDate = new Date(yearToSend, monthToSend - 1, 1);
+  const prevMonthDate = new Date(
+    currentMonthDate.getFullYear(),
+    currentMonthDate.getMonth() - 1,
+    1
+  );
+  const daysInPrevMonth = new Date(
+    prevMonthDate.getFullYear(),
+    prevMonthDate.getMonth() + 1,
+    0
+  ).getDate();
+
+  const daysToCompare =
+    effectiveCurrentDay > 0 ? Math.min(effectiveCurrentDay, daysInPrevMonth) : 0;
+
+  // Current month MTD (SSP & USD)
+  const currentMTDIncomeSSP =
+    daysToCompare > 0
+      ? incomeSeries
+          .filter((d) => d.day <= daysToCompare)
+          .reduce((s, d) => s + d.amountSSP, 0)
+      : 0;
+
+  const currentMTDIncomeUSD =
+    daysToCompare > 0
+      ? incomeSeries
+          .filter((d) => d.day <= daysToCompare)
+          .reduce((s, d) => s + d.amountUSD, 0)
+      : 0;
+
+  // Previous month income mapped by day
+  let prevIncomeByDay: Record<
+    number,
+    { amountSSP: number; amountUSD: number }
+  > = {};
+
+  if (Array.isArray(prevRawIncome)) {
+    const prevDays = daysInPrevMonth;
+    for (const r of prevRawIncome as any[]) {
+      let d = (r as any).day;
+      if (!d && (r as any).dateISO)
+        d = new Date((r as any).dateISO).getDate();
+      if (!d && (r as any).date) d = new Date((r as any).date).getDate();
+      if (typeof d === "number" && d >= 1 && d <= prevDays) {
+        const ssp = Number(
+          (r as any).incomeSSP ??
+            (r as any).income ??
+            (r as any).amount ??
+            0
+        );
+        const usd = Number((r as any).incomeUSD ?? 0);
+        const existing = prevIncomeByDay[d] ?? {
+          amountSSP: 0,
+          amountUSD: 0,
+        };
+        prevIncomeByDay[d] = {
+          amountSSP: existing.amountSSP + ssp,
+          amountUSD: existing.amountUSD + usd,
+        };
+      }
+    }
+  }
+
+  const prevMTDIncomeSSP =
+    isCurrentMonthRange && daysToCompare > 0
+      ? Array.from({ length: daysToCompare }, (_, idx) => idx + 1).reduce(
+          (sum, day) => sum + (prevIncomeByDay[day]?.amountSSP ?? 0),
+          0
+        )
+      : 0;
+
+  const prevMTDIncomeUSD =
+    isCurrentMonthRange && daysToCompare > 0
+      ? Array.from({ length: daysToCompare }, (_, idx) => idx + 1).reduce(
+          (sum, day) => sum + (prevIncomeByDay[day]?.amountUSD ?? 0),
+          0
+        )
+      : 0;
+
+  let incomeChangeSSP_MTD: number | null = null;
+  let incomeChangeUSD_MTD: number | null = null;
+
+  if (isCurrentMonthRange && daysToCompare > 0 && prevMTDIncomeSSP > 0) {
+    incomeChangeSSP_MTD =
+      ((currentMTDIncomeSSP - prevMTDIncomeSSP) / prevMTDIncomeSSP) * 100;
+  }
+
+  if (isCurrentMonthRange && daysToCompare > 0 && prevMTDIncomeUSD > 0) {
+    incomeChangeUSD_MTD =
+      ((currentMTDIncomeUSD - prevMTDIncomeUSD) / prevMTDIncomeUSD) * 100;
+  }
+
+  /* ---------- totals & metrics ---------- */
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const daysWithSSP = incomeSeries.filter((d) => d.amountSSP > 0).length;
-  const monthlyAvgSSP = daysWithSSP
-    ? Math.round(monthTotalSSP / daysWithSSP)
-    : 0;
+  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
   const peakSSP = Math.max(...incomeSeries.map((d) => d.amountSSP), 0);
   const peakDaySSP = incomeSeries.find((d) => d.amountSSP === peakSSP);
   const showAvgLine = daysWithSSP >= 2;
   const hasAnyUSD = incomeSeries.some((d) => d.amountUSD > 0);
 
-  // loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -384,32 +528,43 @@ export default function AdvancedDashboard() {
     );
   }
 
-  // summary numbers
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
 
-  // helpers for the KPI change labels
-  const comparisonLabel = (hasPrev: boolean) => {
-    if (!hasPrev) {
-      return timeRange === "year" ? "No data last year" : "No previous period";
-    }
-    return timeRange === "year" ? "vs last year" : "vs last month";
-  };
+  // Which % we actually use on the cards
+  const revenueChangePct =
+    isCurrentMonthRange && incomeChangeSSP_MTD !== null
+      ? incomeChangeSSP_MTD
+      : dashboardData?.changes?.incomeChangeSSP;
+
+  const insuranceChangePct =
+    isCurrentMonthRange && incomeChangeUSD_MTD !== null
+      ? incomeChangeUSD_MTD
+      : dashboardData?.changes?.incomeChangeUSD;
+
+  const prevMonthLabel = (() => {
+    const date = prevMonthDate;
+    return `${date.toLocaleString("default", {
+      month: "short",
+    })} ${date.getFullYear()}`;
+  })();
+
+  /* ================== RENDER ================== */
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Sticky, modern header with mobile-safe padding */}
+      {/* Header */}
       <header
-        className="
-          sticky top-0 z-50
-          bg-white/80 dark:bg-slate-900/70
-          backdrop-blur-md supports-[backdrop-filter]:bg-white/60
-          shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)]
-          dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]
-        "
+        className={cn(
+          "sticky top-0 z-50",
+          "bg-white/80 dark:bg-slate-900/70",
+          "backdrop-blur-md supports-[backdrop-filter]:bg-white/60",
+          "shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)]",
+          "dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]"
+        )}
       >
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
@@ -424,7 +579,7 @@ export default function AdvancedDashboard() {
               </div>
             </div>
 
-            {/* RIGHT: range + (optional) month/year or custom dates) */}
+            {/* Filters */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                 <SelectTrigger className="h-10 w-full sm:w-[160px]">
@@ -514,9 +669,7 @@ export default function AdvancedDashboard() {
                         numberOfMonths={1}
                         showOutsideDays={false}
                         selected={customStartDate}
-                        onSelect={(d) =>
-                          setCustomRange(d ?? undefined, customEndDate)
-                        }
+                        onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
                         initialFocus
                       />
                     </PopoverContent>
@@ -561,9 +714,7 @@ export default function AdvancedDashboard() {
                         numberOfMonths={1}
                         showOutsideDays={false}
                         selected={customEndDate}
-                        onSelect={(d) =>
-                          setCustomRange(customStartDate, d ?? undefined)
-                        }
+                        onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
                         initialFocus
                       />
                     </PopoverContent>
@@ -600,44 +751,36 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {(() => {
-                        const change =
-                          dashboardData?.changes?.incomeChangeSSP ?? null;
-                        const hasPrev = change !== null && change !== undefined;
-                        const className =
-                          change == null
-                            ? "text-xs font-medium text-slate-400"
-                            : change > 0
-                            ? "text-xs font-medium text-emerald-600"
-                            : change < 0
-                            ? "text-xs font-medium text-red-600"
-                            : "text-xs font-medium text-slate-500";
-                        return (
-                          <span className={className}>
-                            {hasPrev ? (
-                              <>
-                                {change! > 0 ? "+" : ""}
-                                {change!.toFixed(1)}%{" "}
-                                {comparisonLabel(true)}
-                              </>
-                            ) : (
-                              comparisonLabel(false)
+                      {revenueChangePct !== undefined &&
+                        revenueChangePct !== null && (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              revenueChangePct > 0
+                                ? "text-emerald-600"
+                                : revenueChangePct < 0
+                                ? "text-red-600"
+                                : "text-slate-500"
                             )}
+                          >
+                            {revenueChangePct > 0 ? "+" : ""}
+                            {revenueChangePct.toFixed(1)}%
+                            {isCurrentMonthRange &&
+                            incomeChangeSSP_MTD !== null
+                              ? ` vs same days last month (${prevMonthLabel})`
+                              : " vs last month"}
                           </span>
-                        );
-                      })()}
+                        )}
                     </div>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {(() => {
-                      const change =
-                        dashboardData?.changes?.incomeChangeSSP ?? null;
-                      return change != null && change < 0 ? (
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      ) : (
-                        <TrendingUp className="h-4 w-4 text-emerald-600" />
-                      );
-                    })()}
+                    {revenueChangePct !== undefined &&
+                    revenueChangePct !== null &&
+                    revenueChangePct < 0 ? (
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                    ) : (
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -664,44 +807,35 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {(() => {
-                        const change =
-                          dashboardData?.changes?.expenseChangeSSP ?? null;
-                        const hasPrev = change !== null && change !== undefined;
-                        const className =
-                          change == null
-                            ? "text-xs font-medium text-slate-400"
-                            : change > 0
-                            ? "text-xs font-medium text-red-600"
-                            : change < 0
-                            ? "text-xs font-medium text-emerald-600"
-                            : "text-xs font-medium text-slate-500";
-                        return (
-                          <span className={className}>
-                            {hasPrev ? (
-                              <>
-                                {change! > 0 ? "+" : ""}
-                                {change!.toFixed(1)}%{" "}
-                                {comparisonLabel(true)}
-                              </>
-                            ) : (
-                              comparisonLabel(false)
-                            )}
-                          </span>
-                        );
-                      })()}
+                      {dashboardData?.changes?.expenseChangeSSP !==
+                        undefined && (
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            dashboardData.changes.expenseChangeSSP > 0
+                              ? "text-red-600"
+                              : dashboardData.changes.expenseChangeSSP < 0
+                              ? "text-emerald-600"
+                              : "text-slate-500"
+                          )}
+                        >
+                          {dashboardData.changes.expenseChangeSSP > 0
+                            ? "+"
+                            : ""}
+                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}
+                          % vs last month
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {(() => {
-                      const change =
-                        dashboardData?.changes?.expenseChangeSSP ?? null;
-                      return change != null && change < 0 ? (
-                        <TrendingDown className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <TrendingUp className="h-4 w-4 text-red-600" />
-                      );
-                    })()}
+                    {dashboardData?.changes?.expenseChangeSSP !==
+                      undefined &&
+                    dashboardData.changes.expenseChangeSSP < 0 ? (
+                      <TrendingDown className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <TrendingUp className="h-4 w-4 text-red-600" />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -716,46 +850,28 @@ export default function AdvancedDashboard() {
                       Net Income
                     </p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP{" "}
-                      {nf0.format(
-                        Math.round(
-                          (monthTotalSSP ||
-                            parseFloat(
-                              dashboardData?.totalIncomeSSP || "0"
-                            )) -
-                            parseFloat(
-                              dashboardData?.totalExpenses || "0"
-                            )
-                        )
-                      )}
+                      SSP {nf0.format(Math.round(sspNetIncome))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {(() => {
-                        const change =
-                          dashboardData?.changes?.netIncomeChangeSSP ?? null;
-                        const hasPrev = change !== null && change !== undefined;
-                        const className =
-                          change == null
-                            ? "text-xs font-medium text-slate-400"
-                            : change > 0
-                            ? "text-xs font-medium text-emerald-600"
-                            : change < 0
-                            ? "text-xs font-medium text-red-600"
-                            : "text-xs font-medium text-slate-500";
-                        return (
-                          <span className={className}>
-                            {hasPrev ? (
-                              <>
-                                {change! > 0 ? "+" : ""}
-                                {change!.toFixed(1)}%{" "}
-                                {comparisonLabel(true)}
-                              </>
-                            ) : (
-                              comparisonLabel(false)
-                            )}
-                          </span>
-                        );
-                      })()}
+                      {dashboardData?.changes?.netIncomeChangeSSP !==
+                        undefined && (
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            dashboardData.changes.netIncomeChangeSSP > 0
+                              ? "text-emerald-600"
+                              : dashboardData.changes.netIncomeChangeSSP < 0
+                              ? "text-red-600"
+                              : "text-slate-500"
+                          )}
+                        >
+                          {dashboardData.changes.netIncomeChangeSSP > 0
+                            ? "+"
+                            : ""}
+                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}
+                          % vs last month
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="bg-blue-50 p-1.5 rounded-lg">
@@ -796,33 +912,38 @@ export default function AdvancedDashboard() {
                         )}
                       </p>
                       <div className="flex items-center mt-1">
-                        {(() => {
-                          const change =
-                            dashboardData?.changes?.incomeChangeUSD ?? null;
-                          const hasPrev =
-                            change !== null && change !== undefined;
-                          const className =
-                            change == null
-                              ? "text-xs font-medium text-slate-400"
-                              : change > 0
-                              ? "text-xs font-medium text-emerald-600"
-                              : change < 0
-                              ? "text-xs font-medium text-red-600"
-                              : "text-xs font-medium text-slate-500";
-                          return (
-                            <span className={className}>
-                              {hasPrev ? (
-                                <>
-                                  {change! > 0 ? "+" : ""}
-                                  {change!.toFixed(1)}%{" "}
-                                  {comparisonLabel(true)}
-                                </>
-                              ) : (
-                                comparisonLabel(false)
-                              )}
-                            </span>
-                          );
-                        })()}
+                        {insuranceChangePct !== undefined &&
+                        insuranceChangePct !== null ? (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              insuranceChangePct > 0
+                                ? "text-emerald-600"
+                                : insuranceChangePct < 0
+                                ? "text-red-600"
+                                : "text-slate-500"
+                            )}
+                          >
+                            {insuranceChangePct > 0 ? "+" : ""}
+                            {insuranceChangePct.toFixed(1)}%
+                            {isCurrentMonthRange &&
+                            incomeChangeUSD_MTD !== null
+                              ? ` vs same days last month (${prevMonthLabel})`
+                              : " vs last month"}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-purple-600">
+                            {Object.keys(
+                              dashboardData?.insuranceBreakdown || {}
+                            ).length === 1
+                              ? "1 provider"
+                              : `${
+                                  Object.keys(
+                                    dashboardData?.insuranceBreakdown || {}
+                                  ).length
+                                } providers`}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="bg-purple-50 p-1.5 rounded-lg">
@@ -862,9 +983,9 @@ export default function AdvancedDashboard() {
             </Link>
           </div>
 
-          {/* ======= Main Content: Two-column layout ======= */}
+          {/* ===== Main layout ===== */}
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-            {/* LEFT COLUMN: chart + quick actions */}
+            {/* LEFT: chart + quick actions */}
             <div className="space-y-6">
               <RevenueAnalyticsDaily
                 timeRange={rangeToSend}
@@ -949,12 +1070,10 @@ export default function AdvancedDashboard() {
               </Card>
             </div>
 
-            {/* RIGHT COLUMN: departments + providers + system status */}
+            {/* RIGHT: departments + providers + system status */}
             <div className="space-y-6">
               <DepartmentsPanel
-                departments={
-                  Array.isArray(departments) ? (departments as any[]) : []
-                }
+                departments={Array.isArray(departments) ? (departments as any[]) : []}
                 departmentBreakdown={dashboardData?.departmentBreakdown}
                 totalSSP={sspRevenue}
               />
