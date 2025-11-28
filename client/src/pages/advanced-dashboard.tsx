@@ -1,5 +1,5 @@
 // client/src/pages/advanced-dashboard.tsx
-'use client';
+"use client";
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -9,15 +9,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import {
-  TrendingUp, TrendingDown, DollarSign, Users, CalendarIcon, Shield, RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Users,
+  CalendarIcon,
+  Shield,
+  RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 
@@ -29,7 +43,8 @@ import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-dail
 /* ================== number formatting helpers ================== */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const kfmt = (v: number) => (v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v)));
+const kfmt = (v: number) =>
+  v >= 1000 ? `${nf0.format(Math.round(v / 1000))}k` : nf0.format(Math.round(v));
 const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
@@ -47,7 +62,11 @@ function computeRangeParams(
 
   if (timeRange === "last-month") {
     const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    return { rangeToSend: "current-month", yearToSend: d.getFullYear(), monthToSend: d.getMonth() + 1 };
+    return {
+      rangeToSend: "current-month",
+      yearToSend: d.getFullYear(),
+      monthToSend: d.getMonth() + 1,
+    };
   }
   if (timeRange === "month-select") {
     return {
@@ -63,6 +82,56 @@ function computeRangeParams(
   };
 }
 
+/* ================== helpers: previous period & deltas ================== */
+
+function getPrevPeriod(year: number, month: number) {
+  if (!year || !month) return { prevYear: year, prevMonth: month };
+  if (month === 1) return { prevYear: year - 1, prevMonth: 12 };
+  return { prevYear: year, prevMonth: month - 1 };
+}
+
+function getPercentChange(current: number, previous: number | null | undefined) {
+  if (
+    current == null ||
+    previous == null ||
+    isNaN(current) ||
+    isNaN(previous)
+  ) {
+    return null;
+  }
+  if (previous === 0) {
+    // No meaningful % change vs zero baseline
+    return null;
+  }
+  return ((current - previous) / previous) * 100;
+}
+
+function formatPercentChangeLabel(pct: number | null) {
+  if (pct === null) return "No data for last month";
+  const rounded = Number(pct.toFixed(1));
+  if (rounded === 0) return "No change vs last month";
+  const sign = rounded > 0 ? "+" : "";
+  return `${sign}${rounded.toFixed(1)}% vs last month`;
+}
+
+function formatPatientsChangeLabel(
+  current: number,
+  previous: number | null | undefined
+) {
+  if (
+    current == null ||
+    previous == null ||
+    isNaN(current) ||
+    isNaN(previous)
+  ) {
+    return "No data for last month";
+  }
+  const diff = current - previous;
+  if (diff === 0) return "No change vs last month";
+  const sign = diff > 0 ? "+" : "";
+  return `${sign}${diff} vs last month`;
+}
+
 /* ================== Insurance Providers Card ================== */
 function InsuranceProvidersUSD({
   breakdown,
@@ -73,7 +142,9 @@ function InsuranceProvidersUSD({
   customStartDate,
   customEndDate,
 }: {
-  breakdown?: Record<string, number> | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
+  breakdown?:
+    | Record<string, number>
+    | Array<{ name?: string; provider?: string; amount?: number; total?: number }>;
   totalUSD: number;
   timeRange: string;
   selectedYear?: number | null;
@@ -101,33 +172,48 @@ function InsuranceProvidersUSD({
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
 
   const palette = [
-    "#00A3A3", "#4F46E5", "#F59E0B", "#EF4444",
-    "#10B981", "#8B5CF6", "#EA580C", "#06B6D4",
+    "#00A3A3",
+    "#4F46E5",
+    "#F59E0B",
+    "#EF4444",
+    "#10B981",
+    "#8B5CF6",
+    "#EA580C",
+    "#06B6D4",
   ];
 
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
     timeRange === "custom" && customStartDate && customEndDate
-      ? `${base}&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+      ? `${base}&startDate=${format(
+          customStartDate,
+          "yyyy-MM-dd"
+        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
       : `${base}&year=${selectedYear}&month=${selectedMonth}`;
 
   return (
     <Card className="border border-slate-200 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance Providers (USD)
+          <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance
+          Providers (USD)
         </CardTitle>
         <Link href={viewAllHref}>
-          <Button variant="outline" size="sm">View all</Button>
+          <Button variant="outline" size="sm">
+            View all
+          </Button>
         </Link>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="text-xs text-slate-500">
-          Totals in period: <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
+          Totals in period:{" "}
+          <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
         </div>
 
         {sorted.length === 0 ? (
-          <div className="text-sm text-slate-500">No insurance receipts for this period.</div>
+          <div className="text-sm text-slate-500">
+            No insurance receipts for this period.
+          </div>
         ) : (
           <div className="space-y-3">
             {sorted.map((item, idx) => {
@@ -137,15 +223,23 @@ function InsuranceProvidersUSD({
                 <div key={`${item.name}-${idx}`} className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
-                      <span className="text-sm text-slate-700">{item.name}</span>
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-sm"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-sm text-slate-700">
+                        {item.name}
+                      </span>
                     </div>
                     <div className="text-xs font-medium text-slate-600">
                       USD {fmtUSD(item.amount)}
                     </div>
                   </div>
                   <div className="h-2 rounded bg-slate-100 overflow-hidden">
-                    <div className="h-2 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    <div
+                      className="h-2 rounded"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
                   </div>
                 </div>
               );
@@ -160,17 +254,27 @@ function InsuranceProvidersUSD({
 /* ================== Page ================== */
 export default function AdvancedDashboard() {
   const {
-    timeRange, selectedYear, selectedMonth,
-    customStartDate, customEndDate,
-    setTimeRange, setCustomRange, setSpecificMonth, periodLabel,
+    timeRange,
+    selectedYear,
+    selectedMonth,
+    customStartDate,
+    customEndDate,
+    setTimeRange,
+    setCustomRange,
+    setSpecificMonth,
+    periodLabel,
   } = useDateFilter();
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
   // Normalize the range for API/links (key fix for "Last Month")
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
-    timeRange, selectedYear ?? null, selectedMonth ?? null
+    timeRange,
+    selectedYear ?? null,
+    selectedMonth ?? null
   );
+
+  const isMonthMode = rangeToSend === "current-month";
 
   const handleTimeRangeChange = (
     range:
@@ -184,7 +288,10 @@ export default function AdvancedDashboard() {
 
   const now = new Date();
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
+  const years = useMemo(
+    () => [thisYear, thisYear - 1, thisYear - 2],
+    [thisYear]
+  );
   const months = [
     { label: "January", value: 1 },
     { label: "February", value: 2 },
@@ -200,7 +307,7 @@ export default function AdvancedDashboard() {
     { label: "December", value: 12 },
   ];
 
-  // ---------- queries ----------
+  // ---------- queries: current period ----------
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
@@ -213,7 +320,10 @@ export default function AdvancedDashboard() {
     queryFn: async () => {
       let url = `/api/dashboard?year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+        url += `&startDate=${format(
+          customStartDate,
+          "yyyy-MM-dd"
+        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
       const { data } = await api.get(url);
       return data;
@@ -234,8 +344,27 @@ export default function AdvancedDashboard() {
     queryFn: async () => {
       let url = `/api/income-trends/${yearToSend}/${monthToSend}?range=${rangeToSend}`;
       if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+        url += `&startDate=${format(
+          customStartDate,
+          "yyyy-MM-dd"
+        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
       }
+      const { data } = await api.get(url);
+      return data;
+    },
+  });
+
+  // ---------- query: previous month for deltas (only for month views) ----------
+  const { prevYear, prevMonth } = getPrevPeriod(
+    yearToSend as number,
+    monthToSend as number
+  );
+
+  const { data: prevDashboardData } = useQuery({
+    enabled: isMonthMode && !!yearToSend && !!monthToSend,
+    queryKey: ["/api/dashboard-prev", prevYear, prevMonth],
+    queryFn: async () => {
+      const url = `/api/dashboard?year=${prevYear}&month=${prevMonth}&range=current-month`;
       const { data } = await api.get(url);
       return data;
     },
@@ -243,14 +372,27 @@ export default function AdvancedDashboard() {
 
   // ---------- build income series ----------
   let incomeSeries: Array<{
-    day: number; amount: number; amountSSP: number; amountUSD: number; label: string; fullDate: string;
+    day: number;
+    amount: number;
+    amountSSP: number;
+    amountUSD: number;
+    label: string;
+    fullDate: string;
   }> = [];
-  if (timeRange === "custom" && customStartDate && customEndDate && Array.isArray(rawIncome)) {
+
+  if (
+    timeRange === "custom" &&
+    customStartDate &&
+    customEndDate &&
+    Array.isArray(rawIncome)
+  ) {
     incomeSeries = rawIncome.map((r: any, i: number) => ({
       day: i + 1,
       amount: Number(r.income ?? r.amount ?? 0),
       amountUSD: Number(r.incomeUSD ?? 0),
-      amountSSP: Number(r.incomeSSP ?? (r.income ?? r.amount ?? 0)),
+      amountSSP: Number(
+        r.incomeSSP ?? (r.income ?? r.amount ?? 0)
+      ),
       label: r.date,
       fullDate: r.date,
     }));
@@ -259,33 +401,64 @@ export default function AdvancedDashboard() {
     const m = monthToSend!;
     const daysInMonth = new Date(y, m, 0).getDate();
     incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
-      day: i + 1, amount: 0, amountUSD: 0, amountSSP: 0,
+      day: i + 1,
+      amount: 0,
+      amountUSD: 0,
+      amountSSP: 0,
       label: `${i + 1}`,
-      fullDate: new Date(y, m - 1, i + 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      fullDate: new Date(y, m - 1, i + 1).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
     }));
     if (Array.isArray(rawIncome)) {
       for (const r of rawIncome as any[]) {
         let d = (r as any).day;
-        if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
-        if (!d && (r as any).date) d = new Date((r as any).date).getDate();
+        if (!d && (r as any).dateISO)
+          d = new Date((r as any).dateISO).getDate();
+        if (!d && (r as any).date)
+          d = new Date((r as any).date).getDate();
         if (d >= 1 && d <= daysInMonth) {
-          incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
-          incomeSeries[d - 1].amountSSP += Number((r as any).incomeSSP ?? 0);
-          incomeSeries[d - 1].amount += Number((r as any).income ?? (r as any).amount ?? 0);
+          incomeSeries[d - 1].amountUSD += Number(
+            (r as any).incomeUSD ?? 0
+          );
+          incomeSeries[d - 1].amountSSP += Number(
+            (r as any).incomeSSP ??
+              (r as any).income ??
+              (r as any).amount ??
+              0
+          );
+          incomeSeries[d - 1].amount += Number(
+            (r as any).income ?? (r as any).amount ?? 0
+          );
         }
       }
     }
   }
 
   // ---------- totals & metrics ----------
-  const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
-  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
-  const daysWithSSP = incomeSeries.filter(d => d.amountSSP > 0).length;
-  const monthlyAvgSSP = daysWithSSP ? Math.round(monthTotalSSP / daysWithSSP) : 0;
-  const peakSSP = Math.max(...incomeSeries.map(d => d.amountSSP), 0);
-  const peakDaySSP = incomeSeries.find(d => d.amountSSP === peakSSP);
+  const monthTotalSSP = incomeSeries.reduce(
+    (s, d) => s + d.amountSSP,
+    0
+  );
+  const monthTotalUSD = incomeSeries.reduce(
+    (s, d) => s + d.amountUSD,
+    0
+  );
+  const daysWithSSP = incomeSeries.filter((d) => d.amountSSP > 0).length;
+  const monthlyAvgSSP = daysWithSSP
+    ? Math.round(monthTotalSSP / daysWithSSP)
+    : 0;
+  const peakSSP = Math.max(
+    ...incomeSeries.map((d) => d.amountSSP),
+    0
+  );
+  const peakDaySSP = incomeSeries.find(
+    (d) => d.amountSSP === peakSSP
+  );
   const showAvgLine = daysWithSSP >= 2;
-  const hasAnyUSD = incomeSeries.some(d => d.amountUSD > 0);
+  const hasAnyUSD = incomeSeries.some((d) => d.amountUSD > 0);
 
   // loading
   if (isLoading) {
@@ -299,12 +472,67 @@ export default function AdvancedDashboard() {
     );
   }
 
-  // summary numbers
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  // summary numbers (current)
+  const sspIncome = monthTotalSSP ||
+    parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const usdIncome = monthTotalUSD ||
+    parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
+  const sspRevenue = sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
+
+  // previous-period numbers (month mode only)
+  const prevIncomeSSP = isMonthMode
+    ? parseFloat(prevDashboardData?.totalIncomeSSP || "0")
+    : null;
+  const prevExpensesSSP = isMonthMode
+    ? parseFloat(prevDashboardData?.totalExpenses || "0")
+    : null;
+  const prevNetIncomeSSP =
+    prevIncomeSSP != null && prevExpensesSSP != null
+      ? prevIncomeSSP - prevExpensesSSP
+      : null;
+  const prevIncomeUSD = isMonthMode
+    ? parseFloat(prevDashboardData?.totalIncomeUSD || "0")
+    : null;
+  const prevPatients = isMonthMode
+    ? prevDashboardData?.totalPatients ?? null
+    : null;
+
+  // percent / change labels
+  const revenueChangePct = isMonthMode
+    ? getPercentChange(sspIncome, prevIncomeSSP)
+    : null;
+  const expensesChangePct = isMonthMode
+    ? getPercentChange(totalExpenses, prevExpensesSSP)
+    : null;
+  const netIncomeChangePct = isMonthMode
+    ? getPercentChange(sspNetIncome, prevNetIncomeSSP)
+    : null;
+  const insuranceChangePct = isMonthMode
+    ? getPercentChange(usdIncome, prevIncomeUSD)
+    : null;
+  const patientsChangeText = isMonthMode
+    ? formatPatientsChangeLabel(
+        dashboardData?.totalPatients || 0,
+        prevPatients
+      )
+    : "Current period";
+
+  const revenueLabel = isMonthMode
+    ? formatPercentChangeLabel(revenueChangePct)
+    : "Current period";
+  const expensesLabel = isMonthMode
+    ? formatPercentChangeLabel(expensesChangePct)
+    : "Current period";
+  const netIncomeLabel = isMonthMode
+    ? formatPercentChangeLabel(netIncomeChangePct)
+    : "Current period";
+  const insuranceLabel = isMonthMode
+    ? formatPercentChangeLabel(insuranceChangePct)
+    : `${
+        Object.keys(dashboardData?.insuranceBreakdown || {}).length || 0
+      } providers`;
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
@@ -325,20 +553,28 @@ export default function AdvancedDashboard() {
                 Executive Dashboard
               </h1>
               <div className="mt-1 flex items-center gap-4">
-                <p className="text-sm text-muted-foreground">Key financials · {periodLabel}</p>
+                <p className="text-sm text-muted-foreground">
+                  Key financials · {periodLabel}
+                </p>
               </div>
             </div>
 
             {/* RIGHT: range + (optional) month/year or custom dates) */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-10 w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full sm:w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="current-month">Current Month</SelectItem>
                   <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                  <SelectItem value="last-3-months">
+                    Last 3 Months
+                  </SelectItem>
                   <SelectItem value="year">This Year</SelectItem>
-                  <SelectItem value="month-select">Select Month…</SelectItem>
+                  <SelectItem value="month-select">
+                    Select Month…
+                  </SelectItem>
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>
               </Select>
@@ -347,28 +583,45 @@ export default function AdvancedDashboard() {
                 <>
                   <Select
                     value={String(selectedYear)}
-                    onValueChange={(val) => setSpecificMonth(Number(val), selectedMonth || 1)}
+                    onValueChange={(val) =>
+                      setSpecificMonth(
+                        Number(val),
+                        selectedMonth || 1
+                      )
+                    }
                   >
                     <SelectTrigger className="h-10 w-full sm:w-[120px]">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
                       {years.map((y) => (
-                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
 
                   <Select
                     value={String(selectedMonth)}
-                    onValueChange={(val) => setSpecificMonth(selectedYear || thisYear, Number(val))}
+                    onValueChange={(val) =>
+                      setSpecificMonth(
+                        selectedYear || thisYear,
+                        Number(val)
+                      )
+                    }
                   >
                     <SelectTrigger className="h-10 w-full sm:w-[140px]">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
                       {months.map((m) => (
-                        <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                        <SelectItem
+                          key={m.value}
+                          value={String(m.value)}
+                        >
+                          {m.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -381,10 +634,16 @@ export default function AdvancedDashboard() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn("h-10 w-full sm:w-auto justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}
+                        className={cn(
+                          "h-10 w-full sm:w-auto justify-start text-left font-normal",
+                          !customStartDate &&
+                            "text-muted-foreground"
+                        )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                        {customStartDate
+                          ? format(customStartDate, "MMM d, yyyy")
+                          : "Start date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -392,7 +651,10 @@ export default function AdvancedDashboard() {
                       align="start"
                       sideOffset={12}
                       className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                      style={{
+                        zIndex: 50000,
+                        backgroundColor: "rgb(255, 255, 255)",
+                      }}
                       avoidCollisions
                       collisionPadding={15}
                     >
@@ -401,22 +663,37 @@ export default function AdvancedDashboard() {
                         numberOfMonths={1}
                         showOutsideDays={false}
                         selected={customStartDate}
-                        onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                        onSelect={(d) =>
+                          setCustomRange(
+                            d ?? undefined,
+                            customEndDate
+                          )
+                        }
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
 
-                  <span aria-hidden className="text-center sm:text-left text-muted-foreground">to</span>
+                  <span
+                    aria-hidden
+                    className="text-center sm:text-left text-muted-foreground"
+                  >
+                    to
+                  </span>
 
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn("h-10 w-full sm:w-auto justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}
+                        className={cn(
+                          "h-10 w-full sm:w-auto justify-start text-left font-normal",
+                          !customEndDate && "text-muted-foreground"
+                        )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                        {customEndDate
+                          ? format(customEndDate, "MMM d, yyyy")
+                          : "End date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -424,7 +701,10 @@ export default function AdvancedDashboard() {
                       align="start"
                       sideOffset={12}
                       className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255, 255, 255)" }}
+                      style={{
+                        zIndex: 50000,
+                        backgroundColor: "rgb(255, 255, 255)",
+                      }}
                       avoidCollisions
                       collisionPadding={15}
                     >
@@ -433,7 +713,12 @@ export default function AdvancedDashboard() {
                         numberOfMonths={1}
                         showOutsideDays={false}
                         selected={customEndDate}
-                        onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                        onSelect={(d) =>
+                          setCustomRange(
+                            customStartDate,
+                            d ?? undefined
+                          )
+                        }
                         initialFocus
                       />
                     </PopoverContent>
@@ -455,27 +740,41 @@ export default function AdvancedDashboard() {
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
+                    <p className="text-slate-600 text-xs font-medium">
+                      Total Revenue
+                    </p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")))}
+                      SSP{" "}
+                      {nf0.format(
+                        Math.round(
+                          sspIncome
+                        )
+                      )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.incomeChangeSSP !== undefined && (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.incomeChangeSSP > 0 ? "text-emerald-600" :
-                          dashboardData.changes.incomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.incomeChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.incomeChangeSSP.toFixed(1)}% vs last month
-                        </span>
-                      )}
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          revenueChangePct == null
+                            ? "text-slate-500"
+                            : revenueChangePct > 0
+                            ? "text-emerald-600"
+                            : revenueChangePct < 0
+                            ? "text-red-600"
+                            : "text-slate-500"
+                        )}
+                      >
+                        {revenueLabel}
+                      </span>
                     </div>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.incomeChangeSSP !== undefined &&
-                    dashboardData.changes.incomeChangeSSP < 0 ? (
+                    {revenueChangePct != null &&
+                    revenueChangePct < 0 ? (
                       <TrendingDown className="h-4 w-4 text-red-600" />
-                    ) : (<TrendingUp className="h-4 w-4 text-emerald-600" />)}
+                    ) : (
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -490,27 +789,40 @@ export default function AdvancedDashboard() {
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
+                    <p className="text-slate-600 text-xs font-medium">
+                      Total Expenses
+                    </p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(parseFloat(dashboardData?.totalExpenses || "0")))}
+                      SSP{" "}
+                      {nf0.format(
+                        Math.round(totalExpenses)
+                      )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.expenseChangeSSP !== undefined && (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.expenseChangeSSP > 0 ? "text-red-600" :
-                          dashboardData.changes.expenseChangeSSP < 0 ? "text-emerald-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.expenseChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}% vs last month
-                        </span>
-                      )}
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          expensesChangePct == null
+                            ? "text-slate-500"
+                            : // For expenses: up is bad (red), down is good (green)
+                              expensesChangePct > 0
+                            ? "text-red-600"
+                            : expensesChangePct < 0
+                            ? "text-emerald-600"
+                            : "text-slate-500"
+                        )}
+                      >
+                        {expensesLabel}
+                      </span>
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                    dashboardData.changes.expenseChangeSSP < 0 ? (
+                    {expensesChangePct != null &&
+                    expensesChangePct < 0 ? (
                       <TrendingDown className="h-4 w-4 text-emerald-600" />
-                    ) : (<TrendingUp className="h-4 w-4 text-red-600" />)}
+                    ) : (
+                      <TrendingUp className="h-4 w-4 text-red-600" />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -521,20 +833,27 @@ export default function AdvancedDashboard() {
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-slate-600 text-xs font-medium">Net Income</p>
+                    <p className="text-slate-600 text-xs font-medium">
+                      Net Income
+                    </p>
                     <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round((monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0")) - parseFloat(dashboardData?.totalExpenses || "0")))}
+                      SSP {nf0.format(Math.round(sspNetIncome))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.netIncomeChangeSSP !== undefined && (
-                        <span className={`text-xs font-medium ${
-                          dashboardData.changes.netIncomeChangeSSP > 0 ? "text-emerald-600" :
-                          dashboardData.changes.netIncomeChangeSSP < 0 ? "text-red-600" : "text-slate-500"
-                        }`}>
-                          {dashboardData.changes.netIncomeChangeSSP > 0 ? "+" : ""}
-                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% vs last month
-                        </span>
-                      )}
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          netIncomeChangePct == null
+                            ? "text-slate-500"
+                            : netIncomeChangePct > 0
+                            ? "text-emerald-600"
+                            : netIncomeChangePct < 0
+                            ? "text-red-600"
+                            : "text-slate-500"
+                        )}
+                      >
+                        {netIncomeLabel}
+                      </span>
                     </div>
                   </div>
                   <div className="bg-blue-50 p-1.5 rounded-lg">
@@ -545,57 +864,84 @@ export default function AdvancedDashboard() {
             </Card>
 
             {/* Insurance (USD) quick nav */}
-            <Link href={`/insurance-providers?range=${rangeToSend}${
-              timeRange === "custom" && customStartDate && customEndDate
-                ? `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-                : `&year=${yearToSend}&month=${monthToSend}`
-            }`}>
+            <Link
+              href={`/insurance-providers?range=${rangeToSend}${
+                timeRange === "custom" &&
+                customStartDate &&
+                customEndDate
+                  ? `&startDate=${format(
+                      customStartDate,
+                      "yyyy-MM-dd"
+                    )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+                  : `&year=${yearToSend}&month=${monthToSend}`
+              }`}
+            >
               <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-4 sm:p-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                      <p className="text-slate-600 text-xs font-medium">
+                        Insurance (USD)
+                      </p>
                       <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                        USD {fmtUSD(Math.round(parseFloat(dashboardData?.totalIncomeUSD || "0")))}
+                        USD{" "}
+                        {fmtUSD(
+                          Math.round(
+                            parseFloat(
+                              dashboardData?.totalIncomeUSD ||
+                                "0"
+                            )
+                          )
+                        )}
                       </p>
                       <div className="flex items-center mt-1">
-                        {dashboardData?.changes?.incomeChangeUSD !== undefined ? (
-                          <span className={`text-xs font-medium ${
-                            dashboardData.changes.incomeChangeUSD > 0 ? "text-emerald-600" :
-                            dashboardData.changes.incomeChangeUSD < 0 ? "text-red-600" : "text-slate-500"
-                          }`}>
-                            {dashboardData.changes.incomeChangeUSD > 0 ? "+" : ""}
-                            {dashboardData.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-purple-600">
-                            {Object.keys(dashboardData?.insuranceBreakdown || {}).length === 1
-                              ? "1 provider" : `${Object.keys(dashboardData?.insuranceBreakdown || {}).length} providers`}
-                          </span>
-                        )}
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            insuranceChangePct == null
+                              ? "text-purple-600"
+                              : insuranceChangePct > 0
+                              ? "text-emerald-600"
+                              : insuranceChangePct < 0
+                              ? "text-red-600"
+                              : "text-slate-500"
+                          )}
+                        >
+                          {insuranceLabel}
+                        </span>
                       </div>
                     </div>
-                    <div className="bg-purple-50 p-1.5 rounded-lg"><Shield className="h-4 w-4 text-purple-600" /></div>
+                    <div className="bg-purple-50 p-1.5 rounded-lg">
+                      <Shield className="h-4 w-4 text-purple-600" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </Link>
 
             {/* Patient Volume */}
-            <Link href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}>
+            <Link
+              href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
+            >
               <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-4 sm:p-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-600 text-xs font-medium">Total Patients</p>
+                      <p className="text-slate-600 text-xs font-medium">
+                        Total Patients
+                      </p>
                       <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                         {(dashboardData?.totalPatients || 0).toLocaleString()}
                       </p>
                       <div className="flex items-center mt-1">
-                        <span className="text-xs font-medium text-teal-600">Current period</span>
+                        <span className="text-xs font-medium text-teal-600">
+                          {patientsChangeText}
+                        </span>
                       </div>
                     </div>
-                    <div className="bg-teal-50 p-1.5 rounded-lg"><Users className="h-4 w-4 text-teal-600" /></div>
+                    <div className="bg-teal-50 p-1.5 rounded-lg">
+                      <Users className="h-4 w-4 text-teal-600" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -618,40 +964,69 @@ export default function AdvancedDashboard() {
               <Card className="border border-slate-200 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
+                    <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick
+                    Actions
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <a href="/transactions" className="block">
-                      <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                      >
                         <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">Add Transaction</span>
-                          <span className="text-xs text-slate-500">Record new income or expense</span>
+                          <span className="font-medium text-slate-900">
+                            Add Transaction
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Record new income or expense
+                          </span>
                         </div>
                       </Button>
                     </a>
                     <a href="/patient-volume" className="block">
-                      <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                      >
                         <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">Patient Volume</span>
-                          <span className="text-xs text-slate-500">Update patient count</span>
+                          <span className="font-medium text-slate-900">
+                            Patient Volume
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Update patient count
+                          </span>
                         </div>
                       </Button>
                     </a>
                     <a href="/reports" className="block">
-                      <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                      >
                         <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">Monthly Reports</span>
-                          <span className="text-xs text-slate-500">View generated reports</span>
+                          <span className="font-medium text-slate-900">
+                            Monthly Reports
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            View generated reports
+                          </span>
                         </div>
                       </Button>
                     </a>
                     <a href="/users" className="block">
-                      <Button variant="outline" className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                      >
                         <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">User Management</span>
-                          <span className="text-xs text-slate-500">Manage user accounts</span>
+                          <span className="font-medium text-slate-900">
+                            User Management
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Manage user accounts
+                          </span>
                         </div>
                       </Button>
                     </a>
@@ -663,7 +1038,9 @@ export default function AdvancedDashboard() {
             {/* RIGHT COLUMN: departments + providers + system status */}
             <div className="space-y-6">
               <DepartmentsPanel
-                departments={Array.isArray(departments) ? (departments as any[]) : []}
+                departments={
+                  Array.isArray(departments) ? (departments as any[]) : []
+                }
                 departmentBreakdown={dashboardData?.departmentBreakdown}
                 totalSSP={sspRevenue}
               />
@@ -681,24 +1058,47 @@ export default function AdvancedDashboard() {
               <Card className="border border-slate-200 shadow-sm self-start">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full" /> System Status
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" /> System
+                    Status
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Database</span>
-                      <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 rounded-full">Connected</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Last Sync</span>
-                      <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
-                        {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                      <span className="text-sm text-slate-600">
+                        Database
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 border-green-200 rounded-full"
+                      >
+                        Connected
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Active Users</span>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full">1 online</Badge>
+                      <span className="text-sm text-slate-600">
+                        Last Sync
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="rounded-full border-slate-200 text-slate-600"
+                      >
+                        {new Date().toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600">
+                        Active Users
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-700 border-blue-200 rounded-full"
+                      >
+                        1 online
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -713,7 +1113,9 @@ export default function AdvancedDashboard() {
             periodLabel={periodLabel}
             expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
             totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
-            onViewFullReport={() => { window.location.href = "/reports"; }}
+            onViewFullReport={() => {
+              window.location.href = "/reports";
+            }}
           />
         </div>
       </main>
