@@ -206,10 +206,10 @@ export interface IStorage {
       totalIncomeUSD: number;
     };
     changes: {
-      incomeChangeSSP: number;
-      expenseChangeSSP: number;
-      netIncomeChangeSSP: number;
-      incomeChangeUSD: number;
+      incomeChangeSSP: number | null;
+      expenseChangeSSP: number | null;
+      netIncomeChangeSSP: number | null;
+      incomeChangeUSD: number | null;
     };
   }>;
 
@@ -629,87 +629,170 @@ export class DatabaseStorage implements IStorage {
     startDate?: string;
     endDate?: string;
   }) {
-    // Build half-open window [start, end) for the *current* period
-    let startDate: Date;
-    let endDateExclusive: Date;
+    // ---- 1) Build current + previous windows --------------------------------
+    const now = new Date();
+    const nowY = now.getUTCFullYear();
+    const nowM1 = now.getUTCMonth() + 1;
+    const todayDay = now.getUTCDate();
+
+    let currentStart: Date;
+    let currentEndEx: Date;
+    let previousStart: Date | null = null;
+    let previousEndEx: Date | null = null;
+
+    const buildThreeMonthBack = (y: number, m1_12: number, spanMonths: number) => {
+      // returns { startYear, startMonth1 } spanMonths back from m1_12 (inclusive end)
+      let idx = m1_12 - 1 - (spanMonths - 1); // 0-based month index for start
+      let yy = y;
+      while (idx < 0) {
+        idx += 12;
+        yy -= 1;
+      }
+      return { year: yy, month1: idx + 1 };
+    };
 
     if (range === "custom" && customStartDate && customEndDate) {
-      startDate = new Date(customStartDate);
-      const endCandidate = new Date(customEndDate);
-      endDateExclusive = toEndExclusive(endCandidate)!; // bump if date-only
+      // Custom: [start, end) as given; previous = same length right before
+      currentStart = new Date(customStartDate);
+      currentEndEx = toEndExclusive(new Date(customEndDate))!;
+
+      const spanMs = currentEndEx.getTime() - currentStart.getTime();
+      previousEndEx = currentStart;
+      previousStart = new Date(previousEndEx.getTime() - spanMs);
+    } else if (range === "year") {
+      // This year vs last year (full years)
+      currentStart = new Date(Date.UTC(year, 0, 1));
+      currentEndEx = new Date(Date.UTC(year + 1, 0, 1));
+
+      previousStart = new Date(Date.UTC(year - 1, 0, 1));
+      previousEndEx = new Date(Date.UTC(year, 0, 1));
+    } else if (range === "last-3-months") {
+      // Last 3 months vs previous 3 months
+      // Anchor is (year, month) from frontend (usually "now")
+      const currentWindowEndEx = nextMonthUTC(year, month); // first of next month
+      const curStartInfo = buildThreeMonthBack(year, month, 3);
+      currentStart = monthStartUTC(curStartInfo.year, curStartInfo.month1);
+      currentEndEx = currentWindowEndEx;
+
+      // Previous 3 months immediately before current window
+      const prevEndExLocal = currentStart;
+      const prevStartInfo = buildThreeMonthBack(curStartInfo.year, curStartInfo.month1, 3);
+      previousStart = monthStartUTC(prevStartInfo.year, prevStartInfo.month1);
+      previousEndEx = prevEndExLocal;
     } else {
-      switch (range) {
-        case "current-month":
-          // Single-month window (used for: current month, last month, month-select)
-          startDate = monthStartUTC(year, month);
-          endDateExclusive = nextMonthUTC(year, month);
-          break;
-        case "last-month": {
-          // Kept for backward compatibility if caller ever passes it
-          startDate = monthStartUTC(year, month);
-          endDateExclusive = nextMonthUTC(year, month);
-          break;
-        }
-        case "last-3-months": {
-          // For November (month=11), show Aug(8) + Sep(9) + Oct(10)
-          const threeMonthsBack = new Date(Date.UTC(year, month - 4, 1));
-          startDate = monthStartUTC(
-            threeMonthsBack.getUTCFullYear(),
-            threeMonthsBack.getUTCMonth() + 1
-          );
-          endDateExclusive = monthStartUTC(year, month);
-          break;
-        }
-        case "year":
-        default:
-          startDate = new Date(Date.UTC(year, 0, 1));
-          endDateExclusive = new Date(Date.UTC(year + 1, 0, 1));
+      // Monthly-style range ("current-month" used for:
+      //   - Current Month (current year/month)
+      //   - Last Month (previous year/month)
+      //   - Month select
+      //
+      // For *current* month, align to today's day vs same days last month.
+      // For any other month, use full month vs previous full month.
+      const isCurrentCalendarMonth = year === nowY && month === nowM1;
+
+      currentStart = monthStartUTC(year, month);
+      const monthEndEx = nextMonthUTC(year, month);
+
+      if (isCurrentCalendarMonth && range === "current-month") {
+        // Partial month: from 1st up to "tomorrow" (or end-of-month)
+        const candEndEx = new Date(Date.UTC(year, month - 1, todayDay + 1));
+        currentEndEx = candEndEx > monthEndEx ? monthEndEx : candEndEx;
+      } else {
+        // Full month
+        currentEndEx = monthEndEx;
+      }
+
+      // Previous month
+      let prevY = year;
+      let prevM1 = month - 1;
+      if (prevM1 < 1) {
+        prevM1 = 12;
+        prevY = year - 1;
+      }
+      previousStart = monthStartUTC(prevY, prevM1);
+      const prevMonthEndEx = nextMonthUTC(prevY, prevM1);
+
+      if (isCurrentCalendarMonth && range === "current-month") {
+        // Same number of days as current partial, but clamped to previous month length
+        const spanMs = currentEndEx.getTime() - currentStart.getTime();
+        let candPrevEndEx = new Date(previousStart.getTime() + spanMs);
+        if (candPrevEndEx > prevMonthEndEx) candPrevEndEx = prevMonthEndEx;
+        previousEndEx = candPrevEndEx;
+      } else {
+        // Full previous month
+        previousEndEx = prevMonthEndEx;
       }
     }
 
-    // One pass fetch for the *current* window
-    const txData = await db
+    // ---- 2) Fetch transactions for current + previous windows ---------------
+    const txCurrent = await db
       .select()
       .from(transactions)
-      .where(
-        and(
-          gte(transactions.date, startDate),
-          lt(transactions.date, endDateExclusive)
-        )
-      );
+      .where(and(gte(transactions.date, currentStart), lt(transactions.date, currentEndEx)));
 
-    const sum = (arr: typeof txData, pred: (t: Transaction) => boolean) =>
-      arr.filter(pred).reduce((a, t) => a + Number(t.amount || 0), 0);
+    let txPrevious: Transaction[] = [];
+    if (previousStart && previousEndEx) {
+      txPrevious = await db
+        .select()
+        .from(transactions)
+        .where(and(gte(transactions.date, previousStart), lt(transactions.date, previousEndEx)));
+    }
 
-    // ---------- current-period totals (used for tiles & breakdowns) ----------
-    const totalIncomeSSP = sum(
-      txData,
+    const sumTx = (arr: Transaction[], pred: (t: Transaction) => boolean) =>
+      arr.reduce((a, t) => (pred(t) ? a + Number(t.amount || 0) : a), 0);
+
+    // Current totals
+    const totalIncomeSSP = sumTx(
+      txCurrent,
       (t) => t.type === "income" && t.currency === "SSP"
     );
-
-    // USD tile is "Insurance (USD)" ⇒ only USD rows with a provider
-    const totalIncomeUSD = sum(
-      txData,
-      (t) =>
-        t.type === "income" &&
-        t.currency === "USD" &&
-        !!t.insuranceProviderId
+    const totalIncomeUSD = sumTx(
+      txCurrent,
+      (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId
     );
-
-    const totalExpenseSSP = sum(
-      txData,
+    const totalExpenseSSP = sumTx(
+      txCurrent,
       (t) => t.type === "expense" && t.currency === "SSP"
     );
-    const totalExpenseUSD = sum(
-      txData,
+    const totalExpenseUSD = sumTx(
+      txCurrent,
       (t) => t.type === "expense" && t.currency === "USD"
     );
 
+    const netIncomeSSPVal = totalIncomeSSP - totalExpenseSSP;
+    const netIncomeUSDVal = totalIncomeUSD - totalExpenseUSD;
+
+    // Previous-period totals
+    const prevIncomeSSP = sumTx(
+      txPrevious,
+      (t) => t.type === "income" && t.currency === "SSP"
+    );
+    const prevIncomeUSD = sumTx(
+      txPrevious,
+      (t) => t.type === "income" && t.currency === "USD" && !!t.insuranceProviderId
+    );
+    const prevExpenseSSP = sumTx(
+      txPrevious,
+      (t) => t.type === "expense" && t.currency === "SSP"
+    );
+    const prevNetIncomeSSP = prevIncomeSSP - prevExpenseSSP;
+
+    const pctChange = (current: number, previous: number): number | null => {
+      if (!previous || previous <= 0) return null; // no meaningful comparison
+      return ((current - previous) / previous) * 100;
+    };
+
+    const changes = {
+      incomeChangeSSP: pctChange(totalIncomeSSP, prevIncomeSSP),
+      expenseChangeSSP: pctChange(totalExpenseSSP, prevExpenseSSP),
+      netIncomeChangeSSP: pctChange(netIncomeSSPVal, prevNetIncomeSSP),
+      incomeChangeUSD: pctChange(totalIncomeUSD, prevIncomeUSD),
+    };
+
+    // ---- 3) Breakdowns (current period only) --------------------------------
     // Department breakdown (SSP income only)
     const departmentBreakdown: Record<string, string> = {};
-    for (const t of txData) {
-      if (t.type !== "income" || t.currency !== "SSP" || !t.departmentId)
-        continue;
+    for (const t of txCurrent) {
+      if (t.type !== "income" || t.currency !== "SSP" || !t.departmentId) continue;
       departmentBreakdown[t.departmentId] = (
         Number(departmentBreakdown[t.departmentId] || 0) + Number(t.amount || 0)
       ).toString();
@@ -721,13 +804,8 @@ export class DatabaseStorage implements IStorage {
     allProviders.forEach((p) => providerMap.set(p.id, p.name));
 
     const insuranceBreakdown: Record<string, string> = {};
-    for (const t of txData) {
-      if (
-        t.type !== "income" ||
-        t.currency !== "USD" ||
-        !t.insuranceProviderId
-      )
-        continue;
+    for (const t of txCurrent) {
+      if (t.type !== "income" || t.currency !== "USD" || !t.insuranceProviderId) continue;
       const name = providerMap.get(t.insuranceProviderId);
       if (!name) continue;
       insuranceBreakdown[name] = (
@@ -737,195 +815,37 @@ export class DatabaseStorage implements IStorage {
 
     // Expense breakdown (SSP only)
     const expenseBreakdown: Record<string, string> = {};
-    for (const t of txData) {
-      if (
-        t.type === "expense" &&
-        t.currency === "SSP" &&
-        t.expenseCategory
-      ) {
+    for (const t of txCurrent) {
+      if (t.type === "expense" && t.currency === "SSP" && t.expenseCategory) {
         expenseBreakdown[t.expenseCategory] = (
-          Number(expenseBreakdown[t.expenseCategory] || 0) +
-          Number(t.amount || 0)
+          Number(expenseBreakdown[t.expenseCategory] || 0) + Number(t.amount || 0)
         ).toString();
       }
     }
 
-    // Patients in same window
+    // ---- 4) Patients in same current window ---------------------------------
     const patientVolumeData = await db
       .select()
       .from(patientVolume)
-      .where(
-        and(
-          gte(patientVolume.date, startDate),
-          lt(patientVolume.date, endDateExclusive)
-        )
-      );
+      .where(and(gte(patientVolume.date, currentStart), lt(patientVolume.date, currentEndEx)));
 
     const totalPatients = patientVolumeData.reduce(
       (s, pv) => s + (pv.patientCount || 0),
       0
     );
 
-    const recentTransactions = txData
+    const recentTransactions = txCurrent
       .slice()
       .sort((a, b) => (a.date > b.date ? -1 : 1))
       .slice(0, 10);
 
+    // Convert to strings for legacy fields
     const totalIncomeSSPStr = totalIncomeSSP.toString();
     const totalIncomeUSDStr = totalIncomeUSD.toString();
     const totalExpensesSSPStr = totalExpenseSSP.toString();
     const totalExpensesUSDStr = totalExpenseUSD.toString();
-    const netIncomeSSPStr = (totalIncomeSSP - totalExpenseSSP).toString();
-    const netIncomeUSDStr = (totalIncomeUSD - totalExpenseUSD).toString();
-
-    // ---------- helper functions for previous-period comparison ----------
-    const computeTotalsFromTx = (arr: typeof txData) => {
-      const incomeSSP = sum(
-        arr,
-        (t) => t.type === "income" && t.currency === "SSP"
-      );
-      const incomeUSD = sum(
-        arr,
-        (t) =>
-          t.type === "income" &&
-          t.currency === "USD" &&
-          !!t.insuranceProviderId
-      );
-      const expensesSSP = sum(
-        arr,
-        (t) => t.type === "expense" && t.currency === "SSP"
-      );
-      return {
-        incomeSSP,
-        incomeUSD,
-        expensesSSP,
-        netIncomeSSP: incomeSSP - expensesSSP,
-      };
-    };
-
-    const fetchTotalsForWindow = async (start: Date, end: Date) => {
-      const rows = await db
-        .select()
-        .from(transactions)
-        .where(and(gte(transactions.date, start), lt(transactions.date, end)));
-      return computeTotalsFromTx(rows as typeof txData);
-    };
-
-    const pctChange = (current: number, previous: number): number => {
-      if (previous === 0) {
-        return 0;
-      }
-      return ((current - previous) / previous) * 100;
-    };
-
-    // ---------- compute previousPeriod + changes ----------
-    const now = new Date();
-    const nowYear = now.getUTCFullYear();
-       const nowMonth = now.getUTCMonth() + 1;
-
-    // The frontend always sends range="current-month" for:
-    // - Current Month
-    // - Last Month (shifted year/month)
-    // - Month Select
-    const isMonthLike = range === "current-month";
-    const isRealCurrentMonth =
-      isMonthLike && year === nowYear && month === nowMonth;
-
-    // Defaults
-    let comparisonCurrent = computeTotalsFromTx(txData);
-    let comparisonPrevious = {
-      incomeSSP: 0,
-      incomeUSD: 0,
-      expensesSSP: 0,
-      netIncomeSSP: 0,
-    };
-
-    if (isMonthLike) {
-      // Determine previous month (relative to the selected month)
-      const prevMonthDate = new Date(Date.UTC(year, month - 2, 1));
-      const prevYear = prevMonthDate.getUTCFullYear();
-      const prevMonth = prevMonthDate.getUTCMonth() + 1;
-      const prevStart = monthStartUTC(prevYear, prevMonth);
-      const prevEnd = nextMonthUTC(prevYear, prevMonth);
-
-      if (isRealCurrentMonth) {
-        // ---- Option B: align on the last day with data (Nov 1–25 vs Oct 1–25) ----
-        let lastDayWithData = 0;
-        for (const t of txData) {
-          const d = new Date(t.date);
-          const day = d.getUTCDate();
-          if (day > lastDayWithData) lastDayWithData = day;
-        }
-
-        const daysInSelectedMonth = new Date(year, month, 0).getDate();
-
-        if (!lastDayWithData) {
-          // If no data, fall back to today's date, capped to month length
-          const todayDay = now.getUTCDate();
-          lastDayWithData = Math.min(todayDay, daysInSelectedMonth);
-        } else {
-          lastDayWithData = Math.min(lastDayWithData, daysInSelectedMonth);
-        }
-
-        const currentSubset = txData.filter((t) => {
-          const d = new Date(t.date);
-          const day = d.getUTCDate();
-          return day >= 1 && day <= lastDayWithData;
-        });
-
-        const prevTxAll = await db
-          .select()
-          .from(transactions)
-          .where(
-            and(
-              gte(transactions.date, prevStart),
-              lt(transactions.date, prevEnd)
-            )
-          );
-
-        const prevSubset = (prevTxAll as typeof txData).filter((t) => {
-          const d = new Date(t.date);
-          const day = d.getUTCDate();
-          return day >= 1 && day <= lastDayWithData;
-        });
-
-        comparisonCurrent = computeTotalsFromTx(
-          currentSubset as typeof txData
-        );
-        comparisonPrevious = computeTotalsFromTx(
-          prevSubset as typeof txData
-        );
-      } else {
-        // Historical selected month or "last month": full month vs previous full month
-        comparisonCurrent = computeTotalsFromTx(txData);
-        comparisonPrevious = await fetchTotalsForWindow(prevStart, prevEnd);
-      }
-    }
-
-    // Default changes = 0 (for non-month ranges like last-3-months, year, custom)
-    let incomeChangeSSP = 0;
-    let expenseChangeSSP = 0;
-    let netIncomeChangeSSP = 0;
-    let incomeChangeUSD = 0;
-
-    if (isMonthLike) {
-      incomeChangeSSP = pctChange(
-        comparisonCurrent.incomeSSP,
-        comparisonPrevious.incomeSSP
-      );
-      expenseChangeSSP = pctChange(
-        comparisonCurrent.expensesSSP,
-        comparisonPrevious.expensesSSP
-      );
-      netIncomeChangeSSP = pctChange(
-        comparisonCurrent.netIncomeSSP,
-        comparisonPrevious.netIncomeSSP
-      );
-      incomeChangeUSD = pctChange(
-        comparisonCurrent.incomeUSD,
-        comparisonPrevious.incomeUSD
-      );
-    }
+    const netIncomeSSPStr = netIncomeSSPVal.toString();
+    const netIncomeUSDStr = netIncomeUSDVal.toString();
 
     return {
       totalIncome: totalIncomeSSPStr, // legacy (SSP)
@@ -943,17 +863,12 @@ export class DatabaseStorage implements IStorage {
       recentTransactions,
       totalPatients,
       previousPeriod: {
-        totalIncomeSSP: comparisonPrevious.incomeSSP,
-        totalExpensesSSP: comparisonPrevious.expensesSSP,
-        netIncomeSSP: comparisonPrevious.netIncomeSSP,
-        totalIncomeUSD: comparisonPrevious.incomeUSD,
+        totalIncomeSSP: prevIncomeSSP,
+        totalExpensesSSP: prevExpenseSSP,
+        netIncomeSSP: prevNetIncomeSSP,
+        totalIncomeUSD: prevIncomeUSD,
       },
-      changes: {
-        incomeChangeSSP,
-        expenseChangeSSP,
-        netIncomeChangeSSP,
-        incomeChangeUSD,
-      },
+      changes,
     };
   }
 
