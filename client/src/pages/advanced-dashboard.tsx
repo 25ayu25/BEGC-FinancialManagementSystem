@@ -103,7 +103,8 @@ function InsuranceProvidersUSD({
   customEndDate?: Date;
 }) {
   const rows = useMemo(() => {
-    if (!breakdown) return [] as { name: string; amount: number }[];
+    if (!breakdown)
+      return [] as { name: string; amount: number }[];
     if (Array.isArray(breakdown)) {
       return breakdown
         .map((r) => ({
@@ -167,7 +168,8 @@ function InsuranceProvidersUSD({
         ) : (
           <div className="space-y-3">
             {sorted.map((item, idx) => {
-              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
+              const pct =
+                displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
               const color = palette[idx % palette.length];
               return (
                 <div key={`${item.name}-${idx}`} className="space-y-1.5">
@@ -177,7 +179,9 @@ function InsuranceProvidersUSD({
                         className="inline-block w-2.5 h-2.5 rounded-sm"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-sm text-slate-700">{item.name}</span>
+                      <span className="text-sm text-slate-700">
+                        {item.name}
+                      </span>
                     </div>
                     <div className="text-xs font-medium text-slate-600">
                       USD {fmtUSD(item.amount)}
@@ -221,33 +225,6 @@ export default function AdvancedDashboard() {
     selectedYear ?? null,
     selectedMonth ?? null
   );
-
-  // Comparison label + "no previous data" label, based on the range
-  const { comparisonTarget, noPreviousLabel } = useMemo(() => {
-    if (rangeToSend === "year") {
-      return {
-        comparisonTarget: "last year",
-        noPreviousLabel: "last year",
-      };
-    }
-    if (rangeToSend === "last-3-months") {
-      return {
-        comparisonTarget: "previous 3 months",
-        noPreviousLabel: "previous period",
-      };
-    }
-    if (rangeToSend === "custom") {
-      return {
-        comparisonTarget: "previous period",
-        noPreviousLabel: "previous period",
-      };
-    }
-    // current-month, last-month, month-select
-    return {
-      comparisonTarget: "last month",
-      noPreviousLabel: "previous period",
-    };
-  }, [rangeToSend]);
 
   const handleTimeRangeChange = (
     range:
@@ -414,12 +391,13 @@ export default function AdvancedDashboard() {
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
 
-  // change percentages (null means "no previous data")
-  const incomeChange = dashboardData?.changes?.incomeChangeSSP ?? null;
-  const expenseChange = dashboardData?.changes?.expenseChangeSSP ?? null;
-  const netIncomeChange =
-    dashboardData?.changes?.netIncomeChangeSSP ?? null;
-  const incomeChangeUSD = dashboardData?.changes?.incomeChangeUSD ?? null;
+  // helpers for the KPI change labels
+  const comparisonLabel = (hasPrev: boolean) => {
+    if (!hasPrev) {
+      return timeRange === "year" ? "No data last year" : "No previous period";
+    }
+    return timeRange === "year" ? "vs last year" : "vs last month";
+  };
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
@@ -455,9 +433,7 @@ export default function AdvancedDashboard() {
                 <SelectContent>
                   <SelectItem value="current-month">Current Month</SelectItem>
                   <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="last-3-months">
-                    Last 3 Months
-                  </SelectItem>
+                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
                   <SelectItem value="year">This Year</SelectItem>
                   <SelectItem value="month-select">Select Month…</SelectItem>
                   <SelectItem value="custom">Custom</SelectItem>
@@ -526,7 +502,10 @@ export default function AdvancedDashboard() {
                       align="start"
                       sideOffset={12}
                       className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255,255,255)" }}
+                      style={{
+                        zIndex: 50000,
+                        backgroundColor: "rgb(255, 255, 255)",
+                      }}
                       avoidCollisions
                       collisionPadding={15}
                     >
@@ -535,7 +514,9 @@ export default function AdvancedDashboard() {
                         numberOfMonths={1}
                         showOutsideDays={false}
                         selected={customStartDate}
-                        onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                        onSelect={(d) =>
+                          setCustomRange(d ?? undefined, customEndDate)
+                        }
                         initialFocus
                       />
                     </PopoverContent>
@@ -568,7 +549,10 @@ export default function AdvancedDashboard() {
                       align="start"
                       sideOffset={12}
                       className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{ zIndex: 50000, backgroundColor: "rgb(255,255,255)" }}
+                      style={{
+                        zIndex: 50000,
+                        backgroundColor: "rgb(255, 255, 255)",
+                      }}
                       avoidCollisions
                       collisionPadding={15}
                     >
@@ -577,7 +561,9 @@ export default function AdvancedDashboard() {
                         numberOfMonths={1}
                         showOutsideDays={false}
                         selected={customEndDate}
-                        onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                        onSelect={(d) =>
+                          setCustomRange(customStartDate, d ?? undefined)
+                        }
                         initialFocus
                       />
                     </PopoverContent>
@@ -607,39 +593,51 @@ export default function AdvancedDashboard() {
                       {nf0.format(
                         Math.round(
                           monthTotalSSP ||
-                            parseFloat(dashboardData?.totalIncomeSSP || "0")
+                            parseFloat(
+                              dashboardData?.totalIncomeSSP || "0"
+                            )
                         )
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {incomeChange != null ? (
-                        <span
-                          className={`text-xs font-medium ${
-                            incomeChange > 0
-                              ? "text-emerald-600"
-                              : incomeChange < 0
-                              ? "text-red-600"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {incomeChange > 0 ? "+" : ""}
-                          {incomeChange.toFixed(1)}% vs {comparisonTarget}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-medium text-slate-500">
-                          No data {noPreviousLabel}
-                        </span>
-                      )}
+                      {(() => {
+                        const change =
+                          dashboardData?.changes?.incomeChangeSSP ?? null;
+                        const hasPrev = change !== null && change !== undefined;
+                        const className =
+                          change == null
+                            ? "text-xs font-medium text-slate-400"
+                            : change > 0
+                            ? "text-xs font-medium text-emerald-600"
+                            : change < 0
+                            ? "text-xs font-medium text-red-600"
+                            : "text-xs font-medium text-slate-500";
+                        return (
+                          <span className={className}>
+                            {hasPrev ? (
+                              <>
+                                {change! > 0 ? "+" : ""}
+                                {change!.toFixed(1)}%{" "}
+                                {comparisonLabel(true)}
+                              </>
+                            ) : (
+                              comparisonLabel(false)
+                            )}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {incomeChange != null && incomeChange < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-red-600" />
-                    ) : incomeChange != null && incomeChange > 0 ? (
-                      <TrendingUp className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <TrendingUp className="h-4 w-4 text-slate-400" />
-                    )}
+                    {(() => {
+                      const change =
+                        dashboardData?.changes?.incomeChangeSSP ?? null;
+                      return change != null && change < 0 ? (
+                        <TrendingDown className="h-4 w-4 text-red-600" />
+                      ) : (
+                        <TrendingUp className="h-4 w-4 text-emerald-600" />
+                      );
+                    })()}
                   </div>
                 </div>
               </CardContent>
@@ -666,34 +664,44 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {expenseChange != null ? (
-                        <span
-                          className={`text-xs font-medium ${
-                            expenseChange > 0
-                              ? "text-red-600"
-                              : expenseChange < 0
-                              ? "text-emerald-600"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {expenseChange > 0 ? "+" : ""}
-                          {expenseChange.toFixed(1)}% vs {comparisonTarget}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-medium text-slate-500">
-                          No data {noPreviousLabel}
-                        </span>
-                      )}
+                      {(() => {
+                        const change =
+                          dashboardData?.changes?.expenseChangeSSP ?? null;
+                        const hasPrev = change !== null && change !== undefined;
+                        const className =
+                          change == null
+                            ? "text-xs font-medium text-slate-400"
+                            : change > 0
+                            ? "text-xs font-medium text-red-600"
+                            : change < 0
+                            ? "text-xs font-medium text-emerald-600"
+                            : "text-xs font-medium text-slate-500";
+                        return (
+                          <span className={className}>
+                            {hasPrev ? (
+                              <>
+                                {change! > 0 ? "+" : ""}
+                                {change!.toFixed(1)}%{" "}
+                                {comparisonLabel(true)}
+                              </>
+                            ) : (
+                              comparisonLabel(false)
+                            )}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {expenseChange != null && expenseChange < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-emerald-600" />
-                    ) : expenseChange != null && expenseChange > 0 ? (
-                      <TrendingUp className="h-4 w-4 text-red-600" />
-                    ) : (
-                      <TrendingUp className="h-4 w-4 text-slate-400" />
-                    )}
+                    {(() => {
+                      const change =
+                        dashboardData?.changes?.expenseChangeSSP ?? null;
+                      return change != null && change < 0 ? (
+                        <TrendingDown className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <TrendingUp className="h-4 w-4 text-red-600" />
+                      );
+                    })()}
                   </div>
                 </div>
               </CardContent>
@@ -712,30 +720,42 @@ export default function AdvancedDashboard() {
                       {nf0.format(
                         Math.round(
                           (monthTotalSSP ||
-                            parseFloat(dashboardData?.totalIncomeSSP || "0")) -
-                            parseFloat(dashboardData?.totalExpenses || "0")
+                            parseFloat(
+                              dashboardData?.totalIncomeSSP || "0"
+                            )) -
+                            parseFloat(
+                              dashboardData?.totalExpenses || "0"
+                            )
                         )
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {netIncomeChange != null ? (
-                        <span
-                          className={`text-xs font-medium ${
-                            netIncomeChange > 0
-                              ? "text-emerald-600"
-                              : netIncomeChange < 0
-                              ? "text-red-600"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {netIncomeChange > 0 ? "+" : ""}
-                          {netIncomeChange.toFixed(1)}% vs {comparisonTarget}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-medium text-slate-500">
-                          No data {noPreviousLabel}
-                        </span>
-                      )}
+                      {(() => {
+                        const change =
+                          dashboardData?.changes?.netIncomeChangeSSP ?? null;
+                        const hasPrev = change !== null && change !== undefined;
+                        const className =
+                          change == null
+                            ? "text-xs font-medium text-slate-400"
+                            : change > 0
+                            ? "text-xs font-medium text-emerald-600"
+                            : change < 0
+                            ? "text-xs font-medium text-red-600"
+                            : "text-xs font-medium text-slate-500";
+                        return (
+                          <span className={className}>
+                            {hasPrev ? (
+                              <>
+                                {change! > 0 ? "+" : ""}
+                                {change!.toFixed(1)}%{" "}
+                                {comparisonLabel(true)}
+                              </>
+                            ) : (
+                              comparisonLabel(false)
+                            )}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="bg-blue-50 p-1.5 rounded-lg">
@@ -748,7 +768,9 @@ export default function AdvancedDashboard() {
             {/* Insurance (USD) quick nav */}
             <Link
               href={`/insurance-providers?range=${rangeToSend}${
-                timeRange === "custom" && customStartDate && customEndDate
+                timeRange === "custom" &&
+                customStartDate &&
+                customEndDate
                   ? `&startDate=${format(
                       customStartDate,
                       "yyyy-MM-dd"
@@ -767,29 +789,40 @@ export default function AdvancedDashboard() {
                         USD{" "}
                         {fmtUSD(
                           Math.round(
-                            parseFloat(dashboardData?.totalIncomeUSD || "0")
+                            parseFloat(
+                              dashboardData?.totalIncomeUSD || "0"
+                            )
                           )
                         )}
                       </p>
                       <div className="flex items-center mt-1">
-                        {incomeChangeUSD != null ? (
-                          <span
-                            className={`text-xs font-medium ${
-                              incomeChangeUSD > 0
-                                ? "text-emerald-600"
-                                : incomeChangeUSD < 0
-                                ? "text-red-600"
-                                : "text-slate-500"
-                            }`}
-                          >
-                            {incomeChangeUSD > 0 ? "+" : ""}
-                            {incomeChangeUSD.toFixed(1)}% vs {comparisonTarget}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-slate-500">
-                            No data {noPreviousLabel}
-                          </span>
-                        )}
+                        {(() => {
+                          const change =
+                            dashboardData?.changes?.incomeChangeUSD ?? null;
+                          const hasPrev =
+                            change !== null && change !== undefined;
+                          const className =
+                            change == null
+                              ? "text-xs font-medium text-slate-400"
+                              : change > 0
+                              ? "text-xs font-medium text-emerald-600"
+                              : change < 0
+                              ? "text-xs font-medium text-red-600"
+                              : "text-xs font-medium text-slate-500";
+                          return (
+                            <span className={className}>
+                              {hasPrev ? (
+                                <>
+                                  {change! > 0 ? "+" : ""}
+                                  {change!.toFixed(1)}%{" "}
+                                  {comparisonLabel(true)}
+                                </>
+                              ) : (
+                                comparisonLabel(false)
+                              )}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="bg-purple-50 p-1.5 rounded-lg">
@@ -919,7 +952,9 @@ export default function AdvancedDashboard() {
             {/* RIGHT COLUMN: departments + providers + system status */}
             <div className="space-y-6">
               <DepartmentsPanel
-                departments={Array.isArray(departments) ? (departments as any[]) : []}
+                departments={
+                  Array.isArray(departments) ? (departments as any[]) : []
+                }
                 departmentBreakdown={dashboardData?.departmentBreakdown}
                 totalSSP={sspRevenue}
               />
