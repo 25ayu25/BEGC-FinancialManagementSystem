@@ -394,6 +394,10 @@ export default function AdvancedDashboard() {
 
   /* ---------- Month-to-date vs same days last month (Option B) ---------- */
   const isCurrentMonthRange = timeRange === "current-month";
+  const isSingleMonthView =
+    timeRange === "current-month" ||
+    timeRange === "last-month" ||
+    timeRange === "month-select";
 
   // Determine how many days of data we have this month
   const daysInCurrentMonth = new Date(yearToSend, monthToSend, 0).getDate();
@@ -535,15 +539,24 @@ export default function AdvancedDashboard() {
   const sspNetIncome = sspRevenue - totalExpenses;
 
   // Which % we actually use on the cards
+  const backendRevenueChangePct =
+    dashboardData?.changes?.incomeChangeSSP ?? null;
+  const backendInsuranceChangePct =
+    dashboardData?.changes?.incomeChangeUSD ?? null;
+  const expenseChangePct =
+    dashboardData?.changes?.expenseChangeSSP ?? null;
+  const netIncomeChangePct =
+    dashboardData?.changes?.netIncomeChangeSSP ?? null;
+
   const revenueChangePct =
     isCurrentMonthRange && incomeChangeSSP_MTD !== null
       ? incomeChangeSSP_MTD
-      : dashboardData?.changes?.incomeChangeSSP;
+      : backendRevenueChangePct;
 
   const insuranceChangePct =
     isCurrentMonthRange && incomeChangeUSD_MTD !== null
       ? incomeChangeUSD_MTD
-      : dashboardData?.changes?.incomeChangeUSD;
+      : backendInsuranceChangePct;
 
   const prevMonthLabel = (() => {
     const date = prevMonthDate;
@@ -751,7 +764,8 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {revenueChangePct !== undefined &&
+                      {isSingleMonthView &&
+                        revenueChangePct !== undefined &&
                         revenueChangePct !== null && (
                           <span
                             className={cn(
@@ -806,33 +820,29 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.expenseChangeSSP !==
-                        undefined && (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            dashboardData.changes.expenseChangeSSP > 0
-                              ? "text-red-600"
-                              : dashboardData.changes.expenseChangeSSP < 0
-                              ? "text-emerald-600"
-                              : "text-slate-500"
-                          )}
-                        >
-                          {dashboardData.changes.expenseChangeSSP > 0
-                            ? "+"
-                            : ""}
-                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}%
-                          {isCurrentMonthRange
-                            ? ` vs same days last month (${prevMonthLabel})`
-                            : " vs last month"}
-                        </span>
-                      )}
+                      {isSingleMonthView &&
+                        expenseChangePct !== null && (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              expenseChangePct > 0
+                                ? "text-red-600"
+                                : expenseChangePct < 0
+                                ? "text-emerald-600"
+                                : "text-slate-500"
+                            )}
+                          >
+                            {expenseChangePct > 0 ? "+" : ""}
+                            {expenseChangePct.toFixed(1)}%
+                            {isCurrentMonthRange
+                              ? ` vs same days last month (${prevMonthLabel})`
+                              : " vs last month"}
+                          </span>
+                        )}
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {dashboardData?.changes?.expenseChangeSSP !==
-                      undefined &&
-                    dashboardData.changes.expenseChangeSSP < 0 ? (
+                    {expenseChangePct !== null && expenseChangePct < 0 ? (
                       <TrendingDown className="h-4 w-4 text-emerald-600" />
                     ) : (
                       <TrendingUp className="h-4 w-4 text-red-600" />
@@ -854,27 +864,25 @@ export default function AdvancedDashboard() {
                       SSP {nf0.format(Math.round(sspNetIncome))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.netIncomeChangeSSP !==
-                        undefined && (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            dashboardData.changes.netIncomeChangeSSP > 0
-                              ? "text-emerald-600"
-                              : dashboardData.changes.netIncomeChangeSSP < 0
-                              ? "text-red-600"
-                              : "text-slate-500"
-                          )}
-                        >
-                          {dashboardData.changes.netIncomeChangeSSP > 0
-                            ? "+"
-                            : ""}
-                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}%
-                          {isCurrentMonthRange
-                            ? ` vs same days last month (${prevMonthLabel})`
-                            : " vs last month"}
-                        </span>
-                      )}
+                      {isSingleMonthView &&
+                        netIncomeChangePct !== null && (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              netIncomeChangePct > 0
+                                ? "text-emerald-600"
+                                : netIncomeChangePct < 0
+                                ? "text-red-600"
+                                : "text-slate-500"
+                            )}
+                          >
+                            {netIncomeChangePct > 0 ? "+" : ""}
+                            {netIncomeChangePct.toFixed(1)}%
+                            {isCurrentMonthRange
+                              ? ` vs same days last month (${prevMonthLabel})`
+                              : " vs last month"}
+                          </span>
+                        )}
                     </div>
                   </div>
                   <div className="bg-blue-50 p-1.5 rounded-lg">
@@ -915,7 +923,8 @@ export default function AdvancedDashboard() {
                         )}
                       </p>
                       <div className="flex items-center mt-1">
-                        {insuranceChangePct !== undefined &&
+                        {isSingleMonthView &&
+                        insuranceChangePct !== undefined &&
                         insuranceChangePct !== null ? (
                           <span
                             className={cn(
