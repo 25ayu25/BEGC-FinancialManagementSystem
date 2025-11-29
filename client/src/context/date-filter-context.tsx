@@ -6,14 +6,14 @@ export type TimeRange =
   | "last-month"
   | "last-3-months"
   | "year"
-  | "month-select" // NEW: pick any specific month (Jan..Dec of any year)
+  | "month-select"   // NEW: pick any specific month (Jan..Dec of any year)
   | "custom";
 
 type Ctx = {
   timeRange: TimeRange;
 
   /** Specific month selection (used when timeRange === "month-select") */
-  selectedYear: number; // 1..9999
+  selectedYear: number;  // 1..9999
   selectedMonth: number; // 1..12
 
   /** Custom range (used when timeRange === "custom") */
@@ -106,7 +106,7 @@ export function DateFilterProvider({ children }: { children: React.ReactNode }) 
         const today = new Date();
         let end = new Date(y, m, 0); // default = full month
 
-        // If we are looking at the real current month, show 1–today
+        // If we are looking at the real current month, show 1–today as the *logical* end
         if (
           today.getFullYear() === y &&
           today.getMonth() + 1 === m
@@ -118,15 +118,15 @@ export function DateFilterProvider({ children }: { children: React.ReactNode }) 
       }
 
       case "last-month": {
-        // selectedYear/Month already point to "last month"
+        // selectedYear/Month already point to last month
         const start = new Date(y, m - 1, 1);
         const end = new Date(y, m, 0);
         return { startDate: start, endDate: end };
       }
 
       case "last-3-months": {
-        // Last 3 *completed* months before the "current" selected month
-        // If selectedMonth = 11 (Nov), this yields Aug 1 – Oct 31.
+        // Last 3 completed months before the "current" selected month
+        // e.g. selectedMonth = 11 (Nov) → Aug 1 – Oct 31
         const start = new Date(y, m - 4, 1);
         const end = new Date(y, m - 1, 0);
         return { startDate: start, endDate: end };
@@ -198,32 +198,25 @@ export function DateFilterProvider({ children }: { children: React.ReactNode }) 
       return `${sMonthName} ${sDay}, ${sYear} – ${eMonthName} ${eDay}, ${eYear}`;
     };
 
-    // Custom range: show explicit dates
+    // Custom range: show explicit dates (Nov 1–29, 2025)
     if (timeRange === "custom" && startDate && endDate) {
       return formatRangeLabel(startDate, endDate);
     }
 
-    // Explicit month selection (e.g., "Nov 2025")
+    // Explicit month selection (Nov 2025)
     if (timeRange === "month-select") {
       return `${monthNames[(selectedMonth - 1) % 12]} ${selectedYear}`;
     }
 
-    // Current month: when it is the real current calendar month, show "Nov 1–25, 2025"
-    if (timeRange === "current-month" && startDate && endDate) {
-      const today = new Date();
-      const isThisCalendarMonth =
-        selectedYear === today.getFullYear() &&
-        selectedMonth === today.getMonth() + 1;
-
-      if (isThisCalendarMonth) {
-        return formatRangeLabel(startDate, endDate);
-      }
+    // Current month: ALWAYS just Month Year (e.g., "Nov 2025")
+    if (timeRange === "current-month") {
+      return `${monthNames[(selectedMonth - 1) % 12]} ${selectedYear}`;
     }
 
     // Default labels for other quick ranges
     return (
       {
-        "current-month": "Current month",
+        "current-month": "Current month", // not used because handled above
         "last-month": "Last month",
         "last-3-months": "Last 3 months",
         year: "This year",
@@ -247,11 +240,7 @@ export function DateFilterProvider({ children }: { children: React.ReactNode }) 
     periodLabel,
   };
 
-  return (
-    <DateFilterContext.Provider value={value}>
-      {children}
-    </DateFilterContext.Provider>
-  );
+  return <DateFilterContext.Provider value={value}>{children}</DateFilterContext.Provider>;
 }
 
 export function useDateFilter() {
