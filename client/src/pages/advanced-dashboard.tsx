@@ -765,8 +765,7 @@ export default function AdvancedDashboard() {
                           >
                             {revenueChangePct > 0 ? "+" : ""}
                             {revenueChangePct.toFixed(1)}%
-                            {isCurrentMonthRange &&
-                            incomeChangeSSP_MTD !== null
+                            {isCurrentMonthRange
                               ? ` vs same days last month (${prevMonthLabel})`
                               : " vs last month"}
                           </span>
@@ -822,8 +821,10 @@ export default function AdvancedDashboard() {
                           {dashboardData.changes.expenseChangeSSP > 0
                             ? "+"
                             : ""}
-                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}
-                          % vs last month
+                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}%
+                          {isCurrentMonthRange
+                            ? ` vs same days last month (${prevMonthLabel})`
+                            : " vs last month"}
                         </span>
                       )}
                     </div>
@@ -868,8 +869,10 @@ export default function AdvancedDashboard() {
                           {dashboardData.changes.netIncomeChangeSSP > 0
                             ? "+"
                             : ""}
-                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}
-                          % vs last month
+                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}%
+                          {isCurrentMonthRange
+                            ? ` vs same days last month (${prevMonthLabel})`
+                            : " vs last month"}
                         </span>
                       )}
                     </div>
@@ -926,8 +929,7 @@ export default function AdvancedDashboard() {
                           >
                             {insuranceChangePct > 0 ? "+" : ""}
                             {insuranceChangePct.toFixed(1)}%
-                            {isCurrentMonthRange &&
-                            incomeChangeUSD_MTD !== null
+                            {isCurrentMonthRange
                               ? ` vs same days last month (${prevMonthLabel})`
                               : " vs last month"}
                           </span>
