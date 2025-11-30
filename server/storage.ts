@@ -243,9 +243,7 @@ export interface IStorage {
     };
   }>;
 
-  getIncomeTrends(
-    days: number
-  ): Promise<
+  getIncomeTrends(days: number): Promise<
     Array<{ date: string; income: number; incomeUSD: number; incomeSSP: number }>
   >; // USD is insurance-only
 
@@ -303,9 +301,7 @@ export interface IStorage {
     >
   >;
 
-  getInsuranceClaim(
-    id: string
-  ): Promise<
+  getInsuranceClaim(id: string): Promise<
     | (InsuranceClaim & {
         providerName: string;
         billedAmount: number;
@@ -383,10 +379,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
-  async updateUser(
-    id: string,
-    updates: Partial<User>
-  ): Promise<User | undefined> {
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ ...updates, updatedAt: new Date() })
@@ -417,7 +410,10 @@ export class DatabaseStorage implements IStorage {
       );
     if (filters?.end)
       conds.push(
-        lt(insurancePayments.paymentDate, toEndExclusive(new Date(filters.end))!)
+        lt(
+          insurancePayments.paymentDate,
+          toEndExclusive(new Date(filters.end))!
+        )
       );
 
     let q = db.select().from(insurancePayments);
@@ -460,9 +456,7 @@ export class DatabaseStorage implements IStorage {
       .from(departments)
       .where(eq(departments.isActive, true));
   }
-  async createDepartment(
-    department: InsertDepartment
-  ): Promise<Department> {
+  async createDepartment(department: InsertDepartment): Promise<Department> {
     const [newDepartment] = await db
       .insert(departments)
       .values(department)
@@ -500,12 +494,9 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
   }): Promise<Transaction[]> {
     const conds: any[] = [];
-    if (filters?.startDate)
-      conds.push(gte(transactions.date, filters.startDate));
+    if (filters?.startDate) conds.push(gte(transactions.date, filters.startDate));
     if (filters?.endDate)
-      conds.push(
-        lt(transactions.date, toEndExclusive(filters.endDate)!)
-      );
+      conds.push(lt(transactions.date, toEndExclusive(filters.endDate)!));
     if (filters?.departmentId)
       conds.push(eq(transactions.departmentId, filters.departmentId));
     if (filters?.insuranceProviderId)
@@ -538,12 +529,9 @@ export class DatabaseStorage implements IStorage {
     const page = Math.floor(offset / limit) + 1;
 
     const conds: any[] = [];
-    if (filters?.startDate)
-      conds.push(gte(transactions.date, filters.startDate));
+    if (filters?.startDate) conds.push(gte(transactions.date, filters.startDate));
     if (filters?.endDate)
-      conds.push(
-        lt(transactions.date, toEndExclusive(filters.endDate)!)
-      );
+      conds.push(lt(transactions.date, toEndExclusive(filters.endDate)!));
     if (filters?.departmentId)
       conds.push(eq(transactions.departmentId, filters.departmentId));
     if (filters?.insuranceProviderId)
@@ -686,9 +674,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transactions.id, id));
     return transaction || undefined;
   }
-  async createTransaction(
-    transaction: InsertTransaction
-  ): Promise<Transaction> {
+  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const [newTransaction] = await db
       .insert(transactions)
       .values(transaction)
@@ -719,16 +705,11 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(monthlyReports)
       .where(
-        and(
-          eq(monthlyReports.year, year),
-          eq(monthlyReports.month, month)
-        )
+        and(eq(monthlyReports.year, year), eq(monthlyReports.month, month))
       );
     return report || undefined;
   }
-  async createMonthlyReport(
-    report: InsertMonthlyReport
-  ): Promise<MonthlyReport> {
+  async createMonthlyReport(report: InsertMonthlyReport): Promise<MonthlyReport> {
     const [newReport] = await db
       .insert(monthlyReports)
       .values(report)
@@ -755,16 +736,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return newReceipt;
   }
-  async getReceiptsByTransaction(
-    transactionId: string
-  ): Promise<Receipt[]> {
+  async getReceiptsByTransaction(transactionId: string): Promise<Receipt[]> {
     return await db
       .select()
       .from(receipts)
       .where(eq(receipts.transactionId, transactionId));
   }
 
-  /* Dashboard / Analytics (SSP totals; USD = Insurance only) */
+  /* ---------------- Dashboard / Analytics (SSP totals; USD = Insurance only) ---------------- */
   async getDashboardData({
     year,
     month,
@@ -800,17 +779,19 @@ export class DatabaseStorage implements IStorage {
           break;
         }
         case "last-3-months": {
-          // For November (month=11), show Aug(8) + Sep(9) + Oct(10)
-          const threeMonthsBack = new Date(Date.UTC(year, month - 4, 1));
+          // Last 3 months = 3-month window ending at the selected month (inclusive)
+          // e.g. year=2025, month=11 (Nov) => [Sep 1, Dec 1)
+          const currentStart = new Date(Date.UTC(year, month - 3, 1));
           startDate = monthStartUTC(
-            threeMonthsBack.getUTCFullYear(),
-            threeMonthsBack.getUTCMonth() + 1
+            currentStart.getUTCFullYear(),
+            currentStart.getUTCMonth() + 1
           );
-          endDateExclusive = monthStartUTC(year, month);
+          endDateExclusive = nextMonthUTC(year, month);
           break;
         }
         case "year":
         default:
+          // Full calendar year
           startDate = new Date(Date.UTC(year, 0, 1));
           endDateExclusive = new Date(Date.UTC(year + 1, 0, 1));
       }
@@ -888,7 +869,11 @@ export class DatabaseStorage implements IStorage {
     // Expense breakdown (SSP only)
     const expenseBreakdown: Record<string, string> = {};
     for (const t of txData) {
-      if (t.type === "expense" && t.currency === "SSP" && t.expenseCategory) {
+      if (
+        t.type === "expense" &&
+        t.currency === "SSP" &&
+        t.expenseCategory
+      ) {
         expenseBreakdown[t.expenseCategory] = (
           Number(expenseBreakdown[t.expenseCategory] || 0) +
           Number(t.amount || 0)
@@ -953,16 +938,12 @@ export class DatabaseStorage implements IStorage {
       const rows = await db
         .select()
         .from(transactions)
-        .where(
-          and(gte(transactions.date, start), lt(transactions.date, end))
-        );
+        .where(and(gte(transactions.date, start), lt(transactions.date, end)));
       return computeTotalsFromTx(rows as typeof txData);
     };
 
     const pctChange = (current: number, previous: number): number => {
-      if (previous === 0) {
-        return 0;
-      }
+      if (previous === 0) return 0;
       return ((current - previous) / previous) * 100;
     };
 
@@ -979,14 +960,15 @@ export class DatabaseStorage implements IStorage {
     const isRealCurrentMonth =
       isMonthLike && year === nowYear && month === nowMonth;
 
-    // Defaults
-    let comparisonCurrent = computeTotalsFromTx(txData);
-    let comparisonPrevious = {
+    const zeroTotals = {
       incomeSSP: 0,
       incomeUSD: 0,
       expensesSSP: 0,
       netIncomeSSP: 0,
     };
+
+    let comparisonCurrent = computeTotalsFromTx(txData);
+    let comparisonPrevious = { ...zeroTotals };
 
     if (isMonthLike) {
       // Determine previous month (relative to the selected month)
@@ -997,7 +979,7 @@ export class DatabaseStorage implements IStorage {
       const prevEnd = nextMonthUTC(prevYear, prevMonth);
 
       if (isRealCurrentMonth) {
-        // ---- Option B: align on the last day with data (Nov 1–25 vs Oct 1–25) ----
+        // ---- Same-days alignment: e.g. Nov 1–25 vs Oct 1–25 ----
         let lastDayWithData = 0;
         for (const t of txData) {
           const d = new Date(t.date);
@@ -1012,10 +994,7 @@ export class DatabaseStorage implements IStorage {
           const todayDay = now.getUTCDate();
           lastDayWithData = Math.min(todayDay, daysInSelectedMonth);
         } else {
-          lastDayWithData = Math.min(
-            lastDayWithData,
-            daysInSelectedMonth
-          );
+          lastDayWithData = Math.min(lastDayWithData, daysInSelectedMonth);
         }
 
         const currentSubset = txData.filter((t) => {
@@ -1051,15 +1030,30 @@ export class DatabaseStorage implements IStorage {
         comparisonCurrent = computeTotalsFromTx(txData);
         comparisonPrevious = await fetchTotalsForWindow(prevStart, prevEnd);
       }
+    } else if (range === "last-3-months" || range === "year") {
+      // Multi-month / yearly: current window vs immediately preceding window of same length
+      const windowMs = endDateExclusive.getTime() - startDate.getTime();
+      if (windowMs > 0) {
+        const prevStart = new Date(startDate.getTime() - windowMs);
+        const prevEnd = startDate;
+        comparisonCurrent = computeTotalsFromTx(txData);
+        comparisonPrevious = await fetchTotalsForWindow(prevStart, prevEnd);
+      }
     }
 
-    // Default changes = 0 (for non-month ranges like last-3-months, year, custom)
+    // Do we actually have anything to compare against?
+    const hasComparison =
+      comparisonPrevious.incomeSSP !== 0 ||
+      comparisonPrevious.expensesSSP !== 0 ||
+      comparisonPrevious.incomeUSD !== 0 ||
+      comparisonPrevious.netIncomeSSP !== 0;
+
     let incomeChangeSSP = 0;
     let expenseChangeSSP = 0;
     let netIncomeChangeSSP = 0;
     let incomeChangeUSD = 0;
 
-    if (isMonthLike) {
+    if (hasComparison) {
       incomeChangeSSP = pctChange(
         comparisonCurrent.incomeSSP,
         comparisonPrevious.incomeSSP
@@ -1118,8 +1112,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         dateISO: sql<string>`DATE(${transactions.date})`,
         incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='USD' AND ${transactions.insuranceProviderId} IS NOT NULL THEN ${transactions.amount} ELSE 0 END),0)`,
-        incomeSSP:
-          sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='SSP' THEN ${transactions.amount} ELSE 0 END),0)`,
+        incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='SSP' THEN ${transactions.amount} ELSE 0 END),0)`,
       })
       .from(transactions)
       .where(and(gte(transactions.date, start), lt(transactions.date, endEx)))
@@ -1134,18 +1127,10 @@ export class DatabaseStorage implements IStorage {
       incomeSSP: number;
     }> = [];
     const cur = new Date(
-      Date.UTC(
-        start.getUTCFullYear(),
-        start.getUTCMonth(),
-        start.getUTCDate()
-      )
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate())
     );
     const endDay = new Date(
-      Date.UTC(
-        endEx.getUTCFullYear(),
-        endEx.getUTCMonth(),
-        endEx.getUTCDate()
-      )
+      Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth(), endEx.getUTCDate())
     );
     while (cur <= endDay) {
       const iso = cur.toISOString().slice(0, 10);
@@ -1172,8 +1157,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         dateISO: sql<string>`DATE(${transactions.date})`,
         incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='USD' AND ${transactions.insuranceProviderId} IS NOT NULL THEN ${transactions.amount} ELSE 0 END),0)`,
-        incomeSSP:
-          sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='SSP' THEN ${transactions.amount} ELSE 0 END),0)`,
+        incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='SSP' THEN ${transactions.amount} ELSE 0 END),0)`,
       })
       .from(transactions)
       .where(and(gte(transactions.date, start), lt(transactions.date, endEx)))
@@ -1211,8 +1195,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         dateISO: sql<string>`DATE(${transactions.date})`,
         incomeUSD: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='USD' AND ${transactions.insuranceProviderId} IS NOT NULL THEN ${transactions.amount} ELSE 0 END),0)`,
-        incomeSSP:
-          sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='SSP' THEN ${transactions.amount} ELSE 0 END),0)`,
+        incomeSSP: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type}='income' AND ${transactions.currency}='SSP' THEN ${transactions.amount} ELSE 0 END),0)`,
       })
       .from(transactions)
       .where(and(gte(transactions.date, startDate), lt(transactions.date, endEx)))
@@ -1233,11 +1216,7 @@ export class DatabaseStorage implements IStorage {
       )
     );
     const last = new Date(
-      Date.UTC(
-        endEx.getUTCFullYear(),
-        endEx.getUTCMonth(),
-        endEx.getUTCDate()
-      )
+      Date.UTC(endEx.getUTCFullYear(), endEx.getUTCMonth(), endEx.getUTCDate())
     );
     while (cur < last) {
       const iso = cur.toISOString().slice(0, 10);
@@ -1318,9 +1297,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   /* Patient Volume (half-open day [start, nextDay) ) */
-  async createPatientVolume(
-    volume: InsertPatientVolume
-  ): Promise<PatientVolume> {
+  async createPatientVolume(volume: InsertPatientVolume): Promise<PatientVolume> {
     const [newVolume] = await db
       .insert(patientVolume)
       .values(volume)
@@ -1409,10 +1386,7 @@ export class DatabaseStorage implements IStorage {
       periodStart: start,
       periodEnd: end,
     };
-    const [created] = await db
-      .insert(insuranceClaims)
-      .values(row)
-      .returning();
+    const [created] = await db.insert(insuranceClaims).values(row).returning();
     return created;
   }
 
@@ -1509,10 +1483,7 @@ export class DatabaseStorage implements IStorage {
     return list.find((c) => c.id === id);
   }
 
-  async updateInsuranceClaim(
-    id: string,
-    updates: Partial<InsuranceClaim>
-  ) {
+  async updateInsuranceClaim(id: string, updates: Partial<InsuranceClaim>) {
     const [row] = await db
       .update(insuranceClaims)
       .set({ ...updates, updatedAt: new Date() })
@@ -1560,7 +1531,8 @@ export class DatabaseStorage implements IStorage {
     const billedConds: any[] = [];
     if (providerId) billedConds.push(eq(insuranceClaims.providerId, providerId));
     if (status) billedConds.push(eq(insuranceClaims.status, status));
-    if (startDate) billedConds.push(gte(insuranceClaims.periodStart, startDate));
+    if (startDate)
+      billedConds.push(gte(insuranceClaims.periodStart, startDate));
     if (endEx) billedConds.push(lt(insuranceClaims.periodEnd, endEx));
     const billedRows = await db
       .select({
