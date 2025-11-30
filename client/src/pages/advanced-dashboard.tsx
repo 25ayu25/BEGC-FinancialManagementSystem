@@ -82,65 +82,6 @@ function computeRangeParams(
   };
 }
 
-/* ================== helper: KPI change label ================== */
-
-type ChangeLabelOpts = {
-  value: number | null | undefined;
-  isCurrentMonthRange: boolean;
-  prevMonthLabel: string;
-  /** text for non-current-month ranges, e.g. "last month" or "last period" */
-  comparisonPeriodLabel?: string;
-  /** when false, we show "No data to compare" instead of a % */
-  hasComparison?: boolean;
-  /** true = up is good (green), false = up is bad (red, e.g. Expenses) */
-  positiveIsGood?: boolean;
-};
-
-type ChangeLabelResult = {
-  text: string;
-  className: string;
-};
-
-function getChangeLabel({
-  value,
-  isCurrentMonthRange,
-  prevMonthLabel,
-  comparisonPeriodLabel = "last month",
-  hasComparison = true,
-  positiveIsGood = true,
-}: ChangeLabelOpts): ChangeLabelResult | null {
-  // Explicitly no comparison data (e.g. This Year but no last year data)
-  if (hasComparison === false) {
-    return {
-      text: "No data to compare",
-      className: "text-slate-500",
-    };
-  }
-
-  if (value === undefined || value === null || Number.isNaN(value)) {
-    return null;
-  }
-
-  const baseSuffix = isCurrentMonthRange
-    ? ` vs same days last month (${prevMonthLabel})`
-    : ` vs ${comparisonPeriodLabel}`;
-
-  const prefix = value > 0 ? "+" : "";
-  const sign = value > 0 ? 1 : value < 0 ? -1 : 0;
-
-  let tone = "text-slate-500";
-  if (sign !== 0) {
-    const positiveClass = positiveIsGood ? "text-emerald-600" : "text-red-600";
-    const negativeClass = positiveIsGood ? "text-red-600" : "text-emerald-600";
-    tone = sign > 0 ? positiveClass : negativeClass;
-  }
-
-  return {
-    text: `${prefix}${value.toFixed(1)}%${baseSuffix}`,
-    className: tone,
-  };
-}
-
 /* ================== Insurance Providers Card ================== */
 function InsuranceProvidersUSD({
   breakdown,
@@ -221,7 +162,9 @@ function InsuranceProvidersUSD({
       <CardContent className="space-y-3">
         <div className="text-xs text-slate-500">
           Totals in period:{" "}
-          <span className="font-mono">USD {fmtUSD(displayTotal)}</span>
+          <span className="font-mono">
+            USD {fmtUSD(displayTotal)}
+          </span>
         </div>
 
         {sorted.length === 0 ? (
@@ -367,7 +310,12 @@ export default function AdvancedDashboard() {
 
   /* ---------- previous-month income trends (for MTD comparison) ---------- */
   const { data: prevRawIncome } = useQuery({
-    queryKey: ["/api/income-trends", "prev-month", yearToSend, monthToSend],
+    queryKey: [
+      "/api/income-trends",
+      "prev-month",
+      yearToSend,
+      monthToSend,
+    ],
     enabled: timeRange === "current-month",
     queryFn: async () => {
       const currentMonthDate = new Date(yearToSend, monthToSend - 1, 1);
@@ -388,6 +336,7 @@ export default function AdvancedDashboard() {
   /* ---------- build income series for current period ---------- */
   let incomeSeries: Array<{
     day: number;
+    amount: number;
     amount: number;
     amountSSP: number;
     amountUSD: number;
@@ -428,15 +377,13 @@ export default function AdvancedDashboard() {
     if (Array.isArray(rawIncome)) {
       for (const r of rawIncome as any[]) {
         let d = (r as any).day;
-        if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
+        if (!d && (r as any).dateISO)
+          d = new Date((r as any).dateISO).getDate();
         if (!d && (r as any).date) d = new Date((r as any).date).getDate();
         if (d >= 1 && d <= daysInMonth) {
           incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
           incomeSeries[d - 1].amountSSP += Number(
-            (r as any).incomeSSP ??
-              (r as any).income ??
-              (r as any).amount ??
-              0
+            (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
           );
           incomeSeries[d - 1].amount += Number(
             (r as any).income ?? (r as any).amount ?? 0
@@ -446,7 +393,7 @@ export default function AdvancedDashboard() {
     }
   }
 
-  /* ---------- Month-to-date vs same days last month ---------- */
+  /* ---------- Month-to-date vs same days last month (Option B) ---------- */
   const isCurrentMonthRange = timeRange === "current-month";
 
   // Determine how many days of data we have this month
@@ -509,7 +456,8 @@ export default function AdvancedDashboard() {
     const prevDays = daysInPrevMonth;
     for (const r of prevRawIncome as any[]) {
       let d = (r as any).day;
-      if (!d && (r as any).dateISO) d = new Date((r as any).dateISO).getDate();
+      if (!d && (r as any).dateISO)
+        d = new Date((r as any).dateISO).getDate();
       if (!d && (r as any).date) d = new Date((r as any).date).getDate();
       if (typeof d === "number" && d >= 1 && d <= prevDays) {
         const ssp = Number(
@@ -593,9 +541,6 @@ export default function AdvancedDashboard() {
       ? incomeChangeSSP_MTD
       : dashboardData?.changes?.incomeChangeSSP;
 
-  const expenseChangePct = dashboardData?.changes?.expenseChangeSSP;
-  const netIncomeChangePct = dashboardData?.changes?.netIncomeChangeSSP;
-
   const insuranceChangePct =
     isCurrentMonthRange && incomeChangeUSD_MTD !== null
       ? incomeChangeUSD_MTD
@@ -608,42 +553,41 @@ export default function AdvancedDashboard() {
     })} ${date.getFullYear()}`;
   })();
 
-  // Optional: global flag from API to indicate if comparison is valid
-  const hasComparison =
-    dashboardData?.changes?.hasComparison ?? true;
+  // ---------- comparison label & "no data" logic ----------
 
-  /* ----- prebuild labels for the four KPI cards ----- */
-  const revenueLabel = getChangeLabel({
-    value: revenueChangePct,
-    isCurrentMonthRange,
-    prevMonthLabel,
-    hasComparison,
-    positiveIsGood: true,
-  });
+  const comparisonLabel = (() => {
+    if (isCurrentMonthRange) {
+      return `vs same days last month (${prevMonthLabel})`;
+    }
+    switch (timeRange) {
+      case "last-3-months":
+        return "vs previous 3 months";
+      case "year":
+        return "vs last year";
+      case "last-month":
+      case "month-select":
+        return "vs last month";
+      default:
+        return "vs previous period";
+    }
+  })();
 
-  const expenseLabel = getChangeLabel({
-    value: expenseChangePct,
-    isCurrentMonthRange,
-    prevMonthLabel,
-    hasComparison,
-    positiveIsGood: false, // up is bad for expenses
-  });
+  const hasPreviousPeriodSSP =
+    !!dashboardData?.previousPeriod &&
+    (dashboardData.previousPeriod.totalIncomeSSP !== 0 ||
+      dashboardData.previousPeriod.totalExpensesSSP !== 0);
 
-  const netIncomeLabel = getChangeLabel({
-    value: netIncomeChangePct,
-    isCurrentMonthRange,
-    prevMonthLabel,
-    hasComparison,
-    positiveIsGood: true,
-  });
+  const hasPreviousPeriodUSD =
+    !!dashboardData?.previousPeriod &&
+    dashboardData.previousPeriod.totalIncomeUSD !== 0;
 
-  const insuranceLabel = getChangeLabel({
-    value: insuranceChangePct,
-    isCurrentMonthRange,
-    prevMonthLabel,
-    hasComparison,
-    positiveIsGood: true,
-  });
+  const shouldShowNoComparisonSSP =
+    (timeRange === "year" || timeRange === "last-3-months") &&
+    !hasPreviousPeriodSSP;
+
+  const shouldShowNoComparisonUSD =
+    (timeRange === "year" || timeRange === "last-3-months") &&
+    !hasPreviousPeriodUSD;
 
   /* ================== RENDER ================== */
 
@@ -844,20 +788,37 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {revenueLabel && (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            revenueLabel.className
-                          )}
-                        >
-                          {revenueLabel.text}
+                      {revenueChangePct !== undefined &&
+                        revenueChangePct !== null &&
+                        (!(
+                          timeRange === "year" || timeRange === "last-3-months"
+                        ) ||
+                          hasPreviousPeriodSSP) && (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              revenueChangePct > 0
+                                ? "text-emerald-600"
+                                : revenueChangePct < 0
+                                ? "text-red-600"
+                                : "text-slate-500"
+                            )}
+                          >
+                            {revenueChangePct > 0 ? "+" : ""}
+                            {revenueChangePct.toFixed(1)}% {comparisonLabel}
+                          </span>
+                        )}
+
+                      {shouldShowNoComparisonSSP && (
+                        <span className="text-xs font-medium text-slate-500">
+                          No data to compare
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded-lg">
-                    {typeof revenueChangePct === "number" &&
+                    {revenueChangePct !== undefined &&
+                    revenueChangePct !== null &&
                     revenueChangePct < 0 ? (
                       <TrendingDown className="h-4 w-4 text-red-600" />
                     ) : (
@@ -889,21 +850,39 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {expenseLabel && (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            expenseLabel.className
-                          )}
-                        >
-                          {expenseLabel.text}
+                      {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+                        (!(
+                          timeRange === "year" || timeRange === "last-3-months"
+                        ) ||
+                          hasPreviousPeriodSSP) && (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              dashboardData.changes.expenseChangeSSP > 0
+                                ? "text-red-600"
+                                : dashboardData.changes.expenseChangeSSP < 0
+                                ? "text-emerald-600"
+                                : "text-slate-500"
+                            )}
+                          >
+                            {dashboardData.changes.expenseChangeSSP > 0
+                              ? "+"
+                              : ""}
+                            {dashboardData.changes.expenseChangeSSP.toFixed(1)}%{" "}
+                            {comparisonLabel}
+                          </span>
+                        )}
+
+                      {shouldShowNoComparisonSSP && (
+                        <span className="text-xs font-medium text-slate-500">
+                          No data to compare
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="bg-red-50 p-1.5 rounded-lg">
-                    {typeof expenseChangePct === "number" &&
-                    expenseChangePct < 0 ? (
+                    {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+                    dashboardData.changes.expenseChangeSSP < 0 ? (
                       <TrendingDown className="h-4 w-4 text-emerald-600" />
                     ) : (
                       <TrendingUp className="h-4 w-4 text-red-600" />
@@ -925,25 +904,41 @@ export default function AdvancedDashboard() {
                       SSP {nf0.format(Math.round(sspNetIncome))}
                     </p>
                     <div className="flex items-center mt-1">
-                      {netIncomeLabel && (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            netIncomeLabel.className
-                          )}
-                        >
-                          {netIncomeLabel.text}
+                      {dashboardData?.changes?.netIncomeChangeSSP !==
+                        undefined &&
+                        (!(
+                          timeRange === "year" || timeRange === "last-3-months"
+                        ) ||
+                          hasPreviousPeriodSSP) && (
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              dashboardData.changes.netIncomeChangeSSP > 0
+                                ? "text-emerald-600"
+                                : dashboardData.changes.netIncomeChangeSSP < 0
+                                ? "text-red-600"
+                                : "text-slate-500"
+                            )}
+                          >
+                            {dashboardData.changes.netIncomeChangeSSP > 0
+                              ? "+"
+                              : ""}
+                            {dashboardData.changes.netIncomeChangeSSP.toFixed(
+                              1
+                            )}
+                            % {comparisonLabel}
+                          </span>
+                        )}
+
+                      {shouldShowNoComparisonSSP && (
+                        <span className="text-xs font-medium text-slate-500">
+                          No data to compare
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="bg-blue-50 p-1.5 rounded-lg">
-                    {typeof netIncomeChangePct === "number" &&
-                    netIncomeChangePct < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-red-600" />
-                    ) : (
-                      <TrendingUp className="h-4 w-4 text-emerald-600" />
-                    )}
+                    <DollarSign className="h-4 w-4 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
@@ -971,23 +966,39 @@ export default function AdvancedDashboard() {
                       </p>
                       <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
                         USD{" "}
-                        {fmtUSD(
-                          Math.round(
-                            parseFloat(
-                              dashboardData?.totalIncomeUSD || "0"
+                          {fmtUSD(
+                            Math.round(
+                              parseFloat(
+                                dashboardData?.totalIncomeUSD || "0"
+                              )
                             )
-                          )
-                        )}
+                          )}
                       </p>
                       <div className="flex items-center mt-1">
-                        {insuranceLabel ? (
+                        {insuranceChangePct !== undefined &&
+                        insuranceChangePct !== null &&
+                        (!(
+                          timeRange === "year" || timeRange === "last-3-months"
+                        ) ||
+                          hasPreviousPeriodUSD) ? (
                           <span
                             className={cn(
                               "text-xs font-medium",
-                              insuranceLabel.className
+                              insuranceChangePct > 0
+                                ? "text-emerald-600"
+                                : insuranceChangePct < 0
+                                ? "text-red-600"
+                                : "text-slate-500"
                             )}
                           >
-                            {insuranceLabel.text}
+                            {insuranceChangePct > 0 ? "+" : ""}
+                            {insuranceChangePct.toFixed(1)}% {comparisonLabel}
+                          </span>
+                        ) : shouldShowNoComparisonUSD &&
+                          insuranceChangePct !== undefined &&
+                          insuranceChangePct !== null ? (
+                          <span className="text-xs font-medium text-slate-500">
+                            No data to compare
                           </span>
                         ) : (
                           <span className="text-xs font-medium text-purple-600">
@@ -1005,12 +1016,7 @@ export default function AdvancedDashboard() {
                       </div>
                     </div>
                     <div className="bg-purple-50 p-1.5 rounded-lg">
-                      {typeof insuranceChangePct === "number" &&
-                      insuranceChangePct < 0 ? (
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      ) : (
-                        <TrendingUp className="h-4 w-4 text-emerald-600" />
-                      )}
+                      <Shield className="h-4 w-4 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>
