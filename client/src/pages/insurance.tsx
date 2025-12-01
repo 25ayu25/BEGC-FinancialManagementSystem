@@ -394,6 +394,7 @@ export default function InsurancePage() {
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
   const [pNotes, setPNotes] = useState<string>("");
   const [pAmountError, setPAmountError] = useState<string>("");
+  const [pProviderError, setPProviderError] = useState<string>("");
 
   // sticky header shadow only after scroll
   const [scrolled, setScrolled] = useState(false);
@@ -633,6 +634,23 @@ export default function InsurancePage() {
     })).filter((r) => r.outstanding > 0);
     return withPositiveOutstanding.sort((a, b) => b.outstanding - a.outstanding);
   }, [balances, providerId]);
+
+  /* ----------------------------- payment form helpers ----------------------------- */
+  // Computed validation state for payment form
+  const isPaymentFormValid = Number(pAmount) > 0 && !!pProviderId;
+  
+  // Reset payment form to initial state
+  const resetPaymentForm = () => {
+    setShowPayment(false);
+    setEditingPaymentId("");
+    setPProviderId("");
+    setPDate(new Date().toISOString().slice(0, 10));
+    setPAmount("0");
+    setPCurrency("USD");
+    setPNotes("");
+    setPAmountError("");
+    setPProviderError("");
+  };
 
   /* ----------------------------- small helpers ----------------------------- */
   function windowLabel() {
@@ -1309,16 +1327,29 @@ export default function InsurancePage() {
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">Record Payment</div>
-              <button className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); setPAmountError(""); }}>✕</button>
+              <button className="text-slate-500" onClick={resetPaymentForm}>✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Provider</label>
-                  <select className="border rounded-lg p-2 w-full" value={pProviderId} onChange={(e) => setPProviderId(e.target.value)}>
+                  <select 
+                    className={`border rounded-lg p-2 w-full ${pProviderError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    value={pProviderId} 
+                    onChange={(e) => {
+                      setPProviderId(e.target.value);
+                      // Clear error when user selects a provider
+                      if (e.target.value) {
+                        setPProviderError("");
+                      }
+                    }}
+                  >
                     <option value="">Select…</option>
                     {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                   </select>
+                  {pProviderError && (
+                    <p className="text-xs text-red-600 mt-1">{pProviderError}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Payment Date</label>
@@ -1357,30 +1388,30 @@ export default function InsurancePage() {
               </div>
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); setPAmountError(""); }}>Cancel</button>
+              <button className="px-3 py-2 rounded-lg border" onClick={resetPaymentForm}>Cancel</button>
               <button 
                 className={`px-3 py-2 rounded-lg text-white ${
-                  Number(pAmount) > 0 && pProviderId
+                  isPaymentFormValid
                     ? 'bg-slate-800 hover:bg-slate-700' 
                     : 'bg-slate-400 cursor-not-allowed'
                 }`}
-                disabled={Number(pAmount) <= 0 || !pProviderId}
+                disabled={!isPaymentFormValid}
                 onClick={async () => {
-                  // Client-side validation
+                  // Client-side validation with inline error messages
+                  let hasErrors = false;
                   const amount = Number(pAmount);
-                  if (!amount || amount <= 0) {
-                    setPAmountError("Please enter an amount greater than 0.");
-                    return;
-                  }
                   
                   if (!pProviderId) {
-                    toast({
-                      title: "Validation Error",
-                      description: "Please select a provider.",
-                      variant: "destructive"
-                    });
-                    return;
+                    setPProviderError("Please select a provider.");
+                    hasErrors = true;
                   }
+                  
+                  if (!amount || amount <= 0) {
+                    setPAmountError("Please enter an amount greater than 0.");
+                    hasErrors = true;
+                  }
+                  
+                  if (hasErrors) return;
 
                   const body = {
                     providerId: pProviderId || providerId,
@@ -1391,10 +1422,7 @@ export default function InsurancePage() {
                   };
                   try {
                     await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
-                    setShowPayment(false);
-                    setEditingPaymentId("");
-                    setPProviderId(""); setPDate(new Date().toISOString().slice(0,10)); setPAmount("0"); setPCurrency("USD"); setPNotes("");
-                    setPAmountError("");
+                    resetPaymentForm();
                     reloadBalances();
                     if (detailProviderId) {
                       const qs = new URLSearchParams({ providerId: detailProviderId });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Building2, DollarSign } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/lib/currency";
 
 interface RevenueOverviewCardProps {
   totalRevenue: number;

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from "recharts";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile } from "../hooks/useMediaQuery";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/lib/currency";
 
 interface ProviderShare {
   name: string;

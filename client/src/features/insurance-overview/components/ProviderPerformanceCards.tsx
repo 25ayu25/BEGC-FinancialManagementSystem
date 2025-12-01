@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile, useIsTablet } from "../hooks/useMediaQuery";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/lib/currency";
 
 interface ProviderPerformance {
   rank: number;
