@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight, Award } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile, useIsTablet } from "../hooks/useMediaQuery";
 
@@ -15,24 +15,57 @@ interface ProviderPerformanceCardsProps {
   providers: ProviderPerformance[];
 }
 
+// Medal styling for top 3 providers
+const getMedalStyle = (rank: number) => {
+  switch(rank) {
+    case 1:
+      return {
+        badge: "bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-amber-900 shadow-lg shadow-yellow-400/40",
+        card: "ring-2 ring-yellow-300/50 bg-gradient-to-br from-yellow-50/50 via-white to-amber-50/30",
+        accent: "from-yellow-400 to-amber-500",
+        glow: "shadow-yellow-200/50"
+      };
+    case 2:
+      return {
+        badge: "bg-gradient-to-br from-gray-200 via-gray-300 to-slate-400 text-slate-800 shadow-lg shadow-gray-300/40",
+        card: "ring-2 ring-gray-200/50 bg-gradient-to-br from-gray-50/50 via-white to-slate-50/30",
+        accent: "from-gray-300 to-slate-400",
+        glow: "shadow-gray-200/50"
+      };
+    case 3:
+      return {
+        badge: "bg-gradient-to-br from-orange-300 via-orange-400 to-amber-600 text-orange-900 shadow-lg shadow-orange-300/40",
+        card: "ring-2 ring-orange-200/50 bg-gradient-to-br from-orange-50/50 via-white to-amber-50/30",
+        accent: "from-orange-400 to-amber-600",
+        glow: "shadow-orange-200/50"
+      };
+    default:
+      return {
+        badge: "bg-gray-100 text-gray-600",
+        card: "bg-gradient-to-br from-white to-gray-50/50",
+        accent: "from-blue-500 to-blue-600",
+        glow: ""
+      };
+  }
+};
+
 export function ProviderPerformanceCards({ providers }: ProviderPerformanceCardsProps) {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const [mobileIndex, setMobileIndex] = useState(0);
 
   // Determine how many cards to show at once on mobile
-  const cardsToShow = isMobile ? 1 : providers.length;
   const visibleProviders = isMobile 
     ? [providers[mobileIndex]] 
     : providers;
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     setMobileIndex((prev) => (prev > 0 ? prev - 1 : providers.length - 1));
-  };
+  }, [providers.length]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     setMobileIndex((prev) => (prev < providers.length - 1 ? prev + 1 : 0));
-  };
+  }, [providers.length]);
 
   return (
     <div className={`
@@ -92,33 +125,24 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
           {visibleProviders.map((provider) => {
             const isPositive = provider.vsLastMonth >= 0;
             const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-            
-            // Medal colors for top 3 with gradients
-            const getMedalStyle = (rank: number) => {
-              switch(rank) {
-                case 1:
-                  return "bg-gradient-to-br from-yellow-400 to-yellow-600 text-white";
-                case 2:
-                  return "bg-gradient-to-br from-gray-300 to-gray-400 text-white";
-                case 3:
-                  return "bg-gradient-to-br from-orange-400 to-orange-600 text-white";
-                default:
-                  return "bg-gray-100 text-gray-600";
-              }
-            };
+            const medalStyle = getMedalStyle(provider.rank);
 
             return (
               <div
                 key={provider.rank}
                 className={`
-                  border border-gray-200 rounded-xl p-4 sm:p-5
-                  bg-gradient-to-br from-white to-gray-50/50
+                  border rounded-xl p-4 sm:p-5
+                  ${provider.rank <= 3 
+                    ? `${medalStyle.card} border-transparent` 
+                    : 'border-gray-200 bg-gradient-to-br from-white to-gray-50/50'
+                  }
                   ${transitions.base}
                   ${hover.scale}
-                  ${shadows.sm}
+                  ${provider.rank <= 3 ? `shadow-md ${medalStyle.glow}` : shadows.sm}
                   group
                   min-h-[200px]
                   touch-manipulation
+                  backdrop-blur-sm
                 `}
               >
                 {/* Header with Rank and Name */}
@@ -127,9 +151,8 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
                     {provider.rank <= 3 ? (
                       <div className={`
                         w-8 h-8 sm:w-10 sm:h-10 rounded-full 
-                        ${getMedalStyle(provider.rank)}
+                        ${medalStyle.badge}
                         flex items-center justify-center
-                        shadow-lg
                         ${transitions.base}
                         group-hover:scale-110 group-hover:rotate-12
                       `}>
@@ -160,7 +183,7 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
                     bg-gradient-to-r from-gray-900 to-gray-700 
                     bg-clip-text text-transparent
                     ${transitions.base}
-                    group-hover:scale-105
+                    group-hover:scale-105 origin-left
                   `}>
                     ${provider.revenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
@@ -172,23 +195,28 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
                     <span className="font-medium">Revenue Share</span>
                     <span className="font-semibold">{provider.share.toFixed(1)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                  <div className="w-full bg-gray-200/60 rounded-full h-2.5 overflow-hidden backdrop-blur-sm">
                     <div
                       className={`
-                        bg-gradient-to-r from-blue-500 to-blue-600 
+                        bg-gradient-to-r ${provider.rank <= 3 ? medalStyle.accent : 'from-blue-500 to-blue-600'}
                         h-2.5 rounded-full 
                         ${transitions.base}
                         shadow-sm
                       `}
-                      style={{ width: `${Math.min(provider.share, 100)}%` }}
+                      style={{ 
+                        width: `${Math.min(provider.share, 100)}%`,
+                        transition: 'width 0.5s ease-out'
+                      }}
                     />
                   </div>
                 </div>
 
                 {/* vs Last Month with enhanced badge */}
                 <div className={`
-                  flex items-center gap-1.5 p-2 rounded-lg
-                  ${isPositive ? 'bg-green-50' : 'bg-red-50'}
+                  flex items-center gap-1.5 p-2.5 rounded-lg
+                  ${isPositive 
+                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 ring-1 ring-green-200/50' 
+                    : 'bg-gradient-to-r from-red-50 to-rose-50 ring-1 ring-red-200/50'}
                   ${transitions.base}
                 `}>
                   <TrendIcon 
