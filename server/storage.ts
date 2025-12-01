@@ -98,7 +98,7 @@ export interface IStorage {
     claimId?: string;
     start?: string; // YYYY-MM-DD inclusive
     end?: string; // YYYY-MM-DD inclusive (converted to exclusive)
-  }): Promise<InsurancePayment[]>;
+  }): Promise<Array<Omit<InsurancePayment, 'paymentDate'> & { paymentDate: string }>>;
   updateInsurancePayment(
     id: string,
     updates: Partial<InsurancePayment>
@@ -416,8 +416,23 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    let q = db.select().from(insurancePayments);
-    if (conds.length) q = q.where(and(...conds));
+    // Explicitly select columns with proper paymentDate formatting
+    const baseQuery = db
+      .select({
+        id: insurancePayments.id,
+        providerId: insurancePayments.providerId,
+        claimId: insurancePayments.claimId,
+        paymentDate: sql<string>`TO_CHAR(COALESCE(${insurancePayments.paymentDate}, ${insurancePayments.createdAt}), 'YYYY-MM-DD')`,
+        amount: insurancePayments.amount,
+        currency: insurancePayments.currency,
+        reference: insurancePayments.reference,
+        notes: insurancePayments.notes,
+        createdBy: insurancePayments.createdBy,
+        createdAt: insurancePayments.createdAt,
+      })
+      .from(insurancePayments);
+
+    const q = conds.length ? baseQuery.where(and(...conds)) : baseQuery;
     return await q.orderBy(
       desc(insurancePayments.paymentDate),
       desc(insurancePayments.createdAt)
