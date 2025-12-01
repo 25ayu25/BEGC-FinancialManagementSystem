@@ -105,7 +105,8 @@ function getCreatedAt(p: Payment | any): string | undefined {
   return (p?.createdAt ?? p?.created_at ?? undefined) || undefined;
 }
 function displayPaymentDate(p: Payment): string {
-  return fmtDate(getPaymentDate(p) || getCreatedAt(p));
+  const paymentDate = getPaymentDate(p);
+  return paymentDate ? fmtDate(paymentDate) : "Date not set";
 }
 
 /* ----------------------------- provider order ----------------------------- */
@@ -206,7 +207,7 @@ function exportClaimsCsv(rows: Claim[], providers: Provider[]) {
 /* CSV for payments (no reference column) */
 function exportPaymentsCSV(rows: Payment[], providers: Provider[]) {
   const byId = new Map(providers.map((p) => [p.id, p.name]));
-  const header = ["Date","Provider","Currency","Amount","Notes"].join(",");
+  const header = ["Payment Date","Provider","Currency","Amount","Notes"].join(",");
   const body = rows.map((p) =>
     [
       displayPaymentDate(p), // use normalized payment date
@@ -553,9 +554,13 @@ export default function InsurancePage() {
       .slice()
       .filter((p) => p.currency === "USD")
       .sort((a, b) => {
-        const da = Date.parse(getPaymentDate(a) || getCreatedAt(a) || "");
-        const db = Date.parse(getPaymentDate(b) || getCreatedAt(b) || "");
-        return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da); // newest first
+        const da = Date.parse(getPaymentDate(a) || "");
+        const db = Date.parse(getPaymentDate(b) || "");
+        // Payments without payment dates go to the end
+        if (isNaN(da) && isNaN(db)) return 0;
+        if (isNaN(da)) return 1;
+        if (isNaN(db)) return -1;
+        return db - da; // newest first
       });
   }
 
@@ -1011,7 +1016,7 @@ export default function InsurancePage() {
                       <div className="text-sm">
                         <div className="font-medium">{money(p.amount, p.currency)}</div>
                         <div className="text-xs text-slate-500">
-                          Paid: {displayPaymentDate(p)} • Entered: {fmtDate(getCreatedAt(p))}
+                          Payment Date: {displayPaymentDate(p)} • Entry Date: {fmtDate(getCreatedAt(p))}
                         </div>
                         {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
@@ -1100,7 +1105,7 @@ export default function InsurancePage() {
                   <table className="min-w-full text-sm">
                     <thead className="bg-slate-50 text-slate-600">
                       <tr>
-                        <th className="text-left p-3">Date</th>
+                        <th className="text-left p-3">Payment Date</th>
                         <th className="text-left p-3">Provider</th>
                         <th className="text-left p-3">Amount</th>
                         <th className="text-left p-3">Notes</th>
