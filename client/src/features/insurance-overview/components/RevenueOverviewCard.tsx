@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Building2, DollarSign } from "lucide-react";
-import { Sparkline } from "./Sparkline";
 import { transitions, shadows, hover } from "../utils/animations";
 
 interface RevenueOverviewCardProps {
@@ -48,22 +47,7 @@ export function RevenueOverviewCard({
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
   
   // Animated revenue counter with faster speed (500ms)
-  const animatedRevenue = useAnimatedCounter(totalRevenue, 500);
-  
-  // Generate stable sparkline data using useMemo to prevent re-renders
-  // In production, this would come from actual historical data
-  const sparklineData = useMemo(() => {
-    const baseValue = totalRevenue * 0.85;
-    const variance = totalRevenue * 0.15;
-    // Use a seeded approach based on totalRevenue for consistency
-    const seed = totalRevenue % 1000;
-    return Array.from({ length: 7 }, (_, i) => {
-      const trend = isPositive ? i * 0.02 : -i * 0.02;
-      // Deterministic pseudo-random based on seed and index
-      const pseudoRandom = ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
-      return baseValue + pseudoRandom * variance + (baseValue * trend);
-    });
-  }, [totalRevenue, isPositive]);
+  const animatedRevenue = useAnimatedCounter(Math.round(totalRevenue), 500);
 
   return (
     <div className={`
@@ -85,7 +69,7 @@ export function RevenueOverviewCard({
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue Overview</h2>
         
         <div className="space-y-6">
-          {/* Total Revenue with Sparkline */}
+          {/* Total Revenue with Trend Indicator */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
@@ -97,16 +81,21 @@ export function RevenueOverviewCard({
             </div>
             <div className="flex items-end justify-between gap-4">
               <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
-                ${animatedRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${animatedRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
-              {/* Sparkline with proper containment to prevent overflow */}
-              <div className="flex-shrink-0 rounded-lg bg-white/50 p-1.5 border border-gray-100">
-                <Sparkline 
-                  data={sparklineData} 
-                  trend={isPositive ? 'up' : 'down'}
-                  height={32}
-                  width={100}
+              {/* Trend indicator */}
+              <div className={`
+                flex items-center gap-2 px-3 py-2 rounded-lg
+                ${isPositive 
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200/60' 
+                  : 'bg-gradient-to-r from-red-50 to-rose-50 border border-red-200/60'}
+              `}>
+                <TrendIcon 
+                  className={`w-5 h-5 ${isPositive ? 'text-green-600' : 'text-red-600'}`}
                 />
+                <span className={`text-sm font-semibold ${isPositive ? 'text-green-700' : 'text-red-700'}`}>
+                  {isPositive ? '+' : ''}{vsLastMonth.toFixed(1)}%
+                </span>
               </div>
             </div>
           </div>
