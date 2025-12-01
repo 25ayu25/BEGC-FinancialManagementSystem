@@ -17,7 +17,7 @@
  * @module InsuranceOverview
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
@@ -78,6 +78,29 @@ export default function InsuranceOverview() {
   });
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
 
+  // Mock data for development/demo when API is unavailable
+  const getMockData = (): AnalyticsData => ({
+    overview: {
+      totalRevenue: 125750.50,
+      activeProviders: 8,
+      vsLastMonth: 12.5,
+    },
+    providerShares: [
+      { name: "Blue Cross", value: 45000, color: "#3b82f6" },
+      { name: "Aetna", value: 32000, color: "#10b981" },
+      { name: "United Health", value: 28000, color: "#f59e0b" },
+      { name: "Cigna", value: 12750.50, color: "#ef4444" },
+      { name: "Humana", value: 8000, color: "#8b5cf6" },
+    ],
+    topProviders: [
+      { rank: 1, name: "Blue Cross Blue Shield", revenue: 45000, share: 35.8, vsLastMonth: 15.2 },
+      { rank: 2, name: "Aetna Insurance", revenue: 32000, share: 25.4, vsLastMonth: 8.7 },
+      { rank: 3, name: "United Healthcare", revenue: 28000, share: 22.3, vsLastMonth: -3.2 },
+      { rank: 4, name: "Cigna Health", revenue: 12750, share: 10.1, vsLastMonth: 22.1 },
+      { rank: 5, name: "Humana Inc", revenue: 8000, share: 6.4, vsLastMonth: -5.4 },
+    ],
+  });
+
   const fetchAnalytics = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
     try {
       setLoading(true);
@@ -94,6 +117,14 @@ export default function InsuranceOverview() {
       setData(response.data);
     } catch (err: any) {
       console.error("Error fetching analytics:", err);
+      
+      // In development, use mock data if API is unavailable
+      if (import.meta.env.DEV && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
+        console.info("Using mock data for development");
+        setData(getMockData());
+        return;
+      }
+      
       const status = err?.response?.status;
       if (status === 401) {
         setError("Authentication required. Please log in.");
@@ -115,7 +146,8 @@ export default function InsuranceOverview() {
     }
   }, [selectedFilter, customDateRange]);
 
-  const handleFilterChange = (preset: FilterPreset) => {
+  // Memoized handlers to prevent re-renders
+  const handleFilterChange = useCallback((preset: FilterPreset) => {
     if (preset === 'custom') {
       setShowCustomDatePicker(true);
       setShowFilterDropdown(false);
@@ -123,22 +155,31 @@ export default function InsuranceOverview() {
       setSelectedFilter(preset);
       setShowFilterDropdown(false);
     }
-  };
+  }, []);
 
-  const handleCustomDateApply = () => {
+  const handleCustomDateApply = useCallback(() => {
     if (customDateRange.start && customDateRange.end) {
       setSelectedFilter('custom');
       setShowCustomDatePicker(false);
     }
-  };
+  }, [customDateRange.start, customDateRange.end]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     if (selectedFilter === 'custom' && customDateRange.start && customDateRange.end) {
       fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
     } else {
       fetchAnalytics(selectedFilter);
     }
-  };
+  }, [selectedFilter, customDateRange.start, customDateRange.end]);
+
+  // Toggle dropdown without causing re-renders
+  const toggleDropdown = useCallback(() => {
+    setShowFilterDropdown(prev => !prev);
+  }, []);
+
+  const closeDropdown = useCallback(() => {
+    setShowFilterDropdown(false);
+  }, []);
 
   const isMobile = useIsMobile();
 
@@ -163,27 +204,27 @@ export default function InsuranceOverview() {
         {/* Filter Dropdown - Full width on mobile */}
         <div className="relative flex-1 sm:flex-none">
           <button
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+            onClick={toggleDropdown}
             className={`
               flex items-center justify-between gap-2 
               w-full sm:w-auto
               px-3 sm:px-4 py-2.5 sm:py-2 
-              bg-white border border-gray-300 text-gray-700 
-              rounded-lg hover:bg-gray-50 
-              ${transitions.base}
-              shadow-sm hover:shadow-md
+              bg-white/90 backdrop-blur-sm border border-gray-200/80 text-gray-700 
+              rounded-xl hover:bg-white hover:border-blue-200
+              transition-all duration-200 ease-out
+              shadow-sm hover:shadow-md hover:shadow-blue-100/50
               min-h-[44px]
+              focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
             `}
           >
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4" />
+              <Filter className="w-4 h-4 text-blue-600" />
               <span className="text-sm sm:text-base font-medium truncate">
                 {isMobile ? currentFilterLabel.split(' ')[0] : currentFilterLabel}
               </span>
             </div>
             <svg
-              className={`w-4 h-4 transition-transform duration-200 ease-in-out flex-shrink-0 ${showFilterDropdown ? 'rotate-180' : 'rotate-0'}`}
-              style={{ willChange: 'transform' }}
+              className={`w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ease-out ${showFilterDropdown ? 'rotate-180' : 'rotate-0'}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -197,44 +238,52 @@ export default function InsuranceOverview() {
               {/* Backdrop for mobile */}
               {isMobile && (
                 <div 
-                  className="fixed inset-0 bg-black/20 z-40"
-                  onClick={() => setShowFilterDropdown(false)}
+                  className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-200"
+                  onClick={closeDropdown}
                 />
               )}
               
-              {/* Dropdown menu */}
-              <div className={`
-                ${isMobile 
-                  ? 'fixed bottom-0 left-0 right-0 rounded-t-2xl z-50' 
-                  : 'absolute right-0 mt-2 w-56 rounded-lg z-10'
-                }
-                bg-white shadow-xl border border-gray-200
-                ${transitions.base}
-                ${isMobile ? 'animate-in slide-in-from-bottom' : 'animate-in fade-in zoom-in-95'}
-              `}>
+              {/* Dropdown menu with smooth CSS transitions */}
+              <div 
+                className={`
+                  ${isMobile 
+                    ? 'fixed bottom-0 left-0 right-0 rounded-t-2xl z-50' 
+                    : 'absolute right-0 mt-2 w-56 rounded-xl z-10'
+                  }
+                  bg-white/95 backdrop-blur-md shadow-xl border border-gray-200/60
+                  transition-all duration-200 ease-out
+                  ${isMobile ? 'animate-in slide-in-from-bottom duration-300' : 'animate-in fade-in-0 zoom-in-95 duration-150'}
+                `}
+                style={{ willChange: 'transform, opacity' }}
+              >
                 {isMobile && (
-                  <div className="flex justify-center py-2">
-                    <div className="w-12 h-1 bg-gray-300 rounded-full" />
+                  <div className="flex justify-center py-3">
+                    <div className="w-10 h-1 bg-gray-300 rounded-full" />
                   </div>
                 )}
                 
-                <div className={isMobile ? 'py-2 pb-6' : 'py-1'}>
-                  {filterOptions.map((option) => (
+                <div className={isMobile ? 'py-2 pb-8' : 'py-2'}>
+                  {filterOptions.map((option, index) => (
                     <button
                       key={option.value}
                       onClick={() => handleFilterChange(option.value)}
                       className={`
-                        w-full text-left px-4 py-3 sm:py-2 text-sm sm:text-base
-                        hover:bg-gray-100 active:bg-gray-200
-                        ${transitions.fast}
+                        w-full text-left px-4 py-3 sm:py-2.5 text-sm sm:text-base
+                        transition-colors duration-150 ease-out
                         ${selectedFilter === option.value 
-                          ? 'bg-blue-50 text-blue-700 font-semibold' 
-                          : 'text-gray-700'
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-semibold border-l-2 border-blue-500' 
+                          : 'text-gray-700 hover:bg-gray-50 border-l-2 border-transparent'
                         }
                         min-h-[44px] sm:min-h-0
+                        focus:outline-none focus:bg-gray-50
                       `}
                     >
-                      {option.label}
+                      <span className="flex items-center gap-2">
+                        {selectedFilter === option.value && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        )}
+                        {option.label}
+                      </span>
                     </button>
                   ))}
                 </div>

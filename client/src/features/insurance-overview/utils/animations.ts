@@ -3,17 +3,22 @@
  * 
  * Common animation configurations and transition utilities
  * for smooth, consistent animations throughout the Insurance Overview page.
+ * 
+ * Uses CSS-based transitions for better performance and stability.
  */
 
 export const transitions = {
-  // Fast transitions for micro-interactions
-  fast: 'transition-all duration-150 ease-in-out',
+  // Fast transitions for micro-interactions (buttons, checkboxes)
+  fast: 'transition-all duration-150 ease-out',
   
   // Standard transitions for most UI elements
-  base: 'transition-all duration-300 ease-in-out',
+  base: 'transition-all duration-200 ease-out',
   
   // Slower transitions for complex animations
-  slow: 'transition-all duration-500 ease-in-out',
+  slow: 'transition-all duration-300 ease-out',
+  
+  // Smooth spring-like transition for cards and modals
+  spring: 'transition-all duration-300 cubic-bezier(0.34,1.56,0.64,1)',
 };
 
 export const shadows = {
@@ -28,6 +33,9 @@ export const shadows = {
   
   // Layered shadow for depth
   layered: 'shadow-[0_1px_3px_rgba(0,0,0,0.05),0_10px_15px_rgba(0,0,0,0.03)]',
+  
+  // Frosted glass shadow
+  glass: 'shadow-[0_4px_30px_rgba(0,0,0,0.1)]',
 };
 
 export const hover = {
@@ -39,6 +47,9 @@ export const hover = {
   
   // Glow effect
   glow: 'hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]',
+  
+  // Subtle brightness increase
+  brighten: 'hover:brightness-105',
 };
 
 // Shimmer animation for loading states
@@ -65,7 +76,10 @@ export const shimmer = `
 `;
 
 // Fade in animation
-export const fadeIn = 'animate-in fade-in duration-500';
+export const fadeIn = 'animate-in fade-in duration-300';
 
 // Slide up animation
-export const slideUp = 'animate-in slide-in-from-bottom-4 duration-500';
+export const slideUp = 'animate-in slide-in-from-bottom-4 duration-300';
+
+// Glass morphism effect
+export const glassMorphism = 'bg-white/80 backdrop-blur-md border border-white/20';

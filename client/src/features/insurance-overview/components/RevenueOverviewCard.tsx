@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Building2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { TrendingUp, TrendingDown, Building2, DollarSign } from "lucide-react";
 import { Sparkline } from "./Sparkline";
 import { transitions, shadows, hover } from "../utils/animations";
 
@@ -50,32 +50,36 @@ export function RevenueOverviewCard({
   // Animated revenue counter with faster speed (500ms)
   const animatedRevenue = useAnimatedCounter(totalRevenue, 500);
   
-  // Generate mock sparkline data (7-day trend)
+  // Generate stable sparkline data using useMemo to prevent re-renders
   // In production, this would come from actual historical data
-  const generateSparklineData = () => {
+  const sparklineData = useMemo(() => {
     const baseValue = totalRevenue * 0.85;
     const variance = totalRevenue * 0.15;
+    // Use a seeded approach based on totalRevenue for consistency
+    const seed = totalRevenue % 1000;
     return Array.from({ length: 7 }, (_, i) => {
       const trend = isPositive ? i * 0.02 : -i * 0.02;
-      return baseValue + Math.random() * variance + (baseValue * trend);
+      // Deterministic pseudo-random based on seed and index
+      const pseudoRandom = ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
+      return baseValue + pseudoRandom * variance + (baseValue * trend);
     });
-  };
-
-  const sparklineData = generateSparklineData();
+  }, [totalRevenue, isPositive]);
 
   return (
     <div className={`
-      bg-gradient-to-br from-white to-blue-50/30 
+      bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/30
       rounded-xl 
       ${shadows.md} 
-      border border-gray-200/60 
+      border border-blue-100/60 
       p-6 
       ${transitions.base}
       ${hover.lift}
       relative overflow-hidden
+      backdrop-blur-sm
     `}>
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
+      {/* Enhanced gradient overlay with frosted glass effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.08] via-transparent to-indigo-500/[0.05] pointer-events-none" />
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-blue-400/20 to-transparent rounded-full blur-3xl pointer-events-none" />
       
       <div className="relative z-10">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue Overview</h2>
@@ -83,17 +87,27 @@ export function RevenueOverviewCard({
         <div className="space-y-6">
           {/* Total Revenue with Sparkline */}
           <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-600 mb-1">Total Revenue</p>
-            <div className="flex items-end justify-between">
-              <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              {/* Prominent USD Currency Label */}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border border-emerald-200/60 text-emerald-700 text-xs font-semibold">
+                <DollarSign className="w-3 h-3" />
+                USD
+              </span>
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
                 ${animatedRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <Sparkline 
-                data={sparklineData} 
-                trend={isPositive ? 'up' : 'down'}
-                height={32}
-                width={100}
-              />
+              {/* Sparkline with proper containment to prevent overflow */}
+              <div className="flex-shrink-0 rounded-lg bg-white/50 p-1.5 border border-gray-100">
+                <Sparkline 
+                  data={sparklineData} 
+                  trend={isPositive ? 'up' : 'down'}
+                  height={32}
+                  width={100}
+                />
+              </div>
             </div>
           </div>
 
@@ -109,12 +123,15 @@ export function RevenueOverviewCard({
           </div>
 
           {/* vs Last Month with enhanced styling */}
-          <div className="pt-4 border-t border-gray-200">
+          <div className="pt-4 border-t border-gray-200/60">
             <div className="flex items-center gap-2 flex-wrap">
               <div className={`
                 flex items-center gap-1.5 px-3 py-1.5 rounded-full
-                ${isPositive ? 'bg-green-50 ring-1 ring-green-200' : 'bg-red-50 ring-1 ring-red-200'}
+                ${isPositive 
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 ring-1 ring-green-200/80' 
+                  : 'bg-gradient-to-r from-red-50 to-rose-50 ring-1 ring-red-200/80'}
                 ${transitions.base}
+                shadow-sm
               `}>
                 <TrendIcon 
                   className={`w-4 h-4 ${isPositive ? 'text-green-600' : 'text-red-600'}`}
@@ -123,7 +140,7 @@ export function RevenueOverviewCard({
                   {isPositive ? '+' : ''}{vsLastMonth.toFixed(1)}%
                 </span>
               </div>
-              <span className="text-sm text-gray-600">vs Last Month</span>
+              <span className="text-sm text-gray-600 font-medium">vs Last Month</span>
             </div>
           </div>
         </div>
