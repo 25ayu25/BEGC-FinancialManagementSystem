@@ -52,6 +52,7 @@ interface AnalyticsData {
     revenue: number;
     share: number;
     vsLastMonth: number;
+    color?: string;
   }>;
 }
 
@@ -93,11 +94,11 @@ export default function InsuranceOverview() {
       { name: "Humana", value: 8000, color: "#8b5cf6" },
     ],
     topProviders: [
-      { rank: 1, name: "Blue Cross Blue Shield", revenue: 45000, share: 35.8, vsLastMonth: 15.2 },
-      { rank: 2, name: "Aetna Insurance", revenue: 32000, share: 25.4, vsLastMonth: 8.7 },
-      { rank: 3, name: "United Healthcare", revenue: 28000, share: 22.3, vsLastMonth: -3.2 },
-      { rank: 4, name: "Cigna Health", revenue: 12750, share: 10.1, vsLastMonth: 22.1 },
-      { rank: 5, name: "Humana Inc", revenue: 8000, share: 6.4, vsLastMonth: -5.4 },
+      { rank: 1, name: "Blue Cross Blue Shield", revenue: 45000, share: 35.8, vsLastMonth: 15.2, color: "#3b82f6" },
+      { rank: 2, name: "Aetna Insurance", revenue: 32000, share: 25.4, vsLastMonth: 8.7, color: "#10b981" },
+      { rank: 3, name: "United Healthcare", revenue: 28000, share: 22.3, vsLastMonth: -3.2, color: "#f59e0b" },
+      { rank: 4, name: "Cigna Health", revenue: 12750, share: 10.1, vsLastMonth: 22.1, color: "#ef4444" },
+      { rank: 5, name: "Humana Inc", revenue: 8000, share: 6.4, vsLastMonth: -5.4, color: "#8b5cf6" },
     ],
   });
 
@@ -118,9 +119,9 @@ export default function InsuranceOverview() {
     } catch (err: any) {
       console.error("Error fetching analytics:", err);
       
-      // In development, use mock data if API is unavailable
-      if (import.meta.env.DEV && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
-        console.info("Using mock data for development");
+      // Use mock data if API is unavailable (for demo/development)
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error' || err.code === 'ECONNREFUSED') {
+        console.info("Using mock data for demo");
         setData(getMockData());
         return;
       }

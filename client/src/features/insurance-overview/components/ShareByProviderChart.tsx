@@ -75,7 +75,7 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
         <div className="bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-200">
           <p className="text-sm font-semibold text-gray-900">{data.name}</p>
           <p className="text-sm text-gray-600">
-            ${data.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${Math.round(data.value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-gray-500">{percentage.toFixed(1)}% of total</p>
         </div>
