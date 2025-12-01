@@ -69,7 +69,7 @@ export function RevenueOverviewCard({
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue Overview</h2>
         
         <div className="space-y-6">
-          {/* Total Revenue with Sparkline */}
+          {/* Total Revenue with Trend Indicator */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
@@ -83,7 +83,7 @@ export function RevenueOverviewCard({
               <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
                 ${animatedRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
-              {/* Trend indicator replacing broken sparkline */}
+              {/* Trend indicator */}
               <div className={`
                 flex items-center gap-2 px-3 py-2 rounded-lg
                 ${isPositive 

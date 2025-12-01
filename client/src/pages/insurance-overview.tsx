@@ -17,7 +17,7 @@
  * @module InsuranceOverview
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
