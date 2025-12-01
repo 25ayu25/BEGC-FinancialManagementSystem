@@ -277,9 +277,6 @@ export default function InsuranceOverview() {
                         min-h-[44px] sm:min-h-0
                         focus:outline-none focus:bg-gray-50
                       `}
-                      style={{ 
-                        animationDelay: `${index * 30}ms`,
-                      }}
                     >
                       <span className="flex items-center gap-2">
                         {selectedFilter === option.value && (

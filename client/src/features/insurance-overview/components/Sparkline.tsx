@@ -65,7 +65,8 @@ export function Sparkline({
             stroke={lineColor}
             strokeWidth={2}
             dot={false}
-            isAnimationActive={false}
+            isAnimationActive={true}
+            animationDuration={300}
             fill={`url(#sparklineGradient-${trend})`}
           />
         </LineChart>

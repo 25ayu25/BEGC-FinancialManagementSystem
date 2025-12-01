@@ -200,12 +200,11 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
                       className={`
                         bg-gradient-to-r ${provider.rank <= 3 ? medalStyle.accent : 'from-blue-500 to-blue-600'}
                         h-2.5 rounded-full 
-                        ${transitions.base}
+                        transition-[width] duration-500 ease-out
                         shadow-sm
                       `}
                       style={{ 
-                        width: `${Math.min(provider.share, 100)}%`,
-                        transition: 'width 0.5s ease-out'
+                        width: `${Math.min(provider.share, 100)}%`
                       }}
                     />
                   </div>
