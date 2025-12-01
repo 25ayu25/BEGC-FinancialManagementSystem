@@ -2,9 +2,17 @@ import { CURRENCIES } from "./constants";
 
 export function formatCurrency(amount: number, currency: string = "USD"): string {
   const currencyInfo = CURRENCIES[currency as keyof typeof CURRENCIES];
+  // Round to whole dollars to avoid cent display
+  const roundedAmount = Math.round(amount || 0);
   
   if (!currencyInfo) {
-    return `${Math.round(amount)}`;
+    // Return USD format as fallback for unknown currencies
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(roundedAmount);
   }
 
   if (currency === "USD") {
@@ -13,10 +21,10 @@ export function formatCurrency(amount: number, currency: string = "USD"): string
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(roundedAmount);
   }
 
-  return `${currencyInfo.symbol} ${Math.round(amount).toLocaleString('en-US')}`;
+  return `${currencyInfo.symbol} ${roundedAmount.toLocaleString('en-US')}`;
 }
 
 export function parseCurrency(value: string): { amount: number; currency: string } {

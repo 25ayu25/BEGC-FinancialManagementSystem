@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Calendar as CalendarIcon, Search, X } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { useToast } from "@/hooks/use-toast";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -324,6 +325,9 @@ function DateField({
 type WindowPreset = "all" | "ytd" | "year-2025" | "year-2024" | "year-2023" | "year-2022" | "custom";
 
 export default function InsurancePage() {
+  // Toast notifications
+  const { toast } = useToast();
+  
   // data
   const [providers, setProviders] = useState<Provider[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -389,6 +393,8 @@ export default function InsurancePage() {
   const [pAmount, setPAmount] = useState<string>("0");
   const [pCurrency, setPCurrency] = useState<"USD" | "SSP">("USD");
   const [pNotes, setPNotes] = useState<string>("");
+  const [pAmountError, setPAmountError] = useState<string>("");
+  const [pProviderError, setPProviderError] = useState<string>("");
 
   // sticky header shadow only after scroll
   const [scrolled, setScrolled] = useState(false);
@@ -628,6 +634,23 @@ export default function InsurancePage() {
     })).filter((r) => r.outstanding > 0);
     return withPositiveOutstanding.sort((a, b) => b.outstanding - a.outstanding);
   }, [balances, providerId]);
+
+  /* ----------------------------- payment form helpers ----------------------------- */
+  // Computed validation state for payment form
+  const isPaymentFormValid = Number(pAmount) > 0 && !!pProviderId;
+  
+  // Reset payment form to initial state
+  const resetPaymentForm = () => {
+    setShowPayment(false);
+    setEditingPaymentId("");
+    setPProviderId("");
+    setPDate(new Date().toISOString().slice(0, 10));
+    setPAmount("0");
+    setPCurrency("USD");
+    setPNotes("");
+    setPAmountError("");
+    setPProviderError("");
+  };
 
   /* ----------------------------- small helpers ----------------------------- */
   function windowLabel() {
@@ -1281,9 +1304,16 @@ export default function InsurancePage() {
                   setEditingClaimId("");
                   setCProviderId(""); setCDate(new Date().toISOString().slice(0,10)); setCCurrency("USD"); setCAmount("0"); setCNotes("");
                   reloadClaims(); reloadBalances();
-                  alert("Claim saved");
+                  toast({
+                    title: "Success",
+                    description: "Claim saved successfully."
+                  });
                 } catch (e: any) {
-                  alert(`Failed to save claim: ${e.message || e}`);
+                  toast({
+                    title: "Error",
+                    description: `Failed to save claim: ${e.message || e}`,
+                    variant: "destructive"
+                  });
                 }
               }}>Save Claim</button>
             </div>
@@ -1297,16 +1327,29 @@ export default function InsurancePage() {
           <div className="bg-white rounded-xl w-full max-w-xl shadow-lg">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">Record Payment</div>
-              <button className="text-slate-500" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>✕</button>
+              <button className="text-slate-500" onClick={resetPaymentForm}>✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Provider</label>
-                  <select className="border rounded-lg p-2 w-full" value={pProviderId} onChange={(e) => setPProviderId(e.target.value)}>
+                  <select 
+                    className={`border rounded-lg p-2 w-full ${pProviderError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    value={pProviderId} 
+                    onChange={(e) => {
+                      setPProviderId(e.target.value);
+                      // Clear error when user selects a provider
+                      if (e.target.value) {
+                        setPProviderError("");
+                      }
+                    }}
+                  >
                     <option value="">Select…</option>
                     {providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                   </select>
+                  {pProviderError && (
+                    <p className="text-xs text-red-600 mt-1">{pProviderError}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Payment Date</label>
@@ -1321,7 +1364,22 @@ export default function InsurancePage() {
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Amount Received</label>
-                  <input type="number" min="0" className="border rounded-lg p-2 w-full" value={pAmount} onChange={(e) => setPAmount(e.target.value)} />
+                  <input 
+                    type="number" 
+                    min="0" 
+                    className={`border rounded-lg p-2 w-full ${pAmountError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    value={pAmount} 
+                    onChange={(e) => {
+                      setPAmount(e.target.value);
+                      // Clear error when user starts typing a valid amount
+                      if (Number(e.target.value) > 0) {
+                        setPAmountError("");
+                      }
+                    }} 
+                  />
+                  {pAmountError && (
+                    <p className="text-xs text-red-600 mt-1">{pAmountError}</p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
@@ -1330,33 +1388,62 @@ export default function InsurancePage() {
               </div>
             </div>
             <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-lg border" onClick={() => { setShowPayment(false); setEditingPaymentId(""); }}>Cancel</button>
-              <button className="px-3 py-2 rounded-lg bg-slate-800 text-white" onClick={async () => {
-                const body = {
-                  providerId: pProviderId || providerId,
-                  paymentDate: pDate || undefined,
-                  amount: Number(pAmount),
-                  currency: pCurrency,
-                  notes: pNotes || undefined,
-                };
-                try {
-                  await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
-                  setShowPayment(false);
-                  setEditingPaymentId("");
-                  setPProviderId(""); setPDate(new Date().toISOString().slice(0,10)); setPAmount("0"); setPCurrency("USD"); setPNotes("");
-                  reloadBalances();
-                  if (detailProviderId) {
-                    const qs = new URLSearchParams({ providerId: detailProviderId });
-                    setLoadingPayments(true);
-                    api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-                      .then(setPayments)
-                      .finally(() => setLoadingPayments(false));
+              <button className="px-3 py-2 rounded-lg border" onClick={resetPaymentForm}>Cancel</button>
+              <button 
+                className={`px-3 py-2 rounded-lg text-white ${
+                  isPaymentFormValid
+                    ? 'bg-slate-800 hover:bg-slate-700' 
+                    : 'bg-slate-400 cursor-not-allowed'
+                }`}
+                disabled={!isPaymentFormValid}
+                onClick={async () => {
+                  // Client-side validation with inline error messages
+                  let hasErrors = false;
+                  const amount = Number(pAmount);
+                  
+                  if (!pProviderId) {
+                    setPProviderError("Please select a provider.");
+                    hasErrors = true;
                   }
-                  alert("Payment saved");
-                } catch (e: any) {
-                  alert(`Failed to save payment: ${e.message || e}`);
-                }
-              }}>Record Payment</button>
+                  
+                  if (!amount || amount <= 0) {
+                    setPAmountError("Please enter an amount greater than 0.");
+                    hasErrors = true;
+                  }
+                  
+                  if (hasErrors) return;
+
+                  const body = {
+                    providerId: pProviderId || providerId,
+                    paymentDate: pDate || undefined,
+                    amount: amount,
+                    currency: pCurrency,
+                    notes: pNotes || undefined,
+                  };
+                  try {
+                    await api<Payment>("/api/insurance-payments", { method: "POST", body: JSON.stringify(body) });
+                    resetPaymentForm();
+                    reloadBalances();
+                    if (detailProviderId) {
+                      const qs = new URLSearchParams({ providerId: detailProviderId });
+                      setLoadingPayments(true);
+                      api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+                        .then(setPayments)
+                        .finally(() => setLoadingPayments(false));
+                    }
+                    toast({
+                      title: "Success",
+                      description: "Payment saved successfully."
+                    });
+                  } catch (e: any) {
+                    toast({
+                      title: "Error",
+                      description: `Failed to save payment: ${e.message || e}`,
+                      variant: "destructive"
+                    });
+                  }
+                }}
+              >Record Payment</button>
             </div>
           </div>
         </div>

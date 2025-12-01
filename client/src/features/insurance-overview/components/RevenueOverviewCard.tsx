@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Building2, DollarSign } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
+import { formatCurrency } from "@/lib/currency";
 
 interface RevenueOverviewCardProps {
   totalRevenue: number;
@@ -81,7 +82,7 @@ export function RevenueOverviewCard({
             </div>
             <div className="flex items-end justify-between gap-4">
               <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
-                ${animatedRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {formatCurrency(animatedRevenue)}
               </p>
               {/* Trend indicator */}
               <div className={`
