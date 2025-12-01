@@ -2,6 +2,7 @@ import React, { useState, useCallback } from "react";
 import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile, useIsTablet } from "../hooks/useMediaQuery";
+import { formatCurrency } from "@/lib/format";
 
 interface ProviderPerformance {
   rank: number;
@@ -188,7 +189,7 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
                     ${transitions.base}
                     group-hover:scale-105 origin-left
                   `}>
-                    ${Math.round(provider.revenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    {formatCurrency(provider.revenue || 0)}
                   </p>
                 </div>
 

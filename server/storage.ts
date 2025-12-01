@@ -1484,12 +1484,13 @@ export class DatabaseStorage implements IStorage {
       desc(insuranceClaims.createdAt)
     );
 
+    // Ensure all numeric values are rounded to whole dollars
     return rows.map((r: any) => ({
       ...r,
-      claimedAmount: Number(r.claimedAmount),
-      billedAmount: Number(r.billedAmount),
-      paidToDate: Number(r.paidToDate),
-      balance: Number(r.balance),
+      claimedAmount: Math.round(Number(r.claimedAmount) || 0),
+      billedAmount: Math.round(Number(r.billedAmount) || 0),
+      paidToDate: Math.round(Number(r.paidToDate) || 0),
+      balance: Math.round(Number(r.balance) || 0),
     }));
   }
 
@@ -1628,11 +1629,11 @@ export class DatabaseStorage implements IStorage {
       end,
     });
 
-    // Build provider summaries
+    // Build provider summaries - ensure all values are rounded to whole dollars
     const providers = provs.map((p) => {
-      const billed = billedMap.get(p.id) || 0;
-      const collected = paidMap.get(p.id) || 0;
-      const carryForward = carryMap.get(p.id) || 0;
+      const billed = Math.round(billedMap.get(p.id) || 0);
+      const collected = Math.round(paidMap.get(p.id) || 0);
+      const carryForward = Math.round(carryMap.get(p.id) || 0);
       const outstandingRaw = billed - collected + carryForward;
       return {
         providerId: p.id,

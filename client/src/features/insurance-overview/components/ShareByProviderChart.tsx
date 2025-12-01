@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from "recharts";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile } from "../hooks/useMediaQuery";
+import { formatCurrency } from "@/lib/format";
 
 interface ProviderShare {
   name: string;
@@ -75,7 +76,7 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
         <div className="bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-200">
           <p className="text-sm font-semibold text-gray-900">{data.name}</p>
           <p className="text-sm text-gray-600">
-            ${Math.round(data.value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            {formatCurrency(data.value || 0)}
           </p>
           <p className="text-xs text-gray-500">{percentage.toFixed(1)}% of total</p>
         </div>
@@ -134,7 +135,7 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
                     />
                   ))}
                   <Label
-                    value={`$${total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                    value={formatCurrency(total)}
                     position="center"
                     className="text-xl sm:text-2xl font-bold"
                     fill="#111827"
@@ -180,7 +181,7 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className={`text-sm sm:text-base font-semibold text-gray-900 ${isHidden ? 'opacity-50' : ''}`}>
-                      ${item.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      {formatCurrency(item.value || 0)}
                     </p>
                     <p className={`text-xs text-gray-500 ${isHidden ? 'opacity-50' : ''}`}>
                       {percentage.toFixed(1)}%
