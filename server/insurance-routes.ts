@@ -138,8 +138,8 @@ router.get("/insurance-payments", async (req: Request, res: Response) => {
     const sql = `
       SELECT
         p.id, p.provider_id as "providerId", p.claim_id as "claimId",
-        p.payment_date as "paymentDate", p.amount, p.currency,
-        p.reference, p.notes, p.created_at as "createdAt"
+        TO_CHAR(p.payment_date, 'YYYY-MM-DD') as "paymentDate", p.amount, p.currency,
+        p.reference, p.notes, TO_CHAR(p.created_at, 'YYYY-MM-DD') as "createdAt"
       FROM insurance_payments p
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY p.payment_date DESC, p.created_at DESC

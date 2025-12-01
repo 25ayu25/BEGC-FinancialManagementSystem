@@ -62,9 +62,29 @@ const titleCase = (s: string) =>
 
 const fmtDate = (iso?: string | null) => {
   if (!iso) return "—";
+  
+  // Handle various date formats
+  let dateStr = iso;
+  
+  // If it's an ISO timestamp, extract just the date part
+  if (dateStr.includes('T')) {
+    dateStr = dateStr.split('T')[0];
+  }
+  
+  // Try to parse YYYY-MM-DD format (creates local date to avoid timezone issues)
+  const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (parts) {
+    const d = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  }
+  
+  // Fallback: try Date.parse on original string
   const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "—";
-  return new Date(t).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  if (!Number.isNaN(t)) {
+    return new Date(t).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  }
+  
+  return "—";
 };
 
 const RAW_BASE =
