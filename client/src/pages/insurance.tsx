@@ -99,14 +99,19 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 /* --------------------- **Payment date normalizer** --------------------- */
 /* Some APIs return snake_case. Always display payment_date if present.    */
 function getPaymentDate(p: Payment | any): string | undefined {
-  return (p?.paymentDate ?? p?.payment_date ?? p?.date ?? undefined) || undefined;
+  const raw = p?.paymentDate ?? p?.payment_date ?? p?.date;
+  if (!raw) return undefined;
+  // Handle both string dates and Date objects
+  if (raw instanceof Date) return raw.toISOString();
+  if (typeof raw === 'string') return raw;
+  return undefined;
 }
 function getCreatedAt(p: Payment | any): string | undefined {
   return (p?.createdAt ?? p?.created_at ?? undefined) || undefined;
 }
 function displayPaymentDate(p: Payment): string {
   const paymentDate = getPaymentDate(p);
-  return paymentDate ? fmtDate(paymentDate) : "Date not set";
+  return paymentDate ? fmtDate(paymentDate) : "—";
 }
 
 /* ----------------------------- provider order ----------------------------- */
@@ -1016,7 +1021,7 @@ export default function InsurancePage() {
                       <div className="text-sm">
                         <div className="font-medium">{money(p.amount, p.currency)}</div>
                         <div className="text-xs text-slate-500">
-                          Payment Date: {displayPaymentDate(p)} • Entry Date: {fmtDate(getCreatedAt(p))}
+                          {displayPaymentDate(p)}
                         </div>
                         {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
                       </div>
