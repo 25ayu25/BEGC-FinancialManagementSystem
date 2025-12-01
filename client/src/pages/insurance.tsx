@@ -131,7 +131,11 @@ function getCreatedAt(p: Payment | any): string | undefined {
 }
 function displayPaymentDate(p: Payment): string {
   const paymentDate = getPaymentDate(p);
-  return paymentDate ? fmtDate(paymentDate) : "—";
+  if (paymentDate) return fmtDate(paymentDate);
+  
+  // Fallback to createdAt if paymentDate is null
+  const createdAt = getCreatedAt(p);
+  return createdAt ? fmtDate(createdAt) : "—";
 }
 
 /* ----------------------------- provider order ----------------------------- */
