@@ -966,7 +966,7 @@ export default function InsurancePage() {
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600 sticky top-0">
+                <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10">
                   <tr>
                     <th className="text-left p-3">Provider</th>
                     <th className="text-left p-3">Period</th>
@@ -1105,19 +1105,19 @@ export default function InsurancePage() {
                               </div>
                             </div>
                             <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline font-medium">
-                              View details →
+                              View details <span aria-hidden="true">→</span>
                             </button>
                           </div>
                           
                           <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
                             <span>Claims: <strong className="text-slate-900">{money(row.claimed, "USD")}</strong></span>
-                            <span className="text-slate-300">→</span>
+                            <span className="text-slate-300" aria-hidden="true">→</span>
                             <span>Received: <strong className="text-slate-900">{money(row.paid, "USD")}</strong></span>
                           </div>
                           
                           <div className={`mt-2 text-sm font-semibold ${isOverpaid ? "text-emerald-600" : "text-slate-700"}`}>
                             {isOverpaid
-                              ? `Overpaid: ${money(Math.abs(outstanding), "USD")} 🎉`
+                              ? `Overpaid: ${money(Math.abs(outstanding), "USD")}`
                               : `Still unpaid: ${money(outstanding, "USD")}`
                             }
                           </div>
@@ -1147,7 +1147,7 @@ export default function InsurancePage() {
                                   <div className="text-base font-semibold text-slate-500">{row.providerName}</div>
                                 </div>
                                 <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline font-medium">
-                                  View details →
+                                  View details <span aria-hidden="true">→</span>
                                 </button>
                               </div>
                               <div className="text-[11px] text-slate-400 mt-1">No activity in this window</div>
