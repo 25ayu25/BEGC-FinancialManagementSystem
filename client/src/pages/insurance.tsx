@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Calendar as CalendarIcon, Search, X } from "lucide-react";
+import { Calendar as CalendarIcon, Search, X, Send, Wallet, CheckCircle, AlertCircle, Plus, CreditCard, Download, HelpCircle, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -171,41 +173,56 @@ function StatusChip({ status }: { status: ClaimStatus }) {
 function HelpPopover() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm"
-        title="What do these numbers mean?"
-      >
-        ︎Help
-      </button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="p-2 rounded-lg border hover:bg-slate-50 transition-colors"
+            title="What do these numbers mean?"
+          >
+            <HelpCircle className="h-4 w-4 text-slate-500" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Click for help</p>
+        </TooltipContent>
+      </Tooltip>
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
           <div className="font-medium mb-1">How to read this page</div>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Claims sent</strong>: claims in the current window.</li>
-            <li><strong>Payments received</strong>: payments received in the window.</li>
-            <li><strong>Still unpaid</strong>: Claims sent − Payments received (window only).</li>
+            <li><strong>Claims sent</strong>: Total claims submitted in the selected time window.</li>
+            <li><strong>Payments received</strong>: Total payments received from providers in the window.</li>
+            <li><strong>Still unpaid</strong>: Amount owed by providers (Claims − Payments). Shown when Claims ≥ Payments.</li>
+            <li><strong>Overpaid</strong>: You've received more payments than claims submitted in this window. This can happen when providers pay claims from a previous period.</li>
           </ul>
+          <div className="mt-3 p-2 bg-emerald-50 rounded-lg text-xs text-emerald-700">
+            <strong>Example:</strong> If you sent $10,000 in claims and received $12,000 in payments, the page shows "Overpaid: USD 2,000".
+          </div>
           <div className="text-right mt-2">
             <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
           </div>
         </div>
       )}
-    </div>
+    </TooltipProvider>
   );
 }
 
 function ProgressRing({ billed, paid, balance }: { billed: number; paid: number; balance: number }) {
   const pct = billed > 0 ? Math.min(100, Math.round((paid / billed) * 100)) : 0;
-  const label = balance < 0 ? "CR" : `${pct}%`;
-  const sweep = Math.round((balance < 0 ? 100 : pct) * 3.6);
+  const isOverpaid = balance < 0;
+  const sweep = Math.round((isOverpaid ? 100 : pct) * 3.6);
   return (
     <div className="relative h-10 w-10 shrink-0">
       <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#10b981 ${sweep}deg, #e5e7eb 0deg)` }} />
-      <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-slate-700">
-        {label}
+      <div className="absolute inset-[3px] rounded-full bg-white flex items-center justify-center">
+        {isOverpaid ? (
+          <CheckCircle className="h-4 w-4 text-emerald-600" />
+        ) : (
+          <span className="text-[10px] font-semibold text-slate-700">{pct}%</span>
+        )}
       </div>
     </div>
   );
@@ -366,6 +383,9 @@ export default function InsurancePage() {
   const [_editingPaymentId, setEditingPaymentId] = useState<string>("");
 
   const [authError, setAuthError] = useState(false);
+
+  // Collapsible state for inactive providers
+  const [showInactiveProviders, setShowInactiveProviders] = useState(false);
 
   // Top actions (mobile dropdown)
   const [showActions, setShowActions] = useState(false);
@@ -663,40 +683,59 @@ export default function InsurancePage() {
 
   /* ----------------------------- UI helpers ----------------------------- */
   function SummaryCards() {
+    const isOverpaid = summary.outstanding < 0;
+    const isUnpaid = summary.outstanding > 0;
+    
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="text-slate-500 text-sm">Claims sent</div>
+        {/* Claims sent card */}
+        <div className="rounded-2xl border bg-white p-4 hover:shadow-md transition-all duration-200">
+          <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <Send className="h-4 w-4" />
+            <span>Claims sent</span>
+          </div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.billed, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">
             {selectedProvider ? selectedProvider.name : "All providers"}
           </div>
         </div>
 
-        {/* Clickable KPI */}
+        {/* Payments received card - Clickable KPI */}
         <button
           onClick={async () => { await loadWindowPayments(); setPaymentsQuery(""); setShowCollected(true); }}
-          className="text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          className="text-left rounded-2xl border bg-white p-4 hover:shadow-md transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
           title="Click to view all payments in this window"
         >
-          <div className="text-slate-500 text-sm">Payments received</div>
+          <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <Wallet className="h-4 w-4" />
+            <span>Payments received</span>
+          </div>
           <div className="mt-1 text-[22px] font-semibold">{money(summary.collected, "USD")}</div>
           <div className="text-xs text-slate-500 mt-1">Payments received (window) • Click for details</div>
         </button>
 
-        {/* Clickable KPI */}
+        {/* Outstanding/Overpaid card - Clickable KPI */}
         <button
           onClick={() => setShowOutstanding(true)}
-          className={`text-left rounded-2xl border bg-white p-4 hover:shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}
+          className={`text-left rounded-2xl border p-4 hover:shadow-md transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${
+            isOverpaid ? "bg-emerald-50 border-emerald-200" : isUnpaid ? "bg-amber-50 border-amber-200" : "bg-white"
+          }`}
           title="Click to view outstanding by provider"
         >
-          <div className="text-slate-500 text-sm">Still unpaid</div>
-          <div className={`mt-1 text-[22px] font-semibold ${summary.outstanding < 0 ? "text-emerald-700" : ""}`}>
-            {summary.outstanding < 0
-              ? `Credit ${money(Math.abs(summary.outstanding), "USD")}`
-              : money(summary.outstanding, "USD")}
+          <div className={`flex items-center gap-2 text-sm ${isOverpaid ? "text-emerald-600" : isUnpaid ? "text-amber-600" : "text-slate-500"}`}>
+            {isOverpaid ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            <span>{isOverpaid ? "Overpaid" : "Still unpaid"}</span>
           </div>
-          <div className="text-xs text-slate-500 mt-1">Claims sent − Payments received • Click for details</div>
+          <div className={`mt-1 text-[22px] font-semibold ${isOverpaid ? "text-emerald-700" : isUnpaid ? "text-amber-700" : ""}`}>
+            {money(Math.abs(summary.outstanding), "USD")}
+          </div>
+          <div className={`text-xs mt-1 ${isOverpaid ? "text-emerald-600" : isUnpaid ? "text-amber-600" : "text-slate-500"}`}>
+            {isOverpaid ? "You've received more than claimed" : "Claims sent − Payments received"} • Click for details
+          </div>
         </button>
       </div>
     );
@@ -722,9 +761,10 @@ export default function InsurancePage() {
                 setCNotes("");
                 setShowClaim(true);
               }}
-              className="px-3 py-2 rounded-lg border hover:bg-slate-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
             >
-              + Add Claim
+              <Plus className="h-4 w-4" />
+              Add Claim
             </button>
 
             <button
@@ -735,12 +775,17 @@ export default function InsurancePage() {
                 setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
               }}
-              className="px-3 py-2 rounded-lg border hover:bg-slate-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
             >
+              <CreditCard className="h-4 w-4" />
               Record Payment
             </button>
 
-            <button onClick={() => exportClaimsCsv(claims, providers)} className="px-3 py-2 rounded-lg border hover:bg-slate-50">
+            <button 
+              onClick={() => exportClaimsCsv(claims, providers)} 
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
+            >
+              <Download className="h-4 w-4" />
               Export CSV
             </button>
 
@@ -751,15 +796,15 @@ export default function InsurancePage() {
           <div className="md:hidden relative" ref={actionsRef}>
             <button
               onClick={() => setShowActions((v) => !v)}
-              className="px-3 py-2 rounded-lg border hover:bg-slate-50"
+              className="px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
               aria-expanded={showActions}
             >
               Actions ▾
             </button>
             {showActions && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-white shadow-lg p-1 z-40">
+              <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white shadow-lg p-1 z-40">
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50"
                   onClick={() => {
                     setShowActions(false);
                     setEditingClaimId("");
@@ -769,10 +814,11 @@ export default function InsurancePage() {
                     setShowClaim(true);
                   }}
                 >
-                  + Add Claim
+                  <Plus className="h-4 w-4" />
+                  Add Claim
                 </button>
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50"
                   onClick={() => {
                     setShowActions(false);
                     setEditingPaymentId("");
@@ -782,12 +828,14 @@ export default function InsurancePage() {
                     setShowPayment(true);
                   }}
                 >
+                  <CreditCard className="h-4 w-4" />
                   Record Payment
                 </button>
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50"
                   onClick={() => { setShowActions(false); exportClaimsCsv(claims, providers); }}
                 >
+                  <Download className="h-4 w-4" />
                   Export CSV
                 </button>
                 <div className="border-t my-1" />
@@ -928,7 +976,29 @@ export default function InsurancePage() {
                     );
                   })}
                   {!loadingClaims && claims.length === 0 && (
-                    <tr><td colSpan={6} className="p-6 text-center text-slate-500">No claims in this window.</td></tr>
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <FileText className="h-12 w-12 text-slate-300" />
+                          <div className="text-slate-500">You haven't submitted any claims in this period</div>
+                          <button
+                            onClick={() => {
+                              setEditingClaimId("");
+                              setCProviderId(providerId || "");
+                              setCDate(new Date().toISOString().slice(0,10));
+                              setCCurrency("USD");
+                              setCAmount("0");
+                              setCNotes("");
+                              setShowClaim(true);
+                            }}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Your First Claim
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -940,35 +1010,84 @@ export default function InsurancePage() {
             <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
             <div className="p-4 space-y-3">
               {!balances && <div className="text-slate-500">Loading…</div>}
-              {orderedBalanceProviders.map((row) => {
-                const outstanding = (row.claimed || 0) - (row.paid || 0);
-                const paidPct = row.claimed > 0 ? Math.round((row.paid / row.claimed) * 100) : 0;
+              {(() => {
+                // Separate active (has activity) vs inactive (zero activity) providers
+                const activeProviders = orderedBalanceProviders.filter(row => row.claimed > 0 || row.paid > 0);
+                const inactiveProviders = orderedBalanceProviders.filter(row => row.claimed === 0 && row.paid === 0);
+                
                 return (
-                  <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
-                        <div className="font-medium">{row.providerName}</div>
-                      </div>
-                      <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
-                        View details
-                      </button>
-                    </div>
-                    <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
-                      <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
-                      <div className="bg-slate-50 rounded p-2">
-                        <div className="text-slate-500">Still unpaid</div>
-                        <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>
-                          {outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}
+                  <>
+                    {/* Active providers (always shown) */}
+                    {activeProviders.map((row) => {
+                      const outstanding = (row.claimed || 0) - (row.paid || 0);
+                      const isOverpaid = outstanding < 0;
+                      const paidPct = row.claimed > 0 ? Math.round((row.paid / row.claimed) * 100) : 0;
+                      return (
+                        <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-md transition-all duration-200 bg-white">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
+                              <div className="font-medium">{row.providerName}</div>
+                            </div>
+                            <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
+                              View details
+                            </button>
+                          </div>
+                          <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
+                          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                            <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
+                            <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
+                            <div className={`rounded p-2 ${isOverpaid ? "bg-emerald-50" : "bg-slate-50"}`}>
+                              <div className={`${isOverpaid ? "text-emerald-600" : "text-slate-500"}`}>
+                                {isOverpaid ? "Overpaid" : "Still unpaid"}
+                              </div>
+                              <div className={`font-semibold ${isOverpaid ? "text-emerald-700" : ""}`}>
+                                {money(Math.abs(outstanding), "USD")}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
+                      );
+                    })}
+                    
+                    {/* Inactive providers (collapsible) */}
+                    {inactiveProviders.length > 0 && (
+                      <Collapsible open={showInactiveProviders} onOpenChange={setShowInactiveProviders}>
+                        <CollapsibleTrigger asChild>
+                          <button className="w-full flex items-center justify-between p-3 rounded-lg border border-dashed hover:bg-slate-50 transition-colors text-sm text-slate-500">
+                            <span>{inactiveProviders.length} inactive provider{inactiveProviders.length > 1 ? 's' : ''}</span>
+                            {showInactiveProviders ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 mt-3">
+                          {inactiveProviders.map((row) => (
+                            <div key={row.providerId} className="border rounded-lg p-3 bg-slate-50/50 opacity-75">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <ProgressRing billed={0} paid={0} balance={0} />
+                                  <div className="font-medium text-slate-500">{row.providerName}</div>
+                                </div>
+                                <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
+                                  View details
+                                </button>
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-1">No activity in this window</div>
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+                    
+                    {activeProviders.length === 0 && inactiveProviders.length === 0 && balances && (
+                      <div className="text-slate-500">No balances yet.</div>
+                    )}
+                  </>
                 );
-              })}
-              {balances && orderedBalanceProviders.length === 0 && <div className="text-slate-500">No balances yet.</div>}
+              })()}
             </div>
           </div>
         </div>
@@ -990,14 +1109,19 @@ export default function InsurancePage() {
                 {(() => {
                   const prov = balances?.providers.find((r) => r.providerId === detailProviderId) || { claimed: 0, paid: 0 };
                   const outstanding = (prov.claimed || 0) - (prov.paid || 0);
+                  const isOverpaid = outstanding < 0;
                   const paidPct = prov.claimed > 0 ? Math.round((prov.paid / prov.claimed) * 100) : 0;
                   return (
                     <>
                       <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Claims sent</div><div className="font-semibold">{money(prov.claimed, "USD")}</div></div>
                       <div className="rounded-lg border p-3"><div className="text-xs text-slate-500">Payments received</div><div className="font-semibold">{money(prov.paid, "USD")}</div></div>
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-slate-500">Still unpaid</div>
-                        <div className={`font-semibold ${outstanding < 0 ? "text-emerald-700" : ""}`}>{outstanding < 0 ? `Credit ${money(Math.abs(outstanding), "USD")}` : money(outstanding, "USD")}</div>
+                      <div className={`rounded-lg border p-3 ${isOverpaid ? "bg-emerald-50 border-emerald-200" : ""}`}>
+                        <div className={`text-xs ${isOverpaid ? "text-emerald-600" : "text-slate-500"}`}>
+                          {isOverpaid ? "Overpaid" : "Still unpaid"}
+                        </div>
+                        <div className={`font-semibold ${isOverpaid ? "text-emerald-700" : ""}`}>
+                          {money(Math.abs(outstanding), "USD")}
+                        </div>
                         <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
                       </div>
                     </>
@@ -1199,7 +1323,14 @@ export default function InsurancePage() {
           <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border z-50">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">
-                Still unpaid — {summary.outstanding < 0 ? `Credit ${money(Math.abs(summary.outstanding), "USD")}` : money(summary.outstanding, "USD")}
+                <div className="flex items-center gap-2">
+                  {summary.outstanding < 0 ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                  )}
+                  <span>{summary.outstanding < 0 ? "Overpaid" : "Still unpaid"} — {money(Math.abs(summary.outstanding), "USD")}</span>
+                </div>
                 <div className="text-xs text-slate-500">As of: {windowLabel()}</div>
               </div>
               <button className="text-slate-500" onClick={() => setShowOutstanding(false)} title="Close"><X size={18} /></button>
@@ -1212,28 +1343,37 @@ export default function InsurancePage() {
 
               {orderedOutstanding.length > 0 && (
                 <div className="space-y-2">
-                  {orderedOutstanding.map((r) => (
-                    <div
-                      key={r.providerId}
-                      className="border rounded-xl p-3 hover:shadow-sm transition-shadow bg-white"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{providers.find(p => p.id === r.providerId)?.name || r.providerId}</div>
-                        <div className="text-right">
-                          <div className="text-xs text-slate-500 mb-0.5">Still unpaid</div>
-                          <div className="text-base font-semibold">{money(r.outstanding, "USD")}</div>
+                  {orderedOutstanding.map((r) => {
+                    const isOverpaid = r.outstanding < 0;
+                    return (
+                      <div
+                        key={r.providerId}
+                        className={`border rounded-xl p-3 hover:shadow-md transition-all duration-200 ${
+                          isOverpaid ? "bg-emerald-50 border-emerald-200" : "bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium">{providers.find(p => p.id === r.providerId)?.name || r.providerId}</div>
+                          <div className="text-right">
+                            <div className={`text-xs mb-0.5 ${isOverpaid ? "text-emerald-600" : "text-slate-500"}`}>
+                              {isOverpaid ? "Overpaid" : "Still unpaid"}
+                            </div>
+                            <div className={`text-base font-semibold ${isOverpaid ? "text-emerald-700" : ""}`}>
+                              {money(Math.abs(r.outstanding), "USD")}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-right">
+                          <button
+                            className="text-sm text-indigo-600 hover:underline"
+                            onClick={() => setDetailProviderId(r.providerId)}
+                          >
+                            Open provider
+                          </button>
                         </div>
                       </div>
-                      <div className="mt-2 text-right">
-                        <button
-                          className="text-sm text-indigo-600 hover:underline"
-                          onClick={() => setDetailProviderId(r.providerId)}
-                        >
-                          Open provider
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
