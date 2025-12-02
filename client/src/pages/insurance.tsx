@@ -993,7 +993,7 @@ export default function InsurancePage() {
                                 <MoreHorizontal className="h-4 w-4 text-slate-500" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuContent align="end" className="w-48 z-50 bg-white border shadow-lg rounded-lg">
                               {c.notes && (
                                 <>
                                   <DropdownMenuItem className="text-slate-700">
@@ -1174,7 +1174,15 @@ export default function InsurancePage() {
           <div className="absolute inset-0 bg-black/30" onClick={() => setDetailProviderId("")} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl border-l z-50 flex flex-col">
             <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-medium">{providers.find((p) => p.id === detailProviderId)?.name || "Provider"}: details</div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+                  {(providers.find((p) => p.id === detailProviderId)?.name || "P").charAt(0)}
+                </div>
+                <div>
+                  <div className="font-semibold text-lg">{providers.find((p) => p.id === detailProviderId)?.name || "Provider"}</div>
+                  <div className="text-xs text-slate-500">Provider Details</div>
+                </div>
+              </div>
               <button className="text-slate-500" onClick={() => setDetailProviderId("")}>✕</button>
             </div>
 
@@ -1197,7 +1205,13 @@ export default function InsurancePage() {
                         <div className={`font-semibold ${isOverpaid ? "text-emerald-700" : ""}`}>
                           {money(Math.abs(outstanding), "USD")}
                         </div>
-                        <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
+                        {isOverpaid ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                            ✓ Overpaid
+                          </span>
+                        ) : (
+                          <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
+                        )}
                       </div>
                     </>
                   );
@@ -1208,24 +1222,53 @@ export default function InsurancePage() {
               <div>
                 <div className="mb-2 font-medium">Claims</div>
                 {providerClaimsForDrawer.length === 0 && <div className="text-sm text-slate-500">No claims for this provider.</div>}
-                <div className="divide-y border rounded-lg">
+                <div className="space-y-3">
                   {providerClaimsForDrawer.map((c) => {
                     const pct = Number(c.claimedAmount) > 0 ? Math.min(100, Math.round((Number(c.paidToDate) / Number(c.claimedAmount)) * 100)) : 0;
                     return (
-                      <div key={c.id} className="p-3">
+                      <div key={c.id} className={`p-4 border rounded-xl hover:shadow-sm transition-all ${
+                        c.status === 'paid' ? 'border-l-4 border-l-emerald-500' :
+                        c.status === 'partially_paid' ? 'border-l-4 border-l-amber-500' :
+                        'border-l-4 border-l-slate-200'
+                      }`}>
                         <div className="flex items-center justify-between">
                           <div className="font-medium">
                             {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusChip status={c.status as ClaimStatus} />
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => {
-                              if (confirm("Delete this claim? This cannot be undone.")) {
-                                api(`/api/insurance-claims/${c.id}`, { method: "DELETE" }).then(() => { reloadClaims(); reloadBalances(); });
-                              }
-                            }}>
-                              Delete
-                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                                  <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44 z-50 bg-white shadow-lg border rounded-lg">
+                                {c.notes && (
+                                  <>
+                                    <DropdownMenuItem className="text-slate-600 text-xs">
+                                      <FileText className="h-3.5 w-3.5 mr-2" />
+                                      <span className="truncate">{c.notes}</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                  onClick={() => {
+                                    if (confirm("Delete this claim? This cannot be undone.")) {
+                                      api(`/api/insurance-claims/${c.id}`, { method: "DELETE" }).then(() => {
+                                        reloadClaims();
+                                        reloadBalances();
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  Delete claim
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
 
@@ -1241,13 +1284,13 @@ export default function InsurancePage() {
 
                         <div className="mt-2 flex items-center justify-between">
                           <div className="text-xs text-slate-500">{c.notes || ""}</div>
-                          <button className="text-xs px-2 py-1 rounded-md border hover:bg-slate-50" onClick={() => {
+                          <button className="text-sm px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors" onClick={() => {
                             setPProviderId(c.providerId);
                             setPDate(new Date().toISOString().slice(0,10));
                             setEditingPaymentId("");
                             setShowPayment(true);
                           }}>
-                            Record payment
+                            + Record payment
                           </button>
                         </div>
                       </div>
@@ -1261,30 +1304,50 @@ export default function InsurancePage() {
                 <div className="mb-2 font-medium">Payments (history)</div>
                 {loadingPayments && <div className="text-sm text-slate-500">Loading…</div>}
                 {!loadingPayments && payments.length === 0 && <div className="text-sm text-slate-500">No payments recorded.</div>}
-                <div className="divide-y border rounded-lg">
+                <div className="space-y-2">
                   {payments.map((p) => (
-                    <div key={p.id} className="p-3 flex items-center justify-between">
-                      <div className="text-sm">
-                        <div className="font-medium">{money(p.amount, p.currency)}</div>
-                        <div className="text-xs text-slate-500">
-                          {displayPaymentDate(p)}
-                        </div>
-                        {p.notes ? <div className="text-xs text-slate-500 mt-1">{p.notes}</div> : null}
+                    <div key={p.id} className="p-3 border rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-slate-900">{money(p.amount, p.currency)}</div>
+                        <div className="text-xs text-slate-500">{displayPaymentDate(p)}</div>
+                        {p.notes && <div className="text-xs text-slate-400 mt-1">{p.notes}</div>}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => {
-                          if (confirm("Delete this payment? This cannot be undone.")) {
-                            api(`/api/insurance-payments/${p.id}`, { method: "DELETE" }).then(() => {
-                              reloadBalances();
-                              const qs = new URLSearchParams({ providerId: detailProviderId });
-                              setLoadingPayments(true);
-                              api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
-                                .then(setPayments)
-                                .finally(() => setLoadingPayments(false));
-                            });
-                          }
-                        }}>Delete</button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                            <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 z-50 bg-white shadow-lg border rounded-lg">
+                          {p.notes && (
+                            <>
+                              <DropdownMenuItem className="text-slate-600 text-xs">
+                                <FileText className="h-3.5 w-3.5 mr-2" />
+                                <span className="truncate">{p.notes}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            onClick={() => {
+                              if (confirm("Delete this payment? This cannot be undone.")) {
+                                api(`/api/insurance-payments/${p.id}`, { method: "DELETE" }).then(() => {
+                                  reloadBalances();
+                                  const qs = new URLSearchParams({ providerId: detailProviderId });
+                                  setLoadingPayments(true);
+                                  api<Payment[]>(`/api/insurance-payments?${qs.toString()}`)
+                                    .then(setPayments)
+                                    .finally(() => setLoadingPayments(false));
+                                });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete payment
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>
