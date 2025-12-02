@@ -195,7 +195,7 @@ function HelpPopover() {
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li><strong>Claims sent</strong>: Total claims submitted in the selected time window.</li>
             <li><strong>Payments received</strong>: Total payments received from providers in the window.</li>
-            <li><strong>Still unpaid</strong>: Amount owed by providers (Claims − Payments). Shown when Claims ≥ Payments.</li>
+            <li><strong>Still unpaid</strong>: Amount owed by providers (Claims - Payments). Shown when Claims &gt;= Payments.</li>
             <li><strong>Overpaid</strong>: You've received more payments than claims submitted in this window. This can happen when providers pay claims from a previous period.</li>
           </ul>
           <div className="mt-3 p-2 bg-emerald-50 rounded-lg text-xs text-emerald-700">
