@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Calendar as CalendarIcon, Search, X, Send, Wallet, CheckCircle, AlertCircle, Plus, CreditCard, Download, HelpCircle, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { Calendar as CalendarIcon, Search, X, Send, Wallet, CheckCircle, AlertCircle, Plus, CreditCard, Download, HelpCircle, ChevronDown, ChevronUp, FileText, MoreHorizontal, Trash2 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -387,6 +388,9 @@ export default function InsurancePage() {
   // Collapsible state for inactive providers
   const [showInactiveProviders, setShowInactiveProviders] = useState(false);
 
+  // Claims search
+  const [claimsSearch, setClaimsSearch] = useState("");
+
   // Top actions (mobile dropdown)
   const [showActions, setShowActions] = useState(false);
   const actionsRef = useRef<HTMLDivElement | null>(null);
@@ -602,6 +606,17 @@ export default function InsurancePage() {
         .sort((a, b) => rank(a.providerName) - rank(b.providerName) || a.providerName.localeCompare(b.providerName)),
     [balances]
   );
+
+  // Filtered claims based on search
+  const filteredClaims = useMemo(() => {
+    if (!claimsSearch.trim()) return claims;
+    const q = claimsSearch.toLowerCase();
+    return claims.filter(c => {
+      const provName = providers.find(p => p.id === c.providerId)?.name || "";
+      const period = `${c.periodMonth}/${c.periodYear}`;
+      return provName.toLowerCase().includes(q) || period.includes(q) || (c.notes || "").toLowerCase().includes(q);
+    });
+  }, [claims, claimsSearch, providers]);
 
   /* -------------------- derived data for KPI modals -------------------- */
   function normalizedPayments(list: Payment[]) {
@@ -935,67 +950,104 @@ export default function InsurancePage() {
           <div className="lg:col-span-2 bg-white rounded-xl border">
             <div className="px-4 py-3 border-b flex items-center justify-between">
               <div className="font-medium">Claims</div>
-              <div className="text-sm text-slate-500">{claims.length} {claims.length === 1 ? "item" : "items"}</div>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search claims..."
+                    className="pl-8 pr-3 py-2 text-sm border rounded-lg w-48 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    value={claimsSearch}
+                    onChange={(e) => setClaimsSearch(e.target.value)}
+                  />
+                </div>
+                <span className="text-sm text-slate-500">{filteredClaims.length} items</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600">
+                <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10">
                   <tr>
                     <th className="text-left p-3">Provider</th>
                     <th className="text-left p-3">Period</th>
                     <th className="text-left p-3">Claims sent</th>
                     <th className="text-left p-3">Status</th>
-                    <th className="text-left p-3">Notes</th>
-                    <th className="text-right p-3 w-32">Actions</th>
+                    <th className="text-right p-3 w-16">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {claims.map((c) => {
+                  {filteredClaims.map((c) => {
                     const prov = providers.find((p) => p.id === c.providerId);
                     return (
-                      <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={c.id} className="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
                         <td className="p-3">{prov?.name || c.providerId}</td>
                         <td className="p-3">
                           {new Date(c.periodYear, c.periodMonth - 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
                         </td>
                         <td className="p-3">{money(c.claimedAmount, c.currency)}</td>
                         <td className="p-3"><StatusChip status={c.status} /></td>
-                        <td className="p-3">{c.notes || ""}</td>
                         <td className="p-3 text-right">
-                          <div className="inline-flex gap-2">
-                            <button className="text-xs px-2 py-1 rounded-md border text-rose-700" onClick={() => {
-                              if (confirm("Delete this claim? This cannot be undone.")) {
-                                api(`/api/insurance-claims/${c.id}`, { method: "DELETE" }).then(() => { reloadClaims(); reloadBalances(); });
-                              }
-                            }}>
-                              Delete
-                            </button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-1.5 rounded-md hover:bg-slate-100 transition-colors">
+                                <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              {c.notes && (
+                                <>
+                                  <DropdownMenuItem className="text-slate-700">
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    <span className="truncate">{c.notes}</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                onClick={() => {
+                                  if (confirm("Delete this claim? This cannot be undone.")) {
+                                    api(`/api/insurance-claims/${c.id}`, { method: "DELETE" }).then(() => {
+                                      reloadClaims();
+                                      reloadBalances();
+                                    });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     );
                   })}
-                  {!loadingClaims && claims.length === 0 && (
+                  {!loadingClaims && filteredClaims.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center">
+                      <td colSpan={5} className="p-8 text-center">
                         <div className="flex flex-col items-center gap-3">
                           <FileText className="h-12 w-12 text-slate-300" />
-                          <div className="text-slate-500">You haven't submitted any claims in this period</div>
-                          <button
-                            onClick={() => {
-                              setEditingClaimId("");
-                              setCProviderId(providerId || "");
-                              setCDate(new Date().toISOString().slice(0,10));
-                              setCCurrency("USD");
-                              setCAmount("0");
-                              setCNotes("");
-                              setShowClaim(true);
-                            }}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
-                          >
-                            <Plus className="h-4 w-4" />
-                            Add Your First Claim
-                          </button>
+                          <div className="text-slate-500">
+                            {claimsSearch ? "No claims match your search" : "You haven't submitted any claims in this period"}
+                          </div>
+                          {!claimsSearch && (
+                            <button
+                              onClick={() => {
+                                setEditingClaimId("");
+                                setCProviderId(providerId || "");
+                                setCDate(new Date().toISOString().slice(0,10));
+                                setCCurrency("USD");
+                                setCAmount("0");
+                                setCNotes("");
+                                setShowClaim(true);
+                              }}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add Your First Claim
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1007,7 +1059,12 @@ export default function InsurancePage() {
 
           {/* Provider balances */}
           <div className="bg-white rounded-xl border">
-            <div className="px-4 py-3 border-b font-medium">Provider Balances</div>
+            <div className="px-4 py-3 border-b font-medium flex items-center justify-between">
+              <span>Provider Balances</span>
+              <span className="text-sm text-slate-500">
+                Total: {money(orderedBalanceProviders.reduce((sum, p) => sum + (p.claimed - p.paid), 0), "USD")}
+              </span>
+            </div>
             <div className="p-4 space-y-3">
               {!balances && <div className="text-slate-500">Loading…</div>}
               {(() => {
@@ -1023,28 +1080,46 @@ export default function InsurancePage() {
                       const isOverpaid = outstanding < 0;
                       const paidPct = row.claimed > 0 ? Math.round((row.paid / row.claimed) * 100) : 0;
                       return (
-                        <div key={row.providerId} className="border rounded-lg p-3 hover:shadow-md transition-all duration-200 bg-white">
+                        <div
+                          key={row.providerId}
+                          className={`border rounded-xl p-4 hover:shadow-md transition-all duration-200 bg-white border-l-4 ${
+                            isOverpaid
+                              ? "border-l-emerald-500"
+                              : row.paid > 0
+                                ? "border-l-amber-500"
+                                : "border-l-slate-200"
+                          }`}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <ProgressRing billed={row.claimed} paid={row.paid} balance={outstanding} />
-                              <div className="font-medium">{row.providerName}</div>
+                              <div>
+                                <div className="text-base font-semibold text-slate-900">{row.providerName}</div>
+                                {isOverpaid ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                                    <CheckCircle className="h-3 w-3" /> Overpaid
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-slate-500 mt-1">{paidPct}% Paid</span>
+                                )}
+                              </div>
                             </div>
-                            <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
-                              View details
+                            <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline font-medium">
+                              View details <span aria-hidden="true">→</span>
                             </button>
                           </div>
-                          <div className="text-[11px] text-emerald-700 mt-1">{paidPct}% Paid</div>
-                          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                            <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Claims sent</div><div className="font-semibold">{money(row.claimed, "USD")}</div></div>
-                            <div className="bg-slate-50 rounded p-2"><div className="text-slate-500">Payments received</div><div className="font-semibold">{money(row.paid, "USD")}</div></div>
-                            <div className={`rounded p-2 ${isOverpaid ? "bg-emerald-50" : "bg-slate-50"}`}>
-                              <div className={`${isOverpaid ? "text-emerald-600" : "text-slate-500"}`}>
-                                {isOverpaid ? "Overpaid" : "Still unpaid"}
-                              </div>
-                              <div className={`font-semibold ${isOverpaid ? "text-emerald-700" : ""}`}>
-                                {money(Math.abs(outstanding), "USD")}
-                              </div>
-                            </div>
+                          
+                          <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
+                            <span>Claims: <strong className="text-slate-900">{money(row.claimed, "USD")}</strong></span>
+                            <span className="text-slate-300" aria-hidden="true">→</span>
+                            <span>Received: <strong className="text-slate-900">{money(row.paid, "USD")}</strong></span>
+                          </div>
+                          
+                          <div className={`mt-2 text-sm font-semibold ${isOverpaid ? "text-emerald-600" : "text-slate-700"}`}>
+                            {isOverpaid
+                              ? `Overpaid: ${money(Math.abs(outstanding), "USD")}`
+                              : `Still unpaid: ${money(outstanding, "USD")}`
+                            }
                           </div>
                         </div>
                       );
@@ -1065,14 +1140,14 @@ export default function InsurancePage() {
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-3 mt-3">
                           {inactiveProviders.map((row) => (
-                            <div key={row.providerId} className="border rounded-lg p-3 bg-slate-50/50 opacity-75">
+                            <div key={row.providerId} className="border rounded-xl p-4 bg-slate-50/50 opacity-75 border-l-4 border-l-slate-300">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <ProgressRing billed={0} paid={0} balance={0} />
-                                  <div className="font-medium text-slate-500">{row.providerName}</div>
+                                  <div className="text-base font-semibold text-slate-500">{row.providerName}</div>
                                 </div>
-                                <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline">
-                                  View details
+                                <button onClick={() => setDetailProviderId(row.providerId)} className="text-sm text-indigo-600 hover:underline font-medium">
+                                  View details <span aria-hidden="true">→</span>
                                 </button>
                               </div>
                               <div className="text-[11px] text-slate-400 mt-1">No activity in this window</div>
