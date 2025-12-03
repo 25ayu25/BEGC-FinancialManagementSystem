@@ -70,10 +70,10 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
   if (isLoading) {
     return (
       <div className="flex items-center space-x-3 w-full p-2">
-        <div className="w-10 h-10 bg-slate-200 rounded-full animate-pulse"></div>
+        <div className="w-10 h-10 bg-slate-700 rounded-full animate-pulse"></div>
         <div className="text-left">
-          <div className="w-20 h-4 bg-slate-200 rounded animate-pulse mb-1"></div>
-          <div className="w-16 h-3 bg-slate-200 rounded animate-pulse"></div>
+          <div className="w-20 h-4 bg-slate-700 rounded animate-pulse mb-1"></div>
+          <div className="w-16 h-3 bg-slate-700 rounded animate-pulse"></div>
         </div>
       </div>
     );
@@ -84,18 +84,18 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          className="p-0 h-auto w-full justify-start hover:bg-gray-100"
+          className="p-0 h-auto w-full justify-start hover:bg-slate-800"
           data-testid="button-user-profile"
         >
           <div className="flex items-center space-x-3 w-full">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center shadow-md">
               <User className="text-white text-sm" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-gray-900" data-testid="text-user-name">
+              <p className="text-sm font-semibold text-white" data-testid="text-user-name">
                 {displayName}
               </p>
-              <p className="text-xs text-gray-500" data-testid="text-user-role">
+              <p className="text-xs text-slate-400" data-testid="text-user-role">
                 {displayRole}
               </p>
             </div>

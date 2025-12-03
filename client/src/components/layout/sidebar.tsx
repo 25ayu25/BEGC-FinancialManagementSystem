@@ -91,7 +91,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 w-64 h-screen bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed lg:static inset-y-0 left-0 z-50 w-64 h-screen bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
@@ -100,7 +100,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <div className="lg:hidden absolute top-4 right-4">
           <button
             onClick={onClose}
-            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
             data-testid="button-close-sidebar"
           >
             <X className="w-5 h-5" />
@@ -108,26 +108,24 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </div>
 
         {/* Logo */}
-        <div className="p-4">
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 shadow-sm">
-            <div className="flex items-center space-x-3">
-              <div className="bg-teal-50 text-teal-600 border border-teal-100 rounded-lg p-2 flex items-center justify-center">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-slate-800 font-semibold text-base leading-tight">
-                  Bahr El Ghazal Clinic
-                </h1>
-                <p className="text-slate-500 font-normal text-xs leading-tight">
-                  Financial Management System
-                </p>
-              </div>
+        <div className="p-4 border-b border-slate-700">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-white font-semibold text-base leading-tight">
+                Bahr El Ghazal Clinic
+              </h1>
+              <p className="text-slate-400 font-normal text-xs leading-tight">
+                Financial Management System
+              </p>
             </div>
           </div>
         </div>
 
         {/* Scrollable menu area */}
-        <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto px-4 pb-4 pt-4 space-y-1">
           {/* Navigation items before Insurance group */}
           {navigationBefore.map((item) => {
             const isActive = location === item.href;
@@ -137,12 +135,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
-                      ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
-                      : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                      ? "bg-slate-800 text-white border-l-2 border-teal-400"
+                      : "text-slate-300 hover:text-white hover:bg-slate-800"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
-                  <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-teal-400" : "text-slate-400")} aria-hidden="true" />
                   <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
                     {item.name}
                   </span>
@@ -158,16 +156,16 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 className={cn(
                   "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors min-w-0",
                   isInsuranceActive
-                    ? "text-slate-700 bg-slate-50"
-                    : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                    ? "text-white bg-slate-800"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
                 )}
                 data-testid="group-insurance"
               >
-                <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <ShieldCheck className={cn("w-5 h-5 shrink-0", isInsuranceActive ? "text-teal-400" : "text-slate-400")} aria-hidden="true" />
                 <span className="font-medium flex-1 whitespace-normal break-words leading-snug text-left">
                   Insurance
                 </span>
-                <ChevronDown className="w-4 h-4 shrink-0 transition-transform duration-200" aria-hidden="true" />
+                <ChevronDown className="w-4 h-4 shrink-0 text-slate-400 transition-transform duration-200" aria-hidden="true" />
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-1 mt-1">
@@ -179,12 +177,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                       className={cn(
                         "flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors cursor-pointer min-w-0 pl-10 text-sm",
                         isActive
-                          ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
-                          : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                          ? "bg-slate-800 text-white border-l-2 border-teal-400"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800"
                       )}
                       data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                     >
-                      <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                      <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-teal-400" : "")} aria-hidden="true" />
                       <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
                         {item.name}
                       </span>
@@ -204,12 +202,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   className={cn(
                     "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
-                      ? "text-slate-700 bg-slate-100 border-l-2 border-teal-500"
-                      : "text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                      ? "bg-slate-800 text-white border-l-2 border-teal-400"
+                      : "text-slate-300 hover:text-white hover:bg-slate-800"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
-                  <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-teal-400" : "text-slate-400")} aria-hidden="true" />
                   <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
                     {item.name}
                   </span>
@@ -220,7 +218,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </nav>
 
         {/* User Profile & Status - Sticky at bottom */}
-        <div className="mt-auto p-4 border-t border-gray-200 bg-white">
+        <div className="mt-auto p-4 border-t border-slate-700 bg-slate-900">
           <UserProfileMenu />
         </div>
       </aside>
