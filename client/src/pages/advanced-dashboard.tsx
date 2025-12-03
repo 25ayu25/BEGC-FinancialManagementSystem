@@ -32,6 +32,11 @@ import {
   CalendarIcon,
   Shield,
   RefreshCw,
+  Plus,
+  FileText,
+  Settings,
+  ArrowRight,
+  CreditCard,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 
@@ -589,6 +594,18 @@ export default function AdvancedDashboard() {
     (timeRange === "year" || timeRange === "last-3-months") &&
     !hasPreviousPeriodUSD;
 
+  // ---------- "No transactions yet" logic for zero current period ----------
+  const currentRevenueValue = monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
+  const currentInsuranceValue = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const currentPatientsValue = dashboardData?.totalPatients || 0;
+
+  const showNoDataYetRevenue = currentRevenueValue === 0;
+  const showNoDataYetExpenses = currentExpenseValue === 0;
+  const showNoDataYetNetIncome = currentRevenueValue === 0 && currentExpenseValue === 0;
+  const showNoDataYetInsurance = currentInsuranceValue === 0;
+  const showNoDataYetPatients = currentPatientsValue === 0;
+
   /* ================== RENDER ================== */
 
   return (
@@ -613,6 +630,9 @@ export default function AdvancedDashboard() {
                 <p className="text-sm text-muted-foreground">
                   Key financials · {periodLabel}
                 </p>
+                <span className="hidden sm:inline-flex text-xs text-slate-400">
+                  Last updated: {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                </span>
               </div>
             </div>
 
@@ -773,10 +793,10 @@ export default function AdvancedDashboard() {
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-slate-600 text-xs font-medium">
+                    <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
                       Total Revenue
                     </p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                       SSP{" "}
                       {nf0.format(
                         Math.round(
@@ -788,41 +808,50 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {revenueChangePct !== undefined &&
+                      {showNoDataYetRevenue ? (
+                        <span className="text-xs font-medium text-slate-500">
+                          No transactions yet
+                        </span>
+                      ) : revenueChangePct !== undefined &&
                         revenueChangePct !== null &&
                         (!(
                           timeRange === "year" || timeRange === "last-3-months"
                         ) ||
-                          hasPreviousPeriodSSP) && (
-                          <span
-                            className={cn(
-                              "text-xs font-medium",
-                              revenueChangePct > 0
-                                ? "text-emerald-600"
-                                : revenueChangePct < 0
-                                ? "text-red-600"
-                                : "text-slate-500"
-                            )}
-                          >
-                            {revenueChangePct > 0 ? "+" : ""}
-                            {revenueChangePct.toFixed(1)}% {comparisonLabel}
-                          </span>
-                        )}
-
-                      {shouldShowNoComparisonSSP && (
+                          hasPreviousPeriodSSP) ? (
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            revenueChangePct > 0
+                              ? "text-emerald-600"
+                              : revenueChangePct < 0
+                              ? "text-red-600"
+                              : "text-slate-500"
+                          )}
+                        >
+                          {revenueChangePct > 0 ? "+" : ""}
+                          {revenueChangePct.toFixed(1)}% {comparisonLabel}
+                        </span>
+                      ) : shouldShowNoComparisonSSP ? (
                         <span className="text-xs font-medium text-slate-500">
                           No data to compare
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                  <div className="bg-emerald-50 p-1.5 rounded-lg">
+                  <div className={cn(
+                    "p-2.5 rounded-xl shadow-sm",
+                    revenueChangePct !== undefined && revenueChangePct !== null && revenueChangePct > 0
+                      ? "bg-emerald-100"
+                      : revenueChangePct !== undefined && revenueChangePct !== null && revenueChangePct < 0
+                      ? "bg-red-100"
+                      : "bg-emerald-100"
+                  )}>
                     {revenueChangePct !== undefined &&
                     revenueChangePct !== null &&
                     revenueChangePct < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-red-600" />
+                      <TrendingDown className="h-5 w-5 text-red-600" />
                     ) : (
-                      <TrendingUp className="h-4 w-4 text-emerald-600" />
+                      <TrendingUp className="h-5 w-5 text-emerald-600" />
                     )}
                   </div>
                 </div>
@@ -838,10 +867,10 @@ export default function AdvancedDashboard() {
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-slate-600 text-xs font-medium">
+                    <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
                       Total Expenses
                     </p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                       SSP{" "}
                       {nf0.format(
                         Math.round(
@@ -850,95 +879,105 @@ export default function AdvancedDashboard() {
                       )}
                     </p>
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.expenseChangeSSP !== undefined &&
+                      {showNoDataYetExpenses ? (
+                        <span className="text-xs font-medium text-slate-500">
+                          No expenses yet
+                        </span>
+                      ) : dashboardData?.changes?.expenseChangeSSP !== undefined &&
                         (!(
                           timeRange === "year" || timeRange === "last-3-months"
                         ) ||
-                          hasPreviousPeriodSSP) && (
-                          <span
-                            className={cn(
-                              "text-xs font-medium",
-                              dashboardData.changes.expenseChangeSSP > 0
-                                ? "text-red-600"
-                                : dashboardData.changes.expenseChangeSSP < 0
-                                ? "text-emerald-600"
-                                : "text-slate-500"
-                            )}
-                          >
-                            {dashboardData.changes.expenseChangeSSP > 0
-                              ? "+"
-                              : ""}
-                            {dashboardData.changes.expenseChangeSSP.toFixed(1)}%{" "}
-                            {comparisonLabel}
-                          </span>
-                        )}
-
-                      {shouldShowNoComparisonSSP && (
+                          hasPreviousPeriodSSP) ? (
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            dashboardData.changes.expenseChangeSSP > 0
+                              ? "text-red-600"
+                              : dashboardData.changes.expenseChangeSSP < 0
+                              ? "text-emerald-600"
+                              : "text-slate-500"
+                          )}
+                        >
+                          {dashboardData.changes.expenseChangeSSP > 0
+                            ? "+"
+                            : ""}
+                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}%{" "}
+                          {comparisonLabel}
+                        </span>
+                      ) : shouldShowNoComparisonSSP ? (
                         <span className="text-xs font-medium text-slate-500">
                           No data to compare
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                  <div className="bg-red-50 p-1.5 rounded-lg">
+                  <div className={cn(
+                    "p-2.5 rounded-xl shadow-sm",
+                    dashboardData?.changes?.expenseChangeSSP !== undefined && dashboardData.changes.expenseChangeSSP < 0
+                      ? "bg-emerald-100"
+                      : "bg-red-100"
+                  )}>
                     {dashboardData?.changes?.expenseChangeSSP !== undefined &&
                     dashboardData.changes.expenseChangeSSP < 0 ? (
-                      <TrendingDown className="h-4 w-4 text-emerald-600" />
+                      <TrendingDown className="h-5 w-5 text-emerald-600" />
                     ) : (
-                      <TrendingUp className="h-4 w-4 text-red-600" />
+                      <CreditCard className="h-5 w-5 text-red-600" />
                     )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Net Income */}
-            <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+            {/* Net Income - Special Highlight */}
+            <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-lg transition-shadow ring-1 ring-blue-100">
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-slate-600 text-xs font-medium">
-                      Net Income
+                    <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide">
+                      ✨ Net Income
                     </p>
-                    <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                    <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
                       SSP {nf0.format(Math.round(sspNetIncome))}
                     </p>
+                    {sspRevenue > 0 && (
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        Profit Margin: {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
+                      </p>
+                    )}
                     <div className="flex items-center mt-1">
-                      {dashboardData?.changes?.netIncomeChangeSSP !==
-                        undefined &&
+                      {showNoDataYetNetIncome ? (
+                        <span className="text-xs font-medium text-slate-500">
+                          No transactions yet
+                        </span>
+                      ) : dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
                         (!(
                           timeRange === "year" || timeRange === "last-3-months"
                         ) ||
-                          hasPreviousPeriodSSP) && (
-                          <span
-                            className={cn(
-                              "text-xs font-medium",
-                              dashboardData.changes.netIncomeChangeSSP > 0
-                                ? "text-emerald-600"
-                                : dashboardData.changes.netIncomeChangeSSP < 0
-                                ? "text-red-600"
-                                : "text-slate-500"
-                            )}
-                          >
-                            {dashboardData.changes.netIncomeChangeSSP > 0
-                              ? "+"
-                              : ""}
-                            {dashboardData.changes.netIncomeChangeSSP.toFixed(
-                              1
-                            )}
-                            % {comparisonLabel}
-                          </span>
-                        )}
-
-                      {shouldShowNoComparisonSSP && (
+                          hasPreviousPeriodSSP) ? (
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            dashboardData.changes.netIncomeChangeSSP > 0
+                              ? "text-emerald-600"
+                              : dashboardData.changes.netIncomeChangeSSP < 0
+                              ? "text-red-600"
+                              : "text-slate-500"
+                          )}
+                        >
+                          {dashboardData.changes.netIncomeChangeSSP > 0
+                            ? "+"
+                            : ""}
+                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% {comparisonLabel}
+                        </span>
+                      ) : shouldShowNoComparisonSSP ? (
                         <span className="text-xs font-medium text-slate-500">
                           No data to compare
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                  <div className="bg-blue-50 p-1.5 rounded-lg">
-                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  <div className="bg-blue-100 p-2.5 rounded-xl shadow-sm">
+                    <DollarSign className="h-5 w-5 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
@@ -961,10 +1000,10 @@ export default function AdvancedDashboard() {
                 <CardContent className="p-4 sm:p-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-600 text-xs font-medium">
+                      <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
                         Insurance (USD)
                       </p>
-                      <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                      <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                         USD{" "}
                           {fmtUSD(
                             Math.round(
@@ -975,7 +1014,11 @@ export default function AdvancedDashboard() {
                           )}
                       </p>
                       <div className="flex items-center mt-1">
-                        {insuranceChangePct !== undefined &&
+                        {showNoDataYetInsurance ? (
+                          <span className="text-xs font-medium text-slate-500">
+                            No insurance claims yet
+                          </span>
+                        ) : insuranceChangePct !== undefined &&
                         insuranceChangePct !== null &&
                         (!(
                           timeRange === "year" || timeRange === "last-3-months"
@@ -1015,8 +1058,8 @@ export default function AdvancedDashboard() {
                         )}
                       </div>
                     </div>
-                    <div className="bg-purple-50 p-1.5 rounded-lg">
-                      <Shield className="h-4 w-4 text-purple-600" />
+                    <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
+                      <Shield className="h-5 w-5 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -1031,20 +1074,26 @@ export default function AdvancedDashboard() {
                 <CardContent className="p-4 sm:p-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-600 text-xs font-medium">
+                      <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
                         Total Patients
                       </p>
-                      <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                      <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                         {(dashboardData?.totalPatients || 0).toLocaleString()}
                       </p>
                       <div className="flex items-center mt-1">
-                        <span className="text-xs font-medium text-teal-600">
-                          Current period
-                        </span>
+                        {showNoDataYetPatients ? (
+                          <span className="text-xs font-medium text-slate-500">
+                            No patients recorded yet
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-teal-600">
+                            Current period
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="bg-teal-50 p-1.5 rounded-lg">
-                      <Users className="h-4 w-4 text-teal-600" />
+                    <div className="bg-teal-100 p-2.5 rounded-xl shadow-sm">
+                      <Users className="h-5 w-5 text-teal-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -1074,64 +1123,88 @@ export default function AdvancedDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <a href="/transactions" className="block">
+                    <a href="/transactions" className="block group">
                       <Button
                         variant="outline"
-                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                        className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300 transition-all duration-200 group-hover:shadow-sm"
                       >
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            Add Transaction
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Record new income or expense
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
+                            <Plus className="h-4 w-4 text-teal-600" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-slate-900">
+                              Add Transaction
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              Record new income or expense
+                            </span>
+                          </div>
                         </div>
+                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
                       </Button>
                     </a>
-                    <a href="/patient-volume" className="block">
+                    <a href="/patient-volume" className="block group">
                       <Button
                         variant="outline"
-                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                        className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-200 group-hover:shadow-sm"
                       >
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            Patient Volume
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Update patient count
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
+                            <Users className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-slate-900">
+                              Patient Volume
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              Update patient count
+                            </span>
+                          </div>
                         </div>
+                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
                       </Button>
                     </a>
-                    <a href="/reports" className="block">
+                    <a href="/reports" className="block group">
                       <Button
                         variant="outline"
-                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                        className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300 transition-all duration-200 group-hover:shadow-sm"
                       >
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            Monthly Reports
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            View generated reports
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
+                            <FileText className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-slate-900">
+                              Monthly Reports
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              View generated reports
+                            </span>
+                          </div>
                         </div>
+                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
                       </Button>
                     </a>
-                    <a href="/users" className="block">
+                    <a href="/users" className="block group">
                       <Button
                         variant="outline"
-                        className="w-full justify-start h-auto py-3 hover:bg-teal-50 hover:border-teal-200"
+                        className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 transition-all duration-200 group-hover:shadow-sm"
                       >
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            User Management
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Manage user accounts
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
+                            <Settings className="h-4 w-4 text-orange-600" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-slate-900">
+                              User Management
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              Manage user accounts
+                            </span>
+                          </div>
                         </div>
+                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
                       </Button>
                     </a>
                   </div>

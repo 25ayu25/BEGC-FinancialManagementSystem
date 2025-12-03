@@ -14,7 +14,10 @@ import {
   LabelList, // <-- added
 } from "recharts";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/queryClient";
+import { BarChart3, Plus } from "lucide-react";
+import { Link } from "wouter";
 
 /* ----------------------------- Types ----------------------------- */
 
@@ -602,6 +605,9 @@ export default function RevenueAnalyticsDaily({
 
   const showBarLabels = wide; // labels only in Monthly view to avoid clutter in Daily
 
+  // Check if there's no data to display
+  const hasNoData = totalSSP === 0 && totalUSD === 0;
+
   return (
     <Card className="border-0 shadow-md bg-white">
       <CardHeader className="pb-0">
@@ -614,6 +620,25 @@ export default function RevenueAnalyticsDaily({
       </CardHeader>
 
       <CardContent className="pt-4 space-y-8">
+        {/* Empty State */}
+        {hasNoData && !isLoading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="bg-slate-100 p-4 rounded-full mb-4">
+              <BarChart3 className="h-8 w-8 text-slate-400" />
+            </div>
+            <p className="text-slate-600 font-medium">No revenue data yet</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Revenue will appear here once transactions are recorded
+            </p>
+            <Link href="/transactions">
+              <Button variant="outline" className="mt-4">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Transaction
+              </Button>
+            </Link>
+          </div>
+        ) : (
+        <>
         {/* SSP */}
         <section aria-label={`SSP ${wide ? "monthly" : "daily"}`}>
           <div className="flex items-center justify-between mb-2">
@@ -794,6 +819,8 @@ export default function RevenueAnalyticsDaily({
           <div className="text-center text-slate-500 text-sm">
             Loading revenue…
           </div>
+        )}
+        </>
         )}
       </CardContent>
 
