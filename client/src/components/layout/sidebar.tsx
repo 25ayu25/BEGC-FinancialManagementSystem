@@ -91,7 +91,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 w-64 h-screen bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 top-0 z-50 w-64 h-screen bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
@@ -107,8 +107,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           </button>
         </div>
 
-        {/* Logo */}
-        <div className="p-4 border-b border-slate-700">
+        {/* Logo - Fixed at top, never scrolls */}
+        <div className="flex-shrink-0 p-4 border-b border-slate-700">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-white" />
@@ -217,8 +217,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* User Profile & Status - Sticky at bottom */}
-        <div className="mt-auto p-4 border-t border-slate-700 bg-slate-900">
+        {/* User Profile & Status - Fixed at bottom, never scrolls */}
+        <div className="flex-shrink-0 mt-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-slate-700 bg-slate-900">
           <UserProfileMenu />
         </div>
       </aside>
