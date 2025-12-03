@@ -595,7 +595,7 @@ export default function AdvancedDashboard() {
     !hasPreviousPeriodUSD;
 
   // ---------- "No transactions yet" logic for zero current period ----------
-  const currentRevenueValue = monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const currentRevenueValue = monthTotalSSP ?? parseFloat(dashboardData?.totalIncomeSSP || "0");
   const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
   const currentInsuranceValue = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const currentPatientsValue = dashboardData?.totalPatients || 0;
@@ -933,15 +933,18 @@ export default function AdvancedDashboard() {
               <CardContent className="p-4 sm:p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide">
-                      ✨ Net Income
+                    <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
+                      <span className="text-blue-500">★</span> Net Income
                     </p>
                     <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
                       SSP {nf0.format(Math.round(sspNetIncome))}
                     </p>
                     {sspRevenue > 0 && (
-                      <p className="text-xs text-blue-600 mt-0.5">
-                        Profit Margin: {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
+                      <p className={cn(
+                        "text-xs mt-0.5",
+                        sspNetIncome >= 0 ? "text-blue-600" : "text-red-600"
+                      )}>
+                        {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin: {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
                       </p>
                     )}
                     <div className="flex items-center mt-1">
