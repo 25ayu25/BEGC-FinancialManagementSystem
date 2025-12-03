@@ -91,7 +91,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed lg:static inset-y-0 left-0 z-50 w-64 h-screen bg-white border-r border-gray-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
@@ -219,8 +219,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* User Profile & Status */}
-        <div className="p-4 border-t border-gray-200">
+        {/* User Profile & Status - Sticky at bottom */}
+        <div className="mt-auto p-4 border-t border-gray-200 bg-white">
           <UserProfileMenu />
         </div>
       </aside>

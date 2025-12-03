@@ -49,6 +49,16 @@ const BAR_BY_BASE: Record<BaseKey, string> = {
   OTH: "bg-slate-400",
 };
 
+// Border colors for left border visual hierarchy
+const BORDER_BY_BASE: Record<BaseKey, string> = {
+  LAB: "border-l-emerald-500",
+  ULT: "border-l-sky-500",
+  PHM: "border-l-violet-500",
+  XRY: "border-l-cyan-600",
+  CON: "border-l-orange-500",
+  OTH: "border-l-slate-400",
+};
+
 // map common code aliases to a base key
 const CODE_ALIASES: Record<string, BaseKey> = {
   // your originals
@@ -132,11 +142,7 @@ export default function DepartmentsPanel({
 
   const visible = expanded ? rows : rows.slice(0, maxVisible);
 
-  const rowPad = compact ? "py-2.5" : "py-3";
-  const nameCls = compact ? "text-sm font-medium text-slate-900" : "text-base font-medium text-slate-900";
-  const amtCls = compact ? "text-xs font-semibold text-slate-900 font-mono tabular-nums" : "text-sm font-semibold text-slate-900 font-mono tabular-nums";
-  const pctCls = compact ? "text-[11px] text-slate-500" : "text-xs text-slate-500";
-  const barH = compact ? "h-1.5" : "h-2";
+  const nameCls = compact ? "text-sm font-medium text-slate-700" : "text-base font-medium text-slate-700";
 
   return (
     <Card className={cn("border border-slate-200 shadow-sm", className)}>
@@ -151,33 +157,42 @@ export default function DepartmentsPanel({
           <div className="text-sm text-slate-500">No department data for this period.</div>
         )}
 
-        {/* list-style rows (denser than cards) */}
-        <div className={cn(expanded && "overflow-y-auto pr-1", expanded && `max-h-[${maxHeight}px]`)}>
+        {/* Enhanced department rows with visual hierarchy */}
+        <div className={cn("space-y-2", expanded && "overflow-y-auto pr-1", expanded && `max-h-[${maxHeight}px]`)}>
           {visible.map((row) => {
             const Icon = ICON_BY_BASE[row.base];
             const colorBar = BAR_BY_BASE[row.base];
+            const borderColor = BORDER_BY_BASE[row.base];
             return (
-              <div key={row.id} className={cn("border-b last:border-0 border-slate-100", rowPad)}>
-                <div className="flex items-center justify-between">
+              <div 
+                key={row.id} 
+                className={cn(
+                  "p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border-l-4",
+                  borderColor
+                )}
+              >
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-50 border border-slate-200">
-                      <Icon className="h-3.5 w-3.5 text-slate-700" />
+                      <Icon className="h-3.5 w-3.5 text-slate-500" />
                     </span>
-                    <div className={nameCls}>{row.name}</div>
+                    <span className={nameCls}>{row.name}</span>
                   </div>
-                  <div className={amtCls}>SSP {row.ssp.toLocaleString()}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
+                      SSP {row.ssp.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {row.pct.toFixed(1)}%
+                    </span>
+                  </div>
                 </div>
-
-                <div className="mt-1.5">
-                  <div className={cn(barH, "w-full rounded-full bg-slate-100 overflow-hidden")}>
-                    <div
-                      className={cn(barH, "rounded-full", colorBar)}
-                      style={{ width: `${Math.min(100, row.pct)}%` }}
-                    />
-                  </div>
-                  <div className={cn(pctCls, "mt-1")}>
-                    {row.pct.toFixed(1)}% of revenue
-                  </div>
+                {/* Thicker progress bar with animation */}
+                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={cn("h-2.5 rounded-full transition-all duration-500 ease-out", colorBar)}
+                    style={{ width: `${Math.min(100, row.pct)}%` }}
+                  />
                 </div>
               </div>
             );
