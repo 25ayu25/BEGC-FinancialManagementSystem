@@ -645,13 +645,13 @@ export default function RevenueAnalyticsDaily({
             <p className="text-sm font-medium text-slate-700">SSP ({wide ? "Monthly" : "Daily"})</p>
             {!wide ? (
               <span className="text-xs text-slate-500">
-                Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
+                Total: <span className="font-semibold text-slate-700">SSP {nf0.format(totalSSP)}</span>
                 <span className="mx-2">•</span>
-                Avg/day: <span className="font-semibold">SSP {nf0.format(avgDaySSP)}</span>
+                Avg: <span className="font-semibold text-slate-700">SSP {nf0.format(avgDaySSP)}</span>/day
               </span>
             ) : (
               <span className="text-xs text-slate-500">
-                Total: <span className="font-semibold">SSP {nf0.format(totalSSP)}</span>
+                Total: <span className="font-semibold text-slate-700">SSP {nf0.format(totalSSP)}</span>
               </span>
             )}
           </div>
@@ -733,13 +733,13 @@ export default function RevenueAnalyticsDaily({
             <p className="text-sm font-medium text-slate-700">USD ({wide ? "Monthly" : "Daily"})</p>
             {!wide ? (
               <span className="text-xs text-slate-500">
-                Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
+                Total: <span className="font-semibold text-slate-700">USD {nf0.format(totalUSD)}</span>
                 <span className="mx-2">•</span>
-                Avg/day: <span className="font-semibold">USD {nf0.format(avgDayUSD)}</span>
+                Avg: <span className="font-semibold text-slate-700">USD {nf0.format(avgDayUSD)}</span>/day
               </span>
             ) : (
               <span className="text-xs text-slate-500">
-                Total: <span className="font-semibold">USD {nf0.format(totalUSD)}</span>
+                Total: <span className="font-semibold text-slate-700">USD {nf0.format(totalUSD)}</span>
               </span>
             )}
           </div>

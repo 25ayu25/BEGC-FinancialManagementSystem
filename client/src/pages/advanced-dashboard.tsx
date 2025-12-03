@@ -156,7 +156,7 @@ function InsuranceProvidersUSD({
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
           <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance
-          Providers (USD)
+          Providers
         </CardTitle>
         <Link href={viewAllHref}>
           <Button variant="outline" size="sm">
@@ -165,34 +165,36 @@ function InsuranceProvidersUSD({
         </Link>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-xs text-slate-500">
-          Totals in period:{" "}
-          <span className="font-mono">
-            USD {fmtUSD(displayTotal)}
-          </span>
-        </div>
-
         {sorted.length === 0 ? (
           <div className="text-sm text-slate-500">
             No insurance receipts for this period.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {sorted.map((item, idx) => {
               const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
               const color = palette[idx % palette.length];
               return (
-                <div key={`${item.name}-${idx}`} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+                <div 
+                  key={`${item.name}-${idx}`} 
+                  className="p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4"
+                  style={{ borderLeftColor: color }}
+                >
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm"
+                        className="inline-block w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-sm text-slate-700">{item.name}</span>
+                      <span className="text-sm font-medium text-slate-700">{item.name}</span>
                     </div>
-                    <div className="text-xs font-medium text-slate-600">
-                      USD {fmtUSD(item.amount)}
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
+                        ${fmtUSD(item.amount)}
+                      </span>
+                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {pct.toFixed(1)}%
+                      </span>
                     </div>
                   </div>
                   <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
@@ -716,10 +718,10 @@ export default function AdvancedDashboard() {
       <header
         className={cn(
           "sticky top-0 z-50",
-          "bg-white/80 dark:bg-slate-900/70",
-          "backdrop-blur-md supports-[backdrop-filter]:bg-white/60",
-          "shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)]",
-          "dark:shadow-[inset_0_-1px_0_rgba(148,163,184,0.18)]"
+          "bg-gradient-to-r from-slate-50 via-white to-slate-50",
+          "border-b border-slate-200",
+          "shadow-sm",
+          "backdrop-blur-md supports-[backdrop-filter]:bg-gradient-to-r supports-[backdrop-filter]:from-slate-50/90 supports-[backdrop-filter]:via-white/90 supports-[backdrop-filter]:to-slate-50/90"
         )}
       >
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
