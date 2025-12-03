@@ -211,6 +211,108 @@ function InsuranceProvidersUSD({
   );
 }
 
+/* ================== Quick Actions Card ================== */
+function QuickActionsCard() {
+  return (
+    <Card className="border border-slate-200 shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick
+          Actions
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <a href="/transactions" className="block group">
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300 transition-all duration-200 group-hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
+                  <Plus className="h-4 w-4 text-teal-600" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-medium text-slate-900">
+                    Add Transaction
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Record new income or expense
+                  </span>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
+            </Button>
+          </a>
+          <a href="/patient-volume" className="block group">
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-200 group-hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
+                  <Users className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-medium text-slate-900">
+                    Patient Volume
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Update patient count
+                  </span>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+            </Button>
+          </a>
+          <a href="/reports" className="block group">
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300 transition-all duration-200 group-hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
+                  <FileText className="h-4 w-4 text-purple-600" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-medium text-slate-900">
+                    Monthly Reports
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    View generated reports
+                  </span>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+            </Button>
+          </a>
+          <a href="/users" className="block group">
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 transition-all duration-200 group-hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
+                  <Settings className="h-4 w-4 text-orange-600" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-medium text-slate-900">
+                    User Management
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Manage user accounts
+                  </span>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
+            </Button>
+          </a>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ================== Page ================== */
 export default function AdvancedDashboard() {
   const {
@@ -1118,102 +1220,7 @@ export default function AdvancedDashboard() {
 
               {/* Quick Actions - Hidden on mobile, shown on desktop */}
               <div className="hidden lg:block">
-                <Card className="border border-slate-200 shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick
-                      Actions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <a href="/transactions" className="block group">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300 transition-all duration-200 group-hover:shadow-sm"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
-                              <Plus className="h-4 w-4 text-teal-600" />
-                            </div>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium text-slate-900">
-                                Add Transaction
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                Record new income or expense
-                              </span>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
-                        </Button>
-                      </a>
-                      <a href="/patient-volume" className="block group">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-200 group-hover:shadow-sm"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
-                              <Users className="h-4 w-4 text-blue-600" />
-                            </div>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium text-slate-900">
-                                Patient Volume
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                Update patient count
-                              </span>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
-                        </Button>
-                      </a>
-                      <a href="/reports" className="block group">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300 transition-all duration-200 group-hover:shadow-sm"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
-                              <FileText className="h-4 w-4 text-purple-600" />
-                            </div>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium text-slate-900">
-                                Monthly Reports
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                View generated reports
-                              </span>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
-                        </Button>
-                      </a>
-                      <a href="/users" className="block group">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 transition-all duration-200 group-hover:shadow-sm"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
-                              <Settings className="h-4 w-4 text-orange-600" />
-                            </div>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium text-slate-900">
-                                User Management
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                Manage user accounts
-                              </span>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
-                        </Button>
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
+                <QuickActionsCard />
               </div>
             </div>
 
@@ -1284,102 +1291,7 @@ export default function AdvancedDashboard() {
 
           {/* Quick Actions - Shown only on mobile, at the bottom */}
           <div className="lg:hidden mb-8">
-            <Card className="border border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick
-                  Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <a href="/transactions" className="block group">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300 transition-all duration-200 group-hover:shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
-                          <Plus className="h-4 w-4 text-teal-600" />
-                        </div>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            Add Transaction
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Record new income or expense
-                          </span>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
-                    </Button>
-                  </a>
-                  <a href="/patient-volume" className="block group">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-200 group-hover:shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
-                          <Users className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            Patient Volume
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Update patient count
-                          </span>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
-                    </Button>
-                  </a>
-                  <a href="/reports" className="block group">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300 transition-all duration-200 group-hover:shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
-                          <FileText className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            Monthly Reports
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            View generated reports
-                          </span>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
-                    </Button>
-                  </a>
-                  <a href="/users" className="block group">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 transition-all duration-200 group-hover:shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
-                          <Settings className="h-4 w-4 text-orange-600" />
-                        </div>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-slate-900">
-                            User Management
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Manage user accounts
-                          </span>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
-                    </Button>
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
+            <QuickActionsCard />
           </div>
 
           {/* Expenses drawer */}

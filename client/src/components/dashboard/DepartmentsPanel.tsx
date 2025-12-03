@@ -167,7 +167,7 @@ export default function DepartmentsPanel({
               <div 
                 key={row.id} 
                 className={cn(
-                  "p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border-l-4",
+                  "p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4",
                   borderColor
                 )}
               >
