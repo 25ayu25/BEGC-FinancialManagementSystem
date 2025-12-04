@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Receipt, TrendingUp } from "lucide-react";
+import { Receipt } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,

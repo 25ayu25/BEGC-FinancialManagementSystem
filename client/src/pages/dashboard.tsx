@@ -147,17 +147,25 @@ function getDepartmentStyle(name: string): DepartmentStyleConfig {
   return { icon: Building, bgColor: "bg-slate-100", iconColor: "text-slate-600" };
 }
 
+// Month abbreviations for custom month picker
+const MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 export default function Dashboard() {
   const now = new Date();
   const [selectedFilter, setSelectedFilter] = useState<FilterOption>("this-year");
   const [currencyTab, setCurrencyTab] = useState<"ssp" | "usd">("ssp");
   
   // Month vs Month custom selection state
+  // Handle year boundary: if current month is January (0), compare to December of previous year
   const [customComparisonEnabled, setCustomComparisonEnabled] = useState(false);
   const [customBaseYear, setCustomBaseYear] = useState<number>(now.getFullYear());
   const [customBaseMonth, setCustomBaseMonth] = useState<number>(now.getMonth()); // 0-indexed for Date
-  const [customCompareYear, setCustomCompareYear] = useState<number>(now.getFullYear());
-  const [customCompareMonth, setCustomCompareMonth] = useState<number>(now.getMonth() - 1); // Previous month
+  const [customCompareYear, setCustomCompareYear] = useState<number>(
+    now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+  );
+  const [customCompareMonth, setCustomCompareMonth] = useState<number>(
+    now.getMonth() === 0 ? 11 : now.getMonth() - 1 // December (11) if January, otherwise previous month
+  );
   
   const thisYear = now.getFullYear();
   const currentCalendarMonth = now.getMonth() + 1;
@@ -975,7 +983,7 @@ export default function Dashboard() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                            {MONTH_NAMES_SHORT.map((m, i) => (
                               <SelectItem key={i} value={String(i)}>{m}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1006,7 +1014,7 @@ export default function Dashboard() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                            {MONTH_NAMES_SHORT.map((m, i) => (
                               <SelectItem key={i} value={String(i)}>{m}</SelectItem>
                             ))}
                           </SelectContent>
