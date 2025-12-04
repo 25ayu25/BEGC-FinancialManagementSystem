@@ -109,6 +109,8 @@ interface DepartmentGrowthItem extends DepartmentStyleConfig {
   currentValue: number;
   prevValue: number;
   growth: number;
+  isNewDepartment: boolean;  // true when prev = 0 and current > 0
+  hasNoActivity: boolean;    // true when both prev and current = 0
 }
 
 /** Monthly trend data item returned by the batched endpoint */
@@ -147,8 +149,15 @@ function getDepartmentStyle(name: string): DepartmentStyleConfig {
 
 export default function Dashboard() {
   const now = new Date();
-  const [selectedFilter, setSelectedFilter] = useState<FilterOption>("last-12-months");
+  const [selectedFilter, setSelectedFilter] = useState<FilterOption>("this-year");
   const [currencyTab, setCurrencyTab] = useState<"ssp" | "usd">("ssp");
+  
+  // Month vs Month custom selection state
+  const [customComparisonEnabled, setCustomComparisonEnabled] = useState(false);
+  const [customBaseYear, setCustomBaseYear] = useState<number>(now.getFullYear());
+  const [customBaseMonth, setCustomBaseMonth] = useState<number>(now.getMonth()); // 0-indexed for Date
+  const [customCompareYear, setCustomCompareYear] = useState<number>(now.getFullYear());
+  const [customCompareMonth, setCustomCompareMonth] = useState<number>(now.getMonth() - 1); // Previous month
   
   const thisYear = now.getFullYear();
   const currentCalendarMonth = now.getMonth() + 1;
@@ -203,14 +212,36 @@ export default function Dashboard() {
     };
   }, [selectedFilter, thisYear, lastCompleteMonth, lastCompleteMonthDate]);
 
-  // For Month vs Month comparison, always compare last two complete months
-  // This avoids comparing a partial current month with a full previous month
-  const comparisonCurrentDate = lastCompleteMonthDate;
-  const comparisonPrevDate = subMonths(lastCompleteMonthDate, 1);
-  const comparisonCurrentYear = comparisonCurrentDate.getFullYear();
-  const comparisonCurrentMonth = comparisonCurrentDate.getMonth() + 1;
-  const comparisonPrevYear = comparisonPrevDate.getFullYear();
-  const comparisonPrevMonth = comparisonPrevDate.getMonth() + 1;
+  // For Month vs Month comparison
+  // Use custom selection if enabled, otherwise use last two complete months
+  const { comparisonCurrentDate, comparisonPrevDate, comparisonCurrentYear, comparisonCurrentMonth, comparisonPrevYear, comparisonPrevMonth, isCustomComparison } = useMemo(() => {
+    if (customComparisonEnabled) {
+      // Custom selection: use user-selected months
+      const baseDate = new Date(customBaseYear, customBaseMonth, 1);
+      const compareDate = new Date(customCompareYear, customCompareMonth, 1);
+      return {
+        comparisonCurrentDate: baseDate,
+        comparisonPrevDate: compareDate,
+        comparisonCurrentYear: customBaseYear,
+        comparisonCurrentMonth: customBaseMonth + 1, // Convert to 1-indexed
+        comparisonPrevYear: customCompareYear,
+        comparisonPrevMonth: customCompareMonth + 1, // Convert to 1-indexed
+        isCustomComparison: true,
+      };
+    }
+    // Default: last two complete months
+    const current = lastCompleteMonthDate;
+    const prev = subMonths(lastCompleteMonthDate, 1);
+    return {
+      comparisonCurrentDate: current,
+      comparisonPrevDate: prev,
+      comparisonCurrentYear: current.getFullYear(),
+      comparisonCurrentMonth: current.getMonth() + 1,
+      comparisonPrevYear: prev.getFullYear(),
+      comparisonPrevMonth: prev.getMonth() + 1,
+      isCustomComparison: false,
+    };
+  }, [customComparisonEnabled, customBaseYear, customBaseMonth, customCompareYear, customCompareMonth, lastCompleteMonthDate]);
 
   // Fetch dashboard data for comparison current month (last complete month)
   const { data: currentMonthData, isLoading: loadingCurrent } = useQuery({
@@ -312,7 +343,7 @@ export default function Dashboard() {
   const comparisonCurrentMonthLabel = format(comparisonCurrentDate, "MMMM yyyy");
   const comparisonPrevMonthLabel = format(comparisonPrevDate, "MMMM yyyy");
 
-  // Calculate department growth
+  // Calculate department growth with proper handling for new and inactive departments
   const departmentGrowth = useMemo((): DepartmentGrowthItem[] => {
     const currentBreakdown = currentMonthData?.departmentBreakdown || {};
     const prevBreakdown = prevMonthData?.departmentBreakdown || {};
@@ -322,7 +353,20 @@ export default function Dashboard() {
     return deptArray.map((dept: Department) => {
       const currentVal = parseFloat(currentBreakdown[dept.id] || currentBreakdown[dept.name] || "0");
       const prevVal = parseFloat(prevBreakdown[dept.id] || prevBreakdown[dept.name] || "0");
-      const growth = prevVal > 0 ? ((currentVal - prevVal) / prevVal) * 100 : (currentVal > 0 ? 100 : 0);
+      
+      // Determine if this is a new department (started this month) or has no activity
+      const isNewDepartment = prevVal === 0 && currentVal > 0;
+      const hasNoActivity = prevVal === 0 && currentVal === 0;
+      
+      // Calculate growth - for new departments, don't show misleading +100%
+      let growth = 0;
+      if (prevVal > 0) {
+        growth = ((currentVal - prevVal) / prevVal) * 100;
+      } else if (currentVal > 0) {
+        // New department - we'll display "New this month" instead of percentage
+        growth = 0; // Will be handled specially in UI
+      }
+      
       const style = getDepartmentStyle(dept.name);
       
       return {
@@ -331,10 +375,17 @@ export default function Dashboard() {
         currentValue: currentVal,
         prevValue: prevVal,
         growth,
+        isNewDepartment,
+        hasNoActivity,
         ...style,
       };
-    }).filter((d) => d.currentValue > 0 || d.prevValue > 0)
-      .sort((a, b) => b.growth - a.growth);
+    }).filter((d) => d.currentValue > 0 || d.prevValue > 0) // Hide departments with no activity
+      .sort((a, b) => {
+        // Sort new departments to top, then by growth rate
+        if (a.isNewDepartment && !b.isNewDepartment) return -1;
+        if (!a.isNewDepartment && b.isNewDepartment) return 1;
+        return b.growth - a.growth;
+      });
   }, [currentMonthData, prevMonthData, departments]);
 
   // Aggregate expenses based on the selected filter period
@@ -356,11 +407,17 @@ export default function Dashboard() {
       const breakdown = month.expenseBreakdown || {};
       for (const [category, amount] of Object.entries(breakdown)) {
         const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount) || "0");
-        combined[category] = (combined[category] || 0) + numAmount;
+        // Normalize category names - merge "Other", "Others", "other", "others" into "Other expenses"
+        const normalizedCategory = category.toLowerCase().trim();
+        let finalCategory = category;
+        if (normalizedCategory === 'other' || normalizedCategory === 'others') {
+          finalCategory = 'Other expenses';
+        }
+        combined[finalCategory] = (combined[finalCategory] || 0) + numAmount;
       }
     }
     
-    // Determine period label based on filter
+    // Determine period label based on filter with clearer wording
     let periodLabel: string;
     const firstMonth = monthlyTrend[0]?.fullMonth || '';
     const lastMonth = monthlyTrend[monthlyTrend.length - 1]?.fullMonth || '';
@@ -370,22 +427,22 @@ export default function Dashboard() {
         periodLabel = lastMonth;
         break;
       case 'last-quarter':
-        periodLabel = `${firstMonth} - ${lastMonth} (Last Quarter)`;
+        periodLabel = `${firstMonth} – ${lastMonth} (Last quarter)`;
         break;
       case 'last-6-months':
-        periodLabel = `${firstMonth} - ${lastMonth} (6 Months)`;
+        periodLabel = `${firstMonth} – ${lastMonth} (Last 6 complete months)`;
         break;
       case 'last-12-months':
-        periodLabel = `${firstMonth} - ${lastMonth} (12 Months)`;
+        periodLabel = `${firstMonth} – ${lastMonth} (Last 12 complete months)`;
         break;
       case 'this-year':
-        periodLabel = `${firstMonth} - ${lastMonth} (Year to Date)`;
+        periodLabel = `${firstMonth} – ${lastMonth} (Year to date – last complete month)`;
         break;
       case 'last-year':
-        periodLabel = `${firstMonth} - ${lastMonth} (Last Year)`;
+        periodLabel = `${firstMonth} – ${lastMonth} (Full year ${thisYear - 1})`;
         break;
       default:
-        periodLabel = `${firstMonth} - ${lastMonth}`;
+        periodLabel = `${firstMonth} – ${lastMonth}`;
     }
     
     return {
@@ -393,7 +450,7 @@ export default function Dashboard() {
       total: totalExpensesSum,
       periodLabel,
     };
-  }, [monthlyTrend, currentMonthData, currentExpenses, selectedFilter, comparisonCurrentMonthLabel]);
+  }, [monthlyTrend, currentMonthData, currentExpenses, selectedFilter, comparisonCurrentMonthLabel, thisYear]);
 
   // Calculate trend stats for SSP with improved YoY calculation
   const trendStats = useMemo(() => {
@@ -496,14 +553,20 @@ export default function Dashboard() {
       return value >= 0 ? `+${formatted}` : `-${formatted}`;
     };
     
-    // Find departments with positive growth, or the one with smallest decline
-    const deptWithPositiveGrowth = departmentGrowth.filter(d => d.growth > 0);
-    const topDepartment = deptWithPositiveGrowth.length > 0 
-      ? deptWithPositiveGrowth[0] 
-      : departmentGrowth[0];
+    // Find departments with positive growth or that are new
+    const newDepartments = departmentGrowth.filter(d => d.isNewDepartment);
+    const deptWithPositiveGrowth = departmentGrowth.filter(d => d.growth > 0 && !d.isNewDepartment);
     
-    // Check if all departments have negative growth
-    const allDepartmentsNegative = departmentGrowth.length > 0 && departmentGrowth.every(d => d.growth < 0);
+    // Priority: new departments first, then positive growth, then smallest decline
+    const topDepartment = newDepartments.length > 0 
+      ? newDepartments[0]
+      : deptWithPositiveGrowth.length > 0 
+        ? deptWithPositiveGrowth[0] 
+        : departmentGrowth[0];
+    
+    // Check if all departments have negative growth (excluding new ones)
+    const nonNewDepts = departmentGrowth.filter(d => !d.isNewDepartment);
+    const allDepartmentsNegative = nonNewDepts.length > 0 && nonNewDepts.every(d => d.growth < 0);
     const hasAnyDepartmentData = departmentGrowth.length > 0;
     
     // Build revenue part of the insight
@@ -514,6 +577,13 @@ export default function Dashboard() {
     let departmentMessage = '';
     if (!hasAnyDepartmentData) {
       departmentMessage = '';
+    } else if (newDepartments.length > 0) {
+      // Highlight new departments
+      if (newDepartments.length === 1) {
+        departmentMessage = `. ${newDepartments[0].name} is new this period`;
+      } else {
+        departmentMessage = `. ${newDepartments.length} departments are new this period`;
+      }
     } else if (allDepartmentsNegative) {
       departmentMessage = `, with ${topDepartment?.name} showing the smallest decline at ${formatGrowth(topDepartment?.growth || 0)}%`;
     } else if (topDepartment && topDepartment.growth > 0) {
@@ -533,11 +603,12 @@ export default function Dashboard() {
       yoyGrowth: formatGrowth(yoyGrowth),
       yoyGrowthPositive: yoyGrowth >= 0,
       topDepartment: topDepartment?.name || 'N/A',
-      topDepartmentGrowth: formatGrowth(topDepartment?.growth || 0),
-      topDepartmentGrowthPositive: (topDepartment?.growth || 0) >= 0,
+      topDepartmentGrowth: topDepartment?.isNewDepartment ? 'New' : formatGrowth(topDepartment?.growth || 0),
+      topDepartmentGrowthPositive: (topDepartment?.growth || 0) >= 0 || topDepartment?.isNewDepartment,
       allDepartmentsNegative,
       departmentInsight: departmentMessage,
       bestMonth,
+      hasNewDepartments: newDepartments.length > 0,
     };
   }, [monthlyTrend, departmentGrowth, trendStats]);
 
@@ -552,11 +623,24 @@ export default function Dashboard() {
       return firstMonth;
     }
     
-    // Get filter-specific description
-    const filterLabel = filterOptions.find(f => f.value === selectedFilter)?.label || '';
-    
-    return `${firstMonth} – ${lastMonth} (${filterLabel})`;
-  }, [monthlyTrend, selectedFilter]);
+    // Get filter-specific description with clearer wording
+    switch (selectedFilter) {
+      case 'last-month':
+        return lastMonth;
+      case 'last-quarter':
+        return `${firstMonth} – ${lastMonth} (Last quarter)`;
+      case 'last-6-months':
+        return `${firstMonth} – ${lastMonth} (Last 6 complete months)`;
+      case 'last-12-months':
+        return `${firstMonth} – ${lastMonth} (Last 12 complete months)`;
+      case 'this-year':
+        return `${firstMonth} – ${lastMonth} (Year to date – last complete month)`;
+      case 'last-year':
+        return `${firstMonth} – ${lastMonth} (Full year ${thisYear - 1})`;
+      default:
+        return `${firstMonth} – ${lastMonth}`;
+    }
+  }, [monthlyTrend, selectedFilter, thisYear]);
 
   const isLoading = loadingCurrent || loadingPrev || loadingTrend;
 
@@ -831,19 +915,117 @@ export default function Dashboard() {
           
           {/* Month vs Month Comparison */}
           <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-                <div className="p-1.5 rounded-lg bg-blue-100">
-                  <ArrowLeftRight className="h-5 w-5 text-blue-600" />
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-blue-100">
+                      <ArrowLeftRight className="h-5 w-5 text-blue-600" />
+                    </div>
+                    Month vs Month
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel}
+                    {!isCustomComparison && (
+                      <span className="ml-1 text-xs text-slate-400">(Last two complete months)</span>
+                    )}
+                    {isCustomComparison && (
+                      <span className="ml-1 text-xs text-blue-500">(Selected months)</span>
+                    )}
+                  </CardDescription>
                 </div>
-                Month vs Month
-              </CardTitle>
-              <CardDescription>
-                {comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel}
-                <span className="ml-1 text-xs text-slate-400">(Last two complete months)</span>
-              </CardDescription>
+                <button
+                  onClick={() => setCustomComparisonEnabled(!customComparisonEnabled)}
+                  className={cn(
+                    "text-xs px-2 py-1 rounded-md border transition-colors",
+                    customComparisonEnabled 
+                      ? "bg-blue-50 border-blue-200 text-blue-700" 
+                      : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                  )}
+                >
+                  {customComparisonEnabled ? "Reset to default" : "Compare other months"}
+                </button>
+              </div>
+              
+              {/* Custom month selection controls */}
+              {customComparisonEnabled && (
+                <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Base Month</label>
+                      <div className="flex gap-1">
+                        <Select 
+                          value={String(customBaseYear)} 
+                          onValueChange={(v) => setCustomBaseYear(Number(v))}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[72px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[thisYear, thisYear - 1, thisYear - 2].map((y) => (
+                              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select 
+                          value={String(customBaseMonth)} 
+                          onValueChange={(v) => setCustomBaseMonth(Number(v))}
+                        >
+                          <SelectTrigger className="h-8 text-xs flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                              <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Compare To</label>
+                      <div className="flex gap-1">
+                        <Select 
+                          value={String(customCompareYear)} 
+                          onValueChange={(v) => setCustomCompareYear(Number(v))}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[72px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[thisYear, thisYear - 1, thisYear - 2].map((y) => (
+                              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select 
+                          value={String(customCompareMonth)} 
+                          onValueChange={(v) => setCustomCompareMonth(Number(v))}
+                        >
+                          <SelectTrigger className="h-8 text-xs flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                              <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
+              {/* Show empty state if no data for selected months */}
+              {(currentRevenue === 0 && prevRevenue === 0 && currentExpenses === 0 && prevExpenses === 0) ? (
+                <div className="py-8 text-center text-slate-500">
+                  <ArrowLeftRight className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">No data for the selected months</p>
+                  <p className="text-xs text-slate-400 mt-1">Try selecting different months</p>
+                </div>
+              ) : (
               <div className="space-y-3">
                 {/* Revenue comparison */}
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
@@ -913,6 +1095,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+              )}
             </CardContent>
           </Card>
 
@@ -927,7 +1110,12 @@ export default function Dashboard() {
               </CardTitle>
               <CardDescription>
                 {comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel}
-                <span className="ml-1 text-xs text-slate-400">(Sorted by growth rate)</span>
+                {!isCustomComparison && (
+                  <span className="ml-1 text-xs text-slate-400">(Last two complete months)</span>
+                )}
+                {isCustomComparison && (
+                  <span className="ml-1 text-xs text-blue-500">(Selected months)</span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -943,17 +1131,32 @@ export default function Dashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm font-medium text-slate-700 truncate">{dept.name}</span>
-                            <span className={cn("text-sm font-semibold flex items-center gap-1", dept.growth >= 0 ? "text-green-600" : "text-red-600")}>
-                              {dept.growth >= 0 ? "+" : ""}{dept.growth.toFixed(1)}%
-                              {dept.growth >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                            </span>
+                            {/* Show "New this month" for departments that started this period */}
+                            {dept.isNewDepartment ? (
+                              <span className="text-sm font-semibold text-blue-600 flex items-center gap-1">
+                                <Star className="h-3 w-3" />
+                                New
+                              </span>
+                            ) : (
+                              <span className={cn("text-sm font-semibold flex items-center gap-1", dept.growth >= 0 ? "text-green-600" : "text-red-600")}>
+                                {dept.growth >= 0 ? "+" : ""}{dept.growth.toFixed(1)}%
+                                {dept.growth >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                              </span>
+                            )}
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className={cn("h-full rounded-full transition-all duration-500", dept.growth >= 0 ? "bg-green-500" : "bg-red-500")}
-                              style={{ width: `${Math.min(Math.abs(dept.growth) * GROWTH_SCALE_FACTOR, MAX_GROWTH_BAR_WIDTH)}%` }}
-                            />
-                          </div>
+                          {/* Show progress bar or new department indicator */}
+                          {dept.isNewDepartment ? (
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <span className="font-mono">SSP 0 → {compactSSP(dept.currentValue)}</span>
+                            </div>
+                          ) : (
+                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div 
+                                className={cn("h-full rounded-full transition-all duration-500", dept.growth >= 0 ? "bg-green-500" : "bg-red-500")}
+                                style={{ width: `${Math.min(Math.abs(dept.growth) * GROWTH_SCALE_FACTOR, MAX_GROWTH_BAR_WIDTH)}%` }}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
