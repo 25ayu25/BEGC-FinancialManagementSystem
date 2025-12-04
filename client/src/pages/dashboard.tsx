@@ -303,6 +303,11 @@ export default function Dashboard() {
   const netIncomeChange = prevNetIncome !== 0 ? ((currentNetIncome - prevNetIncome) / Math.abs(prevNetIncome)) * 100 : 0;
   const patientsChange = prevPatients > 0 ? ((currentPatients - prevPatients) / prevPatients) * 100 : 0;
 
+  // Labels for Month vs Month comparison - use comparison months, not current calendar month
+  // Defined here before use in useMemo hooks
+  const comparisonCurrentMonthLabel = format(comparisonCurrentDate, "MMMM yyyy");
+  const comparisonPrevMonthLabel = format(comparisonPrevDate, "MMMM yyyy");
+
   // Calculate department growth
   const departmentGrowth = useMemo((): DepartmentGrowthItem[] => {
     const currentBreakdown = currentMonthData?.departmentBreakdown || {};
@@ -485,10 +490,6 @@ export default function Dashboard() {
   }, [monthlyTrend, departmentGrowth, trendStats]);
 
   const isLoading = loadingCurrent || loadingPrev || loadingTrend;
-
-  // Labels for Month vs Month comparison - use comparison months, not current calendar month
-  const comparisonCurrentMonthLabel = format(comparisonCurrentDate, "MMMM yyyy");
-  const comparisonPrevMonthLabel = format(comparisonPrevDate, "MMMM yyyy");
 
   if (isLoading) {
     return (
