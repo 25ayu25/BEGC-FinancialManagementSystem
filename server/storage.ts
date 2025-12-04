@@ -355,6 +355,25 @@ export interface IStorage {
     months: Array<{ ym: string; usd: number }>;
     totals: Record<string, number>;
   }>;
+
+  /**
+   * Batched monthly trend data for the Trends & Comparisons page.
+   * Fetches all transactions in a single query and groups by month server-side.
+   */
+  getMonthlyTrendData(args: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Array<{
+    month: string;           // Short month label (e.g., "Nov")
+    fullMonth: string;       // Full month label (e.g., "November 2025")
+    year: number;
+    monthNum: number;        // 1-12
+    revenue: number;         // SSP income
+    revenueUSD: number;      // USD insurance income
+    departmentBreakdown: Record<string, number>;
+    expenseBreakdown: Record<string, number>;
+    totalExpenses: number;
+  }>>;
 }
 
 /* ----------------------------- implementation ----------------------------- */
@@ -1749,6 +1768,146 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => a.ym.localeCompare(b.ym));
 
     return { months, totals: providerTotals };
+  }
+
+  /**
+   * Batched monthly trend data for the Trends & Comparisons page.
+   * Fetches all transactions in a single query and groups by month server-side.
+   */
+  async getMonthlyTrendData(args: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Array<{
+    month: string;
+    fullMonth: string;
+    year: number;
+    monthNum: number;
+    revenue: number;
+    revenueUSD: number;
+    departmentBreakdown: Record<string, number>;
+    expenseBreakdown: Record<string, number>;
+    totalExpenses: number;
+  }>> {
+    const { startDate, endDate } = args;
+    const endDateExclusive = toEndExclusive(endDate)!;
+
+    // Fetch all transactions in the date range in a single query
+    const txData = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          gte(transactions.date, startDate),
+          lt(transactions.date, endDateExclusive)
+        )
+      );
+
+    // Group transactions by year-month
+    const monthMap = new Map<string, {
+      revenue: number;
+      revenueUSD: number;
+      departmentBreakdown: Record<string, number>;
+      expenseBreakdown: Record<string, number>;
+      totalExpenses: number;
+    }>();
+
+    // Initialize all months in the range
+    const cursor = new Date(Date.UTC(
+      startDate.getUTCFullYear(),
+      startDate.getUTCMonth(),
+      1
+    ));
+    const endMonthStart = new Date(Date.UTC(
+      endDateExclusive.getUTCFullYear(),
+      endDateExclusive.getUTCMonth(),
+      1
+    ));
+
+    // Initialize all months in the range (use < for exclusive end)
+    while (cursor < endMonthStart) {
+      const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+      monthMap.set(key, {
+        revenue: 0,
+        revenueUSD: 0,
+        departmentBreakdown: {},
+        expenseBreakdown: {},
+        totalExpenses: 0,
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+
+    // Process all transactions
+    for (const t of txData) {
+      const txDate = new Date(t.date);
+      const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
+      
+      // Get existing month data (should exist if transaction is within range)
+      // If not, skip this transaction as it's outside the requested range
+      const data = monthMap.get(key);
+      if (!data) {
+        continue; // Transaction is outside the requested date range
+      }
+
+      const amount = Number(t.amount || 0);
+
+      if (t.type === 'income') {
+        if (t.currency === 'SSP') {
+          data.revenue += amount;
+          // Track department breakdown for SSP income
+          if (t.departmentId) {
+            data.departmentBreakdown[t.departmentId] = 
+              (data.departmentBreakdown[t.departmentId] || 0) + amount;
+          }
+        } else if (t.currency === 'USD' && t.insuranceProviderId) {
+          // USD insurance income only
+          data.revenueUSD += amount;
+        }
+      } else if (t.type === 'expense') {
+        if (t.currency === 'SSP') {
+          data.totalExpenses += amount;
+          // Track expense category breakdown
+          if (t.expenseCategory) {
+            data.expenseBreakdown[t.expenseCategory] = 
+              (data.expenseBreakdown[t.expenseCategory] || 0) + amount;
+          }
+        }
+      }
+    }
+
+    // Convert map to sorted array with formatted labels
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const shortMonthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+
+    const result = Array.from(monthMap.entries())
+      .map(([key, data]) => {
+        const [yearStr, monthStr] = key.split('-');
+        const year = parseInt(yearStr, 10);
+        const monthNum = parseInt(monthStr, 10);
+        
+        return {
+          month: shortMonthNames[monthNum - 1],
+          fullMonth: `${monthNames[monthNum - 1]} ${year}`,
+          year,
+          monthNum,
+          revenue: data.revenue,
+          revenueUSD: data.revenueUSD,
+          departmentBreakdown: data.departmentBreakdown,
+          expenseBreakdown: data.expenseBreakdown,
+          totalExpenses: data.totalExpenses,
+        };
+      })
+      .sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.monthNum - b.monthNum;
+      });
+
+    return result;
   }
 }
 
