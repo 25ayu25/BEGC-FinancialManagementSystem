@@ -2,10 +2,11 @@
  * Trends & Comparisons Page
  * 
  * Provides historical analysis and comparative insights:
- * - 12-month Revenue Trend chart
+ * - 12-month Revenue Trend chart with SSP/USD toggle
  * - Month vs Month comparison
  * - Department Growth rates
  * - Enhanced Expenses Breakdown
+ * - Insights Summary Card
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -15,8 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { format, subMonths } from "date-fns";
+import { format, subMonths, subQuarters } from "date-fns";
 import {
   TrendingUp,
   TrendingDown,
@@ -34,6 +36,7 @@ import {
   Pill,
   TestTubes,
   LucideIcon,
+  Sparkles,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
@@ -69,7 +72,24 @@ function compactSSP(n: number) {
   return `SSP ${nf0.format(Math.round(n))}`;
 }
 
-type YearOption = "this-year" | "last-year";
+function compactUSD(n: number) {
+  const v = Math.abs(n);
+  if (v >= MILLION) return `USD ${(n / MILLION).toFixed(v < TEN_MILLION ? 1 : 0)}M`;
+  if (v >= THOUSAND) return `USD ${(n / THOUSAND).toFixed(v < (10 * THOUSAND) ? 1 : 0)}k`;
+  return `USD ${nf0.format(Math.round(n))}`;
+}
+
+// Filter options for time period selection
+type FilterOption = 'last-month' | 'last-quarter' | 'last-6-months' | 'last-12-months' | 'this-year' | 'last-year';
+
+const filterOptions: Array<{ value: FilterOption; label: string }> = [
+  { value: 'last-month', label: 'Last Month' },
+  { value: 'last-quarter', label: 'Last Quarter' },
+  { value: 'last-6-months', label: 'Last 6 Months' },
+  { value: 'last-12-months', label: 'Last 12 Months' },
+  { value: 'this-year', label: 'This Year' },
+  { value: 'last-year', label: 'Last Year' },
+];
 
 // Type definitions
 interface Department {
@@ -114,11 +134,56 @@ function getDepartmentStyle(name: string): DepartmentStyleConfig {
 
 export default function Dashboard() {
   const now = new Date();
-  const [selectedYear, setSelectedYear] = useState<YearOption>("this-year");
+  const [selectedFilter, setSelectedFilter] = useState<FilterOption>("last-12-months");
+  const [currencyTab, setCurrencyTab] = useState<"ssp" | "usd">("ssp");
   
   const thisYear = now.getFullYear();
-  const displayYear = selectedYear === "this-year" ? thisYear : thisYear - 1;
   const currentMonth = now.getMonth() + 1;
+
+  // Calculate date range based on selected filter
+  const { startDate: filterStartDate, monthsCount } = useMemo(() => {
+    const end = new Date(thisYear, currentMonth - 1, 1);
+    let start: Date;
+    let months: number;
+    
+    switch (selectedFilter) {
+      case 'last-month':
+        start = subMonths(end, 1);
+        months = 1;
+        break;
+      case 'last-quarter':
+        start = subQuarters(end, 1);
+        months = 3;
+        break;
+      case 'last-6-months':
+        start = subMonths(end, 6);
+        months = 6;
+        break;
+      case 'last-12-months':
+        start = subMonths(end, 12);
+        months = 12;
+        break;
+      case 'this-year':
+        start = new Date(thisYear, 0, 1);
+        months = currentMonth;
+        break;
+      case 'last-year':
+        start = new Date(thisYear - 1, 0, 1);
+        months = 12;
+        break;
+      default:
+        start = subMonths(end, 12);
+        months = 12;
+    }
+    
+    return { 
+      startDate: start, 
+      monthsCount: months 
+    };
+  }, [selectedFilter, thisYear, currentMonth]);
+
+  // Display year for the selected filter
+  const displayYear = selectedFilter === 'last-year' ? thisYear - 1 : thisYear;
 
   // Fetch dashboard data for current month (for Month vs Month comparison)
   const { data: currentMonthData, isLoading: loadingCurrent } = useQuery({
@@ -144,16 +209,15 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch 12-month revenue trend data
+  // Fetch revenue trend data based on filter
   const { data: monthlyTrend = [], isLoading: loadingTrend } = useQuery({
-    queryKey: ["/api/trends/monthly-revenue", displayYear],
+    queryKey: ["/api/trends/monthly-revenue", selectedFilter, displayYear],
     queryFn: async () => {
-      // Fetch last 12 months of data
-      const months: Array<{ month: string; revenue: number; fullMonth: string }> = [];
-      const startDate = subMonths(new Date(displayYear, currentMonth - 1, 1), 11);
+      // Fetch months based on filter
+      const months: Array<{ month: string; revenue: number; revenueUSD: number; fullMonth: string }> = [];
       
-      for (let i = 0; i < 12; i++) {
-        const date = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+      for (let i = 0; i < monthsCount; i++) {
+        const date = new Date(filterStartDate.getFullYear(), filterStartDate.getMonth() + i, 1);
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
         
@@ -164,12 +228,14 @@ export default function Dashboard() {
             month: format(date, "MMM"),
             fullMonth: format(date, "MMMM yyyy"),
             revenue: parseFloat(data?.totalIncomeSSP || "0"),
+            revenueUSD: parseFloat(data?.totalIncomeUSD || "0"),
           });
         } catch {
           months.push({
             month: format(date, "MMM"),
             fullMonth: format(date, "MMMM yyyy"),
             revenue: 0,
+            revenueUSD: 0,
           });
         }
       }
@@ -246,7 +312,7 @@ export default function Dashboard() {
       .sort((a, b) => b.growth - a.growth);
   }, [currentMonthData, prevMonthData, departments]);
 
-  // Calculate trend stats
+  // Calculate trend stats for SSP
   const trendStats = useMemo(() => {
     if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0 };
     
@@ -265,6 +331,42 @@ export default function Dashboard() {
       monthlyAvg: avg,
     };
   }, [monthlyTrend]);
+
+  // Calculate trend stats for USD
+  const trendStatsUSD = useMemo(() => {
+    if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0 };
+    
+    const total = monthlyTrend.reduce((sum, m) => sum + m.revenueUSD, 0);
+    const avg = total / monthlyTrend.length;
+    const best = monthlyTrend.reduce((max, m) => m.revenueUSD > max.revenueUSD ? m : max, monthlyTrend[0]);
+    
+    // YoY growth: compare last month to same month last year (if available in trend)
+    const currentMonthRev = monthlyTrend[monthlyTrend.length - 1]?.revenueUSD || 0;
+    const sameMonthLastYear = monthlyTrend[0]?.revenueUSD || 0;
+    const yoyGrowth = sameMonthLastYear > 0 ? ((currentMonthRev - sameMonthLastYear) / sameMonthLastYear) * 100 : 0;
+    
+    return {
+      yoyGrowth,
+      bestMonth: best?.month || "",
+      monthlyAvg: avg,
+    };
+  }, [monthlyTrend]);
+
+  // Calculate insights data
+  const insights = useMemo(() => {
+    if (monthlyTrend.length === 0 || departmentGrowth.length === 0) return null;
+    
+    const yoyGrowth = trendStats.yoyGrowth;
+    const topDepartment = departmentGrowth[0];
+    const bestMonth = trendStats.bestMonth;
+    
+    return {
+      yoyGrowth: yoyGrowth.toFixed(0),
+      topDepartment: topDepartment?.name || 'N/A',
+      topDepartmentGrowth: topDepartment?.growth.toFixed(0) || '0',
+      bestMonth,
+    };
+  }, [monthlyTrend, departmentGrowth, trendStats]);
 
   const isLoading = loadingCurrent || loadingPrev || loadingTrend;
 
@@ -295,14 +397,36 @@ export default function Dashboard() {
     );
   }
 
-  // Custom tooltip for chart
-  const CustomTooltip = ({ active, payload }: any) => {
+  // Custom tooltip for SSP chart
+  const CustomTooltipSSP = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     const data = payload[0].payload;
+    const avgRevenue = trendStats.monthlyAvg;
+    const isAboveAverage = data.revenue > avgRevenue;
     return (
-      <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
-        <div className="text-sm font-semibold text-slate-900">{data.fullMonth}</div>
-        <div className="text-sm font-mono tabular-nums text-teal-600">{compactSSP(data.revenue)}</div>
+      <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
+        <p className="font-medium text-slate-900">{data.fullMonth}</p>
+        <p className="text-teal-600 font-semibold">{compactSSP(data.revenue)}</p>
+        <p className="text-xs text-slate-500 mt-1">
+          {isAboveAverage ? '↑ Above average' : '↓ Below average'}
+        </p>
+      </div>
+    );
+  };
+
+  // Custom tooltip for USD chart
+  const CustomTooltipUSD = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0].payload;
+    const avgRevenue = trendStatsUSD.monthlyAvg;
+    const isAboveAverage = data.revenueUSD > avgRevenue;
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
+        <p className="font-medium text-slate-900">{data.fullMonth}</p>
+        <p className="text-blue-600 font-semibold">{compactUSD(data.revenueUSD)}</p>
+        <p className="text-xs text-slate-500 mt-1">
+          {isAboveAverage ? '↑ Above average' : '↓ Below average'}
+        </p>
       </div>
     );
   };
@@ -321,13 +445,16 @@ export default function Dashboard() {
             </p>
           </div>
           
-          <Select value={selectedYear} onValueChange={(v: YearOption) => setSelectedYear(v)}>
-            <SelectTrigger className="h-10 w-[140px]">
+          <Select value={selectedFilter} onValueChange={(v: FilterOption) => setSelectedFilter(v)}>
+            <SelectTrigger className="h-10 w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="this-year">This Year</SelectItem>
-              <SelectItem value="last-year">Last Year</SelectItem>
+              {filterOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -336,78 +463,174 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
         
-        {/* 12-Month Revenue Trend Chart */}
-        <Card className="border border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-              <div className="p-1.5 rounded-lg bg-teal-100">
-                <TrendingUp className="h-5 w-5 text-teal-600" />
+        {/* Insights Card */}
+        {insights && (
+          <Card className="bg-gradient-to-r from-teal-500 to-blue-500 text-white border-0 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-5 w-5 flex-shrink-0" />
+                <p className="font-medium">
+                  Key Insight: Revenue grew {insights.yoyGrowth}% over this period, with {insights.topDepartment} department 
+                  leading at +{insights.topDepartmentGrowth}% growth. {insights.bestMonth} was your best performing month.
+                </p>
               </div>
-              Revenue Trend
-            </CardTitle>
-            <CardDescription>12-month revenue performance</CardDescription>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Revenue Trend Chart with Tabs */}
+        <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                  <div className="p-1.5 rounded-lg bg-teal-100">
+                    <TrendingUp className="h-5 w-5 text-teal-600" />
+                  </div>
+                  Revenue Trend
+                </CardTitle>
+                <CardDescription>{monthsCount}-month revenue performance</CardDescription>
+              </div>
+              
+              {/* Currency Toggle Tabs */}
+              <Tabs value={currencyTab} onValueChange={(v) => setCurrencyTab(v as "ssp" | "usd")} className="w-auto">
+                <TabsList className="bg-slate-100">
+                  <TabsTrigger value="ssp" className="data-[state=active]:bg-white">
+                    SSP Revenue
+                  </TabsTrigger>
+                  <TabsTrigger value="usd" className="data-[state=active]:bg-white">
+                    USD Insurance
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </CardHeader>
           <CardContent>
             {monthlyTrend.length > 0 ? (
               <>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="month" 
-                        tick={{ fontSize: 12, fill: "#64748b" }}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 11, fill: "#64748b" }}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(v) => {
-                          if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                          if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                          return v.toString();
-                        }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#14b8a6" 
-                        strokeWidth={2}
-                        fill="url(#revenueGradient)" 
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                {/* Summary stats below chart */}
-                <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className={cn("h-4 w-4", trendStats.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
-                    <span className="text-sm text-slate-600">YoY Growth:</span>
-                    <span className={cn("font-semibold", trendStats.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
-                      {trendStats.yoyGrowth >= 0 ? "+" : ""}{trendStats.yoyGrowth.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm text-slate-600">Best Month:</span>
-                    <span className="font-semibold text-slate-900">{trendStats.bestMonth}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm text-slate-600">Monthly Avg:</span>
-                    <span className="font-semibold text-slate-900">{compactSSP(trendStats.monthlyAvg)}</span>
-                  </div>
-                </div>
+                {currencyTab === "ssp" ? (
+                  <>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fontSize: 12, fill: "#64748b" }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(v) => {
+                              if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                              if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                              return v.toString();
+                            }}
+                          />
+                          <Tooltip content={<CustomTooltipSSP />} />
+                          <Area 
+                            type="monotone" 
+                            dataKey="revenue" 
+                            stroke="#14b8a6" 
+                            strokeWidth={2}
+                            fill="url(#revenueGradient)" 
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    {/* SSP Summary stats below chart */}
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className={cn("h-4 w-4", trendStats.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
+                        <span className="text-sm text-slate-600">YoY Growth:</span>
+                        <span className={cn("font-semibold", trendStats.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
+                          {trendStats.yoyGrowth >= 0 ? "+" : ""}{trendStats.yoyGrowth.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm text-slate-600">Best Month:</span>
+                        <span className="font-semibold text-slate-900">{trendStats.bestMonth}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm text-slate-600">Monthly Avg:</span>
+                        <span className="font-semibold text-slate-900">{compactSSP(trendStats.monthlyAvg)}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="usdGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fontSize: 12, fill: "#64748b" }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(v) => {
+                              if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                              if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                              return v.toString();
+                            }}
+                          />
+                          <Tooltip content={<CustomTooltipUSD />} />
+                          <Area 
+                            type="monotone" 
+                            dataKey="revenueUSD" 
+                            stroke="#3b82f6" 
+                            strokeWidth={2}
+                            fill="url(#usdGradient)" 
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    {/* USD Summary stats below chart */}
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className={cn("h-4 w-4", trendStatsUSD.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
+                        <span className="text-sm text-slate-600">YoY Growth:</span>
+                        <span className={cn("font-semibold", trendStatsUSD.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
+                          {trendStatsUSD.yoyGrowth >= 0 ? "+" : ""}{trendStatsUSD.yoyGrowth.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm text-slate-600">Best Month:</span>
+                        <span className="font-semibold text-slate-900">{trendStatsUSD.bestMonth}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm text-slate-600">Monthly Avg:</span>
+                        <span className="font-semibold text-slate-900">{compactUSD(trendStatsUSD.monthlyAvg)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-slate-500">
@@ -421,7 +644,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* Month vs Month Comparison */}
-          <Card className="border border-slate-200 shadow-sm">
+          <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
                 <div className="p-1.5 rounded-lg bg-blue-100">
@@ -436,8 +659,8 @@ export default function Dashboard() {
                 {/* Revenue comparison */}
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                      <DollarSign className="h-5 w-5 text-green-600" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+                      <DollarSign className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <div className="text-sm text-slate-500">Revenue</div>
@@ -453,8 +676,8 @@ export default function Dashboard() {
                 {/* Expenses comparison */}
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-                      <CreditCard className="h-5 w-5 text-red-600" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+                      <CreditCard className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <div className="text-sm text-slate-500">Expenses</div>
@@ -470,8 +693,8 @@ export default function Dashboard() {
                 {/* Net Income comparison */}
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Wallet className="h-5 w-5 text-blue-600" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <Wallet className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <div className="text-sm text-slate-500">Net Income</div>
@@ -487,8 +710,8 @@ export default function Dashboard() {
                 {/* Patients comparison */}
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <Users className="h-5 w-5 text-purple-600" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                      <Users className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <div className="text-sm text-slate-500">Patients</div>
@@ -505,7 +728,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Department Growth */}
-          <Card className="border border-slate-200 shadow-sm">
+          <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
                 <div className="p-1.5 rounded-lg bg-purple-100">
@@ -513,7 +736,7 @@ export default function Dashboard() {
                 </div>
                 Department Growth
               </CardTitle>
-              <CardDescription>Performance change vs last month</CardDescription>
+              <CardDescription>Performance change vs last month (sorted by growth)</CardDescription>
             </CardHeader>
             <CardContent>
               {departmentGrowth.length > 0 ? (

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Receipt } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -85,7 +86,7 @@ export default function SimpleExpenseBreakdown({
   };
 
   return (
-    <Card className="border border-slate-200 shadow-sm">
+    <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -143,8 +144,14 @@ export default function SimpleExpenseBreakdown({
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-40 flex items-center justify-center text-slate-500 text-sm">
-            No expense data for this period.
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+              <Receipt className="h-8 w-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-700 mb-1">No Expenses Yet</h3>
+            <p className="text-sm text-slate-500 max-w-xs">
+              Expense data for this period will appear here once transactions are recorded.
+            </p>
           </div>
         )}
       </CardContent>
