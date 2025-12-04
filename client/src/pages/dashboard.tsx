@@ -1,153 +1,275 @@
+/**
+ * Trends & Comparisons Page
+ * 
+ * Provides historical analysis and comparative insights:
+ * - 12-month Revenue Trend chart
+ * - Month vs Month comparison
+ * - Department Growth rates
+ * - Enhanced Expenses Breakdown
+ */
+
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { CalendarIcon, Users } from "lucide-react";
+import { format, subMonths } from "date-fns";
+import {
+  TrendingUp,
+  TrendingDown,
+  ArrowLeftRight,
+  Building,
+  DollarSign,
+  CreditCard,
+  Wallet,
+  Users,
+  Star,
+  BarChart3,
+  Stethoscope,
+  FlaskConical,
+  ScanLine,
+  Pill,
+  TestTubes,
+  LucideIcon,
+} from "lucide-react";
 import { api } from "@/lib/queryClient";
-import ExecutiveStyleKPIs from "@/components/dashboard/executive-style-kpis";
-import SimpleTopDepartments from "@/components/dashboard/simple-top-departments";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
-import MonthlyIncome from "@/components/dashboard/monthly-income";
-import { Link } from "wouter";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 
-type TimeRange =
-  | "current-month"
-  | "last-month"
-  | "last-3-months"
-  | "year"
-  | "month-select"
-  | "custom";
+// Constants for number formatting thresholds
+const BILLION = 1_000_000_000;
+const TEN_BILLION = 10_000_000_000;
+const MILLION = 1_000_000;
+const TEN_MILLION = 10_000_000;
+const THOUSAND = 1_000;
+
+// Display configuration constants
+const MAX_DEPARTMENTS_DISPLAYED = 6;
+const GROWTH_SCALE_FACTOR = 2;
+const MAX_GROWTH_BAR_WIDTH = 100;
+
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+function compactSSP(n: number) {
+  const v = Math.abs(n);
+  if (v >= BILLION) return `SSP ${(n / BILLION).toFixed(v < TEN_BILLION ? 1 : 0)}B`;
+  if (v >= MILLION) return `SSP ${(n / MILLION).toFixed(v < TEN_MILLION ? 1 : 0)}M`;
+  if (v >= THOUSAND) return `SSP ${nf0.format(Math.round(n / THOUSAND))}k`;
+  return `SSP ${nf0.format(Math.round(n))}`;
+}
+
+type YearOption = "this-year" | "last-year";
+
+// Type definitions
+interface Department {
+  id: string | number;
+  name: string;
+}
+
+interface DepartmentStyleConfig {
+  icon: LucideIcon;
+  bgColor: string;
+  iconColor: string;
+}
+
+interface DepartmentGrowthItem extends DepartmentStyleConfig {
+  id: string | number;
+  name: string;
+  currentValue: number;
+  prevValue: number;
+  growth: number;
+}
+
+// Department icon mapping
+const departmentIcons: Record<string, DepartmentStyleConfig> = {
+  "Lab": { icon: FlaskConical, bgColor: "bg-blue-100", iconColor: "text-blue-600" },
+  "Ultrasound": { icon: ScanLine, bgColor: "bg-purple-100", iconColor: "text-purple-600" },
+  "X-Ray": { icon: ScanLine, bgColor: "bg-amber-100", iconColor: "text-amber-600" },
+  "Pharmacy": { icon: Pill, bgColor: "bg-green-100", iconColor: "text-green-600" },
+  "Consultation": { icon: Stethoscope, bgColor: "bg-teal-100", iconColor: "text-teal-600" },
+  "Lab Tests": { icon: TestTubes, bgColor: "bg-indigo-100", iconColor: "text-indigo-600" },
+};
+
+function getDepartmentStyle(name: string): DepartmentStyleConfig {
+  // Try to match department name
+  for (const [key, style] of Object.entries(departmentIcons)) {
+    if (name.toLowerCase().includes(key.toLowerCase())) {
+      return style;
+    }
+  }
+  // Default style
+  return { icon: Building, bgColor: "bg-slate-100", iconColor: "text-slate-600" };
+}
 
 export default function Dashboard() {
   const now = new Date();
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [timeRange, setTimeRange] = useState<TimeRange>("current-month");
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
-
+  const [selectedYear, setSelectedYear] = useState<YearOption>("this-year");
+  
   const thisYear = now.getFullYear();
-  const years = useMemo(() => [thisYear, thisYear - 1, thisYear - 2], [thisYear]);
-  const months = [
-    { label: "January", value: 1 }, { label: "February", value: 2 }, { label: "March", value: 3 },
-    { label: "April", value: 4 },   { label: "May", value: 5 },      { label: "June", value: 6 },
-    { label: "July", value: 7 },    { label: "August", value: 8 },   { label: "September", value: 9 },
-    { label: "October", value: 10 },{ label: "November", value: 11 },{ label: "December", value: 12 },
-  ];
-  const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const displayYear = selectedYear === "this-year" ? thisYear : thisYear - 1;
+  const currentMonth = now.getMonth() + 1;
 
-  const handleTimeRangeChange = (range: TimeRange) => {
-    setTimeRange(range);
-    const now = new Date();
-    switch (range) {
-      case "current-month":
-        setSelectedYear(now.getFullYear()); setSelectedMonth(now.getMonth() + 1); break;
-      case "last-month": {
-        const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        setSelectedYear(last.getFullYear()); setSelectedMonth(last.getMonth() + 1); break;
-      }
-      case "last-3-months":
-        setSelectedYear(now.getFullYear()); setSelectedMonth(now.getMonth() + 1); break;
-      case "year":
-        setSelectedYear(now.getFullYear()); setSelectedMonth(1); break;
-      case "month-select":
-      case "custom":
-        break;
-    }
-  };
-
-  // IMPORTANT FIX: treat last-month like a specific month for API calls
-  const normalizedRange =
-    timeRange === "month-select" || timeRange === "last-month"
-      ? "current-month"
-      : timeRange;
-
-  const getPatientVolumeNavigation = () => {
-    const now = new Date();
-    switch (timeRange) {
-      case "current-month": return { year: now.getFullYear(), month: now.getMonth() + 1 };
-      case "last-month": {
-        const last = new Date(now.getFullYear(), now.getMonth() - 1);
-        return { year: last.getFullYear(), month: last.getMonth() + 1 };
-      }
-      case "last-3-months": {
-        const threeAgo = new Date(now.getFullYear(), now.getMonth() - 2);
-        return { year: threeAgo.getFullYear(), month: threeAgo.getMonth() + 1 };
-      }
-      case "year": return { year: now.getFullYear(), month: 1 };
-      case "month-select": return { year: selectedYear, month: selectedMonth };
-      case "custom":
-        if (customStartDate) {
-          return { year: customStartDate.getFullYear(), month: customStartDate.getMonth() + 1 };
-        }
-        return { year: now.getFullYear(), month: now.getMonth() + 1 };
-      default: return { year: selectedYear, month: selectedMonth };
-    }
-  };
-
-  const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: [
-      "/api/dashboard", selectedYear, selectedMonth, normalizedRange,
-      customStartDate?.toISOString(), customEndDate?.toISOString(),
-    ],
+  // Fetch dashboard data for current month (for Month vs Month comparison)
+  const { data: currentMonthData, isLoading: loadingCurrent } = useQuery({
+    queryKey: ["/api/dashboard", displayYear, currentMonth, "current-month"],
     queryFn: async () => {
-      let url = `/api/dashboard?year=${selectedYear}&month=${selectedMonth}&range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
-      }
+      const url = `/api/dashboard?year=${displayYear}&month=${currentMonth}&range=current-month`;
       const { data } = await api.get(url);
       return data;
     },
   });
 
-  const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
+  // Fetch dashboard data for previous month
+  const prevMonthDate = subMonths(new Date(displayYear, currentMonth - 1, 1), 1);
+  const prevYear = prevMonthDate.getFullYear();
+  const prevMonth = prevMonthDate.getMonth() + 1;
 
-  const { data: periodPatientVolume = [] } = useQuery({
-    queryKey: [
-      "/api/patient-volume/period", selectedYear, selectedMonth, normalizedRange,
-      customStartDate?.toISOString(), customEndDate?.toISOString(),
-    ],
+  const { data: prevMonthData, isLoading: loadingPrev } = useQuery({
+    queryKey: ["/api/dashboard", prevYear, prevMonth, "current-month", "prev"],
     queryFn: async () => {
-      let url = `/api/patient-volume/period/${selectedYear}/${selectedMonth}?range=${normalizedRange}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(customStartDate, "yyyy-MM-dd")}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
+      const url = `/api/dashboard?year=${prevYear}&month=${prevMonth}&range=current-month`;
+      const { data } = await api.get(url);
+      return data;
+    },
+  });
+
+  // Fetch 12-month revenue trend data
+  const { data: monthlyTrend = [], isLoading: loadingTrend } = useQuery({
+    queryKey: ["/api/trends/monthly-revenue", displayYear],
+    queryFn: async () => {
+      // Fetch last 12 months of data
+      const months: Array<{ month: string; revenue: number; fullMonth: string }> = [];
+      const startDate = subMonths(new Date(displayYear, currentMonth - 1, 1), 11);
+      
+      for (let i = 0; i < 12; i++) {
+        const date = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        
+        try {
+          const url = `/api/dashboard?year=${year}&month=${month}&range=current-month`;
+          const { data } = await api.get(url);
+          months.push({
+            month: format(date, "MMM"),
+            fullMonth: format(date, "MMMM yyyy"),
+            revenue: parseFloat(data?.totalIncomeSSP || "0"),
+          });
+        } catch {
+          months.push({
+            month: format(date, "MMM"),
+            fullMonth: format(date, "MMMM yyyy"),
+            revenue: 0,
+          });
+        }
       }
+      
+      return months;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Fetch patient volume for current and previous month
+  const { data: currentPatients = 0 } = useQuery({
+    queryKey: ["/api/patient-volume/period", displayYear, currentMonth],
+    queryFn: async () => {
       try {
+        const url = `/api/patient-volume/period/${displayYear}/${currentMonth}?range=current-month`;
         const { data } = await api.get(url);
-        return Array.isArray(data) ? data : [];
+        return Array.isArray(data) ? data.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0) : 0;
       } catch {
-        console.warn("Patient volume unavailable for this period");
-        return [];
+        return 0;
       }
     },
   });
 
-  if (error) {
-    return (
-      <div className="flex-1 flex flex-col h-full">
-        <div className="bg-white border-b border-slate-200 px-6 py-4">
-          <h1 className="text-2xl font-bold text-slate-900">Overview</h1>
-          <p className="text-slate-600">Daily operations at a glance</p>
-        </div>
-        <main className="flex-1 overflow-y-auto p-6">
-          <Card><CardContent className="pt-6">
-            <div className="text-center text-red-600">
-              <p className="text-lg font-semibold">Error Loading Dashboard</p>
-              <p className="text-sm mt-2">Unable to fetch dashboard data. Please check your connection and try again.</p>
-            </div>
-          </CardContent></Card>
-        </main>
-      </div>
-    );
-  }
+  const { data: prevPatients = 0 } = useQuery({
+    queryKey: ["/api/patient-volume/period", prevYear, prevMonth, "prev"],
+    queryFn: async () => {
+      try {
+        const url = `/api/patient-volume/period/${prevYear}/${prevMonth}?range=current-month`;
+        const { data } = await api.get(url);
+        return Array.isArray(data) ? data.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0) : 0;
+      } catch {
+        return 0;
+      }
+    },
+  });
+
+  const { data: departments = [] } = useQuery({ queryKey: ["/api/departments"] });
+
+  // Calculate comparison metrics
+  const currentRevenue = parseFloat(currentMonthData?.totalIncomeSSP || "0");
+  const prevRevenue = parseFloat(prevMonthData?.totalIncomeSSP || "0");
+  const currentExpenses = parseFloat(currentMonthData?.totalExpenses || "0");
+  const prevExpenses = parseFloat(prevMonthData?.totalExpenses || "0");
+  const currentNetIncome = currentRevenue - currentExpenses;
+  const prevNetIncome = prevRevenue - prevExpenses;
+
+  const revenueChange = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+  const expensesChange = prevExpenses > 0 ? ((currentExpenses - prevExpenses) / prevExpenses) * 100 : 0;
+  const netIncomeChange = prevNetIncome !== 0 ? ((currentNetIncome - prevNetIncome) / Math.abs(prevNetIncome)) * 100 : 0;
+  const patientsChange = prevPatients > 0 ? ((currentPatients - prevPatients) / prevPatients) * 100 : 0;
+
+  // Calculate department growth
+  const departmentGrowth = useMemo((): DepartmentGrowthItem[] => {
+    const currentBreakdown = currentMonthData?.departmentBreakdown || {};
+    const prevBreakdown = prevMonthData?.departmentBreakdown || {};
+    
+    const deptArray: Department[] = Array.isArray(departments) ? departments : [];
+    
+    return deptArray.map((dept: Department) => {
+      const currentVal = parseFloat(currentBreakdown[dept.id] || currentBreakdown[dept.name] || "0");
+      const prevVal = parseFloat(prevBreakdown[dept.id] || prevBreakdown[dept.name] || "0");
+      const growth = prevVal > 0 ? ((currentVal - prevVal) / prevVal) * 100 : (currentVal > 0 ? 100 : 0);
+      const style = getDepartmentStyle(dept.name);
+      
+      return {
+        id: dept.id,
+        name: dept.name,
+        currentValue: currentVal,
+        prevValue: prevVal,
+        growth,
+        ...style,
+      };
+    }).filter((d) => d.currentValue > 0 || d.prevValue > 0)
+      .sort((a, b) => b.growth - a.growth);
+  }, [currentMonthData, prevMonthData, departments]);
+
+  // Calculate trend stats
+  const trendStats = useMemo(() => {
+    if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0 };
+    
+    const total = monthlyTrend.reduce((sum, m) => sum + m.revenue, 0);
+    const avg = total / monthlyTrend.length;
+    const best = monthlyTrend.reduce((max, m) => m.revenue > max.revenue ? m : max, monthlyTrend[0]);
+    
+    // YoY growth: compare last month to same month last year (if available in trend)
+    const currentMonthRev = monthlyTrend[monthlyTrend.length - 1]?.revenue || 0;
+    const sameMonthLastYear = monthlyTrend[0]?.revenue || 0;
+    const yoyGrowth = sameMonthLastYear > 0 ? ((currentMonthRev - sameMonthLastYear) / sameMonthLastYear) * 100 : 0;
+    
+    return {
+      yoyGrowth,
+      bestMonth: best?.month || "",
+      monthlyAvg: avg,
+    };
+  }, [monthlyTrend]);
+
+  const isLoading = loadingCurrent || loadingPrev || loadingTrend;
+
+  const currentMonthLabel = format(new Date(displayYear, currentMonth - 1, 1), "MMMM yyyy");
+  const prevMonthLabel = format(prevMonthDate, "MMMM yyyy");
 
   if (isLoading) {
     return (
@@ -155,151 +277,289 @@ export default function Dashboard() {
         <div className="bg-white border-b border-slate-200 px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <Skeleton className="h-8 w-32 mb-2" />
-              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
             </div>
-            <div className="flex items-center space-x-4">
-              <Skeleton className="h-10 w-32" />
-              <Skeleton className="h-10 w-24" />
-            </div>
+            <Skeleton className="h-10 w-32" />
           </div>
         </div>
-        <main className="flex-1 overflow-y-auto p-6 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <Card key={i} className="p-6"><Skeleton className="h-20 w-full" /></Card>
-            ))}
-          </div>
+        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+          <Card className="p-6"><Skeleton className="h-80 w-full" /></Card>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="p-6"><Skeleton className="h-64 w-full" /></Card>
             <Card className="p-6"><Skeleton className="h-64 w-full" /></Card>
           </div>
+          <Card className="p-6"><Skeleton className="h-64 w-full" /></Card>
         </main>
       </div>
     );
   }
 
-  const headerLabel =
-    timeRange === "current-month" ? "Current month" :
-    timeRange === "last-month" ? "Last month" :
-    timeRange === "last-3-months" ? "Last 3 months" :
-    timeRange === "year" ? "This year" :
-    timeRange === "month-select" ? `${monthShort[(selectedMonth - 1) % 12]} ${selectedYear}` :
-    timeRange === "custom" && customStartDate && customEndDate
-      ? `${format(customStartDate, "MMM d, yyyy")} to ${format(customEndDate, "MMM d, yyyy")}`
-      : "Custom period";
+  // Custom tooltip for chart
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
+        <div className="text-sm font-semibold text-slate-900">{data.fullMonth}</div>
+        <div className="text-sm font-mono tabular-nums text-teal-600">{compactSSP(data.revenue)}</div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50">
-      {/* Header with Time Controls */}
+      {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900">Overview</h1>
-            <div className="mt-1 flex items-center gap-4">
-              <p className="text-sm text-muted-foreground">Key financials · {headerLabel}</p>
-              <Link
-                href={`/patient-volume?view=monthly&year=${getPatientVolumeNavigation().year}&month=${getPatientVolumeNavigation().month}&range=${normalizedRange}`}
-                className="inline-block"
-              >
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 rounded-md transition-colors cursor-pointer min-h-[44px]">
-                  <Users className="w-4 h-4 text-teal-600" />
-                  <span className="text-teal-600 text-sm font-medium font-variant-numeric-tabular">
-                    {periodPatientVolume.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0)}{" "}
-                    patients in selected period
-                  </span>
-                </div>
-              </Link>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-semibold leading-tight text-slate-900">
+              Trends & Comparisons
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Analyze performance trends and compare across periods
+            </p>
           </div>
-
-          {/* RIGHT: range + optional pickers */}
-          <div className="mt-2 md:mt-0 flex flex-wrap items-center justify-end gap-2">
-            <Select value={timeRange} onValueChange={(v: TimeRange) => handleTimeRangeChange(v)}>
-              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current-month">Current Month</SelectItem>
-                <SelectItem value="last-month">Last Month</SelectItem>
-                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="month-select">Select Month…</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {timeRange === "month-select" && (
-              <>
-                <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
-                  <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
-                  <SelectContent>{years.map((y) => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}</SelectContent>
-                </Select>
-
-                <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
-                  <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Month" /></SelectTrigger>
-                  <SelectContent>{months.map((m) => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}</SelectContent>
-                </Select>
-              </>
-            )}
-
-            {timeRange === "custom" && (
-              <>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customStartDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000 }}>
-                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customStartDate} onSelect={setCustomStartDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
-
-                <span aria-hidden className="text-muted-foreground">to</span>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("h-9 justify-start text-left font-normal", !customEndDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent side="bottom" align="start" sideOffset={12} className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl" style={{ zIndex: 50000 }}>
-                    <DatePicker mode="single" numberOfMonths={1} showOutsideDays={false} selected={customEndDate} onSelect={setCustomEndDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
-              </>
-            )}
-          </div>
+          
+          <Select value={selectedYear} onValueChange={(v: YearOption) => setSelectedYear(v)}>
+            <SelectTrigger className="h-10 w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="this-year">This Year</SelectItem>
+              <SelectItem value="last-year">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
-        <ExecutiveStyleKPIs data={dashboardData || {}} />
+      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
+        
+        {/* 12-Month Revenue Trend Chart */}
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+              <div className="p-1.5 rounded-lg bg-teal-100">
+                <TrendingUp className="h-5 w-5 text-teal-600" />
+              </div>
+              Revenue Trend
+            </CardTitle>
+            <CardDescription>12-month revenue performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {monthlyTrend.length > 0 ? (
+              <>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 11, fill: "#64748b" }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => {
+                          if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                          if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                          return v.toString();
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#14b8a6" 
+                        strokeWidth={2}
+                        fill="url(#revenueGradient)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Summary stats below chart */}
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className={cn("h-4 w-4", trendStats.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
+                    <span className="text-sm text-slate-600">YoY Growth:</span>
+                    <span className={cn("font-semibold", trendStats.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
+                      {trendStats.yoyGrowth >= 0 ? "+" : ""}{trendStats.yoyGrowth.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm text-slate-600">Best Month:</span>
+                    <span className="font-semibold text-slate-900">{trendStats.bestMonth}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm text-slate-600">Monthly Avg:</span>
+                    <span className="font-semibold text-slate-900">{compactSSP(trendStats.monthlyAvg)}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-500">
+                No revenue data available for the selected period.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* NEW: Monthly Income (inserted under KPI band) */}
-        <MonthlyIncome
-          timeRange={timeRange}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          customStartDate={customStartDate}
-          customEndDate={customEndDate}
-        />
-
+        {/* Month vs Month and Department Growth Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SimpleTopDepartments
-            data={dashboardData?.departmentBreakdown || {}}
-            departments={(departments as any) || []}
-          />
+          
+          {/* Month vs Month Comparison */}
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                <div className="p-1.5 rounded-lg bg-blue-100">
+                  <ArrowLeftRight className="h-5 w-5 text-blue-600" />
+                </div>
+                Month vs Month
+              </CardTitle>
+              <CardDescription>{currentMonthLabel} compared to {prevMonthLabel}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {/* Revenue comparison */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-slate-500">Revenue</div>
+                      <div className="font-semibold text-slate-900">{compactSSP(currentRevenue)}</div>
+                    </div>
+                  </div>
+                  <div className={cn("flex items-center gap-1", revenueChange >= 0 ? "text-green-600" : "text-red-600")}>
+                    {revenueChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    <span className="font-semibold">{revenueChange >= 0 ? "+" : ""}{revenueChange.toFixed(1)}%</span>
+                  </div>
+                </div>
+                
+                {/* Expenses comparison */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                      <CreditCard className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-slate-500">Expenses</div>
+                      <div className="font-semibold text-slate-900">{compactSSP(currentExpenses)}</div>
+                    </div>
+                  </div>
+                  <div className={cn("flex items-center gap-1", expensesChange <= 0 ? "text-green-600" : "text-red-600")}>
+                    {expensesChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    <span className="font-semibold">{expensesChange >= 0 ? "+" : ""}{expensesChange.toFixed(1)}%</span>
+                  </div>
+                </div>
+                
+                {/* Net Income comparison */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <Wallet className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-slate-500">Net Income</div>
+                      <div className="font-semibold text-slate-900">{compactSSP(currentNetIncome)}</div>
+                    </div>
+                  </div>
+                  <div className={cn("flex items-center gap-1", netIncomeChange >= 0 ? "text-green-600" : "text-red-600")}>
+                    {netIncomeChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    <span className="font-semibold">{netIncomeChange >= 0 ? "+" : ""}{netIncomeChange.toFixed(1)}%</span>
+                  </div>
+                </div>
+                
+                {/* Patients comparison */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-slate-500">Patients</div>
+                      <div className="font-semibold text-slate-900">{nf0.format(currentPatients)}</div>
+                    </div>
+                  </div>
+                  <div className={cn("flex items-center gap-1", patientsChange >= 0 ? "text-green-600" : "text-red-600")}>
+                    {patientsChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    <span className="font-semibold">{patientsChange >= 0 ? "+" : ""}{patientsChange.toFixed(1)}%</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          <SimpleExpenseBreakdown
-            breakdown={(dashboardData as any)?.expenseBreakdown}
-            total={parseFloat((dashboardData as any)?.totalExpenses || "0")}
-            title="Expenses Breakdown"
-            periodLabel={headerLabel}
-          />
+          {/* Department Growth */}
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                <div className="p-1.5 rounded-lg bg-purple-100">
+                  <Building className="h-5 w-5 text-purple-600" />
+                </div>
+                Department Growth
+              </CardTitle>
+              <CardDescription>Performance change vs last month</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {departmentGrowth.length > 0 ? (
+                <div className="space-y-3">
+                  {departmentGrowth.slice(0, MAX_DEPARTMENTS_DISPLAYED).map((dept) => {
+                    const Icon = dept.icon;
+                    return (
+                      <div key={dept.id} className="flex items-center gap-3">
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", dept.bgColor)}>
+                          <Icon className={cn("h-4 w-4", dept.iconColor)} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-slate-700 truncate">{dept.name}</span>
+                            <span className={cn("text-sm font-semibold flex items-center gap-1", dept.growth >= 0 ? "text-green-600" : "text-red-600")}>
+                              {dept.growth >= 0 ? "+" : ""}{dept.growth.toFixed(1)}%
+                              {dept.growth >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            </span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className={cn("h-full rounded-full transition-all duration-500", dept.growth >= 0 ? "bg-green-500" : "bg-red-500")}
+                              style={{ width: `${Math.min(Math.abs(dept.growth) * GROWTH_SCALE_FACTOR, MAX_GROWTH_BAR_WIDTH)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-40 flex items-center justify-center text-slate-500 text-sm">
+                  No department data available for comparison.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Expenses Breakdown - Enhanced */}
+        <SimpleExpenseBreakdown
+          breakdown={(currentMonthData as any)?.expenseBreakdown}
+          total={currentExpenses}
+          title="Expenses Breakdown"
+          periodLabel={currentMonthLabel}
+        />
       </main>
     </div>
   );

@@ -14,6 +14,7 @@ import {
   PieChart,      // insurance overview
   ChevronDown,
   FlaskConical,  // <--- NEW ICON for Lab Finance
+  TrendingUp,    // Trends & Comparisons
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect, useState } from "react";
@@ -28,7 +29,7 @@ type NavItem = {
 // Separate navigation items
 const navigationBefore: NavItem[] = [
   { name: "Executive Dashboard", href: "/", icon: BarChart3 },
-  { name: "Overview", href: "/simple", icon: BarChart3 },
+  { name: "Trends", href: "/simple", icon: TrendingUp },
   { name: "Add Transaction", href: "/transactions", icon: Plus },
 ];
 
