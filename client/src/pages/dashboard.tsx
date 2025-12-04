@@ -33,6 +33,7 @@ import {
   ScanLine,
   Pill,
   TestTubes,
+  LucideIcon,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
@@ -46,20 +47,52 @@ import {
   CartesianGrid,
 } from "recharts";
 
+// Constants for number formatting thresholds
+const BILLION = 1_000_000_000;
+const TEN_BILLION = 10_000_000_000;
+const MILLION = 1_000_000;
+const TEN_MILLION = 10_000_000;
+const THOUSAND = 1_000;
+
+// Display configuration constants
+const MAX_DEPARTMENTS_DISPLAYED = 6;
+const GROWTH_SCALE_FACTOR = 2;
+const MAX_GROWTH_BAR_WIDTH = 100;
+
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 function compactSSP(n: number) {
   const v = Math.abs(n);
-  if (v >= 1_000_000_000) return `SSP ${(n / 1_000_000_000).toFixed(v < 10_000_000_000 ? 1 : 0)}B`;
-  if (v >= 1_000_000) return `SSP ${(n / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
-  if (v >= 1_000) return `SSP ${nf0.format(Math.round(n / 1_000))}k`;
+  if (v >= BILLION) return `SSP ${(n / BILLION).toFixed(v < TEN_BILLION ? 1 : 0)}B`;
+  if (v >= MILLION) return `SSP ${(n / MILLION).toFixed(v < TEN_MILLION ? 1 : 0)}M`;
+  if (v >= THOUSAND) return `SSP ${nf0.format(Math.round(n / THOUSAND))}k`;
   return `SSP ${nf0.format(Math.round(n))}`;
 }
 
 type YearOption = "this-year" | "last-year";
 
+// Type definitions
+interface Department {
+  id: string | number;
+  name: string;
+}
+
+interface DepartmentStyleConfig {
+  icon: LucideIcon;
+  bgColor: string;
+  iconColor: string;
+}
+
+interface DepartmentGrowthItem extends DepartmentStyleConfig {
+  id: string | number;
+  name: string;
+  currentValue: number;
+  prevValue: number;
+  growth: number;
+}
+
 // Department icon mapping
-const departmentIcons: Record<string, { icon: React.ComponentType<any>; bgColor: string; iconColor: string }> = {
+const departmentIcons: Record<string, DepartmentStyleConfig> = {
   "Lab": { icon: FlaskConical, bgColor: "bg-blue-100", iconColor: "text-blue-600" },
   "Ultrasound": { icon: ScanLine, bgColor: "bg-purple-100", iconColor: "text-purple-600" },
   "X-Ray": { icon: ScanLine, bgColor: "bg-amber-100", iconColor: "text-amber-600" },
@@ -68,7 +101,7 @@ const departmentIcons: Record<string, { icon: React.ComponentType<any>; bgColor:
   "Lab Tests": { icon: TestTubes, bgColor: "bg-indigo-100", iconColor: "text-indigo-600" },
 };
 
-function getDepartmentStyle(name: string) {
+function getDepartmentStyle(name: string): DepartmentStyleConfig {
   // Try to match department name
   for (const [key, style] of Object.entries(departmentIcons)) {
     if (name.toLowerCase().includes(key.toLowerCase())) {
@@ -189,13 +222,13 @@ export default function Dashboard() {
   const patientsChange = prevPatients > 0 ? ((currentPatients - prevPatients) / prevPatients) * 100 : 0;
 
   // Calculate department growth
-  const departmentGrowth = useMemo(() => {
+  const departmentGrowth = useMemo((): DepartmentGrowthItem[] => {
     const currentBreakdown = currentMonthData?.departmentBreakdown || {};
     const prevBreakdown = prevMonthData?.departmentBreakdown || {};
     
-    const deptArray = Array.isArray(departments) ? departments : [];
+    const deptArray: Department[] = Array.isArray(departments) ? departments : [];
     
-    return deptArray.map((dept: any) => {
+    return deptArray.map((dept: Department) => {
       const currentVal = parseFloat(currentBreakdown[dept.id] || currentBreakdown[dept.name] || "0");
       const prevVal = parseFloat(prevBreakdown[dept.id] || prevBreakdown[dept.name] || "0");
       const growth = prevVal > 0 ? ((currentVal - prevVal) / prevVal) * 100 : (currentVal > 0 ? 100 : 0);
@@ -209,8 +242,8 @@ export default function Dashboard() {
         growth,
         ...style,
       };
-    }).filter((d: any) => d.currentValue > 0 || d.prevValue > 0)
-      .sort((a: any, b: any) => b.growth - a.growth);
+    }).filter((d) => d.currentValue > 0 || d.prevValue > 0)
+      .sort((a, b) => b.growth - a.growth);
   }, [currentMonthData, prevMonthData, departments]);
 
   // Calculate trend stats
@@ -485,7 +518,7 @@ export default function Dashboard() {
             <CardContent>
               {departmentGrowth.length > 0 ? (
                 <div className="space-y-3">
-                  {departmentGrowth.slice(0, 6).map((dept: any) => {
+                  {departmentGrowth.slice(0, MAX_DEPARTMENTS_DISPLAYED).map((dept) => {
                     const Icon = dept.icon;
                     return (
                       <div key={dept.id} className="flex items-center gap-3">
@@ -503,7 +536,7 @@ export default function Dashboard() {
                           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                             <div 
                               className={cn("h-full rounded-full transition-all duration-500", dept.growth >= 0 ? "bg-green-500" : "bg-red-500")}
-                              style={{ width: `${Math.min(Math.abs(dept.growth) * 2, 100)}%` }}
+                              style={{ width: `${Math.min(Math.abs(dept.growth) * GROWTH_SCALE_FACTOR, MAX_GROWTH_BAR_WIDTH)}%` }}
                             />
                           </div>
                         </div>
