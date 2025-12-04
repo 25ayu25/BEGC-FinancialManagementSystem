@@ -87,6 +87,7 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
         onClick={handleSignOut}
         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors font-medium"
         data-testid="button-sign-out"
+        aria-label="Sign out of your account"
       >
         <LogOut className="h-4 w-4" />
         <span>Sign Out</span>
