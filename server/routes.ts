@@ -1129,6 +1129,60 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  /**
+   * Batched monthly trend endpoint for the Trends & Comparisons page.
+   * Fetches all monthly data in a single DB query for better performance.
+   * 
+   * Query params:
+   *   - startDate (required): YYYY-MM-DD
+   *   - endDate (required): YYYY-MM-DD
+   * 
+   * Returns array of monthly data with:
+   *   - month, fullMonth: date labels
+   *   - revenue: SSP income total
+   *   - revenueUSD: USD insurance income total
+   *   - departmentBreakdown: Record<departmentId, amount>
+   *   - expenseBreakdown: Record<category, amount>
+   *   - totalExpenses: SSP expense total
+   */
+  app.get("/api/trends/monthly-revenue", requireAuth, async (req, res) => {
+    try {
+      const startDateStr = req.query.startDate as string;
+      const endDateStr = req.query.endDate as string;
+
+      if (!startDateStr || !endDateStr) {
+        return res.status(400).json({ 
+          error: "Both startDate and endDate query parameters are required (YYYY-MM-DD format)" 
+        });
+      }
+
+      // Parse dates - expect YYYY-MM-DD format
+      const startDate = parseYMD(startDateStr);
+      const endDate = parseYMD(endDateStr);
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ 
+          error: "Invalid date format. Use YYYY-MM-DD format." 
+        });
+      }
+
+      if (startDate > endDate) {
+        return res.status(400).json({ 
+          error: "startDate must be before or equal to endDate" 
+        });
+      }
+
+      const data = await storage.getMonthlyTrendData({ startDate, endDate });
+      
+      // Cache for 5 minutes since trend data doesn't change frequently
+      res.set("Cache-Control", "private, max-age=300");
+      res.json(data);
+    } catch (err) {
+      console.error("[monthly-trend-error]", err);
+      res.status(500).json({ error: "Failed to load monthly trend data" });
+    }
+  });
+
   app.get("/api/income-trends", requireAuth, async (_req, res) => {
     try {
       const days = parseInt((_req.query.days as string) || "7");

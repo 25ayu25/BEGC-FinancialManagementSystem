@@ -111,6 +111,17 @@ interface DepartmentGrowthItem extends DepartmentStyleConfig {
   growth: number;
 }
 
+/** Monthly trend data item returned by the batched endpoint */
+interface MonthlyTrendItem {
+  month: string;
+  fullMonth: string;
+  revenue: number;
+  revenueUSD: number;
+  departmentBreakdown: Record<string, number>;
+  expenseBreakdown: Record<string, number>;
+  totalExpenses: number;
+}
+
 // Department icon mapping
 const departmentIcons: Record<string, DepartmentStyleConfig> = {
   "Lab": { icon: FlaskConical, bgColor: "bg-blue-100", iconColor: "text-blue-600" },
@@ -219,44 +230,33 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch revenue trend data based on filter
-  const { data: monthlyTrend = [], isLoading: loadingTrend } = useQuery({
+  // Fetch revenue trend data based on filter using batched endpoint (single request)
+  const { data: monthlyTrend = [], isLoading: loadingTrend } = useQuery<MonthlyTrendItem[]>({
     queryKey: ["/api/trends/monthly-revenue", selectedFilter, filterStartDate?.toISOString(), filterEndDate?.toISOString()],
-    queryFn: async () => {
-      // Fetch months based on filter
-      const months: Array<{ month: string; revenue: number; revenueUSD: number; fullMonth: string; departmentBreakdown: Record<string, number>; expenseBreakdown: Record<string, number>; totalExpenses: number }> = [];
+    queryFn: async (): Promise<MonthlyTrendItem[]> => {
+      // Use the batched endpoint for better performance - single DB query instead of N queries
+      const startDateStr = format(filterStartDate, "yyyy-MM-dd");
+      const endDateStr = format(filterEndDate, "yyyy-MM-dd");
       
-      for (let i = 0; i < monthsCount; i++) {
-        const date = new Date(filterStartDate.getFullYear(), filterStartDate.getMonth() + i, 1);
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1;
+      try {
+        const url = `/api/trends/monthly-revenue?startDate=${startDateStr}&endDate=${endDateStr}`;
+        const { data } = await api.get(url);
         
-        try {
-          const url = `/api/dashboard?year=${year}&month=${month}&range=current-month`;
-          const { data } = await api.get(url);
-          months.push({
-            month: format(date, "MMM"),
-            fullMonth: format(date, "MMMM yyyy"),
-            revenue: parseFloat(data?.totalIncomeSSP || "0"),
-            revenueUSD: parseFloat(data?.totalIncomeUSD || "0"),
-            departmentBreakdown: data?.departmentBreakdown || {},
-            expenseBreakdown: data?.expenseBreakdown || {},
-            totalExpenses: parseFloat(data?.totalExpenses || "0"),
-          });
-        } catch {
-          months.push({
-            month: format(date, "MMM"),
-            fullMonth: format(date, "MMMM yyyy"),
-            revenue: 0,
-            revenueUSD: 0,
-            departmentBreakdown: {},
-            expenseBreakdown: {},
-            totalExpenses: 0,
-          });
-        }
+        // Transform response to match expected format
+        return (data || []).map((item: any): MonthlyTrendItem => ({
+          month: item.month,
+          fullMonth: item.fullMonth,
+          revenue: item.revenue || 0,
+          revenueUSD: item.revenueUSD || 0,
+          departmentBreakdown: item.departmentBreakdown || {},
+          expenseBreakdown: item.expenseBreakdown || {},
+          totalExpenses: item.totalExpenses || 0,
+        }));
+      } catch (error) {
+        console.error("Failed to fetch monthly trend data:", error);
+        // Return empty array on error
+        return [];
       }
-      
-      return months;
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
@@ -391,43 +391,90 @@ export default function Dashboard() {
     };
   }, [monthlyTrend, currentMonthData, currentExpenses, selectedFilter, comparisonCurrentMonthLabel]);
 
-  // Calculate trend stats for SSP
+  // Calculate trend stats for SSP with improved YoY calculation
   const trendStats = useMemo(() => {
-    if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0 };
+    if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0, yoyComparisonAvailable: false };
     
-    const total = monthlyTrend.reduce((sum, m) => sum + m.revenue, 0);
+    const total = monthlyTrend.reduce((sum: number, m: MonthlyTrendItem) => sum + m.revenue, 0);
     const avg = total / monthlyTrend.length;
-    const best = monthlyTrend.reduce((max, m) => m.revenue > max.revenue ? m : max, monthlyTrend[0]);
+    const best = monthlyTrend.reduce((max: MonthlyTrendItem, m: MonthlyTrendItem) => m.revenue > max.revenue ? m : max, monthlyTrend[0]);
     
-    // YoY growth: compare last month to same month last year (if available in trend)
-    const currentMonthRev = monthlyTrend[monthlyTrend.length - 1]?.revenue || 0;
-    const sameMonthLastYear = monthlyTrend[0]?.revenue || 0;
-    const yoyGrowth = sameMonthLastYear > 0 ? ((currentMonthRev - sameMonthLastYear) / sameMonthLastYear) * 100 : 0;
+    // Calculate proper YoY growth:
+    // Compare the most recent complete month to the same month last year
+    // Only if both are within the trend window
+    const lastMonthData = monthlyTrend[monthlyTrend.length - 1];
+    let yoyGrowth = 0;
+    let yoyComparisonAvailable = false;
+    
+    if (lastMonthData) {
+      // Find the same month from the previous year in our trend data
+      const targetMonth = lastMonthData.month; // e.g., "Nov"
+      
+      // Look for the same month in the previous year within our data
+      const sameMonthLastYearData = monthlyTrend.find((m: MonthlyTrendItem, idx: number) => {
+        // Must be earlier in the array and be the same month name
+        return idx < monthlyTrend.length - 1 && m.month === targetMonth;
+      });
+      
+      if (sameMonthLastYearData && sameMonthLastYearData.revenue > 0) {
+        yoyGrowth = ((lastMonthData.revenue - sameMonthLastYearData.revenue) / sameMonthLastYearData.revenue) * 100;
+        yoyComparisonAvailable = true;
+      } else if (monthlyTrend.length > 1) {
+        // Fallback: compare first vs last month in trend (period growth)
+        const firstMonthRev = monthlyTrend[0]?.revenue || 0;
+        const lastMonthRev = lastMonthData.revenue;
+        if (firstMonthRev > 0) {
+          yoyGrowth = ((lastMonthRev - firstMonthRev) / firstMonthRev) * 100;
+          yoyComparisonAvailable = true;
+        }
+      }
+    }
     
     return {
       yoyGrowth,
-      bestMonth: best?.month || "",
+      bestMonth: best?.fullMonth || best?.month || "",
       monthlyAvg: avg,
+      yoyComparisonAvailable,
     };
   }, [monthlyTrend]);
 
-  // Calculate trend stats for USD
+  // Calculate trend stats for USD with improved YoY calculation
   const trendStatsUSD = useMemo(() => {
-    if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0 };
+    if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0, yoyComparisonAvailable: false };
     
-    const total = monthlyTrend.reduce((sum, m) => sum + m.revenueUSD, 0);
+    const total = monthlyTrend.reduce((sum: number, m: MonthlyTrendItem) => sum + m.revenueUSD, 0);
     const avg = total / monthlyTrend.length;
-    const best = monthlyTrend.reduce((max, m) => m.revenueUSD > max.revenueUSD ? m : max, monthlyTrend[0]);
+    const best = monthlyTrend.reduce((max: MonthlyTrendItem, m: MonthlyTrendItem) => m.revenueUSD > max.revenueUSD ? m : max, monthlyTrend[0]);
     
-    // YoY growth: compare last month to same month last year (if available in trend)
-    const currentMonthRev = monthlyTrend[monthlyTrend.length - 1]?.revenueUSD || 0;
-    const sameMonthLastYear = monthlyTrend[0]?.revenueUSD || 0;
-    const yoyGrowth = sameMonthLastYear > 0 ? ((currentMonthRev - sameMonthLastYear) / sameMonthLastYear) * 100 : 0;
+    // Calculate proper YoY growth for USD
+    const lastMonthData = monthlyTrend[monthlyTrend.length - 1];
+    let yoyGrowth = 0;
+    let yoyComparisonAvailable = false;
+    
+    if (lastMonthData) {
+      const targetMonth = lastMonthData.month;
+      const sameMonthLastYearData = monthlyTrend.find((m: MonthlyTrendItem, idx: number) => {
+        return idx < monthlyTrend.length - 1 && m.month === targetMonth;
+      });
+      
+      if (sameMonthLastYearData && sameMonthLastYearData.revenueUSD > 0) {
+        yoyGrowth = ((lastMonthData.revenueUSD - sameMonthLastYearData.revenueUSD) / sameMonthLastYearData.revenueUSD) * 100;
+        yoyComparisonAvailable = true;
+      } else if (monthlyTrend.length > 1) {
+        const firstMonthRev = monthlyTrend[0]?.revenueUSD || 0;
+        const lastMonthRev = lastMonthData.revenueUSD;
+        if (firstMonthRev > 0) {
+          yoyGrowth = ((lastMonthRev - firstMonthRev) / firstMonthRev) * 100;
+          yoyComparisonAvailable = true;
+        }
+      }
+    }
     
     return {
       yoyGrowth,
-      bestMonth: best?.month || "",
+      bestMonth: best?.fullMonth || best?.month || "",
       monthlyAvg: avg,
+      yoyComparisonAvailable,
     };
   }, [monthlyTrend]);
 
@@ -488,6 +535,23 @@ export default function Dashboard() {
       bestMonth,
     };
   }, [monthlyTrend, departmentGrowth, trendStats]);
+
+  // Compute clear period description for the trend chart
+  const trendPeriodDescription = useMemo(() => {
+    if (monthlyTrend.length === 0) return "No data available";
+    
+    const firstMonth = monthlyTrend[0]?.fullMonth || '';
+    const lastMonth = monthlyTrend[monthlyTrend.length - 1]?.fullMonth || '';
+    
+    if (firstMonth === lastMonth) {
+      return firstMonth;
+    }
+    
+    // Get filter-specific description
+    const filterLabel = filterOptions.find(f => f.value === selectedFilter)?.label || '';
+    
+    return `${firstMonth} – ${lastMonth} (${filterLabel})`;
+  }, [monthlyTrend, selectedFilter]);
 
   const isLoading = loadingCurrent || loadingPrev || loadingTrend;
 
@@ -606,7 +670,7 @@ export default function Dashboard() {
                   </div>
                   Revenue Trend
                 </CardTitle>
-                <CardDescription>{monthsCount}-month revenue performance</CardDescription>
+                <CardDescription>{trendPeriodDescription}</CardDescription>
               </div>
               
               {/* Currency Toggle Tabs */}
@@ -769,7 +833,10 @@ export default function Dashboard() {
                 </div>
                 Month vs Month
               </CardTitle>
-              <CardDescription>{comparisonCurrentMonthLabel} compared to {comparisonPrevMonthLabel}</CardDescription>
+              <CardDescription>
+                {comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel}
+                <span className="ml-1 text-xs text-slate-400">(Last two complete months)</span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -853,7 +920,10 @@ export default function Dashboard() {
                 </div>
                 Department Growth
               </CardTitle>
-              <CardDescription>{comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel} (sorted by growth)</CardDescription>
+              <CardDescription>
+                {comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel}
+                <span className="ml-1 text-xs text-slate-400">(Sorted by growth rate)</span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {departmentGrowth.length > 0 ? (
