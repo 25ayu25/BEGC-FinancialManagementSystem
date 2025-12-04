@@ -1,17 +1,6 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, Shield } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 
 interface UserProfileMenuProps {
   userName?: string;
@@ -19,9 +8,6 @@ interface UserProfileMenuProps {
 }
 
 export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [, navigate] = useLocation();
-
   // Fetch current user info
   const { data: currentUser, isLoading } = useQuery({
     queryKey: ['/api/auth/user'],
@@ -50,6 +36,9 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
     currentUser?.location === 'south_sudan' ? `${currentUser?.role?.charAt(0).toUpperCase() + currentUser?.role?.slice(1)} - South Sudan` : 
     currentUser?.role) || "User";
 
+  // Get first letter of name for avatar
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+
   const handleSignOut = async () => {
     try {
       await api.post('/api/auth/logout');
@@ -59,68 +48,50 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
     } catch (error) {
       console.error('Sign out error:', error);
     }
-    setIsOpen(false);
-  };
-
-  const handleSecurityClick = () => {
-    navigate('/security');
-    setIsOpen(false);
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center space-x-3 w-full p-2">
-        <div className="w-10 h-10 bg-slate-700 rounded-full animate-pulse"></div>
-        <div className="text-left">
-          <div className="w-20 h-4 bg-slate-700 rounded animate-pulse mb-1"></div>
-          <div className="w-16 h-3 bg-slate-700 rounded animate-pulse"></div>
+      <div className="w-full">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 bg-slate-700 rounded-full animate-pulse"></div>
+          <div className="flex-1 min-w-0">
+            <div className="w-20 h-4 bg-slate-700 rounded animate-pulse mb-1"></div>
+            <div className="w-16 h-3 bg-slate-700 rounded animate-pulse"></div>
+          </div>
         </div>
+        <div className="w-full h-10 bg-slate-700 rounded-lg animate-pulse"></div>
       </div>
     );
   }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          className="p-0 h-auto w-full justify-start hover:bg-slate-800"
-          data-testid="button-user-profile"
-        >
-          <div className="flex items-center space-x-3 w-full">
-            <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center shadow-md">
-              <User className="text-white text-sm" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold text-white" data-testid="text-user-name">
-                {displayName}
-              </p>
-              <p className="text-xs text-slate-400" data-testid="text-user-role">
-                {displayRole}
-              </p>
-            </div>
+    <div className="w-full" data-testid="user-profile-section">
+      {/* User info row - always visible */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-medium shadow-md">
+          {avatarLetter}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate" data-testid="text-user-name">
+            {displayName}
           </div>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56 z-50" align="start" side="top" sideOffset={8}>
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/settings" className="flex items-center w-full cursor-pointer" data-testid="link-settings">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleSecurityClick} className="cursor-pointer" data-testid="button-security">
-          <Shield className="mr-2 h-4 w-4" />
-          <span>Security</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer" data-testid="button-sign-out">
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Sign out</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <div className="text-xs text-slate-400 truncate" data-testid="text-user-role">
+            {displayRole}
+          </div>
+        </div>
+      </div>
+      
+      {/* Sign Out - Always visible, prominent button */}
+      <button 
+        onClick={handleSignOut}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors font-medium"
+        data-testid="button-sign-out"
+        aria-label="Sign out of your account"
+      >
+        <LogOut className="h-4 w-4" />
+        <span>Sign Out</span>
+      </button>
+    </div>
   );
 }
