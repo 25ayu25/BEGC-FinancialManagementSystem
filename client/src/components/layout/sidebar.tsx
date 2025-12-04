@@ -218,7 +218,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </nav>
 
         {/* User Profile & Status - Fixed at bottom, never scrolls */}
-        <div className="flex-shrink-0 mt-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-slate-700 bg-slate-900">
+        <div 
+          className="flex-shrink-0 mt-auto p-4 border-t border-slate-700 bg-slate-900"
+          style={{ 
+            paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 24px))' 
+          }}
+        >
           <UserProfileMenu />
         </div>
       </aside>
