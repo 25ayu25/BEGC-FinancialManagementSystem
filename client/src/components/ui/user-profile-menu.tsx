@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/queryClient";
-import { User, LogOut } from "lucide-react";
+import { LogOut, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UserProfileMenuProps {
   userName?: string;
@@ -53,45 +60,60 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
   if (isLoading) {
     return (
       <div className="w-full">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-slate-700 rounded-full animate-pulse"></div>
           <div className="flex-1 min-w-0">
             <div className="w-20 h-4 bg-slate-700 rounded animate-pulse mb-1"></div>
             <div className="w-16 h-3 bg-slate-700 rounded animate-pulse"></div>
           </div>
         </div>
-        <div className="w-full h-10 bg-slate-700 rounded-lg animate-pulse"></div>
       </div>
     );
   }
 
   return (
     <div className="w-full" data-testid="user-profile-section">
-      {/* User info row - always visible */}
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-medium shadow-md">
-          {avatarLetter}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white truncate" data-testid="text-user-name">
-            {displayName}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button 
+            className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            data-testid="button-user-menu"
+            aria-label="Open user menu"
+          >
+            <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-medium shadow-md shrink-0">
+              {avatarLetter}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="text-sm font-medium text-white truncate" data-testid="text-user-name">
+                {displayName}
+              </div>
+              <div className="text-xs text-slate-400 truncate" data-testid="text-user-role">
+                {displayRole}
+              </div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent 
+          align="end" 
+          className="w-56 bg-slate-800 border-slate-700 text-white"
+          sideOffset={8}
+        >
+          <div className="px-3 py-2">
+            <p className="text-sm font-medium text-white">{displayName}</p>
+            <p className="text-xs text-slate-400">{displayRole}</p>
           </div>
-          <div className="text-xs text-slate-400 truncate" data-testid="text-user-role">
-            {displayRole}
-          </div>
-        </div>
-      </div>
-      
-      {/* Sign Out - Always visible, prominent button */}
-      <button 
-        onClick={handleSignOut}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors font-medium"
-        data-testid="button-sign-out"
-        aria-label="Sign out of your account"
-      >
-        <LogOut className="h-4 w-4" />
-        <span>Sign Out</span>
-      </button>
+          <DropdownMenuSeparator className="bg-slate-700" />
+          <DropdownMenuItem 
+            onClick={handleSignOut}
+            className="text-slate-300 hover:text-white hover:bg-slate-700 cursor-pointer focus:bg-slate-700 focus:text-white"
+            data-testid="button-sign-out"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Sign Out</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

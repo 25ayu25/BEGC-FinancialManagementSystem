@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, DollarSign, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
 interface ExecutiveStyleKPIsProps {
   data?: {
@@ -59,7 +60,7 @@ export default function ExecutiveStyleKPIs({
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Revenue</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  {formatSSP(sspRevenue)}
+                  SSP <AnimatedNumber value={sspRevenue} />
                 </p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.incomeChangeSSP !== undefined ? (
@@ -109,7 +110,7 @@ export default function ExecutiveStyleKPIs({
               <div>
                 <p className="text-slate-600 text-xs font-medium">Total Expenses</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  {formatSSP(totalExpenses)}
+                  SSP <AnimatedNumber value={totalExpenses} />
                 </p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.expenseChangeSSP !== undefined ? (
@@ -151,7 +152,7 @@ export default function ExecutiveStyleKPIs({
               <div>
                 <p className="text-slate-600 text-xs font-medium">Net Income</p>
                 <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                  {formatSSP(sspNetIncome)}
+                  SSP <AnimatedNumber value={sspNetIncome} />
                 </p>
                 <div className="flex items-center mt-1">
                   {data?.changes?.netIncomeChangeSSP !== undefined ? (
@@ -189,7 +190,7 @@ export default function ExecutiveStyleKPIs({
                 <div>
                   <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
                   <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD {Math.round(usdIncome).toLocaleString()}
+                    USD <AnimatedNumber value={usdIncome} />
                   </p>
                   <div className="flex items-center mt-1">
                     {data?.changes?.incomeChangeUSD !== undefined ? (

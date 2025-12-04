@@ -133,10 +133,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
-                      ? "bg-slate-800 text-white border-l-2 border-teal-400"
-                      : "text-slate-300 hover:text-white hover:bg-slate-800"
+                      ? "bg-slate-800/50 text-white border-l-[3px] border-teal-400"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
@@ -154,9 +154,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             <CollapsibleTrigger className="w-full [&[data-state=open]>div>svg:last-child]:rotate-180">
               <div
                 className={cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors min-w-0",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors min-w-0",
                   isInsuranceActive
-                    ? "text-white bg-slate-800"
+                    ? "text-white bg-slate-800/50"
                     : "text-slate-300 hover:text-white hover:bg-slate-800"
                 )}
                 data-testid="group-insurance"
@@ -175,9 +175,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   <Link key={item.name} href={item.href}>
                     <div
                       className={cn(
-                        "flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors cursor-pointer min-w-0 pl-10 text-sm",
+                        "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer min-w-0 pl-10 text-sm",
                         isActive
-                          ? "bg-slate-800 text-white border-l-2 border-teal-400"
+                          ? "bg-slate-800/50 text-white border-l-[3px] border-teal-400"
                           : "text-slate-400 hover:text-white hover:bg-slate-800"
                       )}
                       data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
@@ -200,10 +200,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               <Link key={item.name} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors cursor-pointer min-w-0",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
-                      ? "bg-slate-800 text-white border-l-2 border-teal-400"
-                      : "text-slate-300 hover:text-white hover:bg-slate-800"
+                      ? "bg-slate-800/50 text-white border-l-[3px] border-teal-400"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
