@@ -5,9 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   ResponsiveContainer,
-  ComposedChart,
+  BarChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -157,27 +156,7 @@ function buildTicksPreferred(dataMax: number, preferredMax: number) {
   return buildNiceTicks(dataMax);
 }
 
-/* ---------------------- Moving Average Calculation --------------- */
-
-function calculateMovingAverage<T extends { value: number }>(
-  data: T[],
-  windowSize: number = 7
-): (T & { movingAvg: number | null })[] {
-  // Validate windowSize is a positive integer
-  const validWindowSize = Math.max(1, Math.floor(windowSize));
-  
-  return data.map((item, index) => {
-    if (index < validWindowSize - 1) {
-      return { ...item, movingAvg: null }; // Not enough data points yet
-    }
-    const sum = data
-      .slice(index - validWindowSize + 1, index + 1)
-      .reduce((acc, curr) => acc + curr.value, 0);
-    return { ...item, movingAvg: sum / validWindowSize };
-  });
-}
-
-/* ------------------------ Mobile helper hook --------------------- */
+/* ---------------------- Mobile helper hook --------------------- */
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
@@ -225,7 +204,6 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
   }
 
   const value = Number(p.value ?? 0);
-  const movingAvg = p.movingAvg != null ? Number(p.movingAvg) : null;
   const formatValue = nf0.format(Math.round(value));
 
   return (
@@ -234,11 +212,6 @@ function RevenueTooltip({ active, payload, year, month, currency, mode }: RTProp
       <div className="text-sm text-slate-700 font-mono">
         {currency} {formatValue}
       </div>
-      {movingAvg !== null && mode === "daily" && (
-        <div className="text-xs text-orange-600 font-mono mt-1">
-          7-day avg: {currency} {nf0.format(Math.round(movingAvg))}
-        </div>
-      )}
     </div>
   );
 }
@@ -485,11 +458,6 @@ export default function RevenueAnalyticsDaily({
   const sspMonthly = monthlyKeys.map((k) => ({ label: k, value: sspMonthlyMap.get(k) ?? 0 }));
   const usdMonthly = monthlyKeys.map((k) => ({ label: k, value: usdMonthlyMap.get(k) ?? 0 }));
 
-  /* ------------------- Moving Averages for daily view ------------------- */
-  
-  const sspDailyWithMA = useMemo(() => calculateMovingAverage(sspDaily, 7), [sspDaily]);
-  const usdDailyWithMA = useMemo(() => calculateMovingAverage(usdDaily, 7), [usdDaily]);
-
   /* ------------------- Totals & Averages ------------------- */
 
   const totalSSP = (!wide ? sspDaily : sspMonthly).reduce((s, r: any) => s + (r.value || 0), 0);
@@ -689,8 +657,8 @@ export default function RevenueAnalyticsDaily({
           </div>
           <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={wide ? sspMonthly : sspDailyWithMA}
+              <BarChart
+                data={wide ? sspMonthly : sspDaily}
                 margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
                 barCategoryGap="26%"
               >
@@ -745,7 +713,6 @@ export default function RevenueAnalyticsDaily({
                 />
                 <Bar
                   dataKey="value"
-                  name="Daily Revenue"
                   fill="#14b8a6"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={24}
@@ -754,33 +721,9 @@ export default function RevenueAnalyticsDaily({
                 >
                   {showBarLabels && <LabelList dataKey="value" content={renderSSPLabel} />}
                 </Bar>
-                {!wide && (
-                  <Line
-                    type="monotone"
-                    dataKey="movingAvg"
-                    stroke="#f97316"
-                    strokeWidth={2}
-                    dot={false}
-                    name="7-day Average"
-                    connectNulls={false}
-                  />
-                )}
-              </ComposedChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
-          {/* Legend for daily view */}
-          {!wide && (
-            <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-teal-500" />
-                <span>Daily Revenue</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-6 h-0.5 bg-orange-500 rounded" />
-                <span>7-day Average</span>
-              </div>
-            </div>
-          )}
         </section>
 
         {/* USD */}
@@ -801,8 +744,8 @@ export default function RevenueAnalyticsDaily({
           </div>
           <div className="rounded-lg border border-slate-200" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={wide ? usdMonthly : usdDailyWithMA}
+              <BarChart
+                data={wide ? usdMonthly : usdDaily}
                 margin={{ top: 8, right: 12, left: 12, bottom: 18 }}
                 barCategoryGap="26%"
               >
@@ -857,7 +800,6 @@ export default function RevenueAnalyticsDaily({
                 />
                 <Bar
                   dataKey="value"
-                  name="Daily Revenue"
                   fill="#0ea5e9"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={24}
@@ -866,33 +808,9 @@ export default function RevenueAnalyticsDaily({
                 >
                   {showBarLabels && <LabelList dataKey="value" content={renderUSDLabel} />}
                 </Bar>
-                {!wide && (
-                  <Line
-                    type="monotone"
-                    dataKey="movingAvg"
-                    stroke="#f97316"
-                    strokeWidth={2}
-                    dot={false}
-                    name="7-day Average"
-                    connectNulls={false}
-                  />
-                )}
-              </ComposedChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
-          {/* Legend for daily view */}
-          {!wide && (
-            <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-sky-500" />
-                <span>Daily Revenue</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-6 h-0.5 bg-orange-500 rounded" />
-                <span>7-day Average</span>
-              </div>
-            </div>
-          )}
         </section>
 
         {isLoading && (
