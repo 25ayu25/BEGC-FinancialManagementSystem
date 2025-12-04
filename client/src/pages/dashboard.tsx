@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { format, subMonths, subQuarters } from "date-fns";
+import { format, subMonths } from "date-fns";
 import {
   TrendingUp,
   TrendingDown,
@@ -138,72 +138,82 @@ export default function Dashboard() {
   const [currencyTab, setCurrencyTab] = useState<"ssp" | "usd">("ssp");
   
   const thisYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const currentCalendarMonth = now.getMonth() + 1;
+
+  // Determine the last complete month (not the current partial month)
+  // If we're in December 2025 and it's only day 4, use November as "last complete"
+  const lastCompleteMonthDate = subMonths(new Date(thisYear, currentCalendarMonth - 1, 1), 1);
+  const lastCompleteYear = lastCompleteMonthDate.getFullYear();
+  const lastCompleteMonth = lastCompleteMonthDate.getMonth() + 1;
 
   // Calculate date range based on selected filter
-  const { startDate: filterStartDate, monthsCount } = useMemo(() => {
-    const end = new Date(thisYear, currentMonth - 1, 1);
+  const { startDate: filterStartDate, endDate: filterEndDate, monthsCount } = useMemo(() => {
+    // End date for trend chart - use last complete month, not current partial month
+    const end = lastCompleteMonthDate;
     let start: Date;
     let months: number;
     
     switch (selectedFilter) {
       case 'last-month':
-        start = subMonths(end, 1);
+        start = lastCompleteMonthDate;
         months = 1;
         break;
       case 'last-quarter':
-        start = subQuarters(end, 1);
+        start = subMonths(lastCompleteMonthDate, 2); // 3 months including end month
         months = 3;
         break;
       case 'last-6-months':
-        start = subMonths(end, 6);
+        start = subMonths(lastCompleteMonthDate, 5); // 6 months including end month
         months = 6;
         break;
       case 'last-12-months':
-        start = subMonths(end, 12);
+        start = subMonths(lastCompleteMonthDate, 11); // 12 months including end month
         months = 12;
         break;
       case 'this-year':
         start = new Date(thisYear, 0, 1);
-        months = currentMonth;
+        months = lastCompleteMonth;
         break;
       case 'last-year':
         start = new Date(thisYear - 1, 0, 1);
         months = 12;
         break;
       default:
-        start = subMonths(end, 12);
+        start = subMonths(lastCompleteMonthDate, 11);
         months = 12;
     }
     
     return { 
-      startDate: start, 
+      startDate: start,
+      endDate: end,
       monthsCount: months 
     };
-  }, [selectedFilter, thisYear, currentMonth]);
+  }, [selectedFilter, thisYear, lastCompleteMonth, lastCompleteMonthDate]);
 
-  // Display year for the selected filter
-  const displayYear = selectedFilter === 'last-year' ? thisYear - 1 : thisYear;
+  // For Month vs Month comparison, always compare last two complete months
+  // This avoids comparing a partial current month with a full previous month
+  const comparisonCurrentDate = lastCompleteMonthDate;
+  const comparisonPrevDate = subMonths(lastCompleteMonthDate, 1);
+  const comparisonCurrentYear = comparisonCurrentDate.getFullYear();
+  const comparisonCurrentMonth = comparisonCurrentDate.getMonth() + 1;
+  const comparisonPrevYear = comparisonPrevDate.getFullYear();
+  const comparisonPrevMonth = comparisonPrevDate.getMonth() + 1;
 
-  // Fetch dashboard data for current month (for Month vs Month comparison)
+  // Fetch dashboard data for comparison current month (last complete month)
   const { data: currentMonthData, isLoading: loadingCurrent } = useQuery({
-    queryKey: ["/api/dashboard", displayYear, currentMonth, "current-month"],
+    queryKey: ["/api/dashboard", comparisonCurrentYear, comparisonCurrentMonth, "current-month", "comparison"],
     queryFn: async () => {
-      const url = `/api/dashboard?year=${displayYear}&month=${currentMonth}&range=current-month`;
+      const url = `/api/dashboard?year=${comparisonCurrentYear}&month=${comparisonCurrentMonth}&range=current-month`;
       const { data } = await api.get(url);
       return data;
     },
   });
 
-  // Fetch dashboard data for previous month
-  const prevMonthDate = subMonths(new Date(displayYear, currentMonth - 1, 1), 1);
-  const prevYear = prevMonthDate.getFullYear();
-  const prevMonth = prevMonthDate.getMonth() + 1;
-
+  // Fetch dashboard data for comparison previous month (month before last complete)
   const { data: prevMonthData, isLoading: loadingPrev } = useQuery({
-    queryKey: ["/api/dashboard", prevYear, prevMonth, "current-month", "prev"],
+    queryKey: ["/api/dashboard", comparisonPrevYear, comparisonPrevMonth, "current-month", "prev"],
     queryFn: async () => {
-      const url = `/api/dashboard?year=${prevYear}&month=${prevMonth}&range=current-month`;
+      const url = `/api/dashboard?year=${comparisonPrevYear}&month=${comparisonPrevMonth}&range=current-month`;
       const { data } = await api.get(url);
       return data;
     },
@@ -211,10 +221,10 @@ export default function Dashboard() {
 
   // Fetch revenue trend data based on filter
   const { data: monthlyTrend = [], isLoading: loadingTrend } = useQuery({
-    queryKey: ["/api/trends/monthly-revenue", selectedFilter, displayYear],
+    queryKey: ["/api/trends/monthly-revenue", selectedFilter, filterStartDate?.toISOString(), filterEndDate?.toISOString()],
     queryFn: async () => {
       // Fetch months based on filter
-      const months: Array<{ month: string; revenue: number; revenueUSD: number; fullMonth: string }> = [];
+      const months: Array<{ month: string; revenue: number; revenueUSD: number; fullMonth: string; departmentBreakdown: Record<string, number>; expenseBreakdown: Record<string, number>; totalExpenses: number }> = [];
       
       for (let i = 0; i < monthsCount; i++) {
         const date = new Date(filterStartDate.getFullYear(), filterStartDate.getMonth() + i, 1);
@@ -229,6 +239,9 @@ export default function Dashboard() {
             fullMonth: format(date, "MMMM yyyy"),
             revenue: parseFloat(data?.totalIncomeSSP || "0"),
             revenueUSD: parseFloat(data?.totalIncomeUSD || "0"),
+            departmentBreakdown: data?.departmentBreakdown || {},
+            expenseBreakdown: data?.expenseBreakdown || {},
+            totalExpenses: parseFloat(data?.totalExpenses || "0"),
           });
         } catch {
           months.push({
@@ -236,6 +249,9 @@ export default function Dashboard() {
             fullMonth: format(date, "MMMM yyyy"),
             revenue: 0,
             revenueUSD: 0,
+            departmentBreakdown: {},
+            expenseBreakdown: {},
+            totalExpenses: 0,
           });
         }
       }
@@ -245,12 +261,12 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  // Fetch patient volume for current and previous month
+  // Fetch patient volume for comparison months (last complete month vs month before)
   const { data: currentPatients = 0 } = useQuery({
-    queryKey: ["/api/patient-volume/period", displayYear, currentMonth],
+    queryKey: ["/api/patient-volume/period", comparisonCurrentYear, comparisonCurrentMonth],
     queryFn: async () => {
       try {
-        const url = `/api/patient-volume/period/${displayYear}/${currentMonth}?range=current-month`;
+        const url = `/api/patient-volume/period/${comparisonCurrentYear}/${comparisonCurrentMonth}?range=current-month`;
         const { data } = await api.get(url);
         return Array.isArray(data) ? data.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0) : 0;
       } catch {
@@ -260,10 +276,10 @@ export default function Dashboard() {
   });
 
   const { data: prevPatients = 0 } = useQuery({
-    queryKey: ["/api/patient-volume/period", prevYear, prevMonth, "prev"],
+    queryKey: ["/api/patient-volume/period", comparisonPrevYear, comparisonPrevMonth, "prev"],
     queryFn: async () => {
       try {
-        const url = `/api/patient-volume/period/${prevYear}/${prevMonth}?range=current-month`;
+        const url = `/api/patient-volume/period/${comparisonPrevYear}/${comparisonPrevMonth}?range=current-month`;
         const { data } = await api.get(url);
         return Array.isArray(data) ? data.reduce((sum: number, v: any) => sum + (v.patientCount || 0), 0) : 0;
       } catch {
@@ -312,6 +328,64 @@ export default function Dashboard() {
       .sort((a, b) => b.growth - a.growth);
   }, [currentMonthData, prevMonthData, departments]);
 
+  // Aggregate expenses based on the selected filter period
+  const aggregatedExpenses = useMemo(() => {
+    if (monthlyTrend.length === 0) {
+      return {
+        breakdown: currentMonthData?.expenseBreakdown || {},
+        total: currentExpenses,
+        periodLabel: comparisonCurrentMonthLabel,
+      };
+    }
+    
+    // Aggregate expense breakdowns from all months in the trend
+    const combined: Record<string, number> = {};
+    let totalExpensesSum = 0;
+    
+    for (const month of monthlyTrend) {
+      totalExpensesSum += month.totalExpenses || 0;
+      const breakdown = month.expenseBreakdown || {};
+      for (const [category, amount] of Object.entries(breakdown)) {
+        const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount) || "0");
+        combined[category] = (combined[category] || 0) + numAmount;
+      }
+    }
+    
+    // Determine period label based on filter
+    let periodLabel: string;
+    const firstMonth = monthlyTrend[0]?.fullMonth || '';
+    const lastMonth = monthlyTrend[monthlyTrend.length - 1]?.fullMonth || '';
+    
+    switch (selectedFilter) {
+      case 'last-month':
+        periodLabel = lastMonth;
+        break;
+      case 'last-quarter':
+        periodLabel = `${firstMonth} - ${lastMonth} (Last Quarter)`;
+        break;
+      case 'last-6-months':
+        periodLabel = `${firstMonth} - ${lastMonth} (6 Months)`;
+        break;
+      case 'last-12-months':
+        periodLabel = `${firstMonth} - ${lastMonth} (12 Months)`;
+        break;
+      case 'this-year':
+        periodLabel = `${firstMonth} - ${lastMonth} (Year to Date)`;
+        break;
+      case 'last-year':
+        periodLabel = `${firstMonth} - ${lastMonth} (Last Year)`;
+        break;
+      default:
+        periodLabel = `${firstMonth} - ${lastMonth}`;
+    }
+    
+    return {
+      breakdown: combined,
+      total: totalExpensesSum,
+      periodLabel,
+    };
+  }, [monthlyTrend, currentMonthData, currentExpenses, selectedFilter, comparisonCurrentMonthLabel]);
+
   // Calculate trend stats for SSP
   const trendStats = useMemo(() => {
     if (monthlyTrend.length === 0) return { yoyGrowth: 0, bestMonth: "", monthlyAvg: 0 };
@@ -352,12 +426,11 @@ export default function Dashboard() {
     };
   }, [monthlyTrend]);
 
-  // Calculate insights data
+  // Calculate insights data with improved logic
   const insights = useMemo(() => {
-    if (monthlyTrend.length === 0 || departmentGrowth.length === 0) return null;
+    if (monthlyTrend.length === 0) return null;
     
     const yoyGrowth = trendStats.yoyGrowth;
-    const topDepartment = departmentGrowth[0];
     const bestMonth = trendStats.bestMonth;
     
     // Format growth values with proper sign
@@ -366,20 +439,48 @@ export default function Dashboard() {
       return value >= 0 ? `+${formatted}` : `-${formatted}`;
     };
     
+    // Find departments with positive growth, or the one with smallest decline
+    const deptWithPositiveGrowth = departmentGrowth.filter(d => d.growth > 0);
+    const topDepartment = deptWithPositiveGrowth.length > 0 
+      ? deptWithPositiveGrowth[0] 
+      : departmentGrowth[0];
+    
+    // Check if all departments have negative growth
+    const allDepartmentsNegative = departmentGrowth.length > 0 && departmentGrowth.every(d => d.growth < 0);
+    const hasAnyDepartmentData = departmentGrowth.length > 0;
+    
+    // Build appropriate insight message
+    let departmentInsight = '';
+    if (!hasAnyDepartmentData) {
+      departmentInsight = '';
+    } else if (allDepartmentsNegative) {
+      // All negative: show smallest decline instead of "leading"
+      departmentInsight = `, with ${topDepartment?.name} showing the smallest decline at ${formatGrowth(topDepartment?.growth || 0)}%`;
+    } else if (topDepartment && topDepartment.growth > 0) {
+      // Has positive growth: show as "leading"
+      departmentInsight = `, with ${topDepartment?.name} leading at ${formatGrowth(topDepartment?.growth || 0)}% growth`;
+    } else if (topDepartment && topDepartment.growth === 0) {
+      // Zero growth
+      departmentInsight = `, with ${topDepartment?.name} remaining stable`;
+    }
+    
     return {
       yoyGrowth: formatGrowth(yoyGrowth),
       yoyGrowthPositive: yoyGrowth >= 0,
       topDepartment: topDepartment?.name || 'N/A',
       topDepartmentGrowth: formatGrowth(topDepartment?.growth || 0),
       topDepartmentGrowthPositive: (topDepartment?.growth || 0) >= 0,
+      allDepartmentsNegative,
+      departmentInsight,
       bestMonth,
     };
   }, [monthlyTrend, departmentGrowth, trendStats]);
 
   const isLoading = loadingCurrent || loadingPrev || loadingTrend;
 
-  const currentMonthLabel = format(new Date(displayYear, currentMonth - 1, 1), "MMMM yyyy");
-  const prevMonthLabel = format(prevMonthDate, "MMMM yyyy");
+  // Labels for Month vs Month comparison - use comparison months, not current calendar month
+  const comparisonCurrentMonthLabel = format(comparisonCurrentDate, "MMMM yyyy");
+  const comparisonPrevMonthLabel = format(comparisonPrevDate, "MMMM yyyy");
 
   if (isLoading) {
     return (
@@ -478,8 +579,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <Sparkles className="h-5 w-5 flex-shrink-0" />
                 <p className="font-medium">
-                  Key Insight: Revenue {insights.yoyGrowthPositive ? 'grew' : 'declined'} {insights.yoyGrowth}% over this period, with {insights.topDepartment} department 
-                  leading at {insights.topDepartmentGrowth}% growth. {insights.bestMonth} was your best performing month.
+                  Key Insight: Revenue {insights.yoyGrowthPositive ? 'grew' : 'declined'} {insights.yoyGrowth}% over this period{insights.departmentInsight}. {insights.bestMonth && `${insights.bestMonth} was your best performing month.`}
                 </p>
               </div>
             </CardContent>
@@ -660,7 +760,7 @@ export default function Dashboard() {
                 </div>
                 Month vs Month
               </CardTitle>
-              <CardDescription>{currentMonthLabel} compared to {prevMonthLabel}</CardDescription>
+              <CardDescription>{comparisonCurrentMonthLabel} compared to {comparisonPrevMonthLabel}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -744,7 +844,7 @@ export default function Dashboard() {
                 </div>
                 Department Growth
               </CardTitle>
-              <CardDescription>Performance change vs last month (sorted by growth)</CardDescription>
+              <CardDescription>{comparisonCurrentMonthLabel} vs {comparisonPrevMonthLabel} (sorted by growth)</CardDescription>
             </CardHeader>
             <CardContent>
               {departmentGrowth.length > 0 ? (
@@ -784,12 +884,12 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Expenses Breakdown - Enhanced */}
+        {/* Expenses Breakdown - Uses aggregated data based on filter */}
         <SimpleExpenseBreakdown
-          breakdown={(currentMonthData as any)?.expenseBreakdown}
-          total={currentExpenses}
+          breakdown={aggregatedExpenses.breakdown}
+          total={aggregatedExpenses.total}
           title="Expenses Breakdown"
-          periodLabel={currentMonthLabel}
+          periodLabel={aggregatedExpenses.periodLabel}
         />
       </main>
     </div>
