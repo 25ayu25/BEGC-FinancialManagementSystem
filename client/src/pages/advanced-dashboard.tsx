@@ -909,6 +909,7 @@ export default function AdvancedDashboard() {
                             parseFloat(dashboardData?.totalIncomeSSP || "0")
                         )}
                         duration={1500}
+                        formatFn={(n) => nf0.format(Math.round(n))}
                       />
                     </p>
                     <div className="flex items-center mt-1">
@@ -981,6 +982,7 @@ export default function AdvancedDashboard() {
                           parseFloat(dashboardData?.totalExpenses || "0")
                         )}
                         duration={1500}
+                        formatFn={(n) => nf0.format(Math.round(n))}
                       />
                     </p>
                     <div className="flex items-center mt-1">
@@ -1042,7 +1044,7 @@ export default function AdvancedDashboard() {
                       <span className="text-blue-500">★</span> Net Income
                     </p>
                     <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
-                      SSP <AnimatedNumber value={Math.round(sspNetIncome)} duration={1500} />
+                      SSP <AnimatedNumber value={Math.round(sspNetIncome)} duration={1500} formatFn={(n) => nf0.format(Math.round(n))} />
                     </p>
                     {sspRevenue > 0 && (
                       <p className={cn(
@@ -1118,6 +1120,7 @@ export default function AdvancedDashboard() {
                             parseFloat(dashboardData?.totalIncomeUSD || "0")
                           )}
                           duration={1500}
+                          formatFn={(n) => fmtUSD(Math.round(n))}
                         />
                       </p>
                       <div className="flex items-center mt-1">
@@ -1185,7 +1188,7 @@ export default function AdvancedDashboard() {
                         Total Patients
                       </p>
                       <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                        <AnimatedNumber value={dashboardData?.totalPatients || 0} duration={1500} />
+                        <AnimatedNumber value={dashboardData?.totalPatients || 0} duration={1500} formatFn={(n) => nf0.format(Math.round(n))} />
                       </p>
                       <div className="flex items-center mt-1">
                         {showNoDataYetPatients ? (
