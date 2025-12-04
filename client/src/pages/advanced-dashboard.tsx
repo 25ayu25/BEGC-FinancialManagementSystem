@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -902,14 +903,14 @@ export default function AdvancedDashboard() {
                     </p>
                     <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                       SSP{" "}
-                      {nf0.format(
-                        Math.round(
+                      <AnimatedNumber
+                        value={Math.round(
                           monthTotalSSP ||
-                            parseFloat(
-                              dashboardData?.totalIncomeSSP || "0"
-                            )
-                        )
-                      )}
+                            parseFloat(dashboardData?.totalIncomeSSP || "0")
+                        )}
+                        duration={1500}
+                        formatFn={(n) => nf0.format(Math.round(n))}
+                      />
                     </p>
                     <div className="flex items-center mt-1">
                       {showNoDataYetRevenue ? (
@@ -976,11 +977,13 @@ export default function AdvancedDashboard() {
                     </p>
                     <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                       SSP{" "}
-                      {nf0.format(
-                        Math.round(
+                      <AnimatedNumber
+                        value={Math.round(
                           parseFloat(dashboardData?.totalExpenses || "0")
-                        )
-                      )}
+                        )}
+                        duration={1500}
+                        formatFn={(n) => nf0.format(Math.round(n))}
+                      />
                     </p>
                     <div className="flex items-center mt-1">
                       {showNoDataYetExpenses ? (
@@ -1041,7 +1044,7 @@ export default function AdvancedDashboard() {
                       <span className="text-blue-500">★</span> Net Income
                     </p>
                     <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
-                      SSP {nf0.format(Math.round(sspNetIncome))}
+                      SSP <AnimatedNumber value={Math.round(sspNetIncome)} duration={1500} formatFn={(n) => nf0.format(Math.round(n))} />
                     </p>
                     {sspRevenue > 0 && (
                       <p className={cn(
@@ -1112,13 +1115,13 @@ export default function AdvancedDashboard() {
                       </p>
                       <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
                         USD{" "}
-                          {fmtUSD(
-                            Math.round(
-                              parseFloat(
-                                dashboardData?.totalIncomeUSD || "0"
-                              )
-                            )
+                        <AnimatedNumber
+                          value={Math.round(
+                            parseFloat(dashboardData?.totalIncomeUSD || "0")
                           )}
+                          duration={1500}
+                          formatFn={(n) => fmtUSD(Math.round(n))}
+                        />
                       </p>
                       <div className="flex items-center mt-1">
                         {showNoDataYetInsurance ? (
@@ -1185,7 +1188,7 @@ export default function AdvancedDashboard() {
                         Total Patients
                       </p>
                       <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                        {(dashboardData?.totalPatients || 0).toLocaleString()}
+                        <AnimatedNumber value={dashboardData?.totalPatients || 0} duration={1500} formatFn={(n) => nf0.format(Math.round(n))} />
                       </p>
                       <div className="flex items-center mt-1">
                         {showNoDataYetPatients ? (
