@@ -8,6 +8,13 @@ interface AnimatedNumberProps {
   formatFn?: (n: number) => string;
 }
 
+/**
+ * AnimatedNumber component that animates from 0 to the target value on initial mount.
+ * Animation uses ease-out cubic easing for smooth deceleration.
+ * 
+ * Note: By design, animation only plays on initial render - subsequent value changes
+ * update immediately without animation to prevent jarring re-animations.
+ */
 export function AnimatedNumber({ 
   value, 
   duration = 1500,
@@ -19,7 +26,8 @@ export function AnimatedNumber({
   const hasAnimatedRef = useRef(false);
 
   useEffect(() => {
-    // Only animate on initial mount, not on value changes
+    // Only animate on initial mount - subsequent value changes update immediately
+    // This prevents jarring re-animations when data refreshes
     if (hasAnimatedRef.current) {
       setDisplayValue(value);
       return;

@@ -6,6 +6,13 @@ interface UseCountUpOptions {
   startOnMount?: boolean;
 }
 
+/**
+ * Alternative hook for animated counting.
+ * Returns the current animated count value directly.
+ * 
+ * Use AnimatedNumber component for most cases - this hook is provided for cases
+ * where you need more control over the animated value (e.g., custom rendering).
+ */
 export function useCountUp({ end, duration = 1500, startOnMount = true }: UseCountUpOptions) {
   const [count, setCount] = useState(0);
   const startTimeRef = useRef<number | null>(null);

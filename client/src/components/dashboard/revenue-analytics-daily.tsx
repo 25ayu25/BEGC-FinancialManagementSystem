@@ -163,14 +163,17 @@ function calculateMovingAverage<T extends { value: number }>(
   data: T[],
   windowSize: number = 7
 ): (T & { movingAvg: number | null })[] {
+  // Validate windowSize is a positive integer
+  const validWindowSize = Math.max(1, Math.floor(windowSize));
+  
   return data.map((item, index) => {
-    if (index < windowSize - 1) {
+    if (index < validWindowSize - 1) {
       return { ...item, movingAvg: null }; // Not enough data points yet
     }
     const sum = data
-      .slice(index - windowSize + 1, index + 1)
+      .slice(index - validWindowSize + 1, index + 1)
       .reduce((acc, curr) => acc + curr.value, 0);
-    return { ...item, movingAvg: sum / windowSize };
+    return { ...item, movingAvg: sum / validWindowSize };
   });
 }
 
