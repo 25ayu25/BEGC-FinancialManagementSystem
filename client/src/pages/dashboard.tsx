@@ -360,10 +360,18 @@ export default function Dashboard() {
     const topDepartment = departmentGrowth[0];
     const bestMonth = trendStats.bestMonth;
     
+    // Format growth values with proper sign
+    const formatGrowth = (value: number) => {
+      const formatted = Math.abs(value).toFixed(0);
+      return value >= 0 ? `+${formatted}` : `-${formatted}`;
+    };
+    
     return {
-      yoyGrowth: yoyGrowth.toFixed(0),
+      yoyGrowth: formatGrowth(yoyGrowth),
+      yoyGrowthPositive: yoyGrowth >= 0,
       topDepartment: topDepartment?.name || 'N/A',
-      topDepartmentGrowth: topDepartment?.growth.toFixed(0) || '0',
+      topDepartmentGrowth: formatGrowth(topDepartment?.growth || 0),
+      topDepartmentGrowthPositive: (topDepartment?.growth || 0) >= 0,
       bestMonth,
     };
   }, [monthlyTrend, departmentGrowth, trendStats]);
@@ -470,8 +478,8 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <Sparkles className="h-5 w-5 flex-shrink-0" />
                 <p className="font-medium">
-                  Key Insight: Revenue grew {insights.yoyGrowth}% over this period, with {insights.topDepartment} department 
-                  leading at +{insights.topDepartmentGrowth}% growth. {insights.bestMonth} was your best performing month.
+                  Key Insight: Revenue {insights.yoyGrowthPositive ? 'grew' : 'declined'} {insights.yoyGrowth}% over this period, with {insights.topDepartment} department 
+                  leading at {insights.topDepartmentGrowth}% growth. {insights.bestMonth} was your best performing month.
                 </p>
               </div>
             </CardContent>
