@@ -449,29 +449,37 @@ export default function Dashboard() {
     const allDepartmentsNegative = departmentGrowth.length > 0 && departmentGrowth.every(d => d.growth < 0);
     const hasAnyDepartmentData = departmentGrowth.length > 0;
     
-    // Build appropriate insight message
-    let departmentInsight = '';
+    // Build revenue part of the insight
+    const revenueDirection = yoyGrowth >= 0 ? 'grew' : 'declined';
+    const revenueMessage = `Revenue ${revenueDirection} ${formatGrowth(yoyGrowth)}% over this period`;
+    
+    // Build department part of the insight
+    let departmentMessage = '';
     if (!hasAnyDepartmentData) {
-      departmentInsight = '';
+      departmentMessage = '';
     } else if (allDepartmentsNegative) {
-      // All negative: show smallest decline instead of "leading"
-      departmentInsight = `, with ${topDepartment?.name} showing the smallest decline at ${formatGrowth(topDepartment?.growth || 0)}%`;
+      departmentMessage = `, with ${topDepartment?.name} showing the smallest decline at ${formatGrowth(topDepartment?.growth || 0)}%`;
     } else if (topDepartment && topDepartment.growth > 0) {
-      // Has positive growth: show as "leading"
-      departmentInsight = `, with ${topDepartment?.name} leading at ${formatGrowth(topDepartment?.growth || 0)}% growth`;
+      departmentMessage = `, with ${topDepartment?.name} leading at ${formatGrowth(topDepartment?.growth || 0)}% growth`;
     } else if (topDepartment && topDepartment.growth === 0) {
-      // Zero growth
-      departmentInsight = `, with ${topDepartment?.name} remaining stable`;
+      departmentMessage = `, with ${topDepartment?.name} remaining stable`;
     }
     
+    // Build best month part of the insight
+    const bestMonthMessage = bestMonth ? ` ${bestMonth} was your best performing month.` : '';
+    
+    // Combine into full message
+    const fullMessage = `Key Insight: ${revenueMessage}${departmentMessage}.${bestMonthMessage}`;
+    
     return {
+      fullMessage,
       yoyGrowth: formatGrowth(yoyGrowth),
       yoyGrowthPositive: yoyGrowth >= 0,
       topDepartment: topDepartment?.name || 'N/A',
       topDepartmentGrowth: formatGrowth(topDepartment?.growth || 0),
       topDepartmentGrowthPositive: (topDepartment?.growth || 0) >= 0,
       allDepartmentsNegative,
-      departmentInsight,
+      departmentInsight: departmentMessage,
       bestMonth,
     };
   }, [monthlyTrend, departmentGrowth, trendStats]);
@@ -579,7 +587,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <Sparkles className="h-5 w-5 flex-shrink-0" />
                 <p className="font-medium">
-                  Key Insight: Revenue {insights.yoyGrowthPositive ? 'grew' : 'declined'} {insights.yoyGrowth}% over this period{insights.departmentInsight}. {insights.bestMonth && `${insights.bestMonth} was your best performing month.`}
+                  {insights.fullMessage}
                 </p>
               </div>
             </CardContent>
