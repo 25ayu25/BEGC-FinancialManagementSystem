@@ -1823,7 +1823,8 @@ export class DatabaseStorage implements IStorage {
       1
     ));
 
-    while (cursor <= endMonthStart) {
+    // Initialize all months in the range (use < for exclusive end)
+    while (cursor < endMonthStart) {
       const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
       monthMap.set(key, {
         revenue: 0,
@@ -1840,16 +1841,11 @@ export class DatabaseStorage implements IStorage {
       const txDate = new Date(t.date);
       const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
       
-      let data = monthMap.get(key);
+      // Get existing month data (should exist if transaction is within range)
+      // If not, skip this transaction as it's outside the requested range
+      const data = monthMap.get(key);
       if (!data) {
-        data = {
-          revenue: 0,
-          revenueUSD: 0,
-          departmentBreakdown: {},
-          expenseBreakdown: {},
-          totalExpenses: 0,
-        };
-        monthMap.set(key, data);
+        continue; // Transaction is outside the requested date range
       }
 
       const amount = Number(t.amount || 0);

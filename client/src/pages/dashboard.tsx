@@ -115,6 +115,8 @@ interface DepartmentGrowthItem extends DepartmentStyleConfig {
 interface MonthlyTrendItem {
   month: string;
   fullMonth: string;
+  year: number;
+  monthNum: number;
   revenue: number;
   revenueUSD: number;
   departmentBreakdown: Record<string, number>;
@@ -246,6 +248,8 @@ export default function Dashboard() {
         return (data || []).map((item: any): MonthlyTrendItem => ({
           month: item.month,
           fullMonth: item.fullMonth,
+          year: item.year,
+          monthNum: item.monthNum,
           revenue: item.revenue || 0,
           revenueUSD: item.revenueUSD || 0,
           departmentBreakdown: item.departmentBreakdown || {},
@@ -407,13 +411,12 @@ export default function Dashboard() {
     let yoyComparisonAvailable = false;
     
     if (lastMonthData) {
-      // Find the same month from the previous year in our trend data
-      const targetMonth = lastMonthData.month; // e.g., "Nov"
+      const targetYear = lastMonthData.year - 1; // Previous year
+      const targetMonthNum = lastMonthData.monthNum;
       
-      // Look for the same month in the previous year within our data
-      const sameMonthLastYearData = monthlyTrend.find((m: MonthlyTrendItem, idx: number) => {
-        // Must be earlier in the array and be the same month name
-        return idx < monthlyTrend.length - 1 && m.month === targetMonth;
+      // Look for the same month in the previous year using year and monthNum for precise matching
+      const sameMonthLastYearData = monthlyTrend.find((m: MonthlyTrendItem) => {
+        return m.year === targetYear && m.monthNum === targetMonthNum;
       });
       
       if (sameMonthLastYearData && sameMonthLastYearData.revenue > 0) {
@@ -446,15 +449,17 @@ export default function Dashboard() {
     const avg = total / monthlyTrend.length;
     const best = monthlyTrend.reduce((max: MonthlyTrendItem, m: MonthlyTrendItem) => m.revenueUSD > max.revenueUSD ? m : max, monthlyTrend[0]);
     
-    // Calculate proper YoY growth for USD
+    // Calculate proper YoY growth for USD using year and monthNum for precise matching
     const lastMonthData = monthlyTrend[monthlyTrend.length - 1];
     let yoyGrowth = 0;
     let yoyComparisonAvailable = false;
     
     if (lastMonthData) {
-      const targetMonth = lastMonthData.month;
-      const sameMonthLastYearData = monthlyTrend.find((m: MonthlyTrendItem, idx: number) => {
-        return idx < monthlyTrend.length - 1 && m.month === targetMonth;
+      const targetYear = lastMonthData.year - 1;
+      const targetMonthNum = lastMonthData.monthNum;
+      
+      const sameMonthLastYearData = monthlyTrend.find((m: MonthlyTrendItem) => {
+        return m.year === targetYear && m.monthNum === targetMonthNum;
       });
       
       if (sameMonthLastYearData && sameMonthLastYearData.revenueUSD > 0) {
