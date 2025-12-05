@@ -1,4 +1,3 @@
-// client/src/pages/advanced-dashboard.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -57,8 +56,8 @@ const fmtUSD = (v: number) => {
 };
 
 /* ================== header styles ================== */
-// Premium header control styles - used for dropdowns and buttons in the header
-const headerControlStyles = "h-10 bg-slate-800/80 text-white border border-teal-500/50 hover:border-teal-400 hover:bg-slate-700/80 shadow-sm shadow-teal-500/20 transition-all";
+// Premium header control styles - adapted for the new Dark Command Center look
+const headerControlStyles = "h-10 bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:bg-slate-700 transition-all shadow-sm";
 
 /* ================== helper: normalize range ================== */
 function computeRangeParams(
@@ -451,7 +450,6 @@ export default function AdvancedDashboard() {
   let incomeSeries: Array<{
     day: number;
     amount: number;
-    amount: number;
     amountSSP: number;
     amountUSD: number;
     label: string;
@@ -719,178 +717,145 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
+      
       {/* Header - Premium Dark Mode with Midnight Gradient and Neon Horizon Line */}
       <header
-        className="sticky top-0 z-50 shadow-lg"
+        className="sticky top-0 z-50 shadow-2xl"
         style={{
           background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 100%)',
-          borderBottom: '2px solid transparent',
-          borderImage: 'linear-gradient(to right, #10B981, #3B82F6) 1',
         }}
       >
-        <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:px-6 md:py-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-white">
-                Executive Dashboard
-              </h1>
-              <div className="mt-1 flex flex-wrap items-center gap-3">
-                <p className="text-sm text-slate-400">
-                  Key financials · {periodLabel}
-                </p>
-                <span className="hidden sm:inline-flex text-xs text-teal-400 font-medium">
-                  Last updated: {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+        <div className="flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
+          
+          {/* Left: Brand & Status */}
+          <div className="flex-shrink-0">
+            <h1 className="text-2xl font-bold text-white tracking-tight">
+              Executive Dashboard
+            </h1>
+            <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
+              <span>Key Financials · {periodLabel}</span>
+              <span className="hidden sm:flex items-center gap-1.5 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full text-xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
-              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px]")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="current-month">Current Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                  <SelectItem value="month-select">Select Month…</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {timeRange === "month-select" && (
-                <>
-                  <Select
-                    value={String(selectedYear)}
-                    onValueChange={(val) =>
-                      setSpecificMonth(Number(val), selectedMonth || 1)
-                    }
-                  >
-                    <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[120px]")}>
-                      <SelectValue placeholder="Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {years.map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                          {y}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={String(selectedMonth)}
-                    onValueChange={(val) =>
-                      setSpecificMonth(selectedYear || thisYear, Number(val))
-                    }
-                  >
-                    <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[140px]")}>
-                      <SelectValue placeholder="Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {months.map((m) => (
-                        <SelectItem key={m.value} value={String(m.value)}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
-
-              {timeRange === "custom" && (
-                <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full sm:w-auto">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          headerControlStyles,
-                          "w-full sm:w-auto justify-start text-left font-normal",
-                          !customStartDate && "text-slate-400"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customStartDate
-                          ? format(customStartDate, "MMM d, yyyy")
-                          : "Start date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      side="bottom"
-                      align="start"
-                      sideOffset={12}
-                      className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{
-                        zIndex: 50000,
-                        backgroundColor: "rgb(255, 255, 255)",
-                      }}
-                      avoidCollisions
-                      collisionPadding={15}
-                    >
-                      <DatePicker
-                        mode="single"
-                        numberOfMonths={1}
-                        showOutsideDays={false}
-                        selected={customStartDate}
-                        onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <span
-                    aria-hidden
-                    className="text-center sm:text-left text-slate-400"
-                  >
-                    to
-                  </span>
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          headerControlStyles,
-                          "w-full sm:w-auto justify-start text-left font-normal",
-                          !customEndDate && "text-slate-400"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customEndDate
-                          ? format(customEndDate, "MMM d, yyyy")
-                          : "End date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      side="bottom"
-                      align="start"
-                      sideOffset={12}
-                      className="p-2 w-[280px] bg-white border border-gray-200 shadow-2xl"
-                      style={{
-                        zIndex: 50000,
-                        backgroundColor: "rgb(255, 255, 255)",
-                      }}
-                      avoidCollisions
-                      collisionPadding={15}
-                    >
-                      <DatePicker
-                        mode="single"
-                        numberOfMonths={1}
-                        showOutsideDays={false}
-                        selected={customEndDate}
-                        onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
+                Live Updated
+              </span>
             </div>
           </div>
+
+          {/* Center: Glassy Command Bar (Visual Only) */}
+          <div className="hidden lg:flex flex-1 max-w-md mx-6">
+            <div className="relative w-full group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-slate-500">⌘</span>
+              </div>
+              <input
+                type="text"
+                className="block w-full pl-10 pr-3 py-2 border border-slate-700/50 rounded-full leading-5 bg-slate-800/50 text-slate-300 placeholder-slate-500 focus:outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-all duration-200 shadow-inner"
+                placeholder="Type command or search..."
+              />
+            </div>
+          </div>
+
+          {/* Right: Existing Filters (Preserved Functionality) */}
+          <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px] border-slate-600 bg-slate-800 text-slate-200 focus:ring-emerald-500")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current-month">Current Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="month-select">Select Month…</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {timeRange === "month-select" && (
+              <>
+                <Select
+                  value={String(selectedYear)}
+                  onValueChange={(val) =>
+                    setSpecificMonth(Number(val), selectedMonth || 1)
+                  }
+                >
+                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[100px] border-slate-600 bg-slate-800 text-slate-200")}>
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={String(selectedMonth)}
+                  onValueChange={(val) =>
+                    setSpecificMonth(selectedYear || thisYear, Number(val))
+                  }
+                >
+                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[130px] border-slate-600 bg-slate-800 text-slate-200")}>
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {timeRange === "custom" && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn(headerControlStyles, "text-slate-300 border-slate-600 bg-slate-800")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d") : "Start"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-white" align="end">
+                    <DatePicker
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-slate-500">-</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn(headerControlStyles, "text-slate-300 border-slate-600 bg-slate-800")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d") : "End"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-white" align="end">
+                    <DatePicker
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* The "Neon Horizon" Line */}
+        <div className="h-[1px] w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-100 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
       </header>
 
       {/* Scrollable content */}
@@ -1134,11 +1099,11 @@ export default function AdvancedDashboard() {
                             No insurance claims yet
                           </span>
                         ) : insuranceChangePct !== undefined &&
-                        insuranceChangePct !== null &&
-                        (!(
-                          timeRange === "year" || timeRange === "last-3-months"
-                        ) ||
-                          hasPreviousPeriodUSD) ? (
+                          insuranceChangePct !== null &&
+                          (!(
+                            timeRange === "year" || timeRange === "last-3-months"
+                          ) ||
+                            hasPreviousPeriodUSD) ? (
                           <span
                             className={cn(
                               "text-xs font-medium",
