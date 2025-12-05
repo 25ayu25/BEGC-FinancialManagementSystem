@@ -1,17 +1,19 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Receipt, TrendingUp } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-  LabelList,
-} from "recharts";
+import { 
+  Receipt, 
+  Lightbulb, 
+  User, 
+  Users,
+  Building2, 
+  FlaskConical, 
+  Stethoscope, 
+  TestTube, 
+  Pill, 
+  Package,
+  Zap,
+  type LucideIcon
+} from "lucide-react";
 
 type BreakdownMap = Record<string, number | string>;
 
@@ -33,12 +35,107 @@ function compactValue(n: number) {
   return `${nf0.format(Math.round(n))}`;
 }
 
-function axisCompact(n: number) {
-  const v = Math.abs(n);
-  if (v >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (v >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${Math.round(n / 1_000)}k`;
-  return `${nf0.format(Math.round(n))}`;
+// Minimum width percentage for expense bars to ensure visibility
+const MIN_BAR_WIDTH_PERCENT = 2;
+
+// Category configuration with icons and colors
+interface CategoryConfig {
+  icon: LucideIcon;
+  bgColor: string;
+  barColor: string;
+}
+
+// Map category names to their visual configuration
+function getCategoryConfig(categoryName: string): CategoryConfig {
+  const normalizedName = categoryName.toLowerCase().trim();
+  
+  // Radiographer Payments
+  if (normalizedName.includes('radiographer') || normalizedName.includes('radiology')) {
+    return {
+      icon: User,
+      bgColor: 'bg-gradient-to-br from-blue-400 to-blue-600',
+      barColor: 'bg-blue-500',
+    };
+  }
+  
+  // Clinic Operations
+  if (normalizedName.includes('clinic') || normalizedName.includes('operations')) {
+    return {
+      icon: Building2,
+      bgColor: 'bg-gradient-to-br from-green-400 to-green-600',
+      barColor: 'bg-green-500',
+    };
+  }
+  
+  // Lab Tech Payments
+  if (normalizedName.includes('lab tech') || normalizedName.includes('laboratory tech')) {
+    return {
+      icon: FlaskConical,
+      bgColor: 'bg-gradient-to-br from-orange-400 to-orange-600',
+      barColor: 'bg-orange-500',
+    };
+  }
+  
+  // Doctor Payments
+  if (normalizedName.includes('doctor') || normalizedName.includes('physician')) {
+    return {
+      icon: Stethoscope,
+      bgColor: 'bg-gradient-to-br from-teal-400 to-teal-600',
+      barColor: 'bg-teal-500',
+    };
+  }
+  
+  // Lab Reagents
+  if (normalizedName.includes('reagent') || normalizedName.includes('lab supplies')) {
+    return {
+      icon: TestTube,
+      bgColor: 'bg-gradient-to-br from-pink-400 to-pink-600',
+      barColor: 'bg-pink-500',
+    };
+  }
+  
+  // Drugs Purchased
+  if (normalizedName.includes('drug') || normalizedName.includes('pharmacy') || normalizedName.includes('medication')) {
+    return {
+      icon: Pill,
+      bgColor: 'bg-gradient-to-br from-amber-400 to-amber-600',
+      barColor: 'bg-amber-500',
+    };
+  }
+  
+  // Staff Salaries
+  if (normalizedName.includes('salary') || normalizedName.includes('salaries') || normalizedName.includes('staff')) {
+    return {
+      icon: Users,
+      bgColor: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
+      barColor: 'bg-indigo-500',
+    };
+  }
+  
+  // Utilities / Fuel
+  if (normalizedName.includes('fuel') || normalizedName.includes('utility') || normalizedName.includes('utilities')) {
+    return {
+      icon: Zap,
+      bgColor: 'bg-gradient-to-br from-cyan-400 to-cyan-600',
+      barColor: 'bg-cyan-500',
+    };
+  }
+  
+  // Other / Default
+  return {
+    icon: Package,
+    bgColor: 'bg-gradient-to-br from-slate-400 to-slate-600',
+    barColor: 'bg-slate-500',
+  };
+}
+
+// Check if a category name represents "Other" type
+function isOtherCategory(categoryName: string): boolean {
+  const normalized = categoryName.toLowerCase().trim();
+  return normalized === 'other' || 
+         normalized === 'others' || 
+         normalized === 'other expenses' ||
+         normalized === 'other expense';
 }
 
 export interface SimpleExpenseBreakdownProps {
@@ -54,185 +151,150 @@ export default function SimpleExpenseBreakdown({
   total,
   title = "Expenses Breakdown",
   periodLabel,
-  maxBars = 8,
+  maxBars = 7,
 }: SimpleExpenseBreakdownProps) {
   const rows = React.useMemo(() => {
     const entries = Object.entries(breakdown || {}).map(([k, v]) => ({
       category: k,
       amount: Number(v) || 0,
     }));
-    entries.sort((a, b) => b.amount - a.amount);
 
-    // Merge "Other" and "Others" into "Other expenses"
-    const mergedEntries: typeof entries = [];
+    // STEP 1: First pass - merge ALL "Other" type entries into one
+    const nonOtherEntries: typeof entries = [];
     let otherExpensesTotal = 0;
     
     for (const entry of entries) {
-      const normalized = entry.category.toLowerCase().trim();
-      if (normalized === 'other' || normalized === 'others') {
+      if (isOtherCategory(entry.category)) {
         otherExpensesTotal += entry.amount;
       } else {
-        mergedEntries.push(entry);
+        nonOtherEntries.push(entry);
       }
     }
     
-    // Add merged "Other expenses" if there was any
-    if (otherExpensesTotal > 0) {
-      mergedEntries.push({ category: "Other expenses", amount: otherExpensesTotal });
+    // Sort non-other entries by amount descending
+    nonOtherEntries.sort((a, b) => b.amount - a.amount);
+
+    // STEP 2: If we need to truncate, combine the excess into "Other"
+    // Note: We reserve one slot for the consolidated "Other" entry if needed
+    const maxNonOtherBars = otherExpensesTotal > 0 ? maxBars - 1 : maxBars;
+    
+    let finalEntries: typeof entries;
+    
+    if (nonOtherEntries.length <= maxNonOtherBars) {
+      // All non-other entries fit - just add Other if present
+      finalEntries = [...nonOtherEntries];
+    } else {
+      // Need to truncate - take top entries and add rest to "Other"
+      const topEntries = nonOtherEntries.slice(0, maxNonOtherBars);
+      const truncatedSum = nonOtherEntries.slice(maxNonOtherBars).reduce((s, r) => s + r.amount, 0);
+      otherExpensesTotal += truncatedSum;
+      finalEntries = topEntries;
     }
     
-    // Sort again after merging
-    mergedEntries.sort((a, b) => b.amount - a.amount);
-
-    if (mergedEntries.length <= maxBars) return mergedEntries;
-
-    const top = mergedEntries.slice(0, maxBars - 1);
-    const othersSum = mergedEntries.slice(maxBars - 1).reduce((s, r) => s + r.amount, 0);
-    if (othersSum > 0) top.push({ category: "Other expenses", amount: othersSum });
-    return top;
+    // STEP 3: Add the single consolidated "Other" entry if there's any amount
+    if (otherExpensesTotal > 0) {
+      finalEntries.push({ category: "Other", amount: otherExpensesTotal });
+    }
+    
+    // Final sort by amount descending
+    finalEntries.sort((a, b) => b.amount - a.amount);
+    
+    return finalEntries;
   }, [breakdown, maxBars]);
 
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
 
-  // Number of top expense categories to emphasize visually
-  const TOP_CATEGORIES_COUNT = 3;
+  // Calculate percentages and determine max percentage for bar scaling
+  const maxPercentage = React.useMemo(() => {
+    if (finalTotal === 0) return 100;
+    return Math.max(...rows.map(r => (r.amount / finalTotal) * 100), 1);
+  }, [rows, finalTotal]);
 
-  // Calculate percentages for each row and mark top categories
+  // Calculate percentages for each row
   const rowsWithPct = rows.map((row, index) => ({
     ...row,
     pct: finalTotal > 0 ? (row.amount / finalTotal) * 100 : 0,
-    isTopCategory: index < TOP_CATEGORIES_COUNT && !row.category.toLowerCase().includes('other'), // Top non-other categories
+    config: getCategoryConfig(row.category),
+    isOther: isOtherCategory(row.category),
     rank: index + 1,
   }));
 
-  // Give bars room and keep category labels aligned by fixing Y-axis width
-  const height = Math.max(280, 56 * rows.length + 80);
-  const yLabelWidth = 170;
-
-  // Enhanced color palette - more vibrant for top categories, progressively muted
-  const palette = [
-    "#0ea5e9", // sky-500 - dominant (1st)
-    "#22c55e", // green-500 (2nd)
-    "#f97316", // orange-500 (3rd)
-    "#8b5cf6", // violet-500
-    "#14b8a6", // teal-500
-    "#f43f5e", // rose-500
-    "#eab308", // yellow-500
-    "#64748b", // slate-500 - for "other"
-  ];
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const { category, amount, pct, rank } = payload[0].payload;
-    return (
-      <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-lg min-w-[180px]">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">#{rank}</span>
-          <span className="text-sm font-semibold text-slate-900">{category}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-lg font-mono tabular-nums font-bold text-slate-800">{compactSSP(amount)}</span>
-          <span className="text-sm bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">{pct.toFixed(1)}%</span>
-        </div>
-      </div>
-    );
-  };
-
-  // Custom label to show compact amount and percentage in single line
-  const renderCustomLabel = (props: any) => {
-    const { x, y, width, height: barHeight, value, index } = props;
-    const row = rowsWithPct[index];
-    if (!row) return null;
-    
-    const labelX = x + width + 10;
-    const labelY = y + barHeight / 2 + 4;
-    
-    // Combine amount and percentage in a clean format: "22M · 22%"
-    return (
-      <text
-        x={labelX}
-        y={labelY}
-        fill={row.isTopCategory ? "#1e293b" : "#64748b"}
-        fontSize={row.isTopCategory ? 12 : 11}
-        fontWeight={row.isTopCategory ? 600 : 500}
-        fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-      >
-        {compactValue(value)} · {row.pct.toFixed(0)}%
-      </text>
-    );
-  };
+  // Calculate insight: top 3 non-other expenses percentage
+  const top3Percentage = React.useMemo(() => {
+    const nonOtherRows = rowsWithPct.filter(r => !r.isOther);
+    const top3 = nonOtherRows.slice(0, 3);
+    return top3.reduce((sum, r) => sum + r.pct, 0);
+  }, [rowsWithPct]);
 
   return (
-    <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
+    <Card className="overflow-hidden border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-              <div className="p-1.5 rounded-lg bg-red-100">
-                <Receipt className="h-5 w-5 text-red-600" />
-              </div>
-              {title}
-            </CardTitle>
-            {periodLabel && (
-              <CardDescription className="mt-1">{periodLabel}</CardDescription>
-            )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center">
+              <Receipt className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">{title}</CardTitle>
+              {periodLabel && (
+                <CardDescription>{periodLabel}</CardDescription>
+              )}
+            </div>
           </div>
-          <div className="rounded-lg bg-gradient-to-r from-red-50 to-rose-50 px-4 py-2 border border-red-100">
-            <span className="text-xs text-slate-500 block">Total</span>
-            <span className="font-bold text-slate-900 font-mono tabular-nums">{compactSSP(finalTotal)}</span>
+          <div className="bg-slate-100 px-3 py-1.5 rounded-lg">
+            <span className="text-sm text-slate-500">Total</span>
+            <span className="ml-2 font-bold text-slate-900">{compactSSP(finalTotal)}</span>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="pt-4">
         {rows.length > 0 ? (
-          <div style={{ width: "100%", height }}>
-            <ResponsiveContainer>
-              <BarChart
-                data={rowsWithPct}
-                layout="vertical"
-                margin={{ top: 8, right: 90, bottom: 8, left: 16 }}
-                barCategoryGap={10}
-              >
-                <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  tickFormatter={axisCompact}
-                />
-                <YAxis
-                  dataKey="category"
-                  type="category"
-                  width={yLabelWidth}
-                  tick={{ fontSize: 12, fill: "#334155", fontWeight: 500 }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="amount" 
-                  radius={[4, 4, 4, 4]}
-                  label={renderCustomLabel}
-                >
-                  {rowsWithPct.map((row, i) => {
-                    // Use muted color for "Other expenses", stronger opacity for top 3
-                    const isOther = row.category.toLowerCase().includes('other');
-                    const color = isOther ? palette[palette.length - 1] : palette[i % (palette.length - 1)];
-                    return (
-                      <Cell 
-                        key={`c-${i}`} 
-                        fill={color}
-                        fillOpacity={row.isTopCategory ? 1 : 0.8}
+          <>
+            <div className="space-y-4">
+              {rowsWithPct.map((row) => {
+                const Icon = row.config.icon;
+                // Scale bar width relative to the largest item for better visual comparison
+                const scaledWidth = (row.pct / maxPercentage) * 100;
+                
+                return (
+                  <div key={row.category} className="group">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-md ${row.config.bgColor} flex items-center justify-center`}>
+                          <Icon className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">{row.category}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-900">{compactValue(row.amount)}</span>
+                        <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {row.pct.toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${row.config.barColor} transition-all duration-500 group-hover:opacity-80`}
+                        style={{ width: `${Math.max(scaledWidth, MIN_BAR_WIDTH_PERCENT)}%` }}
                       />
-                    );
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Insight at bottom */}
+            {rowsWithPct.filter(r => !r.isOther).length >= 3 && (
+              <div className="mt-6 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Lightbulb className="h-4 w-4 text-amber-500" />
+                  <span>Top 3 expenses account for <strong>{top3Percentage.toFixed(0)}%</strong> of total spending</span>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
