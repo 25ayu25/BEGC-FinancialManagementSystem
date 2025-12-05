@@ -384,11 +384,11 @@ export default function Dashboard() {
       const breakdown = month.expenseBreakdown || {};
       for (const [category, amount] of Object.entries(breakdown)) {
         const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount) || "0");
-        // Normalize category names - merge "Other", "Others", "other", "others" into "Other expenses"
+        // Normalize category names - merge "Other", "Others", "other", "others", "Other expenses" into "Other"
         const normalizedCategory = category.toLowerCase().trim();
         let finalCategory = category;
-        if (normalizedCategory === 'other' || normalizedCategory === 'others') {
-          finalCategory = 'Other expenses';
+        if (normalizedCategory === 'other' || normalizedCategory === 'others' || normalizedCategory === 'other expenses' || normalizedCategory === 'other expense') {
+          finalCategory = 'Other';
         }
         combined[finalCategory] = (combined[finalCategory] || 0) + numAmount;
       }
