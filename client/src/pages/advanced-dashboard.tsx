@@ -45,7 +45,7 @@ import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-/* ================== number formatting helpers ================== */
+/* ========= number helpers ========= */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const fmtUSD = (v: number) => {
@@ -53,11 +53,11 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
-/* ================== header styles ================== */
+/* ========= header styles ========= */
 const headerControlStyles =
   "h-9 bg-slate-900/60 text-slate-100 border border-slate-600/50 hover:border-cyan-400/80 hover:bg-slate-800/80 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-0";
 
-/* ================== helper: normalize range ================== */
+/* ========= helper: normalize range ========= */
 function computeRangeParams(
   timeRange: string,
   selectedYear: number | null,
@@ -89,7 +89,7 @@ function computeRangeParams(
   };
 }
 
-/* ================== Insurance Providers Card ================== */
+/* ========= Insurance Providers Card ========= */
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
@@ -217,7 +217,7 @@ function InsuranceProvidersUSD({
   );
 }
 
-/* ================== Quick Actions Card ================== */
+/* ========= Quick Actions Card ========= */
 function QuickActionsCard() {
   return (
     <Card className="border border-slate-200 shadow-sm">
@@ -318,7 +318,7 @@ function QuickActionsCard() {
   );
 }
 
-/* ================== Page ================== */
+/* ========= Page ========= */
 export default function AdvancedDashboard() {
   const {
     timeRange,
@@ -334,7 +334,6 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  // Normalize the range for API/links
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
     timeRange,
     selectedYear ?? null,
@@ -377,7 +376,7 @@ export default function AdvancedDashboard() {
     minute: "2-digit",
   }).format(now);
 
-  /* ---------- main dashboard data ---------- */
+  /* ---------- data ---------- */
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
       "/api/dashboard",
@@ -402,7 +401,6 @@ export default function AdvancedDashboard() {
 
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
-  /* ---------- current-period income trends ---------- */
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
@@ -425,7 +423,6 @@ export default function AdvancedDashboard() {
     },
   });
 
-  /* ---------- previous-month income trends (for MTD comparison) ---------- */
   const { data: prevRawIncome } = useQuery({
     queryKey: ["/api/income-trends", "prev-month", yearToSend, monthToSend],
     enabled: timeRange === "current-month",
@@ -445,7 +442,7 @@ export default function AdvancedDashboard() {
     },
   });
 
-  /* ---------- build income series for current period ---------- */
+  /* ---------- income series ---------- */
   let incomeSeries: Array<{
     day: number;
     amount: number;
@@ -507,7 +504,6 @@ export default function AdvancedDashboard() {
     }
   }
 
-  /* ---------- Month-to-date vs same days last month ---------- */
   const isCurrentMonthRange = timeRange === "current-month";
 
   const daysInCurrentMonth = new Date(yearToSend, monthToSend, 0).getDate();
@@ -619,11 +615,9 @@ export default function AdvancedDashboard() {
       ((currentMTDIncomeUSD - prevMTDIncomeUSD) / prevMTDIncomeUSD) * 100;
   }
 
-  /* ---------- totals & metrics ---------- */
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const usdIncome = parseFloat(dashboardData?.totalIncomeUSD || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
@@ -640,12 +634,9 @@ export default function AdvancedDashboard() {
       ? incomeChangeUSD_MTD
       : dashboardData?.changes?.incomeChangeUSD;
 
-  const prevMonthLabel = (() => {
-    const date = prevMonthDate;
-    return `${date.toLocaleString("default", {
-      month: "short",
-    })} ${date.getFullYear()}`;
-  })();
+  const prevMonthLabel = `${prevMonthDate.toLocaleString("default", {
+    month: "short",
+  })} ${prevMonthDate.getFullYear()}`;
 
   const comparisonLabel = (() => {
     if (isCurrent) return `vs same days last month (${prevMonthLabel})`;
@@ -705,18 +696,17 @@ export default function AdvancedDashboard() {
     );
   }
 
-  /* ================== RENDER ================== */
+  /* ========= RENDER ========= */
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
-      {/* PREMIUM HEADER – Midnight gradient + HUD glow (no search bar) */}
+      {/* HEADER – softened gradient + thicker glowing line */}
       <header className="sticky top-0 z-40">
-        <div className="relative bg-[linear-gradient(90deg,#020617_0%,#020617_20%,#0f172a_60%,#020617_100%)] shadow-[0_18px_60px_rgba(15,23,42,0.9)]">
-          {/* radial glow at the very top */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_60%)]" />
+        <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_18%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
+          {/* soft glassy glow across header */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
-            {/* Left: title + subtitle */}
             <div className="flex-shrink-0">
               <h1 className="text-2xl font-semibold text-white tracking-tight">
                 Executive Dashboard
@@ -730,7 +720,7 @@ export default function AdvancedDashboard() {
               </p>
             </div>
 
-            {/* Right: time-range controls only */}
+            {/* Controls only – no search bar */}
             <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto justify-end">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                 <SelectTrigger
@@ -867,22 +857,25 @@ export default function AdvancedDashboard() {
             </div>
           </div>
 
-          {/* Neon horizon line */}
-          <div className="relative z-10 h-[2px] bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 shadow-[0_0_22px_rgba(34,211,238,0.9)]" />
+          {/* THICKER NEON HORIZON LINE WITH BLOOM */}
+          <div className="relative z-10 h-[3px] bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 shadow-[0_0_26px_rgba(34,211,238,0.95),0_0_42px_rgba(59,130,246,0.8)]" />
         </div>
       </header>
 
-      {/* MAIN – dark background + glowing white surface card like Gemini */}
+      {/* MAIN – dark → light with glow that bleeds into the cards */}
       <main className="min-h-0 overflow-y-auto bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
-        <div className="px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-6">
+        <div className="relative px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-6">
+          {/* this glow sits JUST under the cyan line, softening the transition */}
+          <div className="pointer-events-none absolute inset-x-0 -top-4 h-20 bg-gradient-to-b from-cyan-400/26 via-sky-500/12 to-transparent" />
+
           <div className="max-w-6xl xl:max-w-7xl mx-auto">
-            {/* Surface card that the glow "radiates" behind */}
-            <div className="relative rounded-3xl bg-white shadow-[0_30px_80px_rgba(15,23,42,0.75)] border border-slate-100 overflow-hidden">
-              {/* glow behind KPIs, aligned with header line */}
-              <div className="pointer-events-none absolute -top-16 left-0 right-0 h-20 bg-gradient-to-b from-cyan-400/22 via-sky-400/8 to-transparent" />
+            {/* big white surface card the glow appears behind */}
+            <div className="relative rounded-3xl bg-white shadow-[0_28px_80px_rgba(15,23,42,0.78)] border border-slate-100 overflow-hidden">
+              {/* subtle inner glow at the very top of the surface (extra bleed) */}
+              <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
 
               <div className="relative px-4 md:px-6 pt-6 pb-10">
-                {/* KPI Cards */}
+                {/* KPI CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
                   {/* Total Revenue */}
                   <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
@@ -1245,9 +1238,8 @@ export default function AdvancedDashboard() {
                   </Link>
                 </div>
 
-                {/* ===== Main layout inside card ===== */}
+                {/* MAIN GRID INSIDE SURFACE */}
                 <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-                  {/* LEFT: chart + quick actions (desktop only) */}
                   <div className="space-y-6">
                     <RevenueAnalyticsDaily
                       timeRange={rangeToSend}
@@ -1256,14 +1248,11 @@ export default function AdvancedDashboard() {
                       customStartDate={customStartDate ?? undefined}
                       customEndDate={customEndDate ?? undefined}
                     />
-
-                    {/* Quick Actions - Hidden on mobile, shown on desktop */}
                     <div className="hidden lg:block">
                       <QuickActionsCard />
                     </div>
                   </div>
 
-                  {/* RIGHT: departments + providers + system status */}
                   <div className="space-y-6">
                     <DepartmentsPanel
                       departments={
@@ -1333,12 +1322,11 @@ export default function AdvancedDashboard() {
                   </div>
                 </div>
 
-                {/* Quick Actions - mobile */}
+                {/* mobile quick actions */}
                 <div className="lg:hidden mb-4">
                   <QuickActionsCard />
                 </div>
 
-                {/* Expenses drawer */}
                 <ExpensesDrawer
                   open={openExpenses}
                   onOpenChange={setOpenExpenses}
