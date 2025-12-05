@@ -1,19 +1,7 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { 
-  Receipt, 
-  Lightbulb, 
-  User, 
-  Users,
-  Building2, 
-  FlaskConical, 
-  Stethoscope, 
-  TestTube, 
-  Pill, 
-  Package,
-  Zap,
-  type LucideIcon
-} from "lucide-react";
+import { Receipt, Lightbulb } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type BreakdownMap = Record<string, number | string>;
 
@@ -35,99 +23,16 @@ function compactValue(n: number) {
   return `${nf0.format(Math.round(n))}`;
 }
 
-// Minimum width percentage for expense bars to ensure visibility
-const MIN_BAR_WIDTH_PERCENT = 2;
-
-// Category configuration with icons and colors
-interface CategoryConfig {
-  icon: LucideIcon;
-  bgColor: string;
-  barColor: string;
-}
-
-// Map category names to their visual configuration
-function getCategoryConfig(categoryName: string): CategoryConfig {
-  const normalizedName = categoryName.toLowerCase().trim();
-  
-  // Radiographer Payments
-  if (normalizedName.includes('radiographer') || normalizedName.includes('radiology')) {
-    return {
-      icon: User,
-      bgColor: 'bg-gradient-to-br from-blue-400 to-blue-600',
-      barColor: 'bg-blue-500',
-    };
-  }
-  
-  // Clinic Operations
-  if (normalizedName.includes('clinic') || normalizedName.includes('operations')) {
-    return {
-      icon: Building2,
-      bgColor: 'bg-gradient-to-br from-green-400 to-green-600',
-      barColor: 'bg-green-500',
-    };
-  }
-  
-  // Lab Tech Payments
-  if (normalizedName.includes('lab tech') || normalizedName.includes('laboratory tech')) {
-    return {
-      icon: FlaskConical,
-      bgColor: 'bg-gradient-to-br from-orange-400 to-orange-600',
-      barColor: 'bg-orange-500',
-    };
-  }
-  
-  // Doctor Payments
-  if (normalizedName.includes('doctor') || normalizedName.includes('physician')) {
-    return {
-      icon: Stethoscope,
-      bgColor: 'bg-gradient-to-br from-teal-400 to-teal-600',
-      barColor: 'bg-teal-500',
-    };
-  }
-  
-  // Lab Reagents
-  if (normalizedName.includes('reagent') || normalizedName.includes('lab supplies')) {
-    return {
-      icon: TestTube,
-      bgColor: 'bg-gradient-to-br from-pink-400 to-pink-600',
-      barColor: 'bg-pink-500',
-    };
-  }
-  
-  // Drugs Purchased
-  if (normalizedName.includes('drug') || normalizedName.includes('pharmacy') || normalizedName.includes('medication')) {
-    return {
-      icon: Pill,
-      bgColor: 'bg-gradient-to-br from-amber-400 to-amber-600',
-      barColor: 'bg-amber-500',
-    };
-  }
-  
-  // Staff Salaries
-  if (normalizedName.includes('salary') || normalizedName.includes('salaries') || normalizedName.includes('staff')) {
-    return {
-      icon: Users,
-      bgColor: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
-      barColor: 'bg-indigo-500',
-    };
-  }
-  
-  // Utilities / Fuel
-  if (normalizedName.includes('fuel') || normalizedName.includes('utility') || normalizedName.includes('utilities')) {
-    return {
-      icon: Zap,
-      bgColor: 'bg-gradient-to-br from-cyan-400 to-cyan-600',
-      barColor: 'bg-cyan-500',
-    };
-  }
-  
-  // Other / Default
-  return {
-    icon: Package,
-    bgColor: 'bg-gradient-to-br from-slate-400 to-slate-600',
-    barColor: 'bg-slate-500',
-  };
-}
+// Cohesive color palette for the donut chart - premium design
+const EXPENSE_COLORS = [
+  '#3b82f6', // Blue
+  '#10b981', // Green
+  '#f97316', // Orange
+  '#14b8a6', // Teal
+  '#ec4899', // Pink
+  '#eab308', // Yellow
+  '#6b7280', // Gray - Other (always last)
+];
 
 // Check if a category name represents "Other" type
 function isOtherCategory(categoryName: string): boolean {
@@ -153,18 +58,21 @@ export default function SimpleExpenseBreakdown({
   periodLabel,
   maxBars = 7,
 }: SimpleExpenseBreakdownProps) {
-  const rows = React.useMemo(() => {
+  const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+
+  // Sort expenses: specific categories by amount descending, "Other" always last
+  const sortedExpenses = React.useMemo(() => {
     const entries = Object.entries(breakdown || {}).map(([k, v]) => ({
-      category: k,
+      name: k,
       amount: Number(v) || 0,
     }));
 
-    // STEP 1: First pass - merge ALL "Other" type entries into one
+    // Separate "Other" from the rest
     const nonOtherEntries: typeof entries = [];
     let otherExpensesTotal = 0;
     
     for (const entry of entries) {
-      if (isOtherCategory(entry.category)) {
+      if (isOtherCategory(entry.name)) {
         otherExpensesTotal += entry.amount;
       } else {
         nonOtherEntries.push(entry);
@@ -174,123 +82,181 @@ export default function SimpleExpenseBreakdown({
     // Sort non-other entries by amount descending
     nonOtherEntries.sort((a, b) => b.amount - a.amount);
 
-    // STEP 2: If we need to truncate, combine the excess into "Other"
-    // Note: We reserve one slot for the consolidated "Other" entry if needed
-    const maxNonOtherBars = otherExpensesTotal > 0 ? maxBars - 1 : maxBars;
+    // Truncate if needed, combining excess into "Other"
+    const maxNonOtherSlices = otherExpensesTotal > 0 ? maxBars - 1 : maxBars;
     
     let finalEntries: typeof entries;
     
-    if (nonOtherEntries.length <= maxNonOtherBars) {
-      // All non-other entries fit - just add Other if present
+    if (nonOtherEntries.length <= maxNonOtherSlices) {
       finalEntries = [...nonOtherEntries];
     } else {
-      // Need to truncate - take top entries and add rest to "Other"
-      const topEntries = nonOtherEntries.slice(0, maxNonOtherBars);
-      const truncatedSum = nonOtherEntries.slice(maxNonOtherBars).reduce((s, r) => s + r.amount, 0);
+      const topEntries = nonOtherEntries.slice(0, maxNonOtherSlices);
+      const truncatedSum = nonOtherEntries.slice(maxNonOtherSlices).reduce((s, r) => s + r.amount, 0);
       otherExpensesTotal += truncatedSum;
       finalEntries = topEntries;
     }
     
-    // STEP 3: Add the single consolidated "Other" entry if there's any amount
+    // Add "Other" at the END (always last) if there's any amount
     if (otherExpensesTotal > 0) {
-      finalEntries.push({ category: "Other", amount: otherExpensesTotal });
+      finalEntries.push({ name: "Other", amount: otherExpensesTotal });
     }
-    
-    // Final sort by amount descending
-    finalEntries.sort((a, b) => b.amount - a.amount);
     
     return finalEntries;
   }, [breakdown, maxBars]);
 
-  const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
+  const computedTotal = sortedExpenses.reduce((s, r) => s + r.amount, 0);
   const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
 
-  // Calculate percentages and determine max percentage for bar scaling
-  const maxPercentage = React.useMemo(() => {
-    if (finalTotal === 0) return 100;
-    return Math.max(...rows.map(r => (r.amount / finalTotal) * 100), 1);
-  }, [rows, finalTotal]);
+  // Add percentage to each expense for display (memoized)
+  const expensesWithPct = React.useMemo(() => 
+    sortedExpenses.map((expense) => ({
+      ...expense,
+      percentage: finalTotal > 0 ? Math.round((expense.amount / finalTotal) * 100) : 0,
+    })),
+    [sortedExpenses, finalTotal]
+  );
 
-  // Calculate percentages for each row
-  const rowsWithPct = rows.map((row, index) => ({
-    ...row,
-    pct: finalTotal > 0 ? (row.amount / finalTotal) * 100 : 0,
-    config: getCategoryConfig(row.category),
-    isOther: isOtherCategory(row.category),
-    rank: index + 1,
-  }));
-
-  // Calculate insight: top 3 non-other expenses percentage
+  // Calculate top 3 percentage (excluding Other)
   const top3Percentage = React.useMemo(() => {
-    const nonOtherRows = rowsWithPct.filter(r => !r.isOther);
-    const top3 = nonOtherRows.slice(0, 3);
-    return top3.reduce((sum, r) => sum + r.pct, 0);
-  }, [rowsWithPct]);
+    const nonOtherExpenses = expensesWithPct.filter(e => !isOtherCategory(e.name));
+    const top3 = nonOtherExpenses.slice(0, 3);
+    return top3.reduce((sum, e) => sum + e.percentage, 0);
+  }, [expensesWithPct]);
+
+  // Custom tooltip for donut chart
+  interface TooltipProps {
+    active?: boolean;
+    payload?: Array<{ payload: { name: string; amount: number; percentage: number } }>;
+  }
+
+  const CustomTooltip = ({ active, payload }: TooltipProps) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white px-3 py-2 rounded-lg shadow-lg border border-slate-200">
+          <p className="font-medium text-slate-900">{data.name}</p>
+          <p className="text-sm text-slate-600">
+            SSP {compactValue(data.amount)} ({data.percentage}%)
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Handle hover effects
+  const onPieEnter = (_: unknown, index: number) => setActiveIndex(index);
+  const onPieLeave = () => setActiveIndex(null);
 
   return (
     <Card className="overflow-hidden border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center">
-              <Receipt className="h-4 w-4 text-white" />
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+              <Receipt className="h-5 w-5 text-white" />
             </div>
             <div>
-              <CardTitle className="text-lg">{title}</CardTitle>
+              <CardTitle className="text-lg font-semibold">{title}</CardTitle>
               {periodLabel && (
                 <CardDescription>{periodLabel}</CardDescription>
               )}
             </div>
           </div>
-          <div className="bg-slate-100 px-3 py-1.5 rounded-lg">
+          <div className="bg-slate-100 px-4 py-2 rounded-xl">
             <span className="text-sm text-slate-500">Total</span>
-            <span className="ml-2 font-bold text-slate-900">{compactSSP(finalTotal)}</span>
+            <span className="ml-2 text-lg font-bold text-slate-900">{compactSSP(finalTotal)}</span>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4">
-        {rows.length > 0 ? (
+      <CardContent className="pt-6">
+        {sortedExpenses.length > 0 ? (
           <>
-            <div className="space-y-4">
-              {rowsWithPct.map((row) => {
-                const Icon = row.config.icon;
-                // Scale bar width relative to the largest item for better visual comparison
-                const scaledWidth = (row.pct / maxPercentage) * 100;
+            {/* Donut Chart + Legend Layout */}
+            <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
+              {/* Donut Chart */}
+              <div className="w-56 h-56 sm:w-64 sm:h-64 relative flex-shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={expensesWithPct}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="amount"
+                      onMouseEnter={onPieEnter}
+                      onMouseLeave={onPieLeave}
+                      animationDuration={800}
+                      animationBegin={0}
+                      stroke="none"
+                    >
+                      {expensesWithPct.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
+                          opacity={activeIndex === null || activeIndex === index ? 1 : 0.6}
+                          style={{
+                            filter: activeIndex === index ? 'brightness(1.1)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                          }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
                 
-                return (
-                  <div key={row.category} className="group">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded-md ${row.config.bgColor} flex items-center justify-center`}>
-                          <Icon className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span className="text-sm font-medium text-slate-700">{row.category}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-900">{compactValue(row.amount)}</span>
-                        <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                          {row.pct.toFixed(0)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                {/* Center text showing total */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900">{compactSSP(finalTotal)}</span>
+                  <span className="text-xs sm:text-sm text-slate-500">Total</span>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="flex-1 w-full space-y-2">
+                {expensesWithPct.map((expense, index) => (
+                  <div 
+                    key={expense.name}
+                    className="flex items-center justify-between p-2 sm:p-2.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseLeave={() => setActiveIndex(null)}
+                    style={{
+                      backgroundColor: activeIndex === index ? 'rgb(248, 250, 252)' : 'transparent',
+                    }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
                       <div 
-                        className={`h-full rounded-full ${row.config.barColor} transition-all duration-500 group-hover:opacity-80`}
-                        style={{ width: `${Math.max(scaledWidth, MIN_BAR_WIDTH_PERCENT)}%` }}
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: EXPENSE_COLORS[index % EXPENSE_COLORS.length] }}
                       />
+                      <span className="text-sm font-medium text-slate-700 truncate">{expense.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-sm font-semibold text-slate-900">
+                        {compactValue(expense.amount)}
+                      </span>
+                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full min-w-[40px] text-center">
+                        {expense.percentage}%
+                      </span>
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
-            
+
             {/* Insight at bottom */}
-            {rowsWithPct.filter(r => !r.isOther).length >= 3 && (
+            {expensesWithPct.filter(e => !isOtherCategory(e.name)).length >= 3 && (
               <div className="mt-6 pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <Lightbulb className="h-4 w-4 text-amber-500" />
-                  <span>Top 3 expenses account for <strong>{top3Percentage.toFixed(0)}%</strong> of total spending</span>
+                  <span>
+                    Top 3 expenses account for <strong className="text-slate-900">{top3Percentage}%</strong> of total spending
+                  </span>
                 </div>
               </div>
             )}
