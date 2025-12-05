@@ -715,26 +715,26 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Header - Light Teal Gradient */}
+      {/* Header - Modern Slate-800 with Teal Accent */}
       <header
         className={cn(
           "sticky top-0 z-50",
-          "bg-gradient-to-r from-teal-100 via-teal-50 to-blue-100",
-          "border-b border-teal-200/50",
-          "shadow-sm"
+          "bg-slate-800",
+          "border-b-2 border-teal-500",
+          "shadow-md"
         )}
       >
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:px-6 md:py-4">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-slate-900">
+              <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-white">
                 Executive Dashboard
               </h1>
               <div className="mt-1 flex items-center gap-3">
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-300">
                   Key financials · {periodLabel}
                 </p>
-                <span className="hidden sm:inline-flex text-xs text-teal-600 font-medium">
+                <span className="hidden sm:inline-flex text-xs text-teal-400 font-medium">
                   Last updated: {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
@@ -743,7 +743,7 @@ export default function AdvancedDashboard() {
             {/* Filters */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-10 w-full sm:w-[160px] bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors">
+                <SelectTrigger className="h-10 w-full sm:w-[160px] bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -764,7 +764,7 @@ export default function AdvancedDashboard() {
                       setSpecificMonth(Number(val), selectedMonth || 1)
                     }
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[120px] bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors">
+                    <SelectTrigger className="h-10 w-full sm:w-[120px] bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -782,7 +782,7 @@ export default function AdvancedDashboard() {
                       setSpecificMonth(selectedYear || thisYear, Number(val))
                     }
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[140px] bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors">
+                    <SelectTrigger className="h-10 w-full sm:w-[140px] bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -803,8 +803,8 @@ export default function AdvancedDashboard() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors",
-                          !customStartDate && "text-slate-500"
+                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors",
+                          !customStartDate && "text-slate-400"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -838,7 +838,7 @@ export default function AdvancedDashboard() {
 
                   <span
                     aria-hidden
-                    className="text-center sm:text-left text-slate-600"
+                    className="text-center sm:text-left text-slate-300"
                   >
                     to
                   </span>
@@ -848,8 +848,8 @@ export default function AdvancedDashboard() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors",
-                          !customEndDate && "text-slate-500"
+                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors",
+                          !customEndDate && "text-slate-400"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
