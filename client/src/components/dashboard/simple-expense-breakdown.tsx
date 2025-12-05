@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Receipt } from "lucide-react";
+import { Receipt, TrendingUp } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -23,6 +23,14 @@ function compactSSP(n: number) {
   if (v >= 1_000_000) return `SSP ${(n / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
   if (v >= 1_000) return `SSP ${nf0.format(Math.round(n / 1_000))}k`;
   return `SSP ${nf0.format(Math.round(n))}`;
+}
+
+function compactValue(n: number) {
+  const v = Math.abs(n);
+  if (v >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(v < 10_000_000_000 ? 1 : 0)}B`;
+  if (v >= 1_000_000) return `${(n / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
+  if (v >= 1_000) return `${nf0.format(Math.round(n / 1_000))}k`;
+  return `${nf0.format(Math.round(n))}`;
 }
 
 function axisCompact(n: number) {
@@ -87,21 +95,26 @@ export default function SimpleExpenseBreakdown({
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
 
-  // Calculate percentages for each row
-  const rowsWithPct = rows.map(row => ({
+  // Number of top expense categories to emphasize visually
+  const TOP_CATEGORIES_COUNT = 3;
+
+  // Calculate percentages for each row and mark top categories
+  const rowsWithPct = rows.map((row, index) => ({
     ...row,
     pct: finalTotal > 0 ? (row.amount / finalTotal) * 100 : 0,
+    isTopCategory: index < TOP_CATEGORIES_COUNT && !row.category.toLowerCase().includes('other'), // Top non-other categories
+    rank: index + 1,
   }));
 
   // Give bars room and keep category labels aligned by fixing Y-axis width
-  const height = Math.max(280, 52 * rows.length + 80);
-  const yLabelWidth = 160;
+  const height = Math.max(280, 56 * rows.length + 80);
+  const yLabelWidth = 170;
 
-  // Enhanced color palette - more vibrant for top categories, muted for smaller
+  // Enhanced color palette - more vibrant for top categories, progressively muted
   const palette = [
-    "#0ea5e9", // sky-500 - dominant
-    "#22c55e", // green-500
-    "#f97316", // orange-500
+    "#0ea5e9", // sky-500 - dominant (1st)
+    "#22c55e", // green-500 (2nd)
+    "#f97316", // orange-500 (3rd)
     "#8b5cf6", // violet-500
     "#14b8a6", // teal-500
     "#f43f5e", // rose-500
@@ -111,48 +124,42 @@ export default function SimpleExpenseBreakdown({
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
-    const { category, amount, pct } = payload[0].payload;
+    const { category, amount, pct, rank } = payload[0].payload;
     return (
-      <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-lg">
-        <div className="text-sm font-semibold text-slate-900 mb-1">{category}</div>
-        <div className="flex items-center gap-2">
-          <span className="text-base font-mono tabular-nums font-bold text-slate-800">{compactSSP(amount)}</span>
-          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{pct.toFixed(1)}% of total</span>
+      <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-lg min-w-[180px]">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">#{rank}</span>
+          <span className="text-sm font-semibold text-slate-900">{category}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-lg font-mono tabular-nums font-bold text-slate-800">{compactSSP(amount)}</span>
+          <span className="text-sm bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">{pct.toFixed(1)}%</span>
         </div>
       </div>
     );
   };
 
-  // Custom label to show amount and percentage
+  // Custom label to show compact amount and percentage in single line
   const renderCustomLabel = (props: any) => {
     const { x, y, width, height: barHeight, value, index } = props;
     const row = rowsWithPct[index];
     if (!row) return null;
     
-    const labelX = x + width + 8;
-    const labelY = y + barHeight / 2;
+    const labelX = x + width + 10;
+    const labelY = y + barHeight / 2 + 4;
     
+    // Combine amount and percentage in a clean format: "22M · 22%"
     return (
-      <g>
-        <text
-          x={labelX}
-          y={labelY - 6}
-          fill="#334155"
-          fontSize={11}
-          fontWeight={600}
-          fontFamily="monospace"
-        >
-          {compactSSP(value).replace("SSP ", "")}
-        </text>
-        <text
-          x={labelX}
-          y={labelY + 8}
-          fill="#94a3b8"
-          fontSize={10}
-        >
-          {row.pct.toFixed(0)}%
-        </text>
-      </g>
+      <text
+        x={labelX}
+        y={labelY}
+        fill={row.isTopCategory ? "#1e293b" : "#64748b"}
+        fontSize={row.isTopCategory ? 12 : 11}
+        fontWeight={row.isTopCategory ? 600 : 500}
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+      >
+        {compactValue(value)} · {row.pct.toFixed(0)}%
+      </text>
     );
   };
 
@@ -173,7 +180,7 @@ export default function SimpleExpenseBreakdown({
           </div>
           <div className="rounded-lg bg-gradient-to-r from-red-50 to-rose-50 px-4 py-2 border border-red-100">
             <span className="text-xs text-slate-500 block">Total</span>
-            <span className="font-bold text-slate-900">{compactSSP(finalTotal)}</span>
+            <span className="font-bold text-slate-900 font-mono tabular-nums">{compactSSP(finalTotal)}</span>
           </div>
         </div>
       </CardHeader>
@@ -185,8 +192,8 @@ export default function SimpleExpenseBreakdown({
               <BarChart
                 data={rowsWithPct}
                 layout="vertical"
-                margin={{ top: 8, right: 70, bottom: 8, left: 16 }}
-                barCategoryGap={8}
+                margin={{ top: 8, right: 90, bottom: 8, left: 16 }}
+                barCategoryGap={10}
               >
                 <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" horizontal={false} />
                 <XAxis
@@ -211,12 +218,14 @@ export default function SimpleExpenseBreakdown({
                   label={renderCustomLabel}
                 >
                   {rowsWithPct.map((row, i) => {
-                    // Use muted color for "Other expenses"
+                    // Use muted color for "Other expenses", stronger opacity for top 3
                     const isOther = row.category.toLowerCase().includes('other');
+                    const color = isOther ? palette[palette.length - 1] : palette[i % (palette.length - 1)];
                     return (
                       <Cell 
                         key={`c-${i}`} 
-                        fill={isOther ? palette[palette.length - 1] : palette[i % (palette.length - 1)]} 
+                        fill={color}
+                        fillOpacity={row.isTopCategory ? 1 : 0.8}
                       />
                     );
                   })}

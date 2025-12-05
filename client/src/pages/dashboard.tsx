@@ -19,6 +19,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { format, subMonths } from "date-fns";
+import { 
+  getDateRange, 
+  getLastCompleteMonth, 
+  formatDateForAPI,
+  type RangeKey,
+  filterOptions as dateRangeFilterOptions,
+} from "@/lib/dateRanges";
 import {
   TrendingUp,
   TrendingDown,
@@ -48,6 +55,8 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  BarChart,
+  Bar,
 } from "recharts";
 
 // Constants for number formatting thresholds
@@ -79,17 +88,9 @@ function compactUSD(n: number) {
   return `USD ${nf0.format(Math.round(n))}`;
 }
 
-// Filter options for time period selection
-type FilterOption = 'last-month' | 'last-quarter' | 'last-6-months' | 'last-12-months' | 'this-year' | 'last-year';
-
-const filterOptions: Array<{ value: FilterOption; label: string }> = [
-  { value: 'last-month', label: 'Last Month' },
-  { value: 'last-quarter', label: 'Last Quarter' },
-  { value: 'last-6-months', label: 'Last 6 Months' },
-  { value: 'last-12-months', label: 'Last 12 Months' },
-  { value: 'this-year', label: 'This Year' },
-  { value: 'last-year', label: 'Last Year' },
-];
+// Filter options for time period selection (import from centralized helper)
+type FilterOption = RangeKey;
+const filterOptions = dateRangeFilterOptions;
 
 // Type definitions
 interface Department {
@@ -168,57 +169,25 @@ export default function Dashboard() {
   );
   
   const thisYear = now.getFullYear();
-  const currentCalendarMonth = now.getMonth() + 1;
 
-  // Determine the last complete month (not the current partial month)
-  // If we're in December 2025 and it's only day 4, use November as "last complete"
-  const lastCompleteMonthDate = subMonths(new Date(thisYear, currentCalendarMonth - 1, 1), 1);
+  // Use centralized date range helper for canonical date calculations
+  const lastCompleteMonthDate = getLastCompleteMonth(now);
   const lastCompleteYear = lastCompleteMonthDate.getFullYear();
   const lastCompleteMonth = lastCompleteMonthDate.getMonth() + 1;
 
-  // Calculate date range based on selected filter
-  const { startDate: filterStartDate, endDate: filterEndDate, monthsCount } = useMemo(() => {
-    // End date for trend chart - use last complete month, not current partial month
-    const end = lastCompleteMonthDate;
-    let start: Date;
-    let months: number;
-    
-    switch (selectedFilter) {
-      case 'last-month':
-        start = lastCompleteMonthDate;
-        months = 1;
-        break;
-      case 'last-quarter':
-        start = subMonths(lastCompleteMonthDate, 2); // 3 months including end month
-        months = 3;
-        break;
-      case 'last-6-months':
-        start = subMonths(lastCompleteMonthDate, 5); // 6 months including end month
-        months = 6;
-        break;
-      case 'last-12-months':
-        start = subMonths(lastCompleteMonthDate, 11); // 12 months including end month
-        months = 12;
-        break;
-      case 'this-year':
-        start = new Date(thisYear, 0, 1);
-        months = lastCompleteMonth;
-        break;
-      case 'last-year':
-        start = new Date(thisYear - 1, 0, 1);
-        months = 12;
-        break;
-      default:
-        start = subMonths(lastCompleteMonthDate, 11);
-        months = 12;
-    }
-    
-    return { 
-      startDate: start,
-      endDate: end,
-      monthsCount: months 
-    };
-  }, [selectedFilter, thisYear, lastCompleteMonth, lastCompleteMonthDate]);
+  // Calculate date range based on selected filter using centralized helper
+  const dateRangeResult = useMemo(() => {
+    return getDateRange(selectedFilter, now);
+  }, [selectedFilter, now]);
+
+  // Extract values from the date range result
+  const { 
+    startDate: filterStartDate, 
+    endDate: filterEndDate, 
+    monthsCount, 
+    label: canonicalRangeLabel,
+    isSingleMonth: isFilterSingleMonth 
+  } = dateRangeResult;
 
   // For Month vs Month comparison
   // Use custom selection if enabled, otherwise use last two complete months
@@ -276,8 +245,8 @@ export default function Dashboard() {
     queryKey: ["/api/trends/monthly-revenue", selectedFilter, filterStartDate?.toISOString(), filterEndDate?.toISOString()],
     queryFn: async (): Promise<MonthlyTrendItem[]> => {
       // Use the batched endpoint for better performance - single DB query instead of N queries
-      const startDateStr = format(filterStartDate, "yyyy-MM-dd");
-      const endDateStr = format(filterEndDate, "yyyy-MM-dd");
+      const startDateStr = formatDateForAPI(filterStartDate);
+      const endDateStr = formatDateForAPI(filterEndDate);
       
       try {
         const url = `/api/trends/monthly-revenue?startDate=${startDateStr}&endDate=${endDateStr}`;
@@ -425,40 +394,13 @@ export default function Dashboard() {
       }
     }
     
-    // Determine period label based on filter with clearer wording
-    let periodLabel: string;
-    const firstMonth = monthlyTrend[0]?.fullMonth || '';
-    const lastMonth = monthlyTrend[monthlyTrend.length - 1]?.fullMonth || '';
-    
-    switch (selectedFilter) {
-      case 'last-month':
-        periodLabel = lastMonth;
-        break;
-      case 'last-quarter':
-        periodLabel = `${firstMonth} – ${lastMonth} (Last quarter)`;
-        break;
-      case 'last-6-months':
-        periodLabel = `${firstMonth} – ${lastMonth} (Last 6 complete months)`;
-        break;
-      case 'last-12-months':
-        periodLabel = `${firstMonth} – ${lastMonth} (Last 12 complete months)`;
-        break;
-      case 'this-year':
-        periodLabel = `${firstMonth} – ${lastMonth} (Year to date – last complete month)`;
-        break;
-      case 'last-year':
-        periodLabel = `${firstMonth} – ${lastMonth} (Full year ${thisYear - 1})`;
-        break;
-      default:
-        periodLabel = `${firstMonth} – ${lastMonth}`;
-    }
-    
+    // Use the canonical range label from the centralized helper
     return {
       breakdown: combined,
       total: totalExpensesSum,
-      periodLabel,
+      periodLabel: canonicalRangeLabel,
     };
-  }, [monthlyTrend, currentMonthData, currentExpenses, selectedFilter, comparisonCurrentMonthLabel, thisYear]);
+  }, [monthlyTrend, currentMonthData, currentExpenses, canonicalRangeLabel, comparisonCurrentMonthLabel]);
 
   // Calculate trend stats for SSP with improved YoY calculation
   const trendStats = useMemo(() => {
@@ -620,35 +562,16 @@ export default function Dashboard() {
     };
   }, [monthlyTrend, departmentGrowth, trendStats]);
 
-  // Compute clear period description for the trend chart
+  // Compute clear period description for the trend chart - use canonical label from helper
   const trendPeriodDescription = useMemo(() => {
-    if (monthlyTrend.length === 0) return "No data available";
-    
-    const firstMonth = monthlyTrend[0]?.fullMonth || '';
-    const lastMonth = monthlyTrend[monthlyTrend.length - 1]?.fullMonth || '';
-    
-    if (firstMonth === lastMonth) {
-      return firstMonth;
+    // If we have no trend data, fall back to the canonical label since that's what we requested
+    if (monthlyTrend.length === 0) {
+      return canonicalRangeLabel || "No data available";
     }
     
-    // Get filter-specific description with clearer wording
-    switch (selectedFilter) {
-      case 'last-month':
-        return lastMonth;
-      case 'last-quarter':
-        return `${firstMonth} – ${lastMonth} (Last quarter)`;
-      case 'last-6-months':
-        return `${firstMonth} – ${lastMonth} (Last 6 complete months)`;
-      case 'last-12-months':
-        return `${firstMonth} – ${lastMonth} (Last 12 complete months)`;
-      case 'this-year':
-        return `${firstMonth} – ${lastMonth} (Year to date – last complete month)`;
-      case 'last-year':
-        return `${firstMonth} – ${lastMonth} (Full year ${thisYear - 1})`;
-      default:
-        return `${firstMonth} – ${lastMonth}`;
-    }
-  }, [monthlyTrend, selectedFilter, thisYear]);
+    // Use the canonical range label from the centralized helper
+    return canonicalRangeLabel;
+  }, [monthlyTrend, canonicalRangeLabel]);
 
   const isLoading = loadingCurrent || loadingPrev || loadingTrend;
 
@@ -788,131 +711,193 @@ export default function Dashboard() {
               <>
                 {currencyTab === "ssp" ? (
                   <>
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                          <XAxis 
-                            dataKey="month" 
-                            tick={{ fontSize: 12, fill: "#64748b" }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis 
-                            tick={{ fontSize: 11, fill: "#64748b" }}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(v) => {
-                              if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                              if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                              return v.toString();
-                            }}
-                          />
-                          <Tooltip content={<CustomTooltipSSP />} />
-                          <Area 
-                            type="monotone" 
-                            dataKey="revenue" 
-                            stroke="#14b8a6" 
-                            strokeWidth={2}
-                            fill="url(#revenueGradient)" 
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {/* For single month, show a prominent single bar/stat display */}
+                    {isFilterSingleMonth && monthlyTrend.length === 1 ? (
+                      <div className="h-[300px] w-full flex flex-col items-center justify-center">
+                        <div className="text-center mb-8">
+                          <div className="text-4xl font-bold text-teal-600 mb-2">
+                            {compactSSP(monthlyTrend[0]?.revenue || 0)}
+                          </div>
+                          <div className="text-sm text-slate-500">
+                            Total Revenue for {monthlyTrend[0]?.fullMonth || 'Selected Month'}
+                          </div>
+                        </div>
+                        <div className="w-full max-w-md">
+                          <ResponsiveContainer width="100%" height={100}>
+                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                              <Bar 
+                                dataKey="revenue" 
+                                fill="#14b8a6" 
+                                radius={[8, 8, 0, 0]}
+                              />
+                              <Tooltip content={<CustomTooltipSSP />} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fontSize: 12, fill: "#64748b" }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(v) => {
+                                if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                return v.toString();
+                              }}
+                            />
+                            <Tooltip content={<CustomTooltipSSP />} />
+                            <Area 
+                              type="monotone" 
+                              dataKey="revenue" 
+                              stroke="#14b8a6" 
+                              strokeWidth={2}
+                              fill="url(#revenueGradient)" 
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                     
-                    {/* SSP Summary stats below chart */}
+                    {/* SSP Summary stats below chart - show different stats for single month */}
                     <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className={cn("h-4 w-4", trendStats.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
-                        <span className="text-sm text-slate-600">YoY Growth:</span>
-                        <span className={cn("font-semibold", trendStats.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
-                          {trendStats.yoyGrowth >= 0 ? "+" : ""}{trendStats.yoyGrowth.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm text-slate-600">Best Month:</span>
-                        <span className="font-semibold text-slate-900">{trendStats.bestMonth}</span>
-                      </div>
+                      {!isFilterSingleMonth && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className={cn("h-4 w-4", trendStats.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
+                            <span className="text-sm text-slate-600">Period Growth:</span>
+                            <span className={cn("font-semibold", trendStats.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
+                              {trendStats.yoyGrowth >= 0 ? "+" : ""}{trendStats.yoyGrowth.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-amber-500" />
+                            <span className="text-sm text-slate-600">Best Month:</span>
+                            <span className="font-semibold text-slate-900">{trendStats.bestMonth}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm text-slate-600">Monthly Avg:</span>
-                        <span className="font-semibold text-slate-900">{compactSSP(trendStats.monthlyAvg)}</span>
+                        <span className="text-sm text-slate-600">{isFilterSingleMonth ? "Monthly Total:" : "Monthly Avg:"}</span>
+                        <span className="font-semibold text-slate-900">{compactSSP(isFilterSingleMonth ? (monthlyTrend[0]?.revenue || 0) : trendStats.monthlyAvg)}</span>
                       </div>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="usdGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                          <XAxis 
-                            dataKey="month" 
-                            tick={{ fontSize: 12, fill: "#64748b" }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis 
-                            tick={{ fontSize: 11, fill: "#64748b" }}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(v) => {
-                              if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                              if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                              return v.toString();
-                            }}
-                          />
-                          <Tooltip content={<CustomTooltipUSD />} />
-                          <Area 
-                            type="monotone" 
-                            dataKey="revenueUSD" 
-                            stroke="#3b82f6" 
-                            strokeWidth={2}
-                            fill="url(#usdGradient)" 
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {/* For single month USD, show a prominent single bar/stat display */}
+                    {isFilterSingleMonth && monthlyTrend.length === 1 ? (
+                      <div className="h-[300px] w-full flex flex-col items-center justify-center">
+                        <div className="text-center mb-8">
+                          <div className="text-4xl font-bold text-blue-600 mb-2">
+                            {compactUSD(monthlyTrend[0]?.revenueUSD || 0)}
+                          </div>
+                          <div className="text-sm text-slate-500">
+                            Total Insurance Revenue for {monthlyTrend[0]?.fullMonth || 'Selected Month'}
+                          </div>
+                        </div>
+                        <div className="w-full max-w-md">
+                          <ResponsiveContainer width="100%" height={100}>
+                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                              <Bar 
+                                dataKey="revenueUSD" 
+                                fill="#3b82f6" 
+                                radius={[8, 8, 0, 0]}
+                              />
+                              <Tooltip content={<CustomTooltipUSD />} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="usdGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fontSize: 12, fill: "#64748b" }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(v) => {
+                                if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                return v.toString();
+                              }}
+                            />
+                            <Tooltip content={<CustomTooltipUSD />} />
+                            <Area 
+                              type="monotone" 
+                              dataKey="revenueUSD" 
+                              stroke="#3b82f6" 
+                              strokeWidth={2}
+                              fill="url(#usdGradient)" 
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                     
                     {/* USD Summary stats below chart */}
                     <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className={cn("h-4 w-4", trendStatsUSD.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
-                        <span className="text-sm text-slate-600">YoY Growth:</span>
-                        <span className={cn("font-semibold", trendStatsUSD.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
-                          {trendStatsUSD.yoyGrowth >= 0 ? "+" : ""}{trendStatsUSD.yoyGrowth.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm text-slate-600">Best Month:</span>
-                        <span className="font-semibold text-slate-900">{trendStatsUSD.bestMonth}</span>
-                      </div>
+                      {!isFilterSingleMonth && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className={cn("h-4 w-4", trendStatsUSD.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
+                            <span className="text-sm text-slate-600">Period Growth:</span>
+                            <span className={cn("font-semibold", trendStatsUSD.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
+                              {trendStatsUSD.yoyGrowth >= 0 ? "+" : ""}{trendStatsUSD.yoyGrowth.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-amber-500" />
+                            <span className="text-sm text-slate-600">Best Month:</span>
+                            <span className="font-semibold text-slate-900">{trendStatsUSD.bestMonth}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm text-slate-600">Monthly Avg:</span>
-                        <span className="font-semibold text-slate-900">{compactUSD(trendStatsUSD.monthlyAvg)}</span>
+                        <span className="text-sm text-slate-600">{isFilterSingleMonth ? "Monthly Total:" : "Monthly Avg:"}</span>
+                        <span className="font-semibold text-slate-900">{compactUSD(isFilterSingleMonth ? (monthlyTrend[0]?.revenueUSD || 0) : trendStatsUSD.monthlyAvg)}</span>
                       </div>
                     </div>
                   </>
                 )}
               </>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-slate-500">
-                No revenue data available for the selected period.
+              <div className="h-[300px] flex flex-col items-center justify-center text-slate-500">
+                <BarChart3 className="h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-sm font-medium">No revenue data available for {canonicalRangeLabel || 'the selected period'}</p>
+                <p className="text-xs text-slate-400 mt-1">Try selecting a different time period</p>
               </div>
             )}
           </CardContent>
