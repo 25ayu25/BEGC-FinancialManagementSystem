@@ -1,7 +1,18 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Receipt, Lightbulb } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { cn } from "@/lib/utils";
+import { 
+  Receipt, 
+  Lightbulb, 
+  User, 
+  Building2, 
+  FlaskConical, 
+  Stethoscope, 
+  TestTube, 
+  Pill, 
+  Package,
+  type LucideIcon
+} from "lucide-react";
 
 type BreakdownMap = Record<string, number | string>;
 
@@ -23,16 +34,63 @@ function compactValue(n: number) {
   return `${nf0.format(Math.round(n))}`;
 }
 
-// Cohesive color palette for the donut chart - premium design
-const EXPENSE_COLORS = [
-  '#3b82f6', // Blue
-  '#10b981', // Green
-  '#f97316', // Orange
-  '#14b8a6', // Teal
-  '#ec4899', // Pink
-  '#eab308', // Yellow
-  '#6b7280', // Gray - Other (always last)
-];
+// Category configuration with icons and colors
+interface CategoryConfig {
+  icon: LucideIcon;
+  gradient: string;
+  border: string;
+  bg: string;
+}
+
+const expenseCategories: Record<string, CategoryConfig> = {
+  'Radiographer Payments': { 
+    icon: User, 
+    gradient: 'from-blue-400 to-blue-600',
+    border: 'border-t-blue-500',
+    bg: 'hover:bg-blue-50'
+  },
+  'Clinic Operations': { 
+    icon: Building2, 
+    gradient: 'from-green-400 to-green-600',
+    border: 'border-t-green-500',
+    bg: 'hover:bg-green-50'
+  },
+  'Lab Tech Payments': { 
+    icon: FlaskConical, 
+    gradient: 'from-orange-400 to-orange-600',
+    border: 'border-t-orange-500',
+    bg: 'hover:bg-orange-50'
+  },
+  'Doctor Payments': { 
+    icon: Stethoscope, 
+    gradient: 'from-teal-400 to-teal-600',
+    border: 'border-t-teal-500',
+    bg: 'hover:bg-teal-50'
+  },
+  'Lab Reagents': { 
+    icon: TestTube, 
+    gradient: 'from-pink-400 to-pink-600',
+    border: 'border-t-pink-500',
+    bg: 'hover:bg-pink-50'
+  },
+  'Drugs Purchased': { 
+    icon: Pill, 
+    gradient: 'from-amber-400 to-amber-600',
+    border: 'border-t-amber-500',
+    bg: 'hover:bg-amber-50'
+  },
+  'Other': { 
+    icon: Package, 
+    gradient: 'from-slate-400 to-slate-600',
+    border: 'border-t-slate-500',
+    bg: 'hover:bg-slate-50'
+  },
+};
+
+// Get config for a category, with fallback to Other
+function getCategoryConfig(categoryName: string): CategoryConfig {
+  return expenseCategories[categoryName] || expenseCategories['Other'];
+}
 
 // Check if a category name represents "Other" type
 function isOtherCategory(categoryName: string): boolean {
@@ -51,6 +109,52 @@ export interface SimpleExpenseBreakdownProps {
   maxBars?: number;
 }
 
+// ExpenseCard component for each expense category
+interface ExpenseCardProps {
+  expense: { name: string; amount: number; percentage: number };
+  config: CategoryConfig;
+}
+
+function ExpenseCard({ expense, config }: ExpenseCardProps) {
+  const Icon = config.icon;
+  
+  return (
+    <div className={cn(
+      "relative overflow-hidden rounded-xl border border-slate-200 bg-white",
+      "shadow-sm hover:shadow-lg transition-all duration-300",
+      "hover:scale-[1.02] cursor-pointer border-t-4",
+      config.border,
+      config.bg
+    )}>
+      <div className="p-4">
+        {/* Icon */}
+        <div className={cn(
+          "w-10 h-10 rounded-lg bg-gradient-to-br",
+          "flex items-center justify-center mb-3 shadow-lg",
+          config.gradient
+        )}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        
+        {/* Category Name */}
+        <h4 className="text-sm font-medium text-slate-600 mb-1">
+          {expense.name}
+        </h4>
+        
+        {/* Amount and Percentage */}
+        <div className="flex items-baseline justify-between">
+          <span className="text-xl font-bold text-slate-900">
+            SSP {compactValue(expense.amount)}
+          </span>
+          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+            {expense.percentage}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SimpleExpenseBreakdown({
   breakdown,
   total,
@@ -58,8 +162,6 @@ export default function SimpleExpenseBreakdown({
   periodLabel,
   maxBars = 7,
 }: SimpleExpenseBreakdownProps) {
-  const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
-
   // Sort expenses: specific categories by amount descending, "Other" always last
   const sortedExpenses = React.useMemo(() => {
     const entries = Object.entries(breakdown || {}).map(([k, v]) => ({
@@ -123,34 +225,9 @@ export default function SimpleExpenseBreakdown({
     return top3.reduce((sum, e) => sum + e.percentage, 0);
   }, [expensesWithPct]);
 
-  // Custom tooltip for donut chart
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{ payload: { name: string; amount: number; percentage: number } }>;
-  }
-
-  const CustomTooltip = ({ active, payload }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white px-3 py-2 rounded-lg shadow-lg border border-slate-200">
-          <p className="font-medium text-slate-900">{data.name}</p>
-          <p className="text-sm text-slate-600">
-            SSP {compactValue(data.amount)} ({data.percentage}%)
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Handle hover effects
-  const onPieEnter = (_: unknown, index: number) => setActiveIndex(index);
-  const onPieLeave = () => setActiveIndex(null);
-
   return (
     <Card className="overflow-hidden border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
@@ -170,83 +247,21 @@ export default function SimpleExpenseBreakdown({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6">
+      <CardContent>
         {sortedExpenses.length > 0 ? (
           <>
-            {/* Donut Chart + Legend Layout */}
-            <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
-              {/* Donut Chart */}
-              <div className="w-56 h-56 sm:w-64 sm:h-64 relative flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={expensesWithPct}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="amount"
-                      onMouseEnter={onPieEnter}
-                      onMouseLeave={onPieLeave}
-                      animationDuration={800}
-                      animationBegin={0}
-                      stroke="none"
-                    >
-                      {expensesWithPct.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
-                          opacity={activeIndex === null || activeIndex === index ? 1 : 0.6}
-                          style={{
-                            filter: activeIndex === index ? 'brightness(1.1)' : 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                          }}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                
-                {/* Center text showing total */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-xl sm:text-2xl font-bold text-slate-900">{compactSSP(finalTotal)}</span>
-                  <span className="text-xs sm:text-sm text-slate-500">Total</span>
-                </div>
-              </div>
-
-              {/* Legend */}
-              <div className="flex-1 w-full space-y-2">
-                {expensesWithPct.map((expense, index) => (
-                  <div 
-                    key={expense.name}
-                    className="flex items-center justify-between p-2 sm:p-2.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onMouseLeave={() => setActiveIndex(null)}
-                    style={{
-                      backgroundColor: activeIndex === index ? 'rgb(248, 250, 252)' : 'transparent',
-                    }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: EXPENSE_COLORS[index % EXPENSE_COLORS.length] }}
-                      />
-                      <span className="text-sm font-medium text-slate-700 truncate">{expense.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-sm font-semibold text-slate-900">
-                        {compactValue(expense.amount)}
-                      </span>
-                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full min-w-[40px] text-center">
-                        {expense.percentage}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* Cards Grid - 3 columns on desktop, 2 on tablet, 1 on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {expensesWithPct.map((expense) => {
+                const config = getCategoryConfig(expense.name);
+                return (
+                  <ExpenseCard 
+                    key={expense.name} 
+                    expense={expense} 
+                    config={config}
+                  />
+                );
+              })}
             </div>
 
             {/* Insight at bottom */}
