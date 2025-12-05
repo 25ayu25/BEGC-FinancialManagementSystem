@@ -56,6 +56,10 @@ const fmtUSD = (v: number) => {
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
 
+/* ================== header styles ================== */
+// Premium header control styles - used for dropdowns and buttons in the header
+const headerControlStyles = "h-10 bg-slate-800/80 text-white border border-teal-500/50 hover:border-teal-400 hover:bg-slate-700/80 shadow-sm shadow-teal-500/20 transition-all";
+
 /* ================== helper: normalize range ================== */
 function computeRangeParams(
   timeRange: string,
@@ -715,14 +719,14 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Header - Modern Slate-800 with Teal Accent */}
+      {/* Header - Premium Dark Mode with Midnight Gradient and Neon Horizon Line */}
       <header
-        className={cn(
-          "sticky top-0 z-50",
-          "bg-slate-800",
-          "border-b-2 border-teal-500",
-          "shadow-md"
-        )}
+        className="sticky top-0 z-50 shadow-lg"
+        style={{
+          background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 100%)',
+          borderBottom: '1px solid transparent',
+          borderImage: 'linear-gradient(to right, #10B981, #3B82F6) 1',
+        }}
       >
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:px-6 md:py-4">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
@@ -730,8 +734,8 @@ export default function AdvancedDashboard() {
               <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-white">
                 Executive Dashboard
               </h1>
-              <div className="mt-1 flex items-center gap-3">
-                <p className="text-sm text-slate-300">
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <p className="text-sm text-slate-400">
                   Key financials · {periodLabel}
                 </p>
                 <span className="hidden sm:inline-flex text-xs text-teal-400 font-medium">
@@ -743,7 +747,7 @@ export default function AdvancedDashboard() {
             {/* Filters */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-10 w-full sm:w-[160px] bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors">
+                <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px]")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -764,7 +768,7 @@ export default function AdvancedDashboard() {
                       setSpecificMonth(Number(val), selectedMonth || 1)
                     }
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[120px] bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors">
+                    <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[120px]")}>
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -782,7 +786,7 @@ export default function AdvancedDashboard() {
                       setSpecificMonth(selectedYear || thisYear, Number(val))
                     }
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[140px] bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors">
+                    <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[140px]")}>
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -803,7 +807,8 @@ export default function AdvancedDashboard() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors",
+                          headerControlStyles,
+                          "w-full sm:w-auto justify-start text-left font-normal",
                           !customStartDate && "text-slate-400"
                         )}
                       >
@@ -838,7 +843,7 @@ export default function AdvancedDashboard() {
 
                   <span
                     aria-hidden
-                    className="text-center sm:text-left text-slate-300"
+                    className="text-center sm:text-left text-slate-400"
                   >
                     to
                   </span>
@@ -848,7 +853,8 @@ export default function AdvancedDashboard() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-slate-700 text-white border-slate-600 hover:bg-slate-600 shadow-sm transition-colors",
+                          headerControlStyles,
+                          "w-full sm:w-auto justify-start text-left font-normal",
                           !customEndDate && "text-slate-400"
                         )}
                       >
