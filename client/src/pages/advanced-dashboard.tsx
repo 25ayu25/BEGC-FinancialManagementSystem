@@ -724,7 +724,7 @@ export default function AdvancedDashboard() {
         className="sticky top-0 z-50 shadow-lg"
         style={{
           background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 100%)',
-          borderBottom: '1px solid transparent',
+          borderBottom: '2px solid transparent',
           borderImage: 'linear-gradient(to right, #10B981, #3B82F6) 1',
         }}
       >
