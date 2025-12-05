@@ -1,4 +1,3 @@
-// client/src/pages/advanced-dashboard.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -57,8 +56,8 @@ const fmtUSD = (v: number) => {
 };
 
 /* ================== header styles ================== */
-// Dark mode inputs to blend with the header (Semi-transparent background)
-const headerControlStyles = "h-9 bg-slate-800/60 text-slate-200 border border-slate-700/50 hover:border-cyan-500/50 hover:bg-slate-800 transition-all shadow-sm focus:ring-cyan-500/20";
+// Adjusted: Slightly more transparent to let the gradient shine through
+const headerControlStyles = "h-9 bg-slate-800/40 text-slate-100 border border-slate-600/30 hover:border-cyan-500/50 hover:bg-slate-700/50 transition-all shadow-sm focus:ring-cyan-500/20";
 
 /* ================== helper: normalize range ================== */
 function computeRangeParams(
@@ -719,9 +718,12 @@ export default function AdvancedDashboard() {
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
       
-      {/* Header - The TRUE "Mock-Matched" Look with Laser Glow */}
-      <header className="sticky top-0 z-50 bg-slate-900 shadow-2xl">
-        <div className="flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
+      {/* Header: 
+         - Updated Background: Slate-900 to Slate-800 Gradient (Lighter, less stark black)
+         - Added "Radiance" Light Leak at the bottom that hangs over the content
+      */}
+      <header className="sticky top-0 z-50 shadow-2xl bg-gradient-to-r from-[#1e293b] to-[#0f172a] relative">
+        <div className="flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4 relative z-20">
           
           {/* Left: Brand & Status */}
           <div className="flex-shrink-0">
@@ -730,18 +732,10 @@ export default function AdvancedDashboard() {
             </h1>
             <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
               <span>Key Financials · {periodLabel}</span>
-              {/* Live badge matched to the mock: dark pill, glowing dot */}
-              <span className="hidden sm:flex items-center gap-1.5 text-cyan-400 font-medium bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded-full text-xs shadow-[0_0_10px_rgba(34,211,238,0.2)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
-                </span>
-                Live System
-              </span>
             </div>
           </div>
 
-          {/* Right: Existing Filters (Functionality preserved, style updated) */}
+          {/* Right: Existing Filters */}
           <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px]")}>
@@ -837,11 +831,17 @@ export default function AdvancedDashboard() {
           </div>
         </div>
 
-        {/* The "Glow Beam" - This is the key visual element from the mock */}
-        <div className="relative h-[2px] w-full bg-slate-900 overflow-visible z-50">
-           {/* Center Bloom Effect */}
-           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-100 shadow-[0_0_20px_2px_rgba(34,211,238,0.6)]"></div>
-        </div>
+        {/* THE RADIANCE EFFECT (The "Bloom" Gradient)
+            1. The physical line (1px)
+            2. The radiated light (48px height, positioned below the header)
+        */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-cyan-400/80 shadow-[0_0_15px_rgba(34,211,238,1)] z-30" />
+        
+        {/* This div creates the "light leak" fading down onto the cards */}
+        <div 
+          className="absolute -bottom-12 left-0 right-0 h-12 w-full bg-gradient-to-b from-cyan-400/10 to-transparent pointer-events-none z-10" 
+          aria-hidden="true"
+        />
       </header>
 
       {/* Scrollable content */}
