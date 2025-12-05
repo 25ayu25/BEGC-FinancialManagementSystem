@@ -56,8 +56,8 @@ const fmtUSD = (v: number) => {
 };
 
 /* ================== header styles ================== */
-// Adjusted: Slightly more transparent to let the gradient shine through
-const headerControlStyles = "h-9 bg-slate-800/40 text-slate-100 border border-slate-600/30 hover:border-cyan-500/50 hover:bg-slate-700/50 transition-all shadow-sm focus:ring-cyan-500/20";
+const headerControlStyles =
+  "h-9 bg-slate-800/40 text-slate-100 border border-slate-600/30 hover:border-cyan-400/70 hover:bg-slate-700/60 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-0";
 
 /* ================== helper: normalize range ================== */
 function computeRangeParams(
@@ -126,7 +126,7 @@ function InsuranceProvidersUSD({
         }))
         .filter((r) => r.amount > 0);
     }
-    return Object.entries(breakdown)
+  return Object.entries(breakdown)
       .map(([name, amount]) => ({ name, amount: Number(amount) }))
       .filter((r) => r.amount > 0);
   }, [breakdown]);
@@ -179,8 +179,8 @@ function InsuranceProvidersUSD({
               const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
               const color = palette[idx % palette.length];
               return (
-                <div 
-                  key={`${item.name}-${idx}`} 
+                <div
+                  key={`${item.name}-${idx}`}
                   className="p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4"
                   style={{ borderLeftColor: color }}
                 >
@@ -190,7 +190,9 @@ function InsuranceProvidersUSD({
                         className="inline-block w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-sm font-medium text-slate-700">{item.name}</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        {item.name}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
@@ -223,8 +225,7 @@ function QuickActionsCard() {
     <Card className="border border-slate-200 shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick
-          Actions
+          <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -495,7 +496,10 @@ export default function AdvancedDashboard() {
         if (d >= 1 && d <= daysInMonth) {
           incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
           incomeSeries[d - 1].amountSSP += Number(
-            (r as any).incomeSSP ?? (r as any).income ?? (r as any).amount ?? 0
+            (r as any).incomeSSP ??
+              (r as any).income ??
+              (r as any).amount ??
+              0
           );
           incomeSeries[d - 1].amount += Number(
             (r as any).income ?? (r as any).amount ?? 0
@@ -505,10 +509,9 @@ export default function AdvancedDashboard() {
     }
   }
 
-  /* ---------- Month-to-date vs same days last month (Option B) ---------- */
+  /* ---------- Month-to-date vs same days last month ---------- */
   const isCurrentMonthRange = timeRange === "current-month";
 
-  // Determine how many days of data we have this month
   const daysInCurrentMonth = new Date(yearToSend, monthToSend, 0).getDate();
   const lastDayWithIncome = incomeSeries.reduce(
     (max, d) =>
@@ -543,7 +546,6 @@ export default function AdvancedDashboard() {
   const daysToCompare =
     effectiveCurrentDay > 0 ? Math.min(effectiveCurrentDay, daysInPrevMonth) : 0;
 
-  // Current month MTD (SSP & USD)
   const currentMTDIncomeSSP =
     daysToCompare > 0
       ? incomeSeries
@@ -558,7 +560,6 @@ export default function AdvancedDashboard() {
           .reduce((s, d) => s + d.amountUSD, 0)
       : 0;
 
-  // Previous month income mapped by day
   let prevIncomeByDay: Record<
     number,
     { amountSSP: number; amountUSD: number }
@@ -647,7 +648,6 @@ export default function AdvancedDashboard() {
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
 
-  // Which % we actually use on the cards
   const revenueChangePct =
     isCurrentMonthRange && incomeChangeSSP_MTD !== null
       ? incomeChangeSSP_MTD
@@ -664,8 +664,6 @@ export default function AdvancedDashboard() {
       month: "short",
     })} ${date.getFullYear()}`;
   })();
-
-  // ---------- comparison label & "no data" logic ----------
 
   const comparisonLabel = (() => {
     if (isCurrentMonthRange) {
@@ -701,571 +699,648 @@ export default function AdvancedDashboard() {
     (timeRange === "year" || timeRange === "last-3-months") &&
     !hasPreviousPeriodUSD;
 
-  // ---------- "No transactions yet" logic for zero current period ----------
-  const currentRevenueValue = monthTotalSSP ?? parseFloat(dashboardData?.totalIncomeSSP || "0");
+  const currentRevenueValue =
+    monthTotalSSP ?? parseFloat(dashboardData?.totalIncomeSSP || "0");
   const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
-  const currentInsuranceValue = parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const currentInsuranceValue = parseFloat(
+    dashboardData?.totalIncomeUSD || "0"
+  );
   const currentPatientsValue = dashboardData?.totalPatients || 0;
 
   const showNoDataYetRevenue = currentRevenueValue === 0;
   const showNoDataYetExpenses = currentExpenseValue === 0;
-  const showNoDataYetNetIncome = currentRevenueValue === 0 && currentExpenseValue === 0;
+  const showNoDataYetNetIncome =
+    currentRevenueValue === 0 && currentExpenseValue === 0;
   const showNoDataYetInsurance = currentInsuranceValue === 0;
   const showNoDataYetPatients = currentPatientsValue === 0;
 
   /* ================== RENDER ================== */
 
   return (
-    <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      
-      {/* Header: 
-         - Updated Background: Slate-900 to Slate-800 Gradient (Lighter, less stark black)
-         - Added "Radiance" Light Leak at the bottom that hangs over the content
-      */}
-      <header className="sticky top-0 z-50 shadow-2xl bg-gradient-to-r from-[#1e293b] to-[#0f172a] relative">
-        <div className="flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4 relative z-20">
-          
-          {/* Left: Brand & Status */}
-          <div className="flex-shrink-0">
-            <h1 className="text-2xl font-bold text-white tracking-tight">
-              Executive Dashboard
-            </h1>
-            <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
-              <span>Key Financials · {periodLabel}</span>
+    <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
+      {/* HEADER: dark glass + cyan line (no search bar) */}
+      <header className="sticky top-0 z-40 shadow-[0_18px_45px_rgba(15,23,42,0.9)]">
+        <div className="relative bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800/60 overflow-hidden">
+          {/* light bloom */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(56,189,248,0.2),_transparent_55%)]" />
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
+            <div className="flex-shrink-0">
+              <h1 className="text-2xl font-semibold text-white tracking-tight">
+                Executive Dashboard
+              </h1>
+              <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
+                <span>Key financials · {periodLabel}</span>
+              </div>
+            </div>
+
+            {/* filters */}
+            <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+                <SelectTrigger
+                  className={cn(
+                    headerControlStyles,
+                    "w-full sm:w-[160px] rounded-full px-3"
+                  )}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="current-month">Current Month</SelectItem>
+                  <SelectItem value="last-month">Last Month</SelectItem>
+                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                  <SelectItem value="month-select">Select Month…</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {timeRange === "month-select" && (
+                <>
+                  <Select
+                    value={String(selectedYear)}
+                    onValueChange={(val) =>
+                      setSpecificMonth(Number(val), selectedMonth || 1)
+                    }
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        headerControlStyles,
+                        "w-full sm:w-[110px] rounded-full px-3"
+                      )}
+                    >
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={String(selectedMonth)}
+                    onValueChange={(val) =>
+                      setSpecificMonth(selectedYear || thisYear, Number(val))
+                    }
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        headerControlStyles,
+                        "w-full sm:w-[140px] rounded-full px-3"
+                      )}
+                    >
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {months.map((m) => (
+                        <SelectItem key={m.value} value={String(m.value)}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+
+              {timeRange === "custom" && (
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          headerControlStyles,
+                          "justify-start text-left font-normal px-3 rounded-full"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customStartDate
+                          ? format(customStartDate, "MMM d")
+                          : "Start"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white" align="end">
+                      <DatePicker
+                        mode="single"
+                        selected={customStartDate}
+                        onSelect={(d) =>
+                          setCustomRange(d ?? undefined, customEndDate)
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <span className="text-slate-500">-</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          headerControlStyles,
+                          "justify-start text-left font-normal px-3 rounded-full"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customEndDate ? format(customEndDate, "MMM d") : "End"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white" align="end">
+                      <DatePicker
+                        mode="single"
+                        selected={customEndDate}
+                        onSelect={(d) =>
+                          setCustomRange(customStartDate, d ?? undefined)
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right: Existing Filters */}
-          <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px]")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current-month">Current Month</SelectItem>
-                <SelectItem value="last-month">Last Month</SelectItem>
-                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="month-select">Select Month…</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {timeRange === "month-select" && (
-              <>
-                <Select
-                  value={String(selectedYear)}
-                  onValueChange={(val) =>
-                    setSpecificMonth(Number(val), selectedMonth || 1)
-                  }
-                >
-                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[100px]")}>
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={String(selectedMonth)}
-                  onValueChange={(val) =>
-                    setSpecificMonth(selectedYear || thisYear, Number(val))
-                  }
-                >
-                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[130px]")}>
-                    <SelectValue placeholder="Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
-
-            {timeRange === "custom" && (
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn(headerControlStyles, "justify-start text-left font-normal px-3")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "MMM d") : "Start"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white" align="end">
-                    <DatePicker
-                      mode="single"
-                      selected={customStartDate}
-                      onSelect={(d) => setCustomRange(d ?? undefined, customEndDate)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <span className="text-slate-500">-</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn(headerControlStyles, "justify-start text-left font-normal px-3")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "MMM d") : "End"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white" align="end">
-                    <DatePicker
-                      mode="single"
-                      selected={customEndDate}
-                      onSelect={(d) => setCustomRange(customStartDate, d ?? undefined)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
+          {/* cyan line + glow */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0">
+            <div className="h-[1px] bg-cyan-400 shadow-[0_0_18px_rgba(34,211,238,1)]" />
+            <div className="h-10 -mb-10 bg-gradient-to-b from-cyan-400/25 via-cyan-400/5 to-transparent" />
           </div>
         </div>
-
-        {/* THE RADIANCE EFFECT (The "Bloom" Gradient)
-            1. The physical line (1px)
-            2. The radiated light (48px height, positioned below the header)
-        */}
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-cyan-400/80 shadow-[0_0_15px_rgba(34,211,238,1)] z-30" />
-        
-        {/* This div creates the "light leak" fading down onto the cards */}
-        <div 
-          className="absolute -bottom-12 left-0 right-0 h-12 w-full bg-gradient-to-b from-cyan-400/10 to-transparent pointer-events-none z-10" 
-          aria-hidden="true"
-        />
       </header>
 
-      {/* Scrollable content */}
-      <main className="min-h-0 overflow-y-auto [overscroll-behavior:contain]">
-        <div className="px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-4 md:pt-6 dashboard-content">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
-            {/* Total Revenue - Emerald/Green tint */}
-            <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                      Total Revenue
-                    </p>
-                    <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                      SSP{" "}
-                      <AnimatedNumber
-                        value={Math.round(
-                          monthTotalSSP ||
-                            parseFloat(dashboardData?.totalIncomeSSP || "0")
+      {/* CONTENT */}
+      <main className="min-h-0 overflow-y-auto bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 [overscroll-behavior:contain]">
+        <div className="px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-6 md:pt-8">
+          <div className="mx-auto max-w-6xl rounded-t-3xl bg-white shadow-[0_24px_60px_rgba(15,23,42,0.65)] border border-slate-100/60 overflow-hidden">
+            <div className="px-4 md:px-6 pt-4 md:pt-5 pb-8">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
+                {/* Total Revenue */}
+                <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                  <CardContent className="p-4 sm:p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                          Total Revenue
+                        </p>
+                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                          SSP{" "}
+                          <AnimatedNumber
+                            value={Math.round(
+                              monthTotalSSP ||
+                                parseFloat(
+                                  dashboardData?.totalIncomeSSP || "0"
+                                )
+                            )}
+                            duration={1500}
+                            formatFn={(n) => nf0.format(Math.round(n))}
+                          />
+                        </p>
+                        <div className="flex items-center mt-1">
+                          {showNoDataYetRevenue ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No transactions yet
+                            </span>
+                          ) : revenueChangePct !== undefined &&
+                            revenueChangePct !== null &&
+                            (!(
+                              timeRange === "year" ||
+                              timeRange === "last-3-months"
+                            ) ||
+                              hasPreviousPeriodSSP) ? (
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                revenueChangePct > 0
+                                  ? "text-emerald-600"
+                                  : revenueChangePct < 0
+                                  ? "text-red-600"
+                                  : "text-slate-500"
+                              )}
+                            >
+                              {revenueChangePct > 0 ? "+" : ""}
+                              {revenueChangePct.toFixed(1)}%{" "}
+                              {comparisonLabel}
+                            </span>
+                          ) : shouldShowNoComparisonSSP ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No data to compare
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div
+                        className={cn(
+                          "p-2.5 rounded-xl shadow-sm",
+                          revenueChangePct !== undefined &&
+                            revenueChangePct !== null &&
+                            revenueChangePct < 0
+                            ? "bg-red-100"
+                            : "bg-emerald-100"
                         )}
-                        duration={1500}
-                        formatFn={(n) => nf0.format(Math.round(n))}
-                      />
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {showNoDataYetRevenue ? (
-                        <span className="text-xs font-medium text-slate-500">
-                          No transactions yet
-                        </span>
-                      ) : revenueChangePct !== undefined &&
+                      >
+                        {revenueChangePct !== undefined &&
                         revenueChangePct !== null &&
-                        (!(
-                          timeRange === "year" || timeRange === "last-3-months"
-                        ) ||
-                          hasPreviousPeriodSSP) ? (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            revenueChangePct > 0
-                              ? "text-emerald-600"
-                              : revenueChangePct < 0
-                              ? "text-red-600"
-                              : "text-slate-500"
-                          )}
-                        >
-                          {revenueChangePct > 0 ? "+" : ""}
-                          {revenueChangePct.toFixed(1)}% {comparisonLabel}
-                        </span>
-                      ) : shouldShowNoComparisonSSP ? (
-                        <span className="text-xs font-medium text-slate-500">
-                          No data to compare
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className={cn(
-                    "p-2.5 rounded-xl shadow-sm",
-                    revenueChangePct !== undefined && revenueChangePct !== null && revenueChangePct > 0
-                      ? "bg-emerald-100"
-                      : revenueChangePct !== undefined && revenueChangePct !== null && revenueChangePct < 0
-                      ? "bg-red-100"
-                      : "bg-emerald-100"
-                  )}>
-                    {revenueChangePct !== undefined &&
-                    revenueChangePct !== null &&
-                    revenueChangePct < 0 ? (
-                      <TrendingDown className="h-5 w-5 text-red-600" />
-                    ) : (
-                      <TrendingUp className="h-5 w-5 text-emerald-600" />
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Total Expenses - Red/Rose tint */}
-            <Card
-              className="border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
-              onClick={() => setOpenExpenses(true)}
-              title="Click to view expense breakdown"
-            >
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                      Total Expenses
-                    </p>
-                    <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                      SSP{" "}
-                      <AnimatedNumber
-                        value={Math.round(
-                          parseFloat(dashboardData?.totalExpenses || "0")
+                        revenueChangePct < 0 ? (
+                          <TrendingDown className="h-5 w-5 text-red-600" />
+                        ) : (
+                          <TrendingUp className="h-5 w-5 text-emerald-600" />
                         )}
-                        duration={1500}
-                        formatFn={(n) => nf0.format(Math.round(n))}
-                      />
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {showNoDataYetExpenses ? (
-                        <span className="text-xs font-medium text-slate-500">
-                          No expenses yet
-                        </span>
-                      ) : dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                        (!(
-                          timeRange === "year" || timeRange === "last-3-months"
-                        ) ||
-                          hasPreviousPeriodSSP) ? (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            dashboardData.changes.expenseChangeSSP > 0
-                              ? "text-red-600"
-                              : dashboardData.changes.expenseChangeSSP < 0
-                              ? "text-emerald-600"
-                              : "text-slate-500"
-                          )}
-                        >
-                          {dashboardData.changes.expenseChangeSSP > 0
-                            ? "+"
-                            : ""}
-                          {dashboardData.changes.expenseChangeSSP.toFixed(1)}%{" "}
-                          {comparisonLabel}
-                        </span>
-                      ) : shouldShowNoComparisonSSP ? (
-                        <span className="text-xs font-medium text-slate-500">
-                          No data to compare
-                        </span>
-                      ) : null}
+                      </div>
                     </div>
-                  </div>
-                  <div className={cn(
-                    "p-2.5 rounded-xl shadow-sm",
-                    dashboardData?.changes?.expenseChangeSSP !== undefined && dashboardData.changes.expenseChangeSSP < 0
-                      ? "bg-emerald-100"
-                      : "bg-red-100"
-                  )}>
-                    {dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                    dashboardData.changes.expenseChangeSSP < 0 ? (
-                      <TrendingDown className="h-5 w-5 text-emerald-600" />
-                    ) : (
-                      <CreditCard className="h-5 w-5 text-red-600" />
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            {/* Net Income - Blue/Indigo tint (THE key metric - slightly more prominent) */}
-            <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-100 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-              <CardContent className="p-4 sm:p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
-                      <span className="text-blue-500">★</span> Net Income
-                    </p>
-                    <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
-                      SSP <AnimatedNumber value={Math.round(sspNetIncome)} duration={1500} formatFn={(n) => nf0.format(Math.round(n))} />
-                    </p>
-                    {sspRevenue > 0 && (
-                      <p className={cn(
-                        "text-xs mt-0.5",
-                        sspNetIncome >= 0 ? "text-blue-600" : "text-red-600"
-                      )}>
-                        {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin: {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
-                      </p>
-                    )}
-                    <div className="flex items-center mt-1">
-                      {showNoDataYetNetIncome ? (
-                        <span className="text-xs font-medium text-slate-500">
-                          No transactions yet
-                        </span>
-                      ) : dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
-                        (!(
-                          timeRange === "year" || timeRange === "last-3-months"
-                        ) ||
-                          hasPreviousPeriodSSP) ? (
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            dashboardData.changes.netIncomeChangeSSP > 0
-                              ? "text-emerald-600"
-                              : dashboardData.changes.netIncomeChangeSSP < 0
-                              ? "text-red-600"
-                              : "text-slate-500"
-                          )}
-                        >
-                          {dashboardData.changes.netIncomeChangeSSP > 0
-                            ? "+"
-                            : ""}
-                          {dashboardData.changes.netIncomeChangeSSP.toFixed(1)}% {comparisonLabel}
-                        </span>
-                      ) : shouldShowNoComparisonSSP ? (
-                        <span className="text-xs font-medium text-slate-500">
-                          No data to compare
-                        </span>
-                      ) : null}
+                {/* Total Expenses */}
+                <Card
+                  className="border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
+                  onClick={() => setOpenExpenses(true)}
+                  title="Click to view expense breakdown"
+                >
+                  <CardContent className="p-4 sm:p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                          Total Expenses
+                        </p>
+                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                          SSP{" "}
+                          <AnimatedNumber
+                            value={Math.round(
+                              parseFloat(dashboardData?.totalExpenses || "0")
+                            )}
+                            duration={1500}
+                            formatFn={(n) => nf0.format(Math.round(n))}
+                          />
+                        </p>
+                        <div className="flex items-center mt-1">
+                          {showNoDataYetExpenses ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No expenses yet
+                            </span>
+                          ) : dashboardData?.changes
+                              ?.expenseChangeSSP !== undefined &&
+                            (!(
+                              timeRange === "year" ||
+                              timeRange === "last-3-months"
+                            ) ||
+                              hasPreviousPeriodSSP) ? (
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                dashboardData.changes.expenseChangeSSP > 0
+                                  ? "text-red-600"
+                                  : dashboardData.changes.expenseChangeSSP < 0
+                                  ? "text-emerald-600"
+                                  : "text-slate-500"
+                              )}
+                            >
+                              {dashboardData.changes.expenseChangeSSP > 0
+                                ? "+"
+                                : ""}
+                              {dashboardData.changes.expenseChangeSSP.toFixed(
+                                1
+                              )}{" "}
+                              {comparisonLabel}
+                            </span>
+                          ) : shouldShowNoComparisonSSP ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No data to compare
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div
+                        className={cn(
+                          "p-2.5 rounded-xl shadow-sm",
+                          dashboardData?.changes?.expenseChangeSSP !==
+                            undefined &&
+                            dashboardData.changes.expenseChangeSSP < 0
+                            ? "bg-emerald-100"
+                            : "bg-red-100"
+                        )}
+                      >
+                        {dashboardData?.changes?.expenseChangeSSP !==
+                          undefined &&
+                        dashboardData.changes.expenseChangeSSP < 0 ? (
+                          <TrendingDown className="h-5 w-5 text-emerald-600" />
+                        ) : (
+                          <CreditCard className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="bg-blue-100 p-2.5 rounded-xl shadow-sm">
-                    <DollarSign className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            {/* Insurance (USD) quick nav - Purple tint */}
-            <Link
-              href={`/insurance-providers?range=${rangeToSend}${
-                timeRange === "custom" &&
-                customStartDate &&
-                customEndDate
-                  ? `&startDate=${format(
-                      customStartDate,
-                      "yyyy-MM-dd"
-                    )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-                  : `&year=${yearToSend}&month=${monthToSend}`
-              }`}
-            >
-              <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                <CardContent className="p-4 sm:p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                        Insurance (USD)
-                      </p>
-                      <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                        USD{" "}
-                        <AnimatedNumber
-                          value={Math.round(
-                            parseFloat(dashboardData?.totalIncomeUSD || "0")
-                          )}
-                          duration={1500}
-                          formatFn={(n) => fmtUSD(Math.round(n))}
-                        />
-                      </p>
-                      <div className="flex items-center mt-1">
-                        {showNoDataYetInsurance ? (
-                          <span className="text-xs font-medium text-slate-500">
-                            No insurance claims yet
-                          </span>
-                        ) : insuranceChangePct !== undefined &&
-                          insuranceChangePct !== null &&
-                          (!(
-                            timeRange === "year" || timeRange === "last-3-months"
-                          ) ||
-                            hasPreviousPeriodUSD) ? (
-                          <span
+                {/* Net Income */}
+                <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-100 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                  <CardContent className="p-4 sm:p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
+                          <span className="text-blue-500">★</span> Net Income
+                        </p>
+                        <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
+                          SSP{" "}
+                          <AnimatedNumber
+                            value={Math.round(sspNetIncome)}
+                            duration={1500}
+                            formatFn={(n) => nf0.format(Math.round(n))}
+                          />
+                        </p>
+                        {sspRevenue > 0 && (
+                          <p
                             className={cn(
-                              "text-xs font-medium",
-                              insuranceChangePct > 0
-                                ? "text-emerald-600"
-                                : insuranceChangePct < 0
-                                ? "text-red-600"
-                                : "text-slate-500"
+                              "text-xs mt-0.5",
+                              sspNetIncome >= 0
+                                ? "text-blue-600"
+                                : "text-red-600"
                             )}
                           >
-                            {insuranceChangePct > 0 ? "+" : ""}
-                            {insuranceChangePct.toFixed(1)}% {comparisonLabel}
-                          </span>
-                        ) : shouldShowNoComparisonUSD &&
-                          insuranceChangePct !== undefined &&
-                          insuranceChangePct !== null ? (
-                          <span className="text-xs font-medium text-slate-500">
-                            No data to compare
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-purple-600">
-                            {Object.keys(
-                              dashboardData?.insuranceBreakdown || {}
-                            ).length === 1
-                              ? "1 provider"
-                              : `${
-                                  Object.keys(
-                                    dashboardData?.insuranceBreakdown || {}
-                                  ).length
-                                } providers`}
-                          </span>
+                            {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin:{" "}
+                            {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
+                          </p>
                         )}
+                        <div className="flex items-center mt-1">
+                          {showNoDataYetNetIncome ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No transactions yet
+                            </span>
+                          ) : dashboardData?.changes
+                              ?.netIncomeChangeSSP !== undefined &&
+                            (!(
+                              timeRange === "year" ||
+                              timeRange === "last-3-months"
+                            ) ||
+                              hasPreviousPeriodSSP) ? (
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                dashboardData.changes.netIncomeChangeSSP > 0
+                                  ? "text-emerald-600"
+                                  : dashboardData.changes.netIncomeChangeSSP < 0
+                                  ? "text-red-600"
+                                  : "text-slate-500"
+                              )}
+                            >
+                              {dashboardData.changes.netIncomeChangeSSP > 0
+                                ? "+"
+                                : ""}
+                              {dashboardData.changes.netIncomeChangeSSP.toFixed(
+                                1
+                              )}{" "}
+                              {comparisonLabel}
+                            </span>
+                          ) : shouldShowNoComparisonSSP ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No data to compare
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="bg-blue-100 p-2.5 rounded-xl shadow-sm">
+                        <DollarSign className="h-5 w-5 text-blue-600" />
                       </div>
                     </div>
-                    <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
-                      <Shield className="h-5 w-5 text-purple-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
 
-            {/* Patient Volume - Teal tint */}
-            <Link
-              href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
-            >
-              <Card className="border-0 shadow-md bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                <CardContent className="p-4 sm:p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                        Total Patients
-                      </p>
-                      <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                        <AnimatedNumber value={dashboardData?.totalPatients || 0} duration={1500} formatFn={(n) => nf0.format(Math.round(n))} />
-                      </p>
-                      <div className="flex items-center mt-1">
-                        {showNoDataYetPatients ? (
-                          <span className="text-xs font-medium text-slate-500">
-                            No patients recorded yet
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-teal-600">
-                            Current period
-                          </span>
-                        )}
+                {/* Insurance */}
+                <Link
+                  href={`/insurance-providers?range=${rangeToSend}${
+                    timeRange === "custom" &&
+                    customStartDate &&
+                    customEndDate
+                      ? `&startDate=${format(
+                          customStartDate,
+                          "yyyy-MM-dd"
+                        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
+                      : `&year=${yearToSend}&month=${monthToSend}`
+                  }`}
+                >
+                  <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+                    <CardContent className="p-4 sm:p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                            Insurance (USD)
+                          </p>
+                          <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                            USD{" "}
+                            <AnimatedNumber
+                              value={Math.round(
+                                parseFloat(
+                                  dashboardData?.totalIncomeUSD || "0"
+                                )
+                              )}
+                              duration={1500}
+                              formatFn={(n) => fmtUSD(Math.round(n))}
+                            />
+                          </p>
+                          <div className="flex items-center mt-1">
+                            {showNoDataYetInsurance ? (
+                              <span className="text-xs font-medium text-slate-500">
+                                No insurance claims yet
+                              </span>
+                            ) : insuranceChangePct !== undefined &&
+                              insuranceChangePct !== null &&
+                              (!(
+                                timeRange === "year" ||
+                                timeRange === "last-3-months"
+                              ) ||
+                                hasPreviousPeriodUSD) ? (
+                              <span
+                                className={cn(
+                                  "text-xs font-medium",
+                                  insuranceChangePct > 0
+                                    ? "text-emerald-600"
+                                    : insuranceChangePct < 0
+                                    ? "text-red-600"
+                                    : "text-slate-500"
+                                )}
+                              >
+                                {insuranceChangePct > 0 ? "+" : ""}
+                                {insuranceChangePct.toFixed(1)}{" "}
+                                {comparisonLabel}
+                              </span>
+                            ) : shouldShowNoComparisonUSD &&
+                              insuranceChangePct !== undefined &&
+                              insuranceChangePct !== null ? (
+                              <span className="text-xs font-medium text-slate-500">
+                                No data to compare
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium text-purple-600">
+                                {Object.keys(
+                                  dashboardData?.insuranceBreakdown || {}
+                                ).length === 1
+                                  ? "1 provider"
+                                  : `${
+                                      Object.keys(
+                                        dashboardData?.insuranceBreakdown ||
+                                          {}
+                                      ).length
+                                    } providers`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
+                          <Shield className="h-5 w-5 text-purple-600" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="bg-teal-100 p-2.5 rounded-xl shadow-sm">
-                      <Users className="h-5 w-5 text-teal-600" />
-                    </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Patients */}
+                <Link
+                  href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
+                >
+                  <Card className="border-0 shadow-md bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+                    <CardContent className="p-4 sm:p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                            Total Patients
+                          </p>
+                          <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                            <AnimatedNumber
+                              value={dashboardData?.totalPatients || 0}
+                              duration={1500}
+                              formatFn={(n) => nf0.format(Math.round(n))}
+                            />
+                          </p>
+                          <div className="flex items-center mt-1">
+                            {showNoDataYetPatients ? (
+                              <span className="text-xs font-medium text-slate-500">
+                                No patients recorded yet
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium text-teal-600">
+                                Current period
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-teal-100 p-2.5 rounded-xl shadow-sm">
+                          <Users className="h-5 w-5 text-teal-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
+
+              {/* MAIN LAYOUT */}
+              <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+                {/* LEFT: chart + quick actions (desktop) */}
+                <div className="space-y-6">
+                  <RevenueAnalyticsDaily
+                    timeRange={rangeToSend}
+                    selectedYear={yearToSend}
+                    selectedMonth={monthToSend}
+                    customStartDate={customStartDate ?? undefined}
+                    customEndDate={customEndDate ?? undefined}
+                  />
+                  <div className="hidden lg:block">
+                    <QuickActionsCard />
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
+                </div>
 
-          {/* ===== Main layout ===== */}
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-            {/* LEFT: chart + quick actions (desktop only) */}
-            <div className="space-y-6">
-              <RevenueAnalyticsDaily
-                timeRange={rangeToSend}
-                selectedYear={yearToSend}
-                selectedMonth={monthToSend}
-                customStartDate={customStartDate ?? undefined}
-                customEndDate={customEndDate ?? undefined}
-              />
+                {/* RIGHT: departments + providers + status */}
+                <div className="space-y-6">
+                  <DepartmentsPanel
+                    departments={
+                      Array.isArray(departments) ? (departments as any[]) : []
+                    }
+                    departmentBreakdown={dashboardData?.departmentBreakdown}
+                    totalSSP={sspRevenue}
+                  />
 
-              {/* Quick Actions - Hidden on mobile, shown on desktop */}
-              <div className="hidden lg:block">
+                  <InsuranceProvidersUSD
+                    breakdown={dashboardData?.insuranceBreakdown}
+                    totalUSD={parseFloat(
+                      dashboardData?.totalIncomeUSD || "0"
+                    )}
+                    timeRange={rangeToSend}
+                    selectedYear={yearToSend}
+                    selectedMonth={monthToSend}
+                    customStartDate={customStartDate ?? undefined}
+                    customEndDate={customEndDate ?? undefined}
+                  />
+
+                  <Card className="border border-slate-200 shadow-sm self-start">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
+                        System Status
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-600">
+                            Database
+                          </span>
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-700 border-green-200 rounded-full"
+                          >
+                            Connected
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-600">
+                            Last Sync
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-slate-200 text-slate-600"
+                          >
+                            {new Date().toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-600">
+                            Active Users
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="bg-blue-50 text-blue-700 border-blue-200 rounded-full"
+                          >
+                            1 online
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Quick Actions - mobile */}
+              <div className="lg:hidden mb-8">
                 <QuickActionsCard />
               </div>
-            </div>
 
-            {/* RIGHT: departments + providers + system status */}
-            <div className="space-y-6">
-              <DepartmentsPanel
-                departments={Array.isArray(departments) ? (departments as any[]) : []}
-                departmentBreakdown={dashboardData?.departmentBreakdown}
-                totalSSP={sspRevenue}
+              {/* Expenses drawer */}
+              <ExpensesDrawer
+                open={openExpenses}
+                onOpenChange={setOpenExpenses}
+                periodLabel={periodLabel}
+                expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
+                totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
+                onViewFullReport={() => {
+                  window.location.href = "/reports";
+                }}
               />
-
-              <InsuranceProvidersUSD
-                breakdown={dashboardData?.insuranceBreakdown}
-                totalUSD={parseFloat(dashboardData?.totalIncomeUSD || "0")}
-                timeRange={rangeToSend}
-                selectedYear={yearToSend}
-                selectedMonth={monthToSend}
-                customStartDate={customStartDate ?? undefined}
-                customEndDate={customEndDate ?? undefined}
-              />
-
-              <Card className="border border-slate-200 shadow-sm self-start">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full" /> System
-                    Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Database</span>
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-100 text-green-700 border-green-200 rounded-full"
-                      >
-                        Connected
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Last Sync</span>
-                      <Badge
-                        variant="outline"
-                        className="rounded-full border-slate-200 text-slate-600"
-                      >
-                        {new Date().toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">
-                        Active Users
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="bg-blue-50 text-blue-700 border-blue-200 rounded-full"
-                      >
-                        1 online
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
-
-          {/* Quick Actions - Shown only on mobile, at the bottom */}
-          <div className="lg:hidden mb-8">
-            <QuickActionsCard />
-          </div>
-
-          {/* Expenses drawer */}
-          <ExpensesDrawer
-            open={openExpenses}
-            onOpenChange={setOpenExpenses}
-            periodLabel={periodLabel}
-            expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
-            totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
-            onViewFullReport={() => {
-              window.location.href = "/reports";
-            }}
-          />
         </div>
       </main>
     </div>
