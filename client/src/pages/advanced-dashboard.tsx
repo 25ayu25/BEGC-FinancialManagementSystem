@@ -719,10 +719,10 @@ export default function AdvancedDashboard() {
       <header
         className={cn(
           "sticky top-0 z-50",
-          "bg-gradient-to-br from-slate-50 via-teal-50/20 to-emerald-50/30",
+          "bg-gradient-to-br from-teal-50 via-teal-100/50 to-emerald-50/60",
           "border-b border-slate-100",
           "shadow-sm",
-          "backdrop-blur-md supports-[backdrop-filter]:bg-gradient-to-br supports-[backdrop-filter]:from-slate-50/90 supports-[backdrop-filter]:via-teal-50/30 supports-[backdrop-filter]:to-emerald-50/40"
+          "backdrop-blur-md supports-[backdrop-filter]:bg-gradient-to-br supports-[backdrop-filter]:from-teal-50/95 supports-[backdrop-filter]:via-teal-100/60 supports-[backdrop-filter]:to-emerald-50/70"
         )}
       >
         <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
