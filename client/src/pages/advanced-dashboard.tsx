@@ -1,3 +1,4 @@
+// client/src/pages/advanced-dashboard.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -56,8 +57,8 @@ const fmtUSD = (v: number) => {
 };
 
 /* ================== header styles ================== */
-// Premium header control styles - adapted for the new Dark Command Center look
-const headerControlStyles = "h-10 bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:bg-slate-700 transition-all shadow-sm";
+// Dark mode inputs to blend with the header
+const headerControlStyles = "h-9 bg-slate-900/50 text-slate-200 border border-slate-700/50 hover:border-cyan-500/50 hover:bg-slate-800 transition-all shadow-sm focus:ring-cyan-500/20";
 
 /* ================== helper: normalize range ================== */
 function computeRangeParams(
@@ -718,50 +719,31 @@ export default function AdvancedDashboard() {
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
       
-      {/* Header - Premium Dark Mode with Midnight Gradient and Neon Horizon Line */}
-      <header
-        className="sticky top-0 z-50 shadow-2xl"
-        style={{
-          background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 100%)',
-        }}
-      >
+      {/* Header - The Premium "Neon Horizon" Look */}
+      <header className="sticky top-0 z-50 bg-[#0F172A] shadow-2xl">
         <div className="flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
           
-          {/* Left: Brand & Status */}
+          {/* Left: Brand & Status (Clean, no search) */}
           <div className="flex-shrink-0">
             <h1 className="text-2xl font-bold text-white tracking-tight">
               Executive Dashboard
             </h1>
             <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
               <span>Key Financials · {periodLabel}</span>
-              <span className="hidden sm:flex items-center gap-1.5 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full text-xs">
+              <span className="hidden sm:flex items-center gap-1.5 text-cyan-400 font-medium bg-cyan-950/30 border border-cyan-900/50 px-2 py-0.5 rounded-full text-xs">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
                 </span>
-                Live Updated
+                Live System
               </span>
-            </div>
-          </div>
-
-          {/* Center: Glassy Command Bar (Visual Only) */}
-          <div className="hidden lg:flex flex-1 max-w-md mx-6">
-            <div className="relative w-full group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-slate-500">⌘</span>
-              </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-slate-700/50 rounded-full leading-5 bg-slate-800/50 text-slate-300 placeholder-slate-500 focus:outline-none focus:bg-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-all duration-200 shadow-inner"
-                placeholder="Type command or search..."
-              />
             </div>
           </div>
 
           {/* Right: Existing Filters (Preserved Functionality) */}
           <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
             <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px] border-slate-600 bg-slate-800 text-slate-200 focus:ring-emerald-500")}>
+              <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[160px]")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -782,7 +764,7 @@ export default function AdvancedDashboard() {
                     setSpecificMonth(Number(val), selectedMonth || 1)
                   }
                 >
-                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[100px] border-slate-600 bg-slate-800 text-slate-200")}>
+                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[100px]")}>
                     <SelectValue placeholder="Year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -800,7 +782,7 @@ export default function AdvancedDashboard() {
                     setSpecificMonth(selectedYear || thisYear, Number(val))
                   }
                 >
-                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[130px] border-slate-600 bg-slate-800 text-slate-200")}>
+                  <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[130px]")}>
                     <SelectValue placeholder="Month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -818,7 +800,7 @@ export default function AdvancedDashboard() {
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn(headerControlStyles, "text-slate-300 border-slate-600 bg-slate-800")}>
+                    <Button variant="outline" className={cn(headerControlStyles, "justify-start text-left font-normal px-3")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customStartDate ? format(customStartDate, "MMM d") : "Start"}
                     </Button>
@@ -835,7 +817,7 @@ export default function AdvancedDashboard() {
                 <span className="text-slate-500">-</span>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn(headerControlStyles, "text-slate-300 border-slate-600 bg-slate-800")}>
+                    <Button variant="outline" className={cn(headerControlStyles, "justify-start text-left font-normal px-3")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {customEndDate ? format(customEndDate, "MMM d") : "End"}
                     </Button>
@@ -854,8 +836,11 @@ export default function AdvancedDashboard() {
           </div>
         </div>
 
-        {/* The "Neon Horizon" Line */}
-        <div className="h-[1px] w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-100 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+        {/* The "Neon Horizon" Light Beam */}
+        <div className="relative h-[1px] w-full bg-slate-800">
+           {/* This is the glowing center beam */}
+           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80 shadow-[0_0_15px_rgba(34,211,238,0.6)]"></div>
+        </div>
       </header>
 
       {/* Scrollable content */}
