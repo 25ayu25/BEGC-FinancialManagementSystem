@@ -804,7 +804,7 @@ export default function AdvancedDashboard() {
                         variant="outline"
                         className={cn(
                           "h-10 w-full sm:w-auto justify-start text-left font-normal bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors",
-                          !customStartDate && "text-slate-400"
+                          !customStartDate && "text-slate-500"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -849,7 +849,7 @@ export default function AdvancedDashboard() {
                         variant="outline"
                         className={cn(
                           "h-10 w-full sm:w-auto justify-start text-left font-normal bg-white/80 text-slate-700 border-teal-200 hover:bg-white hover:border-teal-300 shadow-sm transition-colors",
-                          !customEndDate && "text-slate-400"
+                          !customEndDate && "text-slate-500"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
