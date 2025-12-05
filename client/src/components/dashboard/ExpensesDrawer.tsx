@@ -128,9 +128,9 @@ function ExpenseCard({ expense, config }: ExpenseCardProps) {
       "relative overflow-hidden rounded-xl bg-white",
       "shadow-sm hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300",
       "hover:-translate-y-1 cursor-pointer border-t-4",
-      // Use dashed border for "Other" category to make it visually distinct
-      isOther ? "border border-dashed border-slate-300" : "border border-slate-200",
       config.border,
+      // Use dashed border style for "Other" category sides/bottom only (top is solid colored)
+      isOther ? "border-x border-b border-dashed border-slate-300" : "border border-slate-200",
       config.bg
     )}>
       <div className="p-4">
@@ -204,7 +204,8 @@ export default function ExpensesDrawer({
   }, [expenseBreakdown]);
 
   const computedTotal = sortedExpenses.reduce((s, r) => s + r.amount, 0);
-  const finalTotal = typeof totalExpenseSSP === "number" && totalExpenseSSP > 0 ? totalExpenseSSP : computedTotal;
+  // Use prop value if it's a valid number (including 0), otherwise fall back to computed total
+  const finalTotal = typeof totalExpenseSSP === "number" ? totalExpenseSSP : computedTotal;
   const safeTotal = finalTotal || 0;
 
   // Add percentage to each expense for display
@@ -240,11 +241,11 @@ export default function ExpensesDrawer({
         {/* Scrollable container for expense cards */}
         <div className="flex-1 overflow-y-auto min-h-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4">
-            {expensesWithPct.map((expense) => {
+            {expensesWithPct.map((expense, index) => {
               const config = getCategoryConfig(expense.name);
               return (
                 <ExpenseCard 
-                  key={expense.name} 
+                  key={`${expense.name}-${index}`} 
                   expense={expense} 
                   config={config}
                 />
