@@ -47,43 +47,43 @@ const expenseCategories: Record<string, CategoryConfig> = {
     icon: User, 
     gradient: 'from-blue-400 to-blue-600',
     border: 'border-t-blue-500',
-    bg: 'hover:bg-blue-50'
+    bg: 'hover:bg-blue-50/50'
   },
   'Clinic Operations': { 
     icon: Building2, 
     gradient: 'from-green-400 to-green-600',
     border: 'border-t-green-500',
-    bg: 'hover:bg-green-50'
+    bg: 'hover:bg-green-50/50'
   },
   'Lab Tech Payments': { 
     icon: FlaskConical, 
     gradient: 'from-orange-400 to-orange-600',
     border: 'border-t-orange-500',
-    bg: 'hover:bg-orange-50'
+    bg: 'hover:bg-orange-50/50'
   },
   'Doctor Payments': { 
     icon: Stethoscope, 
     gradient: 'from-teal-400 to-teal-600',
     border: 'border-t-teal-500',
-    bg: 'hover:bg-teal-50'
+    bg: 'hover:bg-teal-50/50'
   },
   'Lab Reagents': { 
     icon: TestTube, 
     gradient: 'from-pink-400 to-pink-600',
     border: 'border-t-pink-500',
-    bg: 'hover:bg-pink-50'
+    bg: 'hover:bg-pink-50/50'
   },
   'Drugs Purchased': { 
     icon: Pill, 
     gradient: 'from-amber-400 to-amber-600',
     border: 'border-t-amber-500',
-    bg: 'hover:bg-amber-50'
+    bg: 'hover:bg-amber-50/50'
   },
   'Other': { 
     icon: Package, 
     gradient: 'from-slate-400 to-slate-600',
     border: 'border-t-slate-500',
-    bg: 'hover:bg-slate-50'
+    bg: 'hover:bg-slate-50/50'
   },
 };
 
@@ -117,12 +117,15 @@ interface ExpenseCardProps {
 
 function ExpenseCard({ expense, config }: ExpenseCardProps) {
   const Icon = config.icon;
+  const isOther = isOtherCategory(expense.name);
   
   return (
     <div className={cn(
-      "relative overflow-hidden rounded-xl border border-slate-200 bg-white",
-      "shadow-sm hover:shadow-lg transition-all duration-300",
-      "hover:scale-[1.02] cursor-pointer border-t-4",
+      "relative overflow-hidden rounded-xl bg-white",
+      "shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300",
+      "hover:-translate-y-1 cursor-pointer border-t-4",
+      // Use dashed border for "Other" category to make it visually distinct
+      isOther ? "border border-dashed border-slate-300" : "border border-slate-200",
       config.border,
       config.bg
     )}>
