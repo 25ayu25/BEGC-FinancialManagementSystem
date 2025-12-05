@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { 
   Receipt, 
   Lightbulb, 
@@ -118,20 +119,20 @@ function ExpenseCard({ expense, config }: ExpenseCardProps) {
   const Icon = config.icon;
   
   return (
-    <div className={`
-      relative overflow-hidden rounded-xl border border-slate-200 bg-white
-      shadow-sm hover:shadow-lg transition-all duration-300
-      hover:scale-[1.02] cursor-pointer
-      border-t-4 ${config.border}
-      ${config.bg}
-    `}>
+    <div className={cn(
+      "relative overflow-hidden rounded-xl border border-slate-200 bg-white",
+      "shadow-sm hover:shadow-lg transition-all duration-300",
+      "hover:scale-[1.02] cursor-pointer border-t-4",
+      config.border,
+      config.bg
+    )}>
       <div className="p-4">
         {/* Icon */}
-        <div className={`
-          w-10 h-10 rounded-lg bg-gradient-to-br ${config.gradient}
-          flex items-center justify-center mb-3
-          shadow-lg
-        `}>
+        <div className={cn(
+          "w-10 h-10 rounded-lg bg-gradient-to-br",
+          "flex items-center justify-center mb-3 shadow-lg",
+          config.gradient
+        )}>
           <Icon className="h-5 w-5 text-white" />
         </div>
         
