@@ -95,11 +95,14 @@ export default function SimpleExpenseBreakdown({
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
 
+  // Number of top expense categories to emphasize visually
+  const TOP_CATEGORIES_COUNT = 3;
+
   // Calculate percentages for each row and mark top categories
   const rowsWithPct = rows.map((row, index) => ({
     ...row,
     pct: finalTotal > 0 ? (row.amount / finalTotal) * 100 : 0,
-    isTopCategory: index < 3 && !row.category.toLowerCase().includes('other'), // Top 3 non-other categories
+    isTopCategory: index < TOP_CATEGORIES_COUNT && !row.category.toLowerCase().includes('other'), // Top non-other categories
     rank: index + 1,
   }));
 

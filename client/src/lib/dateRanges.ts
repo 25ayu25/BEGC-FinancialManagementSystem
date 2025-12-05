@@ -21,9 +21,9 @@ export interface MonthBucket {
 }
 
 export interface DateRangeResult {
-  /** Start date of the range (first day of first month, at midnight UTC) */
+  /** Start date of the range (first day of first month, at local midnight) */
   startDate: Date;
-  /** End date of the range (last day of last month, at midnight UTC) */
+  /** End date of the range (last day of last month, at local midnight) */
   endDate: Date;
   /** Human-readable label for subtitles */
   label: string;
