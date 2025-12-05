@@ -715,27 +715,27 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-white dark:bg-slate-900">
-      {/* Header */}
+      {/* Header - Dark Glassmorphism */}
       <header
         className={cn(
           "sticky top-0 z-50",
-          "bg-gradient-to-br from-teal-50 via-teal-100/50 to-emerald-50/60",
-          "border-b border-slate-100",
-          "shadow-sm",
-          "backdrop-blur-md supports-[backdrop-filter]:bg-gradient-to-br supports-[backdrop-filter]:from-teal-50/95 supports-[backdrop-filter]:via-teal-100/60 supports-[backdrop-filter]:to-emerald-50/70"
+          "bg-slate-900/95",
+          "backdrop-blur-xl",
+          "border-b border-slate-700/50",
+          "shadow-lg shadow-slate-900/20"
         )}
       >
-        <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:p-6">
+        <div className="px-4 py-[max(12px,env(safe-area-inset-top))] md:px-6 md:py-4">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-start md:gap-x-8">
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+              <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-white">
                 Executive Dashboard
               </h1>
-              <div className="mt-1 flex items-center gap-4">
-                <p className="text-sm text-muted-foreground">
+              <div className="mt-1 flex items-center gap-3">
+                <p className="text-sm text-slate-400">
                   Key financials · {periodLabel}
                 </p>
-                <span className="hidden sm:inline-flex text-xs text-slate-400">
+                <span className="hidden sm:inline-flex text-xs text-teal-400">
                   Last updated: {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
@@ -744,7 +744,7 @@ export default function AdvancedDashboard() {
             {/* Filters */}
             <div className="mt-3 md:mt-0 w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-center md:justify-end gap-2">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger className="h-10 w-full sm:w-[160px]">
+                <SelectTrigger className="h-10 w-full sm:w-[160px] bg-slate-800 text-white border-slate-700 hover:bg-slate-700 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -765,7 +765,7 @@ export default function AdvancedDashboard() {
                       setSpecificMonth(Number(val), selectedMonth || 1)
                     }
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[120px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[120px] bg-slate-800 text-white border-slate-700 hover:bg-slate-700 transition-colors">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -783,7 +783,7 @@ export default function AdvancedDashboard() {
                       setSpecificMonth(selectedYear || thisYear, Number(val))
                     }
                   >
-                    <SelectTrigger className="h-10 w-full sm:w-[140px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[140px] bg-slate-800 text-white border-slate-700 hover:bg-slate-700 transition-colors">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -804,8 +804,8 @@ export default function AdvancedDashboard() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "h-10 w-full sm:w-auto justify-start text-left font-normal",
-                          !customStartDate && "text-muted-foreground"
+                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-slate-800 text-white border-slate-700 hover:bg-slate-700 transition-colors",
+                          !customStartDate && "text-slate-400"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -839,7 +839,7 @@ export default function AdvancedDashboard() {
 
                   <span
                     aria-hidden
-                    className="text-center sm:text-left text-muted-foreground"
+                    className="text-center sm:text-left text-slate-400"
                   >
                     to
                   </span>
@@ -849,8 +849,8 @@ export default function AdvancedDashboard() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "h-10 w-full sm:w-auto justify-start text-left font-normal",
-                          !customEndDate && "text-muted-foreground"
+                          "h-10 w-full sm:w-auto justify-start text-left font-normal bg-slate-800 text-white border-slate-700 hover:bg-slate-700 transition-colors",
+                          !customEndDate && "text-slate-400"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
