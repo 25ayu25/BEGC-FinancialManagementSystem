@@ -107,11 +107,14 @@ export default function SimpleExpenseBreakdown({
   const computedTotal = sortedExpenses.reduce((s, r) => s + r.amount, 0);
   const finalTotal = typeof total === "number" && total > 0 ? total : computedTotal;
 
-  // Add percentage to each expense for display
-  const expensesWithPct = sortedExpenses.map((expense) => ({
-    ...expense,
-    percentage: finalTotal > 0 ? Math.round((expense.amount / finalTotal) * 100) : 0,
-  }));
+  // Add percentage to each expense for display (memoized)
+  const expensesWithPct = React.useMemo(() => 
+    sortedExpenses.map((expense) => ({
+      ...expense,
+      percentage: finalTotal > 0 ? Math.round((expense.amount / finalTotal) * 100) : 0,
+    })),
+    [sortedExpenses, finalTotal]
+  );
 
   // Calculate top 3 percentage (excluding Other)
   const top3Percentage = React.useMemo(() => {
@@ -121,7 +124,12 @@ export default function SimpleExpenseBreakdown({
   }, [expensesWithPct]);
 
   // Custom tooltip for donut chart
-  const CustomTooltip = ({ active, payload }: any) => {
+  interface TooltipProps {
+    active?: boolean;
+    payload?: Array<{ payload: { name: string; amount: number; percentage: number } }>;
+  }
+
+  const CustomTooltip = ({ active, payload }: TooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
@@ -137,7 +145,7 @@ export default function SimpleExpenseBreakdown({
   };
 
   // Handle hover effects
-  const onPieEnter = (_: any, index: number) => setActiveIndex(index);
+  const onPieEnter = (_: unknown, index: number) => setActiveIndex(index);
   const onPieLeave = () => setActiveIndex(null);
 
   return (
