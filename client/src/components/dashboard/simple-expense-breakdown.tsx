@@ -4,12 +4,14 @@ import {
   Receipt, 
   Lightbulb, 
   User, 
+  Users,
   Building2, 
   FlaskConical, 
   Stethoscope, 
   TestTube, 
   Pill, 
   Package,
+  Zap,
   type LucideIcon
 } from "lucide-react";
 
@@ -32,6 +34,9 @@ function compactValue(n: number) {
   if (v >= 1_000) return `${nf0.format(Math.round(n / 1_000))}k`;
   return `${nf0.format(Math.round(n))}`;
 }
+
+// Minimum width percentage for expense bars to ensure visibility
+const MIN_BAR_WIDTH_PERCENT = 2;
 
 // Category configuration with icons and colors
 interface CategoryConfig {
@@ -101,7 +106,7 @@ function getCategoryConfig(categoryName: string): CategoryConfig {
   // Staff Salaries
   if (normalizedName.includes('salary') || normalizedName.includes('salaries') || normalizedName.includes('staff')) {
     return {
-      icon: User,
+      icon: Users,
       bgColor: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
       barColor: 'bg-indigo-500',
     };
@@ -110,7 +115,7 @@ function getCategoryConfig(categoryName: string): CategoryConfig {
   // Utilities / Fuel
   if (normalizedName.includes('fuel') || normalizedName.includes('utility') || normalizedName.includes('utilities')) {
     return {
-      icon: Building2,
+      icon: Zap,
       bgColor: 'bg-gradient-to-br from-cyan-400 to-cyan-600',
       barColor: 'bg-cyan-500',
     };
@@ -272,7 +277,7 @@ export default function SimpleExpenseBreakdown({
                     <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full ${row.config.barColor} transition-all duration-500 group-hover:opacity-80`}
-                        style={{ width: `${Math.max(scaledWidth, 2)}%` }}
+                        style={{ width: `${Math.max(scaledWidth, MIN_BAR_WIDTH_PERCENT)}%` }}
                       />
                     </div>
                   </div>
