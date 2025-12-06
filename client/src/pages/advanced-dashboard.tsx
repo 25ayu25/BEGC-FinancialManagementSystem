@@ -54,9 +54,9 @@ const fmtUSD = (v: number) => {
 };
 
 /* ========= header styles ========= */
-// Lighter, semi-transparent controls to match the premium "Midnight" aesthetic
+// Lighter background on inputs so they don't disappear into the dark header
 const headerControlStyles =
-  "h-9 bg-slate-800/50 text-slate-100 border border-slate-700/50 hover:border-cyan-400/50 hover:bg-slate-700/80 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-0 placeholder:text-slate-400";
+  "h-9 bg-slate-800 text-slate-200 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-700 transition-all shadow-sm focus-visible:ring-1 focus-visible:ring-cyan-400";
 
 /* ========= helper: normalize range ========= */
 function computeRangeParams(
@@ -371,6 +371,11 @@ export default function AdvancedDashboard() {
     { label: "November", value: 11 },
     { label: "December", value: 12 },
   ];
+
+  const lastUpdatedLabel = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(now);
 
   /* ---------- data ---------- */
   const { data: dashboardData, isLoading } = useQuery({
@@ -697,9 +702,9 @@ export default function AdvancedDashboard() {
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-900">
       
-      {/* HEADER DESIGN UPDATE:
-        1. Lighter Background: slate-900 instead of pure black/slate-950.
-        2. Radiance Layer: Added a glow layer (h-32) that hangs below the header.
+      {/* HEADER DESIGN UPDATE (Fixing the "Black Hole" and "No Glow" issues):
+        1. Changed background to slate-900 (not 950) so it feels rich, not dead.
+        2. Added specific 'glow' divs (bottom-0 and -bottom-24) to create that atmospheric light leak.
       */}
       <header className="sticky top-0 z-50 shadow-2xl bg-slate-900 relative">
         <div className="flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4 relative z-20">
@@ -849,18 +854,15 @@ export default function AdvancedDashboard() {
           </div>
         </div>
 
-        {/* THE MAGIC GLOW: 
-           This is the "Radiating" effect you were looking for.
-           1. The Border: A sharp gradient line at the very bottom.
-           2. The Radiance: A large, soft gradient that sits BEHIND the main content, 
-              simulating light leaking downwards.
+        {/* --- THE GLOW EFFECT --- 
+            This is what creates the atmosphere. 
+            1. A sharp 1px line.
+            2. A big gradient bleed that hangs underneath the header (z-40) 
         */}
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent z-30 opacity-70" />
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-cyan-400 z-50 shadow-[0_0_20px_2px_rgba(34,211,238,0.6)]" />
         
-        <div 
-          className="absolute -bottom-24 left-0 right-0 h-32 w-full bg-gradient-to-b from-cyan-500/10 via-cyan-500/5 to-transparent pointer-events-none z-0"
-          aria-hidden="true" 
-        />
+        {/* Radiating Light Leak (The Atmosphere) */}
+        <div className="absolute -bottom-24 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/20 to-transparent z-40 pointer-events-none blur-xl" />
       </header>
 
       {/* MAIN CONTENT */}
