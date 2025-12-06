@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,10 +83,19 @@ export default function SecurityPage() {
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <PageHeader
-        title="Security"
-        subtitle="Security settings"
-      />
+      <div className="bg-white border-b border-slate-200 px-6 py-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+              <Shield className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Security</h1>
+              <p className="text-slate-600">Manage your account security and access</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-6">

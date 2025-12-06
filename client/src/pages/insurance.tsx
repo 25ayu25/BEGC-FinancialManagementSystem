@@ -6,8 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { PageHeader, headerControlStyles } from "@/components/ui/page-header";
-import { cn } from "@/lib/utils";
 
 /* ----------------------------- types ----------------------------- */
 type Provider = { id: string; code: string; name: string; isActive: boolean };
@@ -760,25 +758,25 @@ export default function InsurancePage() {
 
   /* ----------------------------- UI ----------------------------- */
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      {/* World-class header */}
-      <PageHeader
-        title="Insurance Management"
-        subtitle="Manage insurance claims"
-      >
-        {/* Desktop actions */}
-        <div className="hidden md:flex items-center gap-2">
-          <button
-            onClick={() => {
-              setEditingClaimId("");
-              setCProviderId(providerId || "");
-              setCDate(new Date().toISOString().slice(0,10));
+    <div className="max-w-[1200px] mx-auto">
+      {/* Sticky header with actions */}
+      <div ref={headerRef} className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}>
+        <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-semibold">Insurance Management</h1>
+
+          {/* Desktop actions */}
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              onClick={() => {
+                setEditingClaimId("");
+                setCProviderId(providerId || "");
+                setCDate(new Date().toISOString().slice(0,10));
                 setCCurrency("USD");
                 setCAmount("0");
                 setCNotes("");
                 setShowClaim(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-slate-900 hover:bg-slate-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Add Claim
@@ -792,7 +790,7 @@ export default function InsurancePage() {
                 setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-slate-900 hover:bg-slate-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
             >
               <CreditCard className="h-4 w-4" />
               Record Payment
@@ -800,7 +798,7 @@ export default function InsurancePage() {
 
             <button 
               onClick={() => exportClaimsCsv(claims, providers)} 
-              className={cn(headerControlStyles, "inline-flex items-center gap-2 px-3 py-2 rounded-full")}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
             >
               <Download className="h-4 w-4" />
               Export CSV
@@ -862,14 +860,12 @@ export default function InsurancePage() {
               </div>
             )}
           </div>
-        </PageHeader>
+        </div>
+      </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto" ref={headerRef}>
-        <div className="max-w-[1200px] mx-auto">
-          {/* Auth notice */}
-          <div className="p-4 sm:p-6">
-            {authError && (
+      {/* Auth notice */}
+      <div className="p-4 sm:p-6">
+        {authError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             Authentication required. If you’re in Incognito/Private mode, allow third-party cookies or sign in again.
           </div>
@@ -1730,8 +1726,6 @@ export default function InsurancePage() {
           </div>
         </div>
       )}
-        </div>
-      </div>
     </div>
   );
 }

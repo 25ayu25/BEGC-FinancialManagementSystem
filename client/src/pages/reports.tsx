@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, api } from "@/lib/queryClient";
-import { PageHeader, headerControlStyles } from "@/components/ui/page-header";
-import { cn } from "@/lib/utils";
+import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -130,48 +129,48 @@ export default function Reports() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50">
-      <PageHeader
+    <div className="flex-1 flex flex-col h-full">
+      <Header
         title="Monthly Reports"
-        subtitle="Generate and view reports"
-      >
-        <div className="flex items-center space-x-3">
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className={cn(headerControlStyles, "w-32 rounded-full")}>
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map((month) => (
-                <SelectItem key={month.value} value={month.value}>
-                  {month.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        subtitle="Generate and manage monthly financial reports"
+        actions={
+          <div className="flex items-center space-x-3">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className={cn(headerControlStyles, "w-24 rounded-full")}>
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {yearOptions.map((year) => (
-                <SelectItem key={year} value={year}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-24">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Button
-            onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
-            data-testid="button-generate-report"
-            className="bg-white text-slate-900 hover:bg-slate-100 rounded-full"
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Generate Report
-          </Button>
-        </div>
-      </PageHeader>
+            <Button
+              onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
+              data-testid="button-generate-report"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Generate Report
+            </Button>
+          </div>
+        }
+      />
 
       <main className="flex-1 overflow-y-auto p-6">
         <Card>

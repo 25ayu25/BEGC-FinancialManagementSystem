@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { PageHeader, headerControlStyles } from "@/components/ui/page-header";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -337,26 +336,29 @@ export default function InsuranceProvidersPage() {
       : "Custom period";
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      {/* World-class header */}
-      <PageHeader
-        title="Insurance Balance"
-        subtitle="Provider balances and payments"
-      >
-        <div className="flex items-center gap-2">
-          <Link href="/" className="inline-flex">
-            <Button variant="ghost" size="sm" className="gap-2 text-slate-300 hover:text-white hover:bg-slate-700/50">
-              <ArrowLeft className="h-4 w-4" />
-              Dashboard
-            </Button>
-          </Link>
-        </div>
-      </PageHeader>
+    <div className="p-4 md:p-6 space-y-6 bg-gray-50 min-h-screen">
+      {/* Header (mobile-first, stacks filter below title) */}
+      <header className="bg-white rounded-lg shadow-sm border p-4 md:p-6">
+        <div className="flex flex-col gap-4 md:gap-6">
+          {/* Row 1: back + titles */}
+          <div className="flex items-start gap-4">
+            <Link href="/" className="inline-flex">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+              </Button>
+            </Link>
 
-      {/* Content */}
-      <div className="flex-1 p-4 md:p-6 space-y-6">
-        {/* Date filter row */}
-        <div className="bg-white rounded-lg shadow-sm border p-4 md:p-6">
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
+                Insurance <br className="hidden md:block" /> Providers
+              </h1>
+              <p className="text-slate-600 mt-1 md:mt-2">
+                Detailed breakdown · {headerLabel}
+              </p>
+            </div>
+          </div>
+
           {/* Row 2: date filter (z-50 so popovers are never clipped) */}
           <div className="relative z-50">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -494,15 +496,16 @@ export default function InsuranceProvidersPage() {
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Overview */}
-        <Card className="border-0 shadow-md bg-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              Insurance Revenue Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Overview */}
+      <Card className="border-0 shadow-md bg-white">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-slate-900">
+            Insurance Revenue Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-center gap-3">
               <div className="bg-purple-50 p-2 rounded-lg">
@@ -556,17 +559,17 @@ export default function InsuranceProvidersPage() {
               </div>
             </div>
           </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-        {/* Share by Provider (Donut + Legend) */}
-        <Card className="border-0 shadow-md bg-white">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              Share by Provider
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
+      {/* Share by Provider (Donut + Legend) */}
+      <Card className="border-0 shadow-md bg-white">
+        <CardHeader className="pb-1">
+          <CardTitle className="text-lg font-semibold text-slate-900">
+            Share by Provider
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-2">
           {providers.length === 0 ? (
             <div className="py-8 text-center text-slate-500">No insurance data for this period.</div>
           ) : (
@@ -625,11 +628,11 @@ export default function InsuranceProvidersPage() {
               </div>
             </div>
           )}
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-        {/* Provider Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* Provider Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {providers.map((p, idx) => {
           const prev = Number(prevInsuranceBreakdown[p.name] || 0);
           const change = prev > 0 ? ((p.usd - prev) / prev) * 100 : 0;
@@ -748,38 +751,37 @@ export default function InsuranceProvidersPage() {
             </Card>
           );
         })}
-        </div>
-
-        {providers.length === 0 && (
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-8 text-center">
-              <Shield className="h-12 w-12 text-slate-400 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">No Insurance Data</h3>
-              <p className="text-slate-600">
-                No insurance transactions found for the selected period.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Monthly totals list (optional) */}
-        {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
-          <Card className="border-0 shadow-md bg-white">
-            <CardHeader>
-              <CardTitle>Insurance Revenue by Month</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-1">
-                {monthlyInsurance.data.map((entry: any) => (
-                  <li key={`${entry.year}-${entry.month}`} className="text-sm text-slate-700">
-                    {entry.month} {entry.year}: USD {nf0.format(Math.round(entry.usd))}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      {providers.length === 0 && (
+        <Card className="border-0 shadow-md bg-white">
+          <CardContent className="p-8 text-center">
+            <Shield className="h-12 w-12 text-slate-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">No Insurance Data</h3>
+            <p className="text-slate-600">
+              No insurance transactions found for the selected period.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Monthly totals list (optional) */}
+      {monthlyInsurance && monthlyInsurance.data && monthlyInsurance.data.length > 0 && (
+        <Card className="border-0 shadow-md bg-white">
+          <CardHeader>
+            <CardTitle>Insurance Revenue by Month</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1">
+              {monthlyInsurance.data.map((entry: any) => (
+                <li key={`${entry.year}-${entry.month}`} className="text-sm text-slate-700">
+                  {entry.month} {entry.year}: USD {nf0.format(Math.round(entry.usd))}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

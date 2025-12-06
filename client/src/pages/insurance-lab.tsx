@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from "react";
-import { PageHeader, headerControlStyles } from "@/components/ui/page-header";
 import {
   useQuery,
   useQueries,
@@ -406,20 +405,18 @@ export default function InsuranceLabPage() {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      {/* World-class header */}
-      <PageHeader
-        title="Lab Finance"
-        subtitle="Laboratory financial data"
-      >
-        <span className="text-xs text-slate-300">{showingLabel}</span>
-      </PageHeader>
-
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto space-y-6 pb-10 px-4 sm:px-6 pt-4">
-          {/* Filters */}
-          <div className="flex flex-col gap-4">
+    <div className="max-w-6xl mx-auto space-y-6 pb-10 px-4 sm:px-6">
+      {/* Header & Filters */}
+      <div className="flex flex-col gap-4 pt-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+            Lab Finance
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Track lab insurance and technician payments.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
+        </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm px-4 py-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <p className="text-[11px] text-muted-foreground max-w-xs">
@@ -1011,8 +1008,6 @@ export default function InsuranceLabPage() {
         paymentToEdit={editingPayment}
         onSaved={handlePaymentSaved}
       />
-        </div>
-      </div>
     </div>
   );
 }
