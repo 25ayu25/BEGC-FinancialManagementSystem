@@ -371,14 +371,10 @@ export default function AdvancedDashboard() {
     { label: "December", value: 12 },
   ];
 
+  // still used for "Last Sync" in System Status, but not in header anymore
   const lastUpdatedLabel = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(now);
-
-  const detailedUpdatedLabel = new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
   }).format(now);
 
   /* ---------- data ---------- */
@@ -718,13 +714,6 @@ export default function AdvancedDashboard() {
               </h1>
               <p className="mt-1 text-sm text-slate-300">
                 Key financials · {periodLabel}
-                <span className="mx-2 text-slate-600">•</span>
-                <span
-                  className="text-emerald-400"
-                  title={detailedUpdatedLabel}
-                >
-                  Last updated {lastUpdatedLabel}
-                </span>
               </p>
             </div>
 
@@ -875,12 +864,12 @@ export default function AdvancedDashboard() {
         {/* soft glow under header into content */}
         <div className="pointer-events-none absolute inset-x-0 -top-8 h-20 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
 
-        {/* subtle vertical glow echoing the header along sidebar edge */}
-        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-sky-500/14 via-cyan-400/6 to-transparent" />
+        {/* subtle vertical glow echoing the header along sidebar edge – slightly reduced */}
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-sky-500/10 via-cyan-400/4 to-transparent" />
 
         <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-8">
-          {/* full-width main surface */}
-          <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden transition-shadow duration-300 hover:shadow-[0_26px_80px_rgba(15,23,42,0.28)] hover:border-slate-200">
+          {/* full-width main surface with slightly softer hover */}
+          <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden transition-shadow duration-300 hover:shadow-[0_22px_72px_rgba(15,23,42,0.22)] hover:border-slate-200">
             {/* inner top glow so KPI cards look lit */}
             <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/18 via-sky-400/8 to-transparent" />
 
