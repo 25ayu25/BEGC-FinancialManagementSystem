@@ -1,3 +1,5 @@
+// client/src/components/layout/sidebar.tsx
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
@@ -13,11 +15,10 @@ import {
   ListChecks,    // providers sub-link
   PieChart,      // insurance overview
   ChevronDown,
-  FlaskConical,  // <--- NEW ICON for Lab Finance
+  FlaskConical,  // Lab Finance
   TrendingUp,    // Trends & Comparisons
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
-import { useEffect, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type NavItem = {
@@ -36,7 +37,6 @@ const navigationBefore: NavItem[] = [
 const insuranceItems: NavItem[] = [
   { name: "Overview", href: "/insurance-overview", icon: PieChart },
   { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks },
-  // --- NEW ITEM ADDED HERE ---
   { name: "Lab Finance", href: "/insurance/lab", icon: FlaskConical },
   { name: "Insurance Balance", href: "/insurance", icon: ShieldCheck },
 ];
@@ -55,13 +55,13 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [location] = useLocation();
-  
+
   // Check if any insurance route is active to auto-expand the group
-  const isInsuranceActive = insuranceItems.some(item => location === item.href);
-  
+  const isInsuranceActive = insuranceItems.some((item) => location === item.href);
+
   // State to control collapsible open/close for user interaction
   const [isInsuranceOpen, setIsInsuranceOpen] = useState(isInsuranceActive);
-  
+
   // Auto-expand when navigating to an insurance route
   useEffect(() => {
     if (isInsuranceActive) {
@@ -92,13 +92,16 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 h-screen bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 h-screen bg-slate-950 text-slate-100 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0 relative",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
       >
+        {/* Neon spine tying into the header glow */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-[2px] bg-gradient-to-b from-emerald-400/40 via-cyan-400/60 to-sky-500/40 shadow-[0_0_18px_rgba(56,189,248,0.85)]" />
+
         {/* Mobile close button */}
-        <div className="lg:hidden absolute top-4 right-4">
+        <div className="lg:hidden absolute top-4 right-4 z-10">
           <button
             onClick={onClose}
             className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
@@ -109,13 +112,13 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </div>
 
         {/* Logo - Fixed at top, never scrolls */}
-        <div className="flex-shrink-0 p-4 border-b border-slate-700">
+        <div className="flex-shrink-0 p-4 border-b border-slate-900/70">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-white font-semibold text-base leading-tight">
+              <h1 className="text-slate-50 font-semibold text-base leading-tight">
                 Bahr El Ghazal Clinic
               </h1>
               <p className="text-slate-400 font-normal text-xs leading-tight">
@@ -136,12 +139,18 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
-                      ? "bg-slate-800/50 text-white border-l-[3px] border-teal-400"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      ? "bg-slate-800/60 text-slate-50 border-l-[3px] border-teal-400"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-slate-50"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
-                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-teal-400" : "text-slate-400")} aria-hidden="true" />
+                  <item.icon
+                    className={cn(
+                      "w-5 h-5 shrink-0",
+                      isActive ? "text-teal-400" : "text-slate-400"
+                    )}
+                    aria-hidden="true"
+                  />
                   <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
                     {item.name}
                   </span>
@@ -157,16 +166,25 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors min-w-0",
                   isInsuranceActive
-                    ? "text-white bg-slate-800/50"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                    ? "text-slate-50 bg-slate-800/60"
+                    : "text-slate-300 hover:text-slate-50 hover:bg-slate-800"
                 )}
                 data-testid="group-insurance"
               >
-                <ShieldCheck className={cn("w-5 h-5 shrink-0", isInsuranceActive ? "text-teal-400" : "text-slate-400")} aria-hidden="true" />
+                <ShieldCheck
+                  className={cn(
+                    "w-5 h-5 shrink-0",
+                    isInsuranceActive ? "text-teal-400" : "text-slate-400"
+                  )}
+                  aria-hidden="true"
+                />
                 <span className="font-medium flex-1 whitespace-normal break-words leading-snug text-left">
                   Insurance
                 </span>
-                <ChevronDown className="w-4 h-4 shrink-0 text-slate-400 transition-transform duration-200" aria-hidden="true" />
+                <ChevronDown
+                  className="w-4 h-4 shrink-0 text-slate-400 transition-transform duration-200"
+                  aria-hidden="true"
+                />
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-1 mt-1">
@@ -178,12 +196,18 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer min-w-0 pl-10 text-sm",
                         isActive
-                          ? "bg-slate-800/50 text-white border-l-[3px] border-teal-400"
-                          : "text-slate-400 hover:text-white hover:bg-slate-800"
+                          ? "bg-slate-800/60 text-slate-50 border-l-[3px] border-teal-400"
+                          : "text-slate-400 hover:text-slate-50 hover:bg-slate-800"
                       )}
                       data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                     >
-                      <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-teal-400" : "")} aria-hidden="true" />
+                      <item.icon
+                        className={cn(
+                          "w-5 h-5 shrink-0",
+                          isActive ? "text-teal-400" : ""
+                        )}
+                        aria-hidden="true"
+                      />
                       <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
                         {item.name}
                       </span>
@@ -203,12 +227,18 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer min-w-0",
                     isActive
-                      ? "bg-slate-800/50 text-white border-l-[3px] border-teal-400"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      ? "bg-slate-800/60 text-slate-50 border-l-[3px] border-teal-400"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-slate-50"
                   )}
                   data-testid={`link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                 >
-                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-teal-400" : "text-slate-400")} aria-hidden="true" />
+                  <item.icon
+                    className={cn(
+                      "w-5 h-5 shrink-0",
+                      isActive ? "text-teal-400" : "text-slate-400"
+                    )}
+                    aria-hidden="true"
+                  />
                   <span className="font-medium flex-1 whitespace-normal break-words leading-snug">
                     {item.name}
                   </span>
@@ -219,10 +249,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </nav>
 
         {/* User Profile & Status - Fixed at bottom, never scrolls */}
-        <div 
-          className="flex-shrink-0 mt-auto p-4 border-t border-slate-700 bg-slate-900"
-          style={{ 
-            paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 24px))' 
+        <div
+          className="flex-shrink-0 mt-auto p-4 border-t border-slate-900/70 bg-slate-950"
+          style={{
+            paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 24px))",
           }}
         >
           <UserProfileMenu />
