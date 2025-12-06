@@ -700,10 +700,10 @@ export default function AdvancedDashboard() {
 
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
-      {/* HEADER – softened gradient + thicker glowing line */}
+      {/* HEADER */}
       <header className="sticky top-0 z-40">
-        <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_18%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
-          {/* soft glassy glow across header */}
+        <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
+          {/* glassy glow */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
@@ -720,7 +720,7 @@ export default function AdvancedDashboard() {
               </p>
             </div>
 
-            {/* Controls only – no search bar */}
+            {/* controls only – no search bar */}
             <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto justify-end">
               <Select value={timeRange} onValueChange={handleTimeRangeChange}>
                 <SelectTrigger
@@ -862,16 +862,19 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* MAIN – dark → light with glow that bleeds into the cards */}
-      <main className="min-h-0 overflow-y-auto bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
-        <div className="relative px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-6">
-          {/* this glow sits JUST under the cyan line, softening the transition */}
-          <div className="pointer-events-none absolute inset-x-0 -top-4 h-20 bg-gradient-to-b from-cyan-400/26 via-sky-500/12 to-transparent" />
+      {/* MAIN – vignette + softer glow + more breathing room */}
+      <main className="relative min-h-0 overflow-y-auto bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
+        {/* vignette around edges */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(15,23,42,0)_0,_rgba(15,23,42,0.9)_78%)] opacity-70" />
 
-          <div className="max-w-6xl xl:max-w-7xl mx-auto">
-            {/* big white surface card the glow appears behind */}
+        <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-10">
+          {/* wider, softer glow under the cyan line */}
+          <div className="pointer-events-none absolute inset-x-0 -top-8 h-24 bg-gradient-to-b from-cyan-400/30 via-sky-500/18 to-transparent" />
+
+          <div className="max-w-6xl xl:max-w-7xl mx-auto mt-8">
+            {/* main white “board” */}
             <div className="relative rounded-3xl bg-white shadow-[0_28px_80px_rgba(15,23,42,0.78)] border border-slate-100 overflow-hidden">
-              {/* subtle inner glow at the very top of the surface (extra bleed) */}
+              {/* inner top glow so cards look lit */}
               <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
 
               <div className="relative px-4 md:px-6 pt-6 pb-10">
