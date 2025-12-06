@@ -1,26 +1,23 @@
-// server/db.ts
-
-import pg from "pg";
+import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 
-const { Pool } = pg;
-
+// Validate env
 if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
 }
 
-// Connection pool for Supabase (Postgres)
+// pg Pool with SSL configuration for Supabase
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 5, // small pool is fine
+  ssl: {
+    // Supabase requires SSL; some environments need relaxed CA validation
+    rejectUnauthorized: false,
+  },
+  // Optional tuning, keep small in constrained environments
+  max: 5,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  // Required for hosted Postgres like Supabase from Northflank
-  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 5000,
 });
 
-// Drizzle DB using node-postgres adapter
 export const db = drizzle(pool, { schema });
