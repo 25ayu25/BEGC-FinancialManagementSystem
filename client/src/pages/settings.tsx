@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Header from "@/components/layout/header";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,11 +159,10 @@ export default function Settings() {
 
   if (isUserLoading) {
     return (
-      <div className="flex-1 flex flex-col h-full">
-        <Header 
+      <div className="flex-1 flex flex-col h-full bg-slate-50">
+        <PageHeader 
           title="Settings" 
-          subtitle="Manage your system preferences and configurations"
-          actions={<div></div>}
+          subtitle="System configuration"
         />
         <main className="flex-1 flex items-center justify-center">
           <div className="text-slate-500">Loading settings...</div>
@@ -172,21 +171,18 @@ export default function Settings() {
     );
   }
   return (
-    <div className="flex-1 flex flex-col h-full">
-      <Header 
+    <div className="flex-1 flex flex-col h-full bg-slate-50">
+      <PageHeader 
         title="Settings" 
-        subtitle="Manage your system preferences and configurations"
-        actions={
-          hasChanges ? (
-            <div className="flex items-center gap-2 text-sm text-amber-600">
-              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-              Unsaved changes
-            </div>
-          ) : (
-            <div></div>
-          )
-        }
-      />
+        subtitle="System configuration"
+      >
+        {hasChanges && (
+          <div className="flex items-center gap-2 text-sm text-amber-400">
+            <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+            Unsaved changes
+          </div>
+        )}
+      </PageHeader>
 
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <main className="flex-1 overflow-y-auto p-6 space-y-6">

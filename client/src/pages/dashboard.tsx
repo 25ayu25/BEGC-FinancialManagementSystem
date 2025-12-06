@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { PageHeader, headerControlStyles } from "@/components/ui/page-header";
 import { format, subMonths } from "date-fns";
 import { 
   getDateRange, 
@@ -636,31 +637,23 @@ export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold leading-tight text-slate-900">
-              Trends & Comparisons
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Analyze performance trends and compare across periods
-            </p>
-          </div>
-          
-          <Select value={selectedFilter} onValueChange={(v: FilterOption) => setSelectedFilter(v)}>
-            <SelectTrigger className="h-10 w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {filterOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <PageHeader
+        title="Overview"
+        subtitle="Financial summary"
+      >
+        <Select value={selectedFilter} onValueChange={(v: FilterOption) => setSelectedFilter(v)}>
+          <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[170px] rounded-full px-3")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {filterOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </PageHeader>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">

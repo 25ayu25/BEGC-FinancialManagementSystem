@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { PageHeader } from "@/components/ui/page-header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO, addMonths, isSameMonth } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
@@ -204,27 +205,24 @@ export default function PatientVolumePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-100">
-        <AppContainer className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-              <p className="text-slate-600">Monthly & multi-period summary</p>
-            </div>
-            <Button
-              className="bg-teal-600 hover:bg-teal-700 w-full sm:w-auto"
-              onClick={() => setAddOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Volume
-            </Button>
-          </div>
-        </AppContainer>
-      </header>
+    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      {/* World-class header */}
+      <PageHeader
+        title="Patient Volume"
+        subtitle="Daily patient statistics"
+      >
+        <Button
+          className="bg-white hover:bg-slate-100 text-slate-900 rounded-full"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Volume
+        </Button>
+      </PageHeader>
 
-      <AppContainer className="space-y-6 py-6">
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto">
+        <AppContainer className="space-y-6 py-6">
         {/* KPI cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card>
@@ -481,7 +479,8 @@ export default function PatientVolumePage() {
             </div>
           </div>
         )}
-      </AppContainer>
+        </AppContainer>
+      </div>
     </div>
   );
 }
