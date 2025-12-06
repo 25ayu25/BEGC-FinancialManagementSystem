@@ -68,7 +68,6 @@ import {
 /* -------------------------------------------------------------------------- */
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
-import { PageHeader } from "@/components/ui/page-header";
 
 /* -------------------------------------------------------------------------- */
 /* Types */
@@ -620,38 +619,40 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      {/* World-class header */}
-      <PageHeader
-        title="Claim Reconciliation"
-        subtitle="Reconcile insurance claims"
-      >
-        <div className="flex items-center gap-2">
-          {runsFetching && (
-            <span className="hidden md:inline text-[11px] uppercase tracking-wide text-slate-300">
-              Refreshing data…
-            </span>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-white text-slate-900 hover:bg-slate-100 rounded-full"
-            onClick={() => setShowHelp((v) => !v)}
-          >
-            <Info className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {showHelp ? "Hide help" : "Show help"}
-            </span>
-          </Button>
-        </div>
-      </PageHeader>
+    <div className="max-w-6xl mx-auto space-y-8 pb-10">
+      {/* Page title + summary + help toggle */}
+      <section className="space-y-4 pt-2">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+              Claim Reconciliation
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
+              Upload claim and remittance files, then review matches,
+              underpayments, and outstanding balances.
+            </p>
+          </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto space-y-8 pb-10 p-4 sm:p-6">
-          {/* Summary section */}
-          <section className="space-y-4">
+          <div className="flex items-end justify-between md:justify-end gap-2">
+            {runsFetching && (
+              <span className="hidden md:inline text-[11px] uppercase tracking-wide text-muted-foreground">
+                Refreshing data…
+              </span>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setShowHelp((v) => !v)}
+            >
+              <Info className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {showHelp ? "Hide help" : "Show help"}
+              </span>
+            </Button>
+          </div>
+        </div>
 
         {/* KPI strip */}
         <div className="grid gap-3 md:grid-cols-3">
@@ -1197,8 +1198,6 @@ export default function ClaimReconciliation() {
           </CardContent>
         </Card>
       )}
-        </div>
-      </div>
     </div>
   );
 }
