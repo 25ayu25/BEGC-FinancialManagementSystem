@@ -376,6 +376,11 @@ export default function AdvancedDashboard() {
     minute: "2-digit",
   }).format(now);
 
+  const detailedUpdatedLabel = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(now);
+
   /* ---------- data ---------- */
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
@@ -714,8 +719,11 @@ export default function AdvancedDashboard() {
               <p className="mt-1 text-sm text-slate-300">
                 Key financials · {periodLabel}
                 <span className="mx-2 text-slate-600">•</span>
-                <span className="text-emerald-400">
-                  Last updated: {lastUpdatedLabel}
+                <span
+                  className="text-emerald-400"
+                  title={detailedUpdatedLabel}
+                >
+                  Last updated {lastUpdatedLabel}
                 </span>
               </p>
             </div>
@@ -862,20 +870,23 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* MAIN: light background, no black bands */}
+      {/* MAIN: light background, slight sidebar-edge glow */}
       <main className="relative min-h-0 overflow-y-auto bg-slate-50">
         {/* soft glow under header into content */}
         <div className="pointer-events-none absolute inset-x-0 -top-8 h-20 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
 
+        {/* subtle vertical glow echoing the header along sidebar edge */}
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-sky-500/14 via-cyan-400/6 to-transparent" />
+
         <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-8">
-          {/* full-width main surface, aligned with sidebar area */}
-          <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden">
+          {/* full-width main surface */}
+          <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden transition-shadow duration-300 hover:shadow-[0_26px_80px_rgba(15,23,42,0.28)] hover:border-slate-200">
             {/* inner top glow so KPI cards look lit */}
             <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/18 via-sky-400/8 to-transparent" />
 
             <div className="relative px-4 md:px-6 pt-6 pb-10">
               {/* KPI CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7">
                 {/* Total Revenue */}
                 <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
                   <CardContent className="p-4 sm:p-3">
