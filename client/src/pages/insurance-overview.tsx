@@ -18,6 +18,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
+import { PageHeader, headerControlStyles } from "@/components/ui/page-header";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
@@ -191,15 +192,10 @@ export default function InsuranceOverview() {
 
   // Reusable Page Header Component with Filter
   const renderPageHeader = () => (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 bg-gradient-to-r from-blue-50/30 via-transparent to-transparent -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 rounded-lg">
-      <div className="w-full sm:w-auto">
-        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
-          Insurance Overview
-        </h1>
-        <p className="text-sm sm:text-base text-gray-600 mt-1">
-          Revenue analytics from insurance transactions (USD only)
-        </p>
-      </div>
+    <PageHeader
+      title="Insurance Overview"
+      subtitle="Claims and provider summary"
+    >
       
       <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
         {/* Filter Dropdown - Full width on mobile */}
@@ -210,12 +206,10 @@ export default function InsuranceOverview() {
               flex items-center justify-between gap-2 
               w-full sm:w-auto
               px-3 sm:px-4 py-2.5 sm:py-2 
-              bg-white/90 backdrop-blur-sm border border-gray-200/80 text-gray-700 
-              rounded-xl hover:bg-white hover:border-blue-200
+              ${headerControlStyles} rounded-full
               transition-all duration-200 ease-out
-              shadow-sm hover:shadow-md hover:shadow-blue-100/50
               min-h-[44px]
-              focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
+              focus:outline-none focus:ring-2 focus:ring-slate-500/20
             `}
           >
             <div className="flex items-center gap-2">
@@ -300,11 +294,9 @@ export default function InsuranceOverview() {
           className={`
             flex items-center justify-center gap-2 
             px-3 sm:px-4 py-2.5 sm:py-2
-            bg-gradient-to-r from-blue-600 to-blue-700 
-            text-white rounded-lg font-medium
-            hover:from-blue-700 hover:to-blue-800
+            bg-white text-slate-900 rounded-full font-medium
+            hover:bg-slate-100
             active:scale-95
-            shadow-lg shadow-blue-500/30
             disabled:opacity-50 disabled:cursor-not-allowed
             ${transitions.base}
             min-h-[44px] min-w-[44px]
@@ -315,7 +307,7 @@ export default function InsuranceOverview() {
           <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
-    </div>
+    </PageHeader>
   );
 
   // Custom Date Range Picker Modal Component
@@ -470,7 +462,7 @@ export default function InsuranceOverview() {
   // No data state with enhanced design - NOW includes header with filter
   if (!data || (data.topProviders.length === 0 && data.overview.totalRevenue === 0)) {
     return (
-      <div className={`max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 ${fadeIn}`}>
+      <div className={`max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-slate-50 ${fadeIn}`}>
         {/* Page Header with Filter - Always visible so users can change time period */}
         {renderPageHeader()}
         
@@ -499,7 +491,7 @@ export default function InsuranceOverview() {
   }
 
   return (
-    <div className={`max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 ${fadeIn}`}>
+    <div className={`max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-slate-50 ${fadeIn}`}>
       {/* Page Header with Filter - Mobile Responsive */}
       {renderPageHeader()}
 
