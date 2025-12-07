@@ -68,6 +68,7 @@ import {
 /* -------------------------------------------------------------------------- */
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
+import PageHeader from "@/components/layout/PageHeader";
 
 /* -------------------------------------------------------------------------- */
 /* Types */
@@ -619,40 +620,28 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-10">
-      {/* Page title + summary + help toggle */}
-      <section className="space-y-4 pt-2">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Claim Reconciliation
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
-              Upload claim and remittance files, then review matches,
-              underpayments, and outstanding balances.
-            </p>
-          </div>
+    <>
+      <PageHeader
+        variant="claimReconciliation"
+        title="Claim Reconciliation"
+        subtitle="Upload claim and remittance files, then review matches, underpayments, and outstanding balances"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => setShowHelp((v) => !v)}
+        >
+          <Info className="w-4 h-4" />
+          <span className="hidden sm:inline">
+            {showHelp ? "Hide help" : "Show help"}
+          </span>
+        </Button>
+      </PageHeader>
 
-          <div className="flex items-end justify-between md:justify-end gap-2">
-            {runsFetching && (
-              <span className="hidden md:inline text-[11px] uppercase tracking-wide text-muted-foreground">
-                Refreshing data…
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowHelp((v) => !v)}
-            >
-              <Info className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {showHelp ? "Hide help" : "Show help"}
-              </span>
-            </Button>
-          </div>
-        </div>
+      <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
+        <section className="space-y-4">
 
         {/* KPI strip */}
         <div className="grid gap-3 md:grid-cols-3">
@@ -1198,6 +1187,7 @@ export default function ClaimReconciliation() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </>
   );
 }

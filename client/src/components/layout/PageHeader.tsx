@@ -11,7 +11,8 @@ export type PageHeaderVariant =
   | "userManagement"
   | "settings"
   | "addTransaction"
-  | "monthlyReports";
+  | "monthlyReports"
+  | "claimReconciliation";
 
 interface PageHeaderProps {
   title: string;
@@ -41,7 +42,7 @@ const variantStyles: Record<
   insuranceOverview: {
     container: "bg-white/10 backdrop-blur-md ring-1 ring-teal-300/20 border-b border-teal-200/30",
     title: "text-slate-900",
-    subtitle: "text-slate-700",
+    subtitle: "text-slate-600",
   },
   
   // 3. Lab Finance — "BioLumina Edge"
@@ -98,10 +99,18 @@ const variantStyles: Record<
   
   // 10. Monthly Reports — "Archive Bar"
   monthlyReports: {
-    container: "bg-gradient-to-r from-slate-900 to-slate-800 border-b border-transparent",
+    container: "bg-gradient-to-r from-slate-900 to-slate-800 border-b-[1px] border-transparent",
+    title: "text-white",
+    subtitle: "text-slate-300",
+    accent: "[border-image:linear-gradient(to_right,#f59e0b,#f97316)_1]",
+  },
+  
+  // 11. Claim Reconciliation — "Statement Stripe"
+  claimReconciliation: {
+    container: "bg-slate-900 border-b-[2px] border-transparent",
     title: "text-white",
     subtitle: "text-slate-400",
-    accent: "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-gradient-to-r after:from-amber-500 after:to-orange-500",
+    accent: "[border-image:linear-gradient(to_right,#10B981,#14B8A6)_1]",
   },
 };
 
@@ -127,8 +136,8 @@ export default function PageHeader({
   return (
     <div
       className={cn(
-        // Base sticky positioning
-        "sticky top-0 z-50",
+        // Base sticky positioning with shadow
+        "sticky top-0 z-50 shadow-sm",
         // Variant-specific container styles
         styles.container,
         // Position relative for pseudo-elements
