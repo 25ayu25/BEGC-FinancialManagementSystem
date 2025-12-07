@@ -31,33 +31,33 @@ const variantStyles: Record<
     accent?: string;
   }
 > = {
-  // 1. Trends — "Aurora Analytics Bar"
+  // 1. Trends — "Aurora Analytics Bar" (UNCHANGED)
   trends: {
     container: "bg-gradient-to-r from-cyan-700 via-sky-600 to-blue-700 border-b border-white/20",
     title: "text-white",
     subtitle: "text-slate-200",
   },
   
-  // 2. Insurance Overview — "Glass Ledger"
+  // 2. Insurance Overview — "Teal Horizon" (UPDATED)
   insuranceOverview: {
-    container: "bg-white/10 backdrop-blur-md ring-1 ring-teal-300/20 border-b border-teal-200/30",
-    title: "text-slate-900",
-    subtitle: "text-slate-600",
-  },
-  
-  // 3. Lab Finance — "BioLumina Edge"
-  labFinance: {
-    container: "bg-[linear-gradient(90deg,#0B1020,#141a35)] border-b border-transparent",
-    title: "text-slate-100",
-    subtitle: "text-slate-400",
-    accent: "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-gradient-to-r after:from-cyan-400 after:to-blue-500",
-  },
-  
-  // 4. Insurance Balance — "Ledger Gradient Subtle"
-  insuranceBalance: {
-    container: "bg-gradient-to-r from-slate-800 to-stone-800 border-b border-teal-500/40",
+    container: "bg-gradient-to-r from-teal-600 via-cyan-500 to-sky-500 border-b-2 border-cyan-300/40",
     title: "text-white",
-    subtitle: "text-slate-300",
+    subtitle: "text-cyan-50",
+  },
+  
+  // 3. Lab Finance — "Electric Science" (UPDATED)
+  labFinance: {
+    container: "bg-gradient-to-r from-blue-700 via-cyan-600 to-blue-600 border-b border-transparent",
+    title: "text-white",
+    subtitle: "text-cyan-100",
+    accent: "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-gradient-to-r after:from-cyan-400 after:via-cyan-300 after:to-cyan-400 after:shadow-[0_0_8px_rgba(34,211,238,0.5)]",
+  },
+  
+  // 4. Insurance Balance — "Emerald Ledger" (UPDATED)
+  insuranceBalance: {
+    container: "bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 border-b-2 border-emerald-300/40",
+    title: "text-white",
+    subtitle: "text-emerald-50",
   },
   
   // 5. Manzali Report — "Editorial Masthead"
@@ -67,50 +67,47 @@ const variantStyles: Record<
     subtitle: "text-neutral-600",
   },
   
-  // 6. Patient Volume — "Pulse Line"
+  // 6. Patient Volume — "Medical Coral" (UPDATED)
   patientVolume: {
-    container: "bg-slate-900 border-b border-transparent",
+    container: "bg-gradient-to-r from-rose-600 via-pink-500 to-rose-500 border-b border-transparent",
     title: "text-white",
-    subtitle: "text-slate-400",
-    accent: "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-gradient-to-r after:from-cyan-500 after:to-rose-500",
+    subtitle: "text-rose-50",
+    accent: "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-gradient-to-r after:from-pink-400 after:via-rose-300 after:to-pink-400 after:shadow-[0_0_8px_rgba(244,114,182,0.5)]",
   },
   
-  // 7. User Management — "Identity Glass"
+  // 7. User Management — "Royal Command" (UPDATED)
   userManagement: {
-    container: "bg-white/5 backdrop-blur-sm ring-1 ring-blue-500/20 border-b border-blue-400/40",
-    title: "text-slate-100",
-    subtitle: "text-slate-300",
+    container: "bg-gradient-to-r from-indigo-700 via-blue-600 to-indigo-600 border-b-2 border-indigo-300/40",
+    title: "text-white",
+    subtitle: "text-indigo-100",
   },
   
-  // 8. Settings — "System Panel"
+  // 8. Settings — "Platinum Panel" (UPDATED)
   settings: {
-    container: "bg-neutral-100 border-b border-neutral-300",
-    title: "text-neutral-800",
-    subtitle: "text-neutral-600",
-    accent: "before:absolute before:inset-0 before:bg-[radial-gradient(circle,#e5e7eb_1px,transparent_1px)] before:bg-[size:20px_20px] before:opacity-50 before:-z-10",
+    container: "bg-gradient-to-r from-slate-600 via-gray-500 to-slate-500 border-b-2 border-slate-300/40",
+    title: "text-white",
+    subtitle: "text-slate-100",
   },
   
-  // 9. Add Transaction — "Action Ribbon"
+  // 9. Add Transaction — "Action Ribbon" (UNCHANGED)
   addTransaction: {
     container: "bg-gradient-to-r from-emerald-700 to-teal-600 border-b border-white/20",
     title: "text-white",
     subtitle: "text-emerald-200",
   },
   
-  // 10. Monthly Reports — "Archive Bar"
+  // 10. Monthly Reports — "Golden Archive" (UPDATED)
   monthlyReports: {
-    container: "bg-gradient-to-r from-slate-900 to-slate-800 border-b-[1px] border-transparent",
+    container: "bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 border-b-2 border-amber-300/40",
     title: "text-white",
-    subtitle: "text-slate-300",
-    accent: "[border-image:linear-gradient(to_right,#f59e0b,#f97316)_1]",
+    subtitle: "text-amber-50",
   },
   
-  // 11. Claim Reconciliation — "Statement Stripe"
+  // 11. Claim Reconciliation — "Purple Prestige" (UPDATED)
   claimReconciliation: {
-    container: "bg-slate-900 border-b-[2px] border-transparent",
+    container: "bg-gradient-to-r from-purple-700 via-violet-600 to-purple-600 border-b-2 border-purple-300/40",
     title: "text-white",
-    subtitle: "text-slate-400",
-    accent: "[border-image:linear-gradient(to_right,#10B981,#14B8A6)_1]",
+    subtitle: "text-purple-100",
   },
 };
 
@@ -118,7 +115,7 @@ const variantStyles: Record<
  * PageHeader Component - Reusable sticky header with premium variants
  * 
  * Features:
- * - Sticky positioning at top of viewport (z-index: 50)
+ * - Sticky positioning at top of viewport (z-index: 60 for mobile compatibility)
  * - 11 distinct variants with unique aesthetics
  * - Support for optional subtitle and right-side controls
  * - Responsive layout
@@ -136,8 +133,8 @@ export default function PageHeader({
   return (
     <div
       className={cn(
-        // Base sticky positioning with shadow
-        "sticky top-0 z-50 shadow-sm",
+        // Base sticky positioning with shadow - z-[60] to be above sidebar overlay on mobile
+        "sticky top-0 z-[60] shadow-md",
         // Variant-specific container styles
         styles.container,
         // Position relative for pseudo-elements
