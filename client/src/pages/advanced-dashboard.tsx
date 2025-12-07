@@ -54,7 +54,7 @@ import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-dail
 
 /* ==================================================================================
    1. UTILITIES
-   ================================================================================== */
+   ================================================================================= */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const headerControlStyles =
@@ -94,7 +94,7 @@ function computeRangeParams(
 
 /* ==================================================================================
    2. INTERNAL UI COMPONENTS
-   ================================================================================== */
+   ================================================================================= */
 
 /**
  * The "World Class" KPI Card.
@@ -104,7 +104,7 @@ interface KpiCardProps {
   value: number;
   currency?: string;
   change?: number;
-  trendMode?: "normal" | "inverse"; // 'normal': Green is good. 'inverse': Red is good (expenses).
+  trendMode?: "normal" | "inverse"; 
   icon: React.ReactNode;
   subText?: React.ReactNode;
   gradient: string;
@@ -122,12 +122,10 @@ function KpiCard({
   gradient,
   onClick,
 }: KpiCardProps) {
-  // Determine if the trend is "Good" or "Bad"
   const isPositive = change !== undefined && change > 0;
   const isNeutral = change === 0 || change === undefined;
   const isGood = trendMode === "normal" ? isPositive : !isPositive;
 
-  // Dynamic Coloring
   const trendColor = isNeutral
     ? "text-slate-500 bg-slate-100"
     : isGood
@@ -147,7 +145,6 @@ function KpiCard({
       )}
     >
       <CardContent className="p-5 relative z-10">
-        {/* Glassy Background Effect */}
         <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/20 blur-3xl pointer-events-none" />
 
         <div className="flex justify-between items-start">
@@ -271,7 +268,7 @@ function QuickActionsCard() {
 
 /* ==================================================================================
    3. LOGIC HOOK
-   ================================================================================== */
+   ================================================================================= */
 
 function useDashboardAnalyticsInternal({
   year,
@@ -346,7 +343,7 @@ function useDashboardAnalyticsInternal({
 
 /* ==================================================================================
    4. MAIN PAGE COMPONENT
-   ================================================================================== */
+   ================================================================================= */
 
 export default function AdvancedDashboard() {
   const {
@@ -510,8 +507,7 @@ export default function AdvancedDashboard() {
                   trendMode="inverse"
                   gradient="bg-gradient-to-br from-rose-50/50 to-red-50/50 hover:to-rose-100/50"
                   icon={<CreditCard className="h-5 w-5 text-rose-600" />}
-                  // UPDATED: Now shows same comparison label as Revenue
-                  subText={comparisonLabel} 
+                  subText={comparisonLabel} // FIXED: Consistent label
                   onClick={() => setOpenExpenses(true)}
                 />
 
@@ -556,13 +552,13 @@ export default function AdvancedDashboard() {
                 </Link>
               </div>
 
-              {/* === MAIN LAYOUT (CHARTS & DEPTS) === */}
+              {/* === MAIN LAYOUT === */}
               <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6 mb-8">
                 
                 {/* Left Column: Charts */}
                 <div className="space-y-6">
-                  {/* WRAPPED IN CARD: Now matches Departments panel style */}
-                  <Card className="border-0 shadow-sm bg-white/60">
+                  {/* FIXED: Solid White Card Container */}
+                  <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl">
                     <CardHeader className="pb-2">
                        <CardTitle className="text-base font-semibold text-slate-900">Revenue Analytics</CardTitle>
                     </CardHeader>
