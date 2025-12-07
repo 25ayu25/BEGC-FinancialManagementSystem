@@ -115,7 +115,7 @@ const variantStyles: Record<
  * PageHeader Component - Reusable sticky header with premium variants
  * 
  * Features:
- * - Sticky positioning at top of viewport (z-index: 50)
+ * - Sticky positioning at top of viewport (z-index: 60 for mobile compatibility)
  * - 11 distinct variants with unique aesthetics
  * - Support for optional subtitle and right-side controls
  * - Responsive layout
