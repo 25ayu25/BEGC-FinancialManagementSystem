@@ -104,7 +104,7 @@ interface KpiCardProps {
   value: number;
   currency?: string;
   change?: number;
-  trendMode?: "normal" | "inverse"; 
+  trendMode?: "normal" | "inverse"; // 'normal': Green is good. 'inverse': Red is good (expenses).
   icon: React.ReactNode;
   subText?: React.ReactNode;
   gradient: string;
@@ -122,10 +122,12 @@ function KpiCard({
   gradient,
   onClick,
 }: KpiCardProps) {
+  // Determine if the trend is "Good" or "Bad"
   const isPositive = change !== undefined && change > 0;
   const isNeutral = change === 0 || change === undefined;
   const isGood = trendMode === "normal" ? isPositive : !isPositive;
 
+  // Dynamic Coloring
   const trendColor = isNeutral
     ? "text-slate-500 bg-slate-100"
     : isGood
@@ -145,6 +147,7 @@ function KpiCard({
       )}
     >
       <CardContent className="p-5 relative z-10">
+        {/* Glassy Background Effect */}
         <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/20 blur-3xl pointer-events-none" />
 
         <div className="flex justify-between items-start">
@@ -507,7 +510,7 @@ export default function AdvancedDashboard() {
                   trendMode="inverse"
                   gradient="bg-gradient-to-br from-rose-50/50 to-red-50/50 hover:to-rose-100/50"
                   icon={<CreditCard className="h-5 w-5 text-rose-600" />}
-                  subText={comparisonLabel} // FIXED: Consistent label
+                  subText={comparisonLabel}
                   onClick={() => setOpenExpenses(true)}
                 />
 
@@ -557,12 +560,12 @@ export default function AdvancedDashboard() {
                 
                 {/* Left Column: Charts */}
                 <div className="space-y-6">
-                  {/* FIXED: Solid White Card Container */}
+                  {/* WRAPPED IN SOLID CARD: Matches Departments panel style */}
                   <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl">
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-2 border-b border-slate-50">
                        <CardTitle className="text-base font-semibold text-slate-900">Revenue Analytics</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                       <RevenueAnalyticsDaily
                         timeRange={params.rangeToSend}
                         selectedYear={params.yearToSend}
