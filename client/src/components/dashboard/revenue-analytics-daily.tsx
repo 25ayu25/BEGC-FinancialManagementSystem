@@ -610,12 +610,52 @@ export default function RevenueAnalyticsDaily({
 
   return (
     <Card className="border-0 shadow-md bg-white">
-      <CardHeader className="pb-0">
-        <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
-          Revenue Analytics
-        </CardTitle>
-        <div className="mt-1 text-sm text-slate-600">
-          {headerLabel} · SSP {nf0.format(totalSSP)} · USD {nf0.format(totalUSD)}
+      {/* UPDATED HEADER */}
+      <CardHeader className="pb-1">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
+              Revenue Analytics
+            </CardTitle>
+            <div className="mt-1 text-xs sm:text-sm text-slate-600 flex flex-wrap items-center gap-2">
+              <span>{headerLabel}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                <span className="uppercase tracking-wide text-slate-500">
+                  SSP
+                </span>
+                <span className="font-mono">
+                  {nf0.format(totalSSP)}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                <span className="uppercase tracking-wide text-slate-500">
+                  USD
+                </span>
+                <span className="font-mono">
+                  {nf0.format(totalUSD)}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* small summary chips on the right, mainly for SSP */}
+          <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-slate-600 mt-1 sm:mt-0">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+              <span className="text-slate-500">Total SSP</span>
+              <span className="font-mono font-semibold text-slate-900">
+                {nf0.format(totalSSP)}
+              </span>
+            </span>
+            {!wide && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+                <span className="text-slate-500">Avg SSP</span>
+                <span className="font-mono font-semibold text-slate-900">
+                  {nf0.format(avgDaySSP)}
+                </span>
+                <span className="text-[10px] text-slate-500">/day (active)</span>
+              </span>
+            )}
+          </div>
         </div>
       </CardHeader>
 
