@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-// UI Components
+// --- UI IMPORTS ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 
-// Icons
+// --- ICONS ---
 import {
   TrendingUp,
   TrendingDown,
@@ -43,23 +43,24 @@ import {
   Settings,
 } from "lucide-react";
 
-// API & Context
+// --- DATA & CONTEXT ---
 import { api } from "@/lib/queryClient";
 import { useDateFilter } from "@/context/date-filter-context";
 
-// Dashboard Sub-components (Assuming these exist in your project)
+// --- SUB-COMPONENTS (Assumed to exist in your project) ---
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
 /* ==================================================================================
-   1. UTILITIES & STYLES (Internal)
+   1. UTILITIES
    ================================================================================== */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const headerControlStyles =
   "h-9 bg-slate-900/60 text-slate-100 border border-slate-600/50 hover:border-cyan-400/80 hover:bg-slate-800/80 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-0";
 
+/** Calculates the API parameters based on the selected time range */
 function computeRangeParams(
   timeRange: string,
   selectedYear: number | null,
@@ -92,16 +93,19 @@ function computeRangeParams(
 }
 
 /* ==================================================================================
-   2. INTERNAL COMPONENTS (Defined here to avoid multiple files)
+   2. INTERNAL UI COMPONENTS (The "Secret" to code reduction)
    ================================================================================== */
 
-// --- The "10/10" KPI Card ---
+/**
+ * The "World Class" KPI Card.
+ * Replaces the repetitive card code with one reusable component.
+ */
 interface KpiCardProps {
   title: string;
   value: number;
   currency?: string;
   change?: number;
-  trendMode?: "normal" | "inverse"; // 'normal': up is good (green). 'inverse': up is bad (red, for expenses).
+  trendMode?: "normal" | "inverse"; // 'normal': Green is good. 'inverse': Red is good (expenses).
   icon: React.ReactNode;
   subText?: React.ReactNode;
   gradient: string;
@@ -119,12 +123,12 @@ function KpiCard({
   gradient,
   onClick,
 }: KpiCardProps) {
-  // Logic: Is this positive news or negative news?
+  // Determine if the trend is "Good" or "Bad"
   const isPositive = change !== undefined && change > 0;
   const isNeutral = change === 0 || change === undefined;
-  // If trendMode is normal (Revenue), Positive is Good. If inverse (Expense), Positive is Bad.
   const isGood = trendMode === "normal" ? isPositive : !isPositive;
 
+  // Dynamic Coloring
   const trendColor = isNeutral
     ? "text-slate-500 bg-slate-100"
     : isGood
@@ -144,7 +148,7 @@ function KpiCard({
       )}
     >
       <CardContent className="p-5 relative z-10">
-         {/* Glassy blob effect in background */}
+        {/* Glassy Background Effect */}
         <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/20 blur-3xl pointer-events-none" />
 
         <div className="flex justify-between items-start">
@@ -198,7 +202,7 @@ function KpiCard({
   );
 }
 
-// --- Loading Skeleton ---
+/** Loading State - Better than a spinner */
 function DashboardSkeleton() {
   return (
     <div className="min-h-screen bg-slate-950 p-6 space-y-8 animate-in fade-in duration-500">
@@ -224,7 +228,7 @@ function DashboardSkeleton() {
   );
 }
 
-// --- Quick Actions (Legacy Support) ---
+/** Legacy Quick Actions (Restored from your code) */
 function QuickActionsCard() {
   const actions = [
     { href: "/transactions", label: "Add Transaction", icon: Plus, color: "text-teal-600", bg: "bg-teal-100" },
@@ -267,7 +271,7 @@ function QuickActionsCard() {
 }
 
 /* ==================================================================================
-   3. CUSTOM LOGIC HOOK (Internal)
+   3. LOGIC HOOK (Extracting Math from UI)
    ================================================================================== */
 
 function useDashboardAnalyticsInternal({
@@ -314,7 +318,7 @@ function useDashboardAnalyticsInternal({
     const margin = rev > 0 ? (net / rev) * 100 : 0;
 
     return {
-      raw: data, // Pass full data for other components
+      raw: data, // Pass full data to children if needed
       revenue: {
         value: rev,
         change: data.changes?.incomeChangeSSP,
@@ -343,7 +347,7 @@ function useDashboardAnalyticsInternal({
 }
 
 /* ==================================================================================
-   4. MAIN PAGE COMPONENT
+   4. MAIN PAGE
    ================================================================================== */
 
 export default function AdvancedDashboard() {
@@ -368,7 +372,7 @@ export default function AdvancedDashboard() {
     selectedMonth ?? null
   );
 
-  // 2. Fetch Data using Internal Hook
+  // 2. Fetch Data (Cleaner!)
   const { metrics, isLoading } = useDashboardAnalyticsInternal({
     year: params.yearToSend,
     month: params.monthToSend,
@@ -377,21 +381,20 @@ export default function AdvancedDashboard() {
     customEnd: customEndDate,
   });
 
-  // Fetch departments (kept simple)
+  // Fetch departments (kept separate as per original logic)
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
-  // 3. Render Skeleton if loading
+  // 3. Render Skeleton
   if (isLoading || !metrics) {
     return <DashboardSkeleton />;
   }
 
-  // 4. Comparison Label Helper
+  // 4. Helper for Label
   const comparisonLabel =
     timeRange === "year" || timeRange === "last-3-months"
       ? "vs previous period"
       : "vs same days last month";
 
-  // 5. Render Main Dashboard
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
       
@@ -481,7 +484,7 @@ export default function AdvancedDashboard() {
         </div>
       </header>
 
-      {/* CONTENT SURFACE: Light Glassy Aesthetic */}
+      {/* CONTENT SURFACE */}
       <main className="relative min-h-0 overflow-y-auto bg-slate-50">
         <div className="pointer-events-none absolute inset-x-0 -top-8 h-20 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
         <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-sky-500/10 via-cyan-400/4 to-transparent" />
@@ -491,7 +494,7 @@ export default function AdvancedDashboard() {
           <div className="relative rounded-3xl bg-white/80 backdrop-blur-sm shadow-[0_18px_55px_rgba(15,23,42,0.1)] border border-white overflow-hidden">
             <div className="relative px-4 md:px-6 pt-6 pb-10">
               
-              {/* === KPI CARDS GRID === */}
+              {/* === KPI GRID === */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-8">
                 
                 <KpiCard
@@ -555,12 +558,12 @@ export default function AdvancedDashboard() {
                 </Link>
               </div>
 
-              {/* === MAIN LAYOUT === */}
+              {/* === CHARTS & DETAILS === */}
               <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6 mb-8">
                 
-                {/* Left Column: Charts */}
+                {/* Left: Charts */}
                 <div className="space-y-6">
-                  {/* Re-using your existing chart component */}
+                  {/* We pass props to the existing chart component, which handles its own data fetching if needed */}
                   <RevenueAnalyticsDaily
                     timeRange={params.rangeToSend}
                     selectedYear={params.yearToSend}
@@ -568,13 +571,13 @@ export default function AdvancedDashboard() {
                     customStartDate={customStartDate ?? undefined}
                     customEndDate={customEndDate ?? undefined}
                   />
-                  {/* Hidden on mobile, shown on desktop */}
+                  {/* Desktop Quick Actions */}
                   <div className="hidden lg:block">
                      <QuickActionsCard />
                   </div>
                 </div>
 
-                {/* Right Column: Departments & Status */}
+                {/* Right: Depts & Status */}
                 <div className="space-y-6">
                   <DepartmentsPanel
                     departments={Array.isArray(departments) ? departments : []}
