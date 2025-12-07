@@ -353,14 +353,9 @@ body {
     background-size: 40px 40px;
   }
 
-  /* Glow and animation effects */
+  /* Glow and animation effects - keyframes defined in tailwind.config.ts */
   .glow-pulse {
     animation: glow-pulse 3s ease-in-out infinite;
-  }
-
-  @keyframes glow-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
   }
 
   .shimmer {
@@ -379,24 +374,9 @@ body {
     animation: shimmer 3s infinite;
   }
 
-  @keyframes shimmer {
-    100% { left: 100%; }
-  }
-
-  /* Breathing glow animation */
+  /* Breathing glow animation - keyframes defined in tailwind.config.ts */
   .breathing-glow {
     animation: breathing-glow 4s ease-in-out infinite;
-  }
-
-  @keyframes breathing-glow {
-    0%, 100% { 
-      opacity: 1;
-      filter: brightness(1);
-    }
-    50% { 
-      opacity: 0.85;
-      filter: brightness(1.1);
-    }
   }
 
   /* Pulse wave pattern for medical theme */
@@ -416,7 +396,7 @@ body {
     );
   }
 
-  /* Metallic shine effect */
+  /* Metallic shine effect - keyframes defined in tailwind.config.ts */
   .metallic-shine {
     background: linear-gradient(
       135deg,
@@ -425,11 +405,6 @@ body {
       transparent 70%
     );
     animation: metallic-shine 4s ease-in-out infinite;
-  }
-
-  @keyframes metallic-shine {
-    0%, 100% { background-position: -200% 0; }
-    50% { background-position: 200% 0; }
   }
 
   /* Accessibility: Respect prefers-reduced-motion */
