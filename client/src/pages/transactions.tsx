@@ -191,15 +191,16 @@ export default function Transactions() {
 
   return (
     <div className="flex-1 flex flex-col h-[100dvh]"> {/* dynamic VH helps iOS */}
-      <Header
+      <PageHeader
+        variant="addTransaction"
         title="Transaction Management"
         subtitle="Add and manage daily income and expense transactions"
-        actions={
+      >
           <TooltipProvider delayDuration={150}>
             <div className="flex flex-wrap gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={() => setShowBulkIncome(true)}>
+                  <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20" onClick={() => setShowBulkIncome(true)}>
                     <CircleDollarSign className="h-4 w-4 mr-2" />
                     Daily Bulk Income
                   </Button>
@@ -209,7 +210,7 @@ export default function Transactions() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={() => setShowBulkExpense(true)}>
+                  <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20" onClick={() => setShowBulkExpense(true)}>
                     <ReceiptText className="h-4 w-4 mr-2" />
                     Bulk Expenses
                   </Button>
@@ -219,7 +220,7 @@ export default function Transactions() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
+                  <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20" onClick={() => setShowAddModal(true)} data-testid="button-add-transaction">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Transaction
                   </Button>
@@ -228,8 +229,7 @@ export default function Transactions() {
               </Tooltip>
             </div>
           </TooltipProvider>
-        }
-      />
+      </PageHeader>
 
       <main className="flex-1 overflow-y-auto p-6 overscroll-contain">
         <div className="space-y-6">

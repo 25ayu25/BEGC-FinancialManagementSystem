@@ -4,6 +4,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import PageHeader from "@/components/layout/PageHeader";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
@@ -760,12 +761,12 @@ export default function InsurancePage() {
   return (
     <div className="max-w-[1200px] mx-auto">
       {/* Sticky header with actions */}
-      <div ref={headerRef} className={`sticky top-0 z-30 bg-white ${scrolled ? "border-b shadow-sm" : ""}`}>
-        <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-semibold">Insurance Management</h1>
-
-          {/* Desktop actions */}
-          <div className="hidden md:flex items-center gap-2">
+      <PageHeader
+        variant="insuranceBalance"
+        title="Insurance Management"
+        subtitle="Track insurance claims and payments across all providers"
+      >
+        <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 setEditingClaimId("");
@@ -805,9 +806,11 @@ export default function InsurancePage() {
             </button>
 
             <HelpPopover />
-          </div>
+        </div>
+      </PageHeader>
 
-          {/* Mobile actions */}
+      <div className="px-4 sm:px-6">
+        {/* Mobile actions (hidden on desktop) */}
           <div className="md:hidden relative" ref={actionsRef}>
             <button
               onClick={() => setShowActions((v) => !v)}
@@ -860,7 +863,6 @@ export default function InsurancePage() {
               </div>
             )}
           </div>
-        </div>
       </div>
 
       {/* Auth notice */}
