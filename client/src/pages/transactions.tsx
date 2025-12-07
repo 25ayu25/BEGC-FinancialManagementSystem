@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Header from "@/components/layout/header";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
 import TransactionFilters from "@/components/transactions/transaction-filters";
 import BulkIncomeModal from "@/components/transactions/bulk-income-modal";
