@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Bell, Lock, User, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import PageHeader from "@/components/layout/PageHeader";
 
 // User type interface
 interface User {
@@ -173,20 +174,18 @@ export default function Settings() {
   }
   return (
     <div className="flex-1 flex flex-col h-full">
-      <Header 
-        title="Settings" 
+      <PageHeader
+        variant="settings"
+        title="Settings"
         subtitle="Manage your system preferences and configurations"
-        actions={
-          hasChanges ? (
-            <div className="flex items-center gap-2 text-sm text-amber-600">
-              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-              Unsaved changes
-            </div>
-          ) : (
-            <div></div>
-          )
-        }
-      />
+      >
+        {hasChanges && (
+          <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+            Unsaved changes
+          </div>
+        )}
+      </PageHeader>
 
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
