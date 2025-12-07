@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
+// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,10 +23,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar as DatePicker } from "@/components/ui/calendar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AnimatedNumber } from "@/components/ui/animated-number";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
+// Icons
 import {
   TrendingUp,
   TrendingDown,
@@ -31,33 +34,32 @@ import {
   Users,
   CalendarIcon,
   Shield,
-  RefreshCw,
+  Minus,
+  CreditCard,
+  Activity,
+  ArrowRight,
   Plus,
   FileText,
   Settings,
-  ArrowRight,
-  CreditCard,
 } from "lucide-react";
-import { api } from "@/lib/queryClient";
 
+// API & Context
+import { api } from "@/lib/queryClient";
 import { useDateFilter } from "@/context/date-filter-context";
+
+// Dashboard Sub-components (Assuming these exist in your project)
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
-/* ========= number helpers ========= */
-const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const fmtUSD = (v: number) => {
-  const one = Number(v.toFixed(1));
-  return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
-};
+/* ==================================================================================
+   1. UTILITIES & STYLES (Internal)
+   ================================================================================== */
 
-/* ========= header styles ========= */
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const headerControlStyles =
   "h-9 bg-slate-900/60 text-slate-100 border border-slate-600/50 hover:border-cyan-400/80 hover:bg-slate-800/80 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-0";
 
-/* ========= helper: normalize range ========= */
 function computeRangeParams(
   timeRange: string,
   selectedYear: number | null,
@@ -89,136 +91,148 @@ function computeRangeParams(
   };
 }
 
-/* ========= Insurance Providers Card ========= */
-function InsuranceProvidersUSD({
-  breakdown,
-  totalUSD,
-  timeRange,
-  selectedYear,
-  selectedMonth,
-  customStartDate,
-  customEndDate,
-}: {
-  breakdown?:
-    | Record<string, number>
-    | Array<{
-        name?: string;
-        provider?: string;
-        amount?: number;
-        total?: number;
-      }>;
-  totalUSD: number;
-  timeRange: string;
-  selectedYear?: number | null;
-  selectedMonth?: number | null;
-  customStartDate?: Date;
-  customEndDate?: Date;
-}) {
-  const rows = useMemo(() => {
-    if (!breakdown) return [] as { name: string; amount: number }[];
-    if (Array.isArray(breakdown)) {
-      return breakdown
-        .map((r) => ({
-          name: String(r.name ?? r.provider ?? "Unknown"),
-          amount: Number(r.amount ?? r.total ?? 0),
-        }))
-        .filter((r) => r.amount > 0);
-    }
-    return Object.entries(breakdown)
-      .map(([name, amount]) => ({ name, amount: Number(amount) }))
-      .filter((r) => r.amount > 0);
-  }, [breakdown]);
+/* ==================================================================================
+   2. INTERNAL COMPONENTS (Defined here to avoid multiple files)
+   ================================================================================== */
 
-  const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
-  const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
-  const sorted = [...rows].sort((a, b) => b.amount - a.amount);
+// --- The "10/10" KPI Card ---
+interface KpiCardProps {
+  title: string;
+  value: number;
+  currency?: string;
+  change?: number;
+  trendMode?: "normal" | "inverse"; // 'normal': up is good (green). 'inverse': up is bad (red, for expenses).
+  icon: React.ReactNode;
+  subText?: React.ReactNode;
+  gradient: string;
+  onClick?: () => void;
+}
 
-  const palette = [
-    "#00A3A3",
-    "#4F46E5",
-    "#F59E0B",
-    "#EF4444",
-    "#10B981",
-    "#8B5CF6",
-    "#EA580C",
-    "#06B6D4",
-  ];
+function KpiCard({
+  title,
+  value,
+  currency = "SSP",
+  change,
+  trendMode = "normal",
+  icon,
+  subText,
+  gradient,
+  onClick,
+}: KpiCardProps) {
+  // Logic: Is this positive news or negative news?
+  const isPositive = change !== undefined && change > 0;
+  const isNeutral = change === 0 || change === undefined;
+  // If trendMode is normal (Revenue), Positive is Good. If inverse (Expense), Positive is Bad.
+  const isGood = trendMode === "normal" ? isPositive : !isPositive;
 
-  const base = `/insurance-providers?range=${timeRange}`;
-  const viewAllHref =
-    timeRange === "custom" && customStartDate && customEndDate
-      ? `${base}&startDate=${format(
-          customStartDate,
-          "yyyy-MM-dd"
-        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-      : `${base}&year=${selectedYear}&month=${selectedMonth}`;
+  const trendColor = isNeutral
+    ? "text-slate-500 bg-slate-100"
+    : isGood
+    ? "text-emerald-700 bg-emerald-100/80"
+    : "text-rose-700 bg-rose-100/80";
+
+  const TrendIcon = isNeutral ? Minus : isPositive ? TrendingUp : TrendingDown;
 
   return (
-    <Card className="border border-slate-200 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance
-          Providers
-        </CardTitle>
-        <Link href={viewAllHref}>
-          <Button variant="outline" size="sm">
-            View all
-          </Button>
-        </Link>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {sorted.length === 0 ? (
-          <div className="text-sm text-slate-500">
-            No insurance receipts for this period.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {sorted.map((item, idx) => {
-              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
-              const color = palette[idx % palette.length];
-              return (
-                <div
-                  key={`${item.name}-${idx}`}
-                  className="p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4"
-                  style={{ borderLeftColor: color }}
+    <Card
+      onClick={onClick}
+      className={cn(
+        "border-0 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] transition-all duration-300",
+        "hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] hover:-translate-y-1 relative overflow-hidden",
+        gradient,
+        onClick && "cursor-pointer active:scale-95"
+      )}
+    >
+      <CardContent className="p-5 relative z-10">
+         {/* Glassy blob effect in background */}
+        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/20 blur-3xl pointer-events-none" />
+
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-slate-600/90 text-[11px] font-bold uppercase tracking-wider mb-1">
+              {title}
+            </p>
+            <div className="text-2xl font-bold text-slate-900 font-mono tracking-tight flex items-baseline gap-1">
+              {currency && (
+                <span className="text-sm text-slate-500 font-sans font-medium">
+                  {currency}
+                </span>
+              )}
+              <AnimatedNumber
+                value={Math.round(value)}
+                duration={1500}
+                formatFn={(n) => nf0.format(Math.round(n))}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mt-3">
+              {change !== undefined && change !== null ? (
+                <span
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 shadow-sm border border-transparent/10",
+                    trendColor
+                  )}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
-                        ${fmtUSD(item.amount)}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                        {pct.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-2.5 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${pct}%`, backgroundColor: color }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                  <TrendIcon className="w-3 h-3" />
+                  {Math.abs(change).toFixed(1)}%
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-400 font-medium bg-slate-100/50 px-2 py-0.5 rounded-full">
+                  No Data
+                </span>
+              )}
+              {subText && (
+                <span className="text-[11px] text-slate-500 font-medium truncate max-w-[100px] sm:max-w-none">
+                  {subText}
+                </span>
+              )}
+            </div>
           </div>
-        )}
+
+          <div className="p-3 rounded-2xl bg-white/60 border border-white/50 shadow-sm backdrop-blur-sm text-slate-700">
+            {icon}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-/* ========= Quick Actions Card ========= */
+// --- Loading Skeleton ---
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-slate-950 p-6 space-y-8 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center pb-6 border-b border-slate-800">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64 bg-slate-800 rounded-lg" />
+          <Skeleton className="h-4 w-40 bg-slate-800 rounded-lg" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-32 bg-slate-800 rounded-full" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-32 w-full bg-slate-800/50 rounded-2xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        <Skeleton className="h-[500px] w-full bg-slate-800/50 rounded-2xl" />
+        <Skeleton className="h-[500px] w-full bg-slate-800/50 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
+// --- Quick Actions (Legacy Support) ---
 function QuickActionsCard() {
+  const actions = [
+    { href: "/transactions", label: "Add Transaction", icon: Plus, color: "text-teal-600", bg: "bg-teal-100" },
+    { href: "/patient-volume", label: "Patient Volume", icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
+    { href: "/reports", label: "Monthly Reports", icon: FileText, color: "text-purple-600", bg: "bg-purple-100" },
+    { href: "/users", label: "User Management", icon: Settings, color: "text-orange-600", bg: "bg-orange-100" },
+  ];
+  
   return (
     <Card className="border border-slate-200 shadow-sm">
       <CardHeader>
@@ -228,97 +242,110 @@ function QuickActionsCard() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <a href="/transactions" className="block group">
-            <Button
-              variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300 transition-all duration-200 group-hover:shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
-                  <Plus className="h-4 w-4 text-teal-600" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
-                    Add Transaction
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    Record new income or expense
-                  </span>
-                </div>
+          {actions.map((action) => (
+            <Link key={action.href} href={action.href}>
+              <div className="block group cursor-pointer">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between h-auto py-4 px-4 hover:bg-slate-50 transition-all duration-200 group-hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn("p-2 rounded-lg transition-colors", action.bg)}>
+                      <action.icon className={cn("h-4 w-4", action.color)} />
+                    </div>
+                    <span className="font-medium text-slate-900">{action.label}</span>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-400 group-hover:translate-x-1 transition-all" />
+                </Button>
               </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
-            </Button>
-          </a>
-          <a href="/patient-volume" className="block group">
-            <Button
-              variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-200 group-hover:shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
-                  <Users className="h-4 w-4 text-blue-600" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
-                    Patient Volume
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    Update patient count
-                  </span>
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
-            </Button>
-          </a>
-          <a href="/reports" className="block group">
-            <Button
-              variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300 transition-all duration-200 group-hover:shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
-                  <FileText className="h-4 w-4 text-purple-600" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
-                    Monthly Reports
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    View generated reports
-                  </span>
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
-            </Button>
-          </a>
-          <a href="/users" className="block group">
-            <Button
-              variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 transition-all duration-200 group-hover:shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
-                  <Settings className="h-4 w-4 text-orange-600" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
-                    User Management
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    Manage user accounts
-                  </span>
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
-            </Button>
-          </a>
+            </Link>
+          ))}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-/* ========= Page ========= */
+/* ==================================================================================
+   3. CUSTOM LOGIC HOOK (Internal)
+   ================================================================================== */
+
+function useDashboardAnalyticsInternal({
+  year,
+  month,
+  range,
+  customStart,
+  customEnd,
+}: {
+  year: number;
+  month: number;
+  range: string;
+  customStart?: Date;
+  customEnd?: Date;
+}) {
+  const queryKey = [
+    "/api/dashboard",
+    year,
+    month,
+    range,
+    customStart?.toISOString(),
+    customEnd?.toISOString(),
+  ];
+
+  const { data, isLoading, error } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      let url = `/api/dashboard?year=${year}&month=${month}&range=${range}`;
+      if (range === "custom" && customStart && customEnd) {
+        url += `&startDate=${format(customStart, "yyyy-MM-dd")}&endDate=${format(customEnd, "yyyy-MM-dd")}`;
+      }
+      const { data } = await api.get(url);
+      return data;
+    },
+  });
+
+  // Calculate metrics here to keep the main component clean
+  const metrics = useMemo(() => {
+    if (!data) return null;
+
+    const rev = parseFloat(data.totalIncomeSSP || "0");
+    const exp = parseFloat(data.totalExpenses || "0");
+    const net = rev - exp;
+    const margin = rev > 0 ? (net / rev) * 100 : 0;
+
+    return {
+      raw: data, // Pass full data for other components
+      revenue: {
+        value: rev,
+        change: data.changes?.incomeChangeSSP,
+      },
+      expenses: {
+        value: exp,
+        change: data.changes?.expenseChangeSSP,
+      },
+      netIncome: {
+        value: net,
+        change: data.changes?.netIncomeChangeSSP,
+        margin,
+        isProfit: net >= 0,
+      },
+      patients: {
+        value: data.totalPatients || 0,
+      },
+      insurance: {
+        valueUSD: parseFloat(data.totalIncomeUSD || "0"),
+        change: data.changes?.incomeChangeUSD,
+      },
+    };
+  }, [data]);
+
+  return { metrics, isLoading, error };
+}
+
+/* ==================================================================================
+   4. MAIN PAGE COMPONENT
+   ================================================================================== */
+
 export default function AdvancedDashboard() {
   const {
     timeRange,
@@ -334,398 +361,59 @@ export default function AdvancedDashboard() {
 
   const [openExpenses, setOpenExpenses] = useState(false);
 
-  const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
+  // 1. Calculate Params
+  const params = computeRangeParams(
     timeRange,
     selectedYear ?? null,
     selectedMonth ?? null
   );
 
-  const handleTimeRangeChange = (
-    range:
-      | "current-month"
-      | "last-month"
-      | "last-3-months"
-      | "year"
-      | "month-select"
-      | "custom"
-  ) => setTimeRange(range);
-
-  const now = new Date();
-  const thisYear = now.getFullYear();
-  const years = useMemo(
-    () => [thisYear, thisYear - 1, thisYear - 2],
-    [thisYear]
-  );
-  const months = [
-    { label: "January", value: 1 },
-    { label: "February", value: 2 },
-    { label: "March", value: 3 },
-    { label: "April", value: 4 },
-    { label: "May", value: 5 },
-    { label: "June", value: 6 },
-    { label: "July", value: 7 },
-    { label: "August", value: 8 },
-    { label: "September", value: 9 },
-    { label: "October", value: 10 },
-    { label: "November", value: 11 },
-    { label: "December", value: 12 },
-  ];
-
-  // still used for "Last Sync" in System Status, but not in header anymore
-  const lastUpdatedLabel = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(now);
-
-  /* ---------- data ---------- */
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: [
-      "/api/dashboard",
-      yearToSend,
-      monthToSend,
-      rangeToSend,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
-    ],
-    queryFn: async () => {
-      let url = `/api/dashboard?year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(
-          customStartDate,
-          "yyyy-MM-dd"
-        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
-      }
-      const { data } = await api.get(url);
-      return data;
-    },
+  // 2. Fetch Data using Internal Hook
+  const { metrics, isLoading } = useDashboardAnalyticsInternal({
+    year: params.yearToSend,
+    month: params.monthToSend,
+    range: params.rangeToSend,
+    customStart: customStartDate,
+    customEnd: customEndDate,
   });
 
+  // Fetch departments (kept simple)
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
-  const { data: rawIncome } = useQuery({
-    queryKey: [
-      "/api/income-trends",
-      yearToSend,
-      monthToSend,
-      rangeToSend,
-      customStartDate?.toISOString(),
-      customEndDate?.toISOString(),
-    ],
-    queryFn: async () => {
-      let url = `/api/income-trends/${yearToSend}/${monthToSend}?range=${rangeToSend}`;
-      if (timeRange === "custom" && customStartDate && customEndDate) {
-        url += `&startDate=${format(
-          customStartDate,
-          "yyyy-MM-dd"
-        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`;
-      }
-      const { data } = await api.get(url);
-      return data;
-    },
-  });
-
-  const { data: prevRawIncome } = useQuery({
-    queryKey: ["/api/income-trends", "prev-month", yearToSend, monthToSend],
-    enabled: timeRange === "current-month",
-    queryFn: async () => {
-      const currentMonthDate = new Date(yearToSend, monthToSend - 1, 1);
-      const prevMonthDate = new Date(
-        currentMonthDate.getFullYear(),
-        currentMonthDate.getMonth() - 1,
-        1
-      );
-      const prevYear = prevMonthDate.getFullYear();
-      const prevMonth = prevMonthDate.getMonth() + 1;
-
-      const url = `/api/income-trends/${prevYear}/${prevMonth}?range=current-month`;
-      const { data } = await api.get(url);
-      return data;
-    },
-  });
-
-  /* ---------- income series ---------- */
-  let incomeSeries: Array<{
-    day: number;
-    amount: number;
-    amountSSP: number;
-    amountUSD: number;
-    label: string;
-    fullDate: string;
-  }> = [];
-
-  if (
-    timeRange === "custom" &&
-    customStartDate &&
-    customEndDate &&
-    Array.isArray(rawIncome)
-  ) {
-    incomeSeries = rawIncome.map((r: any, i: number) => ({
-      day: i + 1,
-      amount: Number(r.income ?? r.amount ?? 0),
-      amountUSD: Number(r.incomeUSD ?? 0),
-      amountSSP: Number(r.incomeSSP ?? r.income ?? r.amount ?? 0),
-      label: r.date,
-      fullDate: r.date,
-    }));
-  } else {
-    const y = yearToSend!;
-    const m = monthToSend!;
-    const daysInMonth = new Date(y, m, 0).getDate();
-    incomeSeries = Array.from({ length: daysInMonth }, (_, i) => ({
-      day: i + 1,
-      amount: 0,
-      amountUSD: 0,
-      amountSSP: 0,
-      label: `${i + 1}`,
-      fullDate: new Date(y, m - 1, i + 1).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-    }));
-    if (Array.isArray(rawIncome)) {
-      for (const r of rawIncome as any[]) {
-        let d = (r as any).day;
-        if (!d && (r as any).dateISO)
-          d = new Date((r as any).dateISO).getDate();
-        if (!d && (r as any).date) d = new Date((r as any).date).getDate();
-        if (d >= 1 && d <= daysInMonth) {
-          incomeSeries[d - 1].amountUSD += Number((r as any).incomeUSD ?? 0);
-          incomeSeries[d - 1].amountSSP += Number(
-            (r as any).incomeSSP ??
-              (r as any).income ??
-              (r as any).amount ??
-              0
-          );
-          incomeSeries[d - 1].amount += Number(
-            (r as any).income ?? (r as any).amount ?? 0
-          );
-        }
-      }
-    }
+  // 3. Render Skeleton if loading
+  if (isLoading || !metrics) {
+    return <DashboardSkeleton />;
   }
 
-  const isCurrentMonthRange = timeRange === "current-month";
+  // 4. Comparison Label Helper
+  const comparisonLabel =
+    timeRange === "year" || timeRange === "last-3-months"
+      ? "vs previous period"
+      : "vs same days last month";
 
-  const daysInCurrentMonth = new Date(yearToSend, monthToSend, 0).getDate();
-  const lastDayWithIncome = incomeSeries.reduce(
-    (max, d) =>
-      d.amountSSP !== 0 || d.amountUSD !== 0 ? Math.max(max, d.day) : max,
-    0
-  );
-
-  const today = new Date();
-  const isThisCalendarMonth =
-    yearToSend === today.getFullYear() &&
-    monthToSend === today.getMonth() + 1;
-
-  const effectiveCurrentDay =
-    lastDayWithIncome > 0
-      ? lastDayWithIncome
-      : isThisCalendarMonth
-      ? Math.min(today.getDate(), daysInCurrentMonth)
-      : daysInCurrentMonth;
-
-  const currentMonthDate = new Date(yearToSend, monthToSend - 1, 1);
-  const prevMonthDate = new Date(
-    currentMonthDate.getFullYear(),
-    currentMonthDate.getMonth() - 1,
-    1
-  );
-  const daysInPrevMonth = new Date(
-    prevMonthDate.getFullYear(),
-    prevMonthDate.getMonth() + 1,
-    0
-  ).getDate();
-
-  const daysToCompare =
-    effectiveCurrentDay > 0 ? Math.min(effectiveCurrentDay, daysInPrevMonth) : 0;
-
-  const currentMTDIncomeSSP =
-    daysToCompare > 0
-      ? incomeSeries
-          .filter((d) => d.day <= daysToCompare)
-          .reduce((s, d) => s + d.amountSSP, 0)
-      : 0;
-
-  const currentMTDIncomeUSD =
-    daysToCompare > 0
-      ? incomeSeries
-          .filter((d) => d.day <= daysToCompare)
-          .reduce((s, d) => s + d.amountUSD, 0)
-      : 0;
-
-  let prevIncomeByDay: Record<
-    number,
-    { amountSSP: number; amountUSD: number }
-  > = {};
-
-  if (Array.isArray(prevRawIncome)) {
-    const prevDays = daysInPrevMonth;
-    for (const r of prevRawIncome as any[]) {
-      let d = (r as any).day;
-      if (!d && (r as any).dateISO)
-        d = new Date((r as any).dateISO).getDate();
-      if (!d && (r as any).date) d = new Date((r as any).date).getDate();
-      if (typeof d === "number" && d >= 1 && d <= prevDays) {
-        const ssp = Number(
-          (r as any).incomeSSP ??
-            (r as any).income ??
-            (r as any).amount ??
-            0
-        );
-        const usd = Number((r as any).incomeUSD ?? 0);
-        const existing = prevIncomeByDay[d] ?? {
-          amountSSP: 0,
-          amountUSD: 0,
-        };
-        prevIncomeByDay[d] = {
-          amountSSP: existing.amountSSP + ssp,
-          amountUSD: existing.amountUSD + usd,
-        };
-      }
-    }
-  }
-
-  const prevMTDIncomeSSP =
-    isCurrentMonthRange && daysToCompare > 0
-      ? Array.from({ length: daysToCompare }, (_, idx) => idx + 1).reduce(
-          (sum, day) => sum + (prevIncomeByDay[day]?.amountSSP ?? 0),
-          0
-        )
-      : 0;
-
-  const prevMTDIncomeUSD =
-    isCurrentMonthRange && daysToCompare > 0
-      ? Array.from({ length: daysToCompare }, (_, idx) => idx + 1).reduce(
-          (sum, day) => sum + (prevIncomeByDay[day]?.amountUSD ?? 0),
-          0
-        )
-      : 0;
-
-  let incomeChangeSSP_MTD: number | null = null;
-  let incomeChangeUSD_MTD: number | null = null;
-
-  if (isCurrentMonthRange && daysToCompare > 0 && prevMTDIncomeSSP > 0) {
-    incomeChangeSSP_MTD =
-      ((currentMTDIncomeSSP - prevMTDIncomeSSP) / prevMTDIncomeSSP) * 100;
-  }
-
-  if (isCurrentMonthRange && daysToCompare > 0 && prevMTDIncomeUSD > 0) {
-    incomeChangeUSD_MTD =
-      ((currentMTDIncomeUSD - prevMTDIncomeUSD) / prevMTDIncomeUSD) * 100;
-  }
-
-  const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
-  const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
-  const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
-  const sspRevenue = monthTotalSSP || sspIncome;
-  const sspNetIncome = sspRevenue - totalExpenses;
-
-  const isCurrent = isCurrentMonthRange;
-
-  const revenueChangePct =
-    isCurrent && incomeChangeSSP_MTD !== null
-      ? incomeChangeSSP_MTD
-      : dashboardData?.changes?.incomeChangeSSP;
-
-  const insuranceChangePct =
-    isCurrent && incomeChangeUSD_MTD !== null
-      ? incomeChangeUSD_MTD
-      : dashboardData?.changes?.incomeChangeUSD;
-
-  const prevMonthLabel = `${prevMonthDate.toLocaleString("default", {
-    month: "short",
-  })} ${prevMonthDate.getFullYear()}`;
-
-  const comparisonLabel = (() => {
-    if (isCurrent) return `vs same days last month (${prevMonthLabel})`;
-    switch (timeRange) {
-      case "last-3-months":
-        return "vs previous 3 months";
-      case "year":
-        return "vs last year";
-      case "last-month":
-      case "month-select":
-        return "vs last month";
-      default:
-        return "vs previous period";
-    }
-  })();
-
-  const hasPreviousPeriodSSP =
-    !!dashboardData?.previousPeriod &&
-    (dashboardData.previousPeriod.totalIncomeSSP !== 0 ||
-      dashboardData.previousPeriod.totalExpensesSSP !== 0);
-
-  const hasPreviousPeriodUSD =
-    !!dashboardData?.previousPeriod &&
-    dashboardData.previousPeriod.totalIncomeUSD !== 0;
-
-  const shouldShowNoComparisonSSP =
-    (timeRange === "year" || timeRange === "last-3-months") &&
-    !hasPreviousPeriodSSP;
-
-  const shouldShowNoComparisonUSD =
-    (timeRange === "year" || timeRange === "last-3-months") &&
-    !hasPreviousPeriodUSD;
-
-  const currentRevenueValue =
-    monthTotalSSP ?? parseFloat(dashboardData?.totalIncomeSSP || "0");
-  const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
-  const currentInsuranceValue = parseFloat(
-    dashboardData?.totalIncomeUSD || "0"
-  );
-  const currentPatientsValue = dashboardData?.totalPatients || 0;
-
-  const showNoDataYetRevenue = currentRevenueValue === 0;
-  const showNoDataYetExpenses = currentExpenseValue === 0;
-  const showNoDataYetNetIncome =
-    currentRevenueValue === 0 && currentExpenseValue === 0;
-  const showNoDataYetInsurance = currentInsuranceValue === 0;
-  const showNoDataYetPatients = currentPatientsValue === 0;
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-950">
-        <div className="flex items-center space-x-2 text-slate-100">
-          <RefreshCw className="h-6 w-6 animate-spin text-cyan-400" />
-          <span className="text-lg">Loading dashboard...</span>
-        </div>
-      </div>
-    );
-  }
-
-  /* ========= RENDER ========= */
-
+  // 5. Render Main Dashboard
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
-      {/* HEADER */}
+      
+      {/* HEADER: Dark with Neon Glow */}
       <header className="sticky top-0 z-40">
         <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
-          {/* header glow */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
-
+          
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
             <div className="flex-shrink-0">
               <h1 className="text-2xl font-semibold text-white tracking-tight">
                 Executive Dashboard
               </h1>
               <p className="mt-1 text-sm text-slate-300">
-                Key financials · {periodLabel}
+                Key financials · <span className="text-cyan-400 font-medium">{periodLabel}</span>
               </p>
             </div>
 
-            {/* controls (no search bar) */}
+            {/* CONTROLS */}
             <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto justify-end">
-              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                <SelectTrigger
-                  className={cn(
-                    headerControlStyles,
-                    "w-full sm:w-[170px] rounded-full px-3"
-                  )}
-                >
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className={cn(headerControlStyles, "w-full sm:w-[170px] rounded-full px-3")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -740,49 +428,20 @@ export default function AdvancedDashboard() {
 
               {timeRange === "month-select" && (
                 <>
-                  <Select
-                    value={String(selectedYear)}
-                    onValueChange={(val) =>
-                      setSpecificMonth(Number(val), selectedMonth || 1)
-                    }
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        headerControlStyles,
-                        "w-full sm:w-[110px] rounded-full px-3"
-                      )}
-                    >
-                      <SelectValue placeholder="Year" />
+                  <Select value={String(selectedYear || 2025)} onValueChange={(v) => setSpecificMonth(Number(v), selectedMonth || 1)}>
+                    <SelectTrigger className={cn(headerControlStyles, "w-[100px] rounded-full")}>
+                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {years.map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                          {y}
-                        </SelectItem>
-                      ))}
+                        {[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                     </SelectContent>
                   </Select>
-
-                  <Select
-                    value={String(selectedMonth)}
-                    onValueChange={(val) =>
-                      setSpecificMonth(selectedYear || thisYear, Number(val))
-                    }
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        headerControlStyles,
-                        "w-full sm:w-[140px] rounded-full px-3"
-                      )}
-                    >
-                      <SelectValue placeholder="Month" />
+                  <Select value={String(selectedMonth || 1)} onValueChange={(v) => setSpecificMonth(selectedYear || 2025, Number(v))}>
+                    <SelectTrigger className={cn(headerControlStyles, "w-[130px] rounded-full")}>
+                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {months.map((m) => (
-                        <SelectItem key={m.value} value={String(m.value)}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
+                        {Array.from({length: 12}, (_, i) => i+1).map(m => <SelectItem key={m} value={String(m)}>Month {m}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </>
@@ -792,547 +451,175 @@ export default function AdvancedDashboard() {
                 <div className="flex items-center gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          headerControlStyles,
-                          "justify-start text-left font-normal px-3 rounded-full"
-                        )}
-                      >
+                      <Button variant="outline" className={cn(headerControlStyles, "justify-start text-left font-normal px-3 rounded-full")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {customStartDate
-                          ? format(customStartDate, "MMM d")
-                          : "Start"}
+                        {customStartDate ? format(customStartDate, "MMM d") : "Start"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0 bg-white"
-                      align="end"
-                    >
-                      <DatePicker
-                        mode="single"
-                        selected={customStartDate}
-                        onSelect={(d) =>
-                          setCustomRange(d ?? undefined, customEndDate)
-                        }
-                        initialFocus
-                      />
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <DatePicker mode="single" selected={customStartDate} onSelect={(d) => setCustomRange(d, customEndDate)} />
                     </PopoverContent>
                   </Popover>
-
-                  <span className="text-slate-500">–</span>
-
+                  <span className="text-slate-500">-</span>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          headerControlStyles,
-                          "justify-start text-left font-normal px-3 rounded-full"
-                        )}
-                      >
+                      <Button variant="outline" className={cn(headerControlStyles, "justify-start text-left font-normal px-3 rounded-full")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {customEndDate ? format(customEndDate, "MMM d") : "End"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0 bg-white"
-                      align="end"
-                    >
-                      <DatePicker
-                        mode="single"
-                        selected={customEndDate}
-                        onSelect={(d) =>
-                          setCustomRange(customStartDate, d ?? undefined)
-                        }
-                        initialFocus
-                      />
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <DatePicker mode="single" selected={customEndDate} onSelect={(d) => setCustomRange(customStartDate, d)} />
                     </PopoverContent>
                   </Popover>
                 </div>
               )}
             </div>
           </div>
-
-          {/* neon horizon line */}
+          {/* Neon Horizon Line */}
           <div className="relative z-10 h-[3px] bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 shadow-[0_0_26px_rgba(34,211,238,0.95),0_0_42px_rgba(59,130,246,0.8)]" />
         </div>
       </header>
 
-      {/* MAIN: light background, slight sidebar-edge glow */}
+      {/* CONTENT SURFACE: Light Glassy Aesthetic */}
       <main className="relative min-h-0 overflow-y-auto bg-slate-50">
-        {/* soft glow under header into content */}
         <div className="pointer-events-none absolute inset-x-0 -top-8 h-20 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
-
-        {/* subtle vertical glow echoing the header along sidebar edge – slightly reduced */}
         <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-sky-500/10 via-cyan-400/4 to-transparent" />
 
-        <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-8">
-          {/* full-width main surface with slightly softer hover */}
-          <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden transition-shadow duration-300 hover:shadow-[0_22px_72px_rgba(15,23,42,0.22)] hover:border-slate-200">
-            {/* inner top glow so KPI cards look lit */}
-            <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/18 via-sky-400/8 to-transparent" />
-
+        <div className="relative z-10 px-4 md:px-6 pb-20 pt-8 max-w-[1600px] mx-auto">
+          
+          <div className="relative rounded-3xl bg-white/80 backdrop-blur-sm shadow-[0_18px_55px_rgba(15,23,42,0.1)] border border-white overflow-hidden">
             <div className="relative px-4 md:px-6 pt-6 pb-10">
-              {/* KPI CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7">
-                {/* Total Revenue */}
-                <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                  <CardContent className="p-4 sm:p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                          Total Revenue
-                        </p>
-                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                          SSP{" "}
-                          <AnimatedNumber
-                            value={Math.round(
-                              monthTotalSSP ||
-                                parseFloat(
-                                  dashboardData?.totalIncomeSSP || "0"
-                                )
-                            )}
-                            duration={1500}
-                            formatFn={(n) => nf0.format(Math.round(n))}
-                          />
-                        </p>
-                        <div className="flex items-center mt-1">
-                          {showNoDataYetRevenue ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              No transactions yet
-                            </span>
-                          ) : revenueChangePct !== undefined &&
-                            revenueChangePct !== null &&
-                            (!(
-                              timeRange === "year" ||
-                              timeRange === "last-3-months"
-                            ) ||
-                              hasPreviousPeriodSSP) ? (
-                            <span
-                              className={cn(
-                                "text-xs font-medium",
-                                revenueChangePct > 0
-                                  ? "text-emerald-600"
-                                  : revenueChangePct < 0
-                                  ? "text-red-600"
-                                  : "text-slate-500"
-                              )}
-                            >
-                              {revenueChangePct > 0 ? "+" : ""}
-                              {revenueChangePct.toFixed(1)}%{" "}
-                              {comparisonLabel}
-                            </span>
-                          ) : shouldShowNoComparisonSSP ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              No data to compare
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          "p-2.5 rounded-xl shadow-sm",
-                          revenueChangePct !== undefined &&
-                            revenueChangePct !== null &&
-                            revenueChangePct < 0
-                            ? "bg-red-100"
-                            : "bg-emerald-100"
-                        )}
-                      >
-                        {revenueChangePct !== undefined &&
-                        revenueChangePct !== null &&
-                        revenueChangePct < 0 ? (
-                          <TrendingDown className="h-5 w-5 text-red-600" />
-                        ) : (
-                          <TrendingUp className="h-5 w-5 text-emerald-600" />
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              
+              {/* === KPI CARDS GRID === */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-8">
+                
+                <KpiCard
+                  title="Total Revenue"
+                  value={metrics.revenue.value}
+                  change={metrics.revenue.change}
+                  gradient="bg-gradient-to-br from-emerald-50/50 to-green-50/50 hover:to-emerald-100/50"
+                  icon={<DollarSign className="h-5 w-5 text-emerald-600" />}
+                  subText={comparisonLabel}
+                />
 
-                {/* Total Expenses */}
-                <Card
-                  className="border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
+                <KpiCard
+                  title="Total Expenses"
+                  value={metrics.expenses.value}
+                  change={metrics.expenses.change}
+                  trendMode="inverse" // Up is bad
+                  gradient="bg-gradient-to-br from-rose-50/50 to-red-50/50 hover:to-rose-100/50"
+                  icon={<CreditCard className="h-5 w-5 text-rose-600" />}
+                  subText="Click for breakdown"
                   onClick={() => setOpenExpenses(true)}
-                  title="Click to view expense breakdown"
-                >
-                  <CardContent className="p-4 sm:p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                          Total Expenses
-                        </p>
-                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                          SSP{" "}
-                          <AnimatedNumber
-                            value={Math.round(
-                              parseFloat(
-                                dashboardData?.totalExpenses || "0"
-                              )
-                            )}
-                            duration={1500}
-                            formatFn={(n) => nf0.format(Math.round(n))}
-                          />
-                        </p>
-                        <div className="flex items-center mt-1">
-                          {showNoDataYetExpenses ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              No expenses yet
-                            </span>
-                          ) : dashboardData?.changes
-                              ?.expenseChangeSSP !== undefined &&
-                            (!(
-                              timeRange === "year" ||
-                              timeRange === "last-3-months"
-                            ) ||
-                              hasPreviousPeriodSSP) ? (
-                            <span
-                              className={cn(
-                                "text-xs font-medium",
-                                dashboardData.changes.expenseChangeSSP > 0
-                                  ? "text-red-600"
-                                  : dashboardData.changes.expenseChangeSSP < 0
-                                  ? "text-emerald-600"
-                                  : "text-slate-500"
-                              )}
-                            >
-                              {dashboardData.changes.expenseChangeSSP > 0
-                                ? "+"
-                                : ""}
-                              {dashboardData.changes.expenseChangeSSP.toFixed(
-                                1
-                              )}{" "}
-                              {comparisonLabel}
-                            </span>
-                          ) : shouldShowNoComparisonSSP ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              No data to compare
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          "p-2.5 rounded-xl shadow-sm",
-                          dashboardData?.changes?.expenseChangeSSP !==
-                            undefined &&
-                            dashboardData.changes.expenseChangeSSP < 0
-                            ? "bg-emerald-100"
-                            : "bg-red-100"
-                        )}
-                      >
-                        {dashboardData?.changes?.expenseChangeSSP !==
-                          undefined &&
-                        dashboardData.changes.expenseChangeSSP < 0 ? (
-                          <TrendingDown className="h-5 w-5 text-emerald-600" />
-                        ) : (
-                          <CreditCard className="h-5 w-5 text-red-600" />
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                />
 
-                {/* Net Income */}
-                <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-100 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                  <CardContent className="p-4 sm:p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
-                          <span className="text-blue-500">★</span> Net Income
-                        </p>
-                        <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
-                          SSP{" "}
-                          <AnimatedNumber
-                            value={Math.round(sspNetIncome)}
-                            duration={1500}
-                            formatFn={(n) => nf0.format(Math.round(n))}
-                          />
-                        </p>
-                        {sspRevenue > 0 && (
-                          <p
-                            className={cn(
-                              "text-xs mt-0.5",
-                              sspNetIncome >= 0
-                                ? "text-blue-600"
-                                : "text-red-600"
-                            )}
-                          >
-                            {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin:{" "}
-                            {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
-                          </p>
-                        )}
-                        <div className="flex items-center mt-1">
-                          {showNoDataYetNetIncome ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              No transactions yet
-                            </span>
-                          ) : dashboardData?.changes
-                              ?.netIncomeChangeSSP !== undefined &&
-                            (!(
-                              timeRange === "year" ||
-                              timeRange === "last-3-months"
-                            ) ||
-                              hasPreviousPeriodSSP) ? (
-                            <span
-                              className={cn(
-                                "text-xs font-medium",
-                                dashboardData.changes.netIncomeChangeSSP > 0
-                                  ? "text-emerald-600"
-                                  : dashboardData.changes.netIncomeChangeSSP < 0
-                                  ? "text-red-600"
-                                  : "text-slate-500"
-                              )}
-                            >
-                              {dashboardData.changes.netIncomeChangeSSP > 0
-                                ? "+"
-                                : ""}
-                              {dashboardData.changes.netIncomeChangeSSP.toFixed(
-                                1
-                              )}{" "}
-                              {comparisonLabel}
-                            </span>
-                          ) : shouldShowNoComparisonSSP ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              No data to compare
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="bg-blue-100 p-2.5 rounded-xl shadow-sm">
-                        <DollarSign className="h-5 w-5 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <KpiCard
+                  title="Net Income"
+                  value={metrics.netIncome.value}
+                  change={metrics.netIncome.change}
+                  gradient="bg-gradient-to-br from-blue-50/50 to-indigo-50/50 hover:to-blue-100/50"
+                  icon={<Activity className="h-5 w-5 text-blue-600" />}
+                  subText={
+                    <span className={cn("font-semibold", metrics.netIncome.isProfit ? "text-blue-600" : "text-red-600")}>
+                      {metrics.netIncome.margin.toFixed(1)}% Margin
+                    </span>
+                  }
+                />
 
-                {/* Insurance (USD) */}
-                <Link
-                  href={`/insurance-providers?range=${rangeToSend}${
-                    timeRange === "custom" &&
-                    customStartDate &&
-                    customEndDate
-                      ? `&startDate=${format(
-                          customStartDate,
-                          "yyyy-MM-dd"
-                        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-                      : `&year=${yearToSend}&month=${monthToSend}`
-                  }`}
-                >
-                  <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                    <CardContent className="p-4 sm:p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                            Insurance (USD)
-                          </p>
-                          <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                            USD{" "}
-                            <AnimatedNumber
-                              value={Math.round(
-                                parseFloat(
-                                  dashboardData?.totalIncomeUSD || "0"
-                                )
-                              )}
-                              duration={1500}
-                              formatFn={(n) => fmtUSD(Math.round(n))}
-                            />
-                          </p>
-                          <div className="flex items-center mt-1">
-                            {showNoDataYetInsurance ? (
-                              <span className="text-xs font-medium text-slate-500">
-                                No insurance claims yet
-                              </span>
-                            ) : insuranceChangePct !== undefined &&
-                              insuranceChangePct !== null &&
-                              (!(
-                                timeRange === "year" ||
-                                timeRange === "last-3-months"
-                              ) ||
-                                hasPreviousPeriodUSD) ? (
-                              <span
-                                className={cn(
-                                  "text-xs font-medium",
-                                  insuranceChangePct > 0
-                                    ? "text-emerald-600"
-                                    : insuranceChangePct < 0
-                                    ? "text-red-600"
-                                    : "text-slate-500"
-                                )}
-                              >
-                                {insuranceChangePct > 0 ? "+" : ""}
-                                {insuranceChangePct.toFixed(1)}{" "}
-                                {comparisonLabel}
-                              </span>
-                            ) : shouldShowNoComparisonUSD &&
-                              insuranceChangePct !== undefined &&
-                              insuranceChangePct !== null ? (
-                              <span className="text-xs font-medium text-slate-500">
-                                No data to compare
-                              </span>
-                            ) : (
-                              <span className="text-xs font-medium text-purple-600">
-                                {Object.keys(
-                                  dashboardData?.insuranceBreakdown || {}
-                                ).length === 1
-                                  ? "1 provider"
-                                  : `${
-                                      Object.keys(
-                                        dashboardData?.insuranceBreakdown || {}
-                                      ).length
-                                    } providers`}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
-                          <Shield className="h-5 w-5 text-purple-600" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <Link href={`/insurance-providers?range=${params.rangeToSend}`}>
+                  <div className="h-full">
+                    <KpiCard
+                      title="Insurance (USD)"
+                      value={metrics.insurance.valueUSD}
+                      currency="USD"
+                      change={metrics.insurance.change}
+                      gradient="bg-gradient-to-br from-purple-50/50 to-violet-50/50 hover:to-purple-100/50"
+                      icon={<Shield className="h-5 w-5 text-purple-600" />}
+                      subText={comparisonLabel}
+                    />
+                  </div>
                 </Link>
 
-                {/* Patient Volume */}
-                <Link
-                  href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
-                >
-                  <Card className="border-0 shadow-md bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                    <CardContent className="p-4 sm:p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                            Total Patients
-                          </p>
-                          <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                            <AnimatedNumber
-                              value={dashboardData?.totalPatients || 0}
-                              duration={1500}
-                              formatFn={(n) => nf0.format(Math.round(n))}
-                            />
-                          </p>
-                          <div className="flex items-center mt-1">
-                            {showNoDataYetPatients ? (
-                              <span className="text-xs font-medium text-slate-500">
-                                No patients recorded yet
-                              </span>
-                            ) : (
-                              <span className="text-xs font-medium text-teal-600">
-                                Current period
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="bg-teal-100 p-2.5 rounded-xl shadow-sm">
-                          <Users className="h-5 w-5 text-teal-600" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <Link href="/patient-volume">
+                  <div className="h-full">
+                    <KpiCard
+                      title="Total Patients"
+                      value={metrics.patients.value}
+                      currency=""
+                      gradient="bg-gradient-to-br from-teal-50/50 to-cyan-50/50 hover:to-teal-100/50"
+                      icon={<Users className="h-5 w-5 text-teal-600" />}
+                      subText="Current period"
+                    />
+                  </div>
                 </Link>
               </div>
 
-              {/* MAIN GRID INSIDE SURFACE */}
-              <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+              {/* === MAIN LAYOUT === */}
+              <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6 mb-8">
+                
+                {/* Left Column: Charts */}
                 <div className="space-y-6">
+                  {/* Re-using your existing chart component */}
                   <RevenueAnalyticsDaily
-                    timeRange={rangeToSend}
-                    selectedYear={yearToSend}
-                    selectedMonth={monthToSend}
+                    timeRange={params.rangeToSend}
+                    selectedYear={params.yearToSend}
+                    selectedMonth={params.monthToSend}
                     customStartDate={customStartDate ?? undefined}
                     customEndDate={customEndDate ?? undefined}
                   />
+                  {/* Hidden on mobile, shown on desktop */}
                   <div className="hidden lg:block">
+                     <QuickActionsCard />
+                  </div>
+                </div>
+
+                {/* Right Column: Departments & Status */}
+                <div className="space-y-6">
+                  <DepartmentsPanel
+                    departments={Array.isArray(departments) ? departments : []}
+                    departmentBreakdown={metrics.raw.departmentBreakdown}
+                    totalSSP={metrics.revenue.value}
+                  />
+                  
+                  {/* System Status */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                       <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                       System Status
+                    </h3>
+                    <div className="space-y-3 text-sm text-slate-600">
+                        <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+                            <span>Database</span>
+                            <Badge variant="outline" className="text-emerald-600 bg-emerald-50 border-emerald-100">Connected</Badge>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span>Last Sync</span>
+                            <span className="font-mono text-xs text-slate-400">{new Date().toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+                  </div>
+                  
+                  {/* Mobile Quick Actions */}
+                  <div className="lg:hidden">
                     <QuickActionsCard />
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  <DepartmentsPanel
-                    departments={
-                      Array.isArray(departments) ? (departments as any[]) : []
-                    }
-                    departmentBreakdown={dashboardData?.departmentBreakdown}
-                    totalSSP={sspRevenue}
-                  />
-
-                  <InsuranceProvidersUSD
-                    breakdown={dashboardData?.insuranceBreakdown}
-                    totalUSD={parseFloat(
-                      dashboardData?.totalIncomeUSD || "0"
-                    )}
-                    timeRange={rangeToSend}
-                    selectedYear={yearToSend}
-                    selectedMonth={monthToSend}
-                    customStartDate={customStartDate ?? undefined}
-                    customEndDate={customEndDate ?? undefined}
-                  />
-
-                  <Card className="border border-slate-200 shadow-sm self-start">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
-                        System Status
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">
-                            Database
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className="bg-green-100 text-green-700 border-green-200 rounded-full"
-                          >
-                            Connected
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">
-                            Last Sync
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className="rounded-full border-slate-200 text-slate-600"
-                          >
-                            {lastUpdatedLabel}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">
-                            Active Users
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className="bg-blue-50 text-blue-700 border-blue-200 rounded-full"
-                          >
-                            1 online
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
               </div>
-
-              {/* mobile quick actions */}
-              <div className="lg:hidden mb-4">
-                <QuickActionsCard />
-              </div>
-
+              
               <ExpensesDrawer
                 open={openExpenses}
                 onOpenChange={setOpenExpenses}
                 periodLabel={periodLabel}
-                expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
-                totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
-                onViewFullReport={() => {
-                  window.location.href = "/reports";
-                }}
+                expenseBreakdown={metrics.raw.expenseBreakdown ?? {}}
+                totalExpenseSSP={metrics.expenses.value}
+                onViewFullReport={() => (window.location.href = "/reports")}
               />
+
             </div>
           </div>
         </div>
