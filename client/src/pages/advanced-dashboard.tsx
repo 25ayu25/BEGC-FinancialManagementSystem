@@ -47,14 +47,14 @@ import {
 import { api } from "@/lib/queryClient";
 import { useDateFilter } from "@/context/date-filter-context";
 
-// --- SUB-COMPONENTS ---
+// --- SUB-COMPONENTS (Assumed to exist in your project) ---
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
 
 /* ==================================================================================
    1. UTILITIES
-   ================================================================================= */
+   ================================================================================== */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const headerControlStyles =
@@ -93,11 +93,12 @@ function computeRangeParams(
 }
 
 /* ==================================================================================
-   2. INTERNAL UI COMPONENTS
-   ================================================================================= */
+   2. INTERNAL UI COMPONENTS (The "Secret" to code reduction)
+   ================================================================================== */
 
 /**
  * The "World Class" KPI Card.
+ * Replaces the repetitive card code with one reusable component.
  */
 interface KpiCardProps {
   title: string;
@@ -201,7 +202,7 @@ function KpiCard({
   );
 }
 
-/** Loading State */
+/** Loading State - Better than a spinner */
 function DashboardSkeleton() {
   return (
     <div className="min-h-screen bg-slate-950 p-6 space-y-8 animate-in fade-in duration-500">
@@ -227,7 +228,7 @@ function DashboardSkeleton() {
   );
 }
 
-/** Legacy Quick Actions */
+/** Legacy Quick Actions (Restored from your code) */
 function QuickActionsCard() {
   const actions = [
     { href: "/transactions", label: "Add Transaction", icon: Plus, color: "text-teal-600", bg: "bg-teal-100" },
@@ -270,8 +271,8 @@ function QuickActionsCard() {
 }
 
 /* ==================================================================================
-   3. LOGIC HOOK
-   ================================================================================= */
+   3. LOGIC HOOK (Extracting Math from UI)
+   ================================================================================== */
 
 function useDashboardAnalyticsInternal({
   year,
@@ -307,6 +308,7 @@ function useDashboardAnalyticsInternal({
     },
   });
 
+  // Calculate metrics here to keep the main component clean
   const metrics = useMemo(() => {
     if (!data) return null;
 
@@ -316,7 +318,7 @@ function useDashboardAnalyticsInternal({
     const margin = rev > 0 ? (net / rev) * 100 : 0;
 
     return {
-      raw: data,
+      raw: data, // Pass full data to children if needed
       revenue: {
         value: rev,
         change: data.changes?.incomeChangeSSP,
@@ -345,8 +347,8 @@ function useDashboardAnalyticsInternal({
 }
 
 /* ==================================================================================
-   4. MAIN PAGE COMPONENT
-   ================================================================================= */
+   4. MAIN PAGE
+   ================================================================================== */
 
 export default function AdvancedDashboard() {
   const {
@@ -370,7 +372,7 @@ export default function AdvancedDashboard() {
     selectedMonth ?? null
   );
 
-  // 2. Fetch Data
+  // 2. Fetch Data (Cleaner!)
   const { metrics, isLoading } = useDashboardAnalyticsInternal({
     year: params.yearToSend,
     month: params.monthToSend,
@@ -379,10 +381,10 @@ export default function AdvancedDashboard() {
     customEnd: customEndDate,
   });
 
-  // Fetch departments
+  // Fetch departments (kept separate as per original logic)
   const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
 
-  // 3. Render Skeleton if loading
+  // 3. Render Skeleton
   if (isLoading || !metrics) {
     return <DashboardSkeleton />;
   }
@@ -396,7 +398,7 @@ export default function AdvancedDashboard() {
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
       
-      {/* HEADER */}
+      {/* HEADER: Dark with Neon Glow */}
       <header className="sticky top-0 z-40">
         <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
@@ -477,6 +479,7 @@ export default function AdvancedDashboard() {
               )}
             </div>
           </div>
+          {/* Neon Horizon Line */}
           <div className="relative z-10 h-[3px] bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 shadow-[0_0_26px_rgba(34,211,238,0.95),0_0_42px_rgba(59,130,246,0.8)]" />
         </div>
       </header>
@@ -507,10 +510,10 @@ export default function AdvancedDashboard() {
                   title="Total Expenses"
                   value={metrics.expenses.value}
                   change={metrics.expenses.change}
-                  trendMode="inverse"
+                  trendMode="inverse" // Up is bad
                   gradient="bg-gradient-to-br from-rose-50/50 to-red-50/50 hover:to-rose-100/50"
                   icon={<CreditCard className="h-5 w-5 text-rose-600" />}
-                  subText={comparisonLabel}
+                  subText="Click for breakdown"
                   onClick={() => setOpenExpenses(true)}
                 />
 
@@ -555,34 +558,26 @@ export default function AdvancedDashboard() {
                 </Link>
               </div>
 
-              {/* === MAIN LAYOUT === */}
+              {/* === CHARTS & DETAILS === */}
               <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6 mb-8">
                 
-                {/* Left Column: Charts */}
+                {/* Left: Charts */}
                 <div className="space-y-6">
-                  {/* WRAPPED IN SOLID CARD: Matches Departments panel style */}
-                  <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl">
-                    <CardHeader className="pb-2 border-b border-slate-50">
-                       <CardTitle className="text-base font-semibold text-slate-900">Revenue Analytics</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <RevenueAnalyticsDaily
-                        timeRange={params.rangeToSend}
-                        selectedYear={params.yearToSend}
-                        selectedMonth={params.monthToSend}
-                        customStartDate={customStartDate ?? undefined}
-                        customEndDate={customEndDate ?? undefined}
-                      />
-                    </CardContent>
-                  </Card>
-
+                  {/* We pass props to the existing chart component, which handles its own data fetching if needed */}
+                  <RevenueAnalyticsDaily
+                    timeRange={params.rangeToSend}
+                    selectedYear={params.yearToSend}
+                    selectedMonth={params.monthToSend}
+                    customStartDate={customStartDate ?? undefined}
+                    customEndDate={customEndDate ?? undefined}
+                  />
                   {/* Desktop Quick Actions */}
                   <div className="hidden lg:block">
                      <QuickActionsCard />
                   </div>
                 </div>
 
-                {/* Right Column: Departments & Status */}
+                {/* Right: Depts & Status */}
                 <div className="space-y-6">
                   <DepartmentsPanel
                     departments={Array.isArray(departments) ? departments : []}
