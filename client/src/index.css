@@ -353,7 +353,8 @@ body {
     background-size: 40px 40px;
   }
 
-  /* Glow and animation effects - keyframes defined in tailwind.config.ts */
+  /* Glow and animation effects */
+  /* Note: All @keyframes are centrally defined in tailwind.config.ts */
   .glow-pulse {
     animation: glow-pulse 3s ease-in-out infinite;
   }
@@ -374,7 +375,7 @@ body {
     animation: shimmer 3s infinite;
   }
 
-  /* Breathing glow animation - keyframes defined in tailwind.config.ts */
+  /* Breathing glow animation */
   .breathing-glow {
     animation: breathing-glow 4s ease-in-out infinite;
   }
@@ -396,7 +397,7 @@ body {
     );
   }
 
-  /* Metallic shine effect - keyframes defined in tailwind.config.ts */
+  /* Metallic shine effect */
   .metallic-shine {
     background: linear-gradient(
       135deg,

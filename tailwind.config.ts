@@ -101,6 +101,7 @@ export default {
           "50%": { opacity: "0.7" },
         },
         "shimmer": {
+          "0%": { left: "-100%" },
           "100%": { left: "100%" },
         },
         "breathing-glow": {

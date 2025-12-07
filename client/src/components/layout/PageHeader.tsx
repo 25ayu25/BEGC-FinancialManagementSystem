@@ -170,7 +170,7 @@ const variantStyles: Record<
  * - Sophisticated animations and glow effects
  * - Support for optional subtitle and right-side controls
  * - Responsive layout
- * - WCAG AAA compliant text contrast (7:1)
+ * - High contrast text (white on vibrant backgrounds for readability)
  * - Respects prefers-reduced-motion for accessibility
  */
 export default function PageHeader({
