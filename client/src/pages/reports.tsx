@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, api } from "@/lib/queryClient";
-import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileText, Lock, Trash2, Calendar } from "lucide-react";
+import PageHeader from "@/components/layout/PageHeader";
 
 /** Helper: month name from 1-based month */
 function monthName(month1Based: number) {
@@ -130,10 +130,11 @@ export default function Reports() {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <Header
+      <PageHeader
+        variant="monthlyReports"
         title="Monthly Reports"
         subtitle="Generate and manage monthly financial reports"
-        actions={
+      >
           <div className="flex items-center space-x-3">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-32">
@@ -169,8 +170,7 @@ export default function Reports() {
               Generate Report
             </Button>
           </div>
-        }
-      />
+      </PageHeader>
 
       <main className="flex-1 overflow-y-auto p-6">
         <Card>

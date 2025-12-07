@@ -34,6 +34,7 @@ import { useIsMobile } from "@/features/insurance-overview/hooks/useMediaQuery";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import PageHeader from "@/components/layout/PageHeader";
 
 interface AnalyticsData {
   overview: {
@@ -499,37 +500,157 @@ export default function InsuranceOverview() {
   }
 
   return (
-    <div className={`max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 ${fadeIn}`}>
+    <div className={fadeIn}>
       {/* Page Header with Filter - Mobile Responsive */}
-      {renderPageHeader()}
+      <PageHeader
+        variant="insuranceOverview"
+        title="Insurance Overview"
+        subtitle="Revenue analytics from insurance transactions (USD only)"
+      >
+        <div className="flex gap-2 sm:gap-3">
+          {/* Filter Dropdown */}
+          <div className="relative">
+            <button
+              onClick={toggleDropdown}
+              className={`
+                flex items-center justify-between gap-2 
+                px-3 sm:px-4 py-2.5 sm:py-2 
+                bg-white/90 backdrop-blur-sm border border-gray-200/80 text-gray-700 
+                rounded-xl hover:bg-white hover:border-blue-200
+                transition-all duration-200 ease-out
+                shadow-sm hover:shadow-md hover:shadow-blue-100/50
+                min-h-[44px]
+                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
+              `}
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-blue-600" />
+                <span className="text-sm sm:text-base font-medium truncate">
+                  {isMobile ? currentFilterLabel.split(' ')[0] : currentFilterLabel}
+                </span>
+              </div>
+              <svg
+                className={`w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ease-out ${showFilterDropdown ? 'rotate-180' : 'rotate-0'}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showFilterDropdown && (
+              <>
+                {/* Backdrop for mobile */}
+                {isMobile && (
+                  <div 
+                    className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-200"
+                    onClick={closeDropdown}
+                  />
+                )}
+                
+                {/* Dropdown menu with smooth CSS transitions */}
+                <div 
+                  className={`
+                    ${isMobile 
+                      ? 'fixed bottom-0 left-0 right-0 rounded-t-2xl z-50' 
+                      : 'absolute right-0 mt-2 w-56 rounded-xl z-10'
+                    }
+                    bg-white/95 backdrop-blur-md shadow-xl border border-gray-200/60
+                    transition-all duration-200 ease-out
+                    ${isMobile ? 'animate-in slide-in-from-bottom duration-300' : 'animate-in fade-in-0 zoom-in-95 duration-150'}
+                  `}
+                  style={{ willChange: 'transform, opacity' }}
+                >
+                  {isMobile && (
+                    <div className="flex justify-center py-3">
+                      <div className="w-10 h-1 bg-gray-300 rounded-full" />
+                    </div>
+                  )}
+                  
+                  <div className={isMobile ? 'py-2 pb-8' : 'py-2'}>
+                    {filterOptions.map((option, index) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleFilterChange(option.value)}
+                        className={`
+                          w-full text-left px-4 py-3 sm:py-2.5 text-sm sm:text-base
+                          transition-colors duration-150 ease-out
+                          ${selectedFilter === option.value 
+                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-semibold border-l-2 border-blue-500' 
+                            : 'text-gray-700 hover:bg-gray-50 border-l-2 border-transparent'
+                          }
+                          min-h-[44px] sm:min-h-0
+                          focus:outline-none focus:bg-gray-50
+                        `}
+                      >
+                        <span className="flex items-center gap-2">
+                          {selectedFilter === option.value && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          )}
+                          {option.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
-      {/* Custom Date Range Picker Modal */}
-      {renderCustomDatePicker()}
-
-      {/* Content with staggered animation */}
-      <div className="space-y-4 sm:space-y-6">
-        {/* Revenue Overview Card */}
-        <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '0ms' }}>
-          <RevenueOverviewCard
-            totalRevenue={data.overview.totalRevenue}
-            activeProviders={data.overview.activeProviders}
-            vsLastMonth={data.overview.vsLastMonth}
-          />
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className={`
+              flex items-center justify-center gap-2 
+              px-3 sm:px-4 py-2.5 sm:py-2
+              bg-gradient-to-r from-blue-600 to-blue-700 
+              text-white rounded-lg font-medium
+              hover:from-blue-700 hover:to-blue-800
+              active:scale-95
+              shadow-lg shadow-blue-500/30
+              disabled:opacity-50 disabled:cursor-not-allowed
+              ${transitions.base}
+              min-h-[44px] min-w-[44px]
+            `}
+            aria-label="Refresh data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
         </div>
+      </PageHeader>
 
-        {/* Share by Provider Chart */}
-        {data.providerShares.length > 0 && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms' }}>
-            <ShareByProviderChart data={data.providerShares} />
-          </div>
-        )}
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+        {/* Custom Date Range Picker Modal */}
+        {renderCustomDatePicker()}
 
-        {/* Provider Performance Cards */}
-        {data.topProviders.length > 0 && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
-            <ProviderPerformanceCards providers={data.topProviders} />
+        {/* Content with staggered animation */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Revenue Overview Card */}
+          <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '0ms' }}>
+            <RevenueOverviewCard
+              totalRevenue={data.overview.totalRevenue}
+              activeProviders={data.overview.activeProviders}
+              vsLastMonth={data.overview.vsLastMonth}
+            />
           </div>
-        )}
+
+          {/* Share by Provider Chart */}
+          {data.providerShares.length > 0 && (
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms' }}>
+              <ShareByProviderChart data={data.providerShares} />
+            </div>
+          )}
+
+          {/* Provider Performance Cards */}
+          {data.topProviders.length > 0 && (
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
+              <ProviderPerformanceCards providers={data.topProviders} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

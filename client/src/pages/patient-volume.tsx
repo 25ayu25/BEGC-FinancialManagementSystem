@@ -35,6 +35,7 @@ import {
 } from "recharts";
 
 import AppContainer from "@/components/layout/AppContainer";
+import PageHeader from "@/components/layout/PageHeader";
 
 type PatientVolume = {
   id: string;
@@ -206,23 +207,19 @@ export default function PatientVolumePage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-100">
-        <AppContainer className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Patient Volume Tracking</h1>
-              <p className="text-slate-600">Monthly & multi-period summary</p>
-            </div>
-            <Button
-              className="bg-teal-600 hover:bg-teal-700 w-full sm:w-auto"
-              onClick={() => setAddOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Volume
-            </Button>
-          </div>
-        </AppContainer>
-      </header>
+      <PageHeader
+        variant="patientVolume"
+        title="Patient Volume Tracking"
+        subtitle="Monthly & multi-period summary"
+      >
+        <Button
+          className="bg-cyan-600 hover:bg-cyan-700"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Volume
+        </Button>
+      </PageHeader>
 
       <AppContainer className="space-y-6 py-6">
         {/* KPI cards */}

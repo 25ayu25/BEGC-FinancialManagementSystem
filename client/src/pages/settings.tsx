@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Header from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Bell, Lock, User, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import PageHeader from "@/components/layout/PageHeader";
 
 // User type interface
 interface User {
@@ -173,20 +173,18 @@ export default function Settings() {
   }
   return (
     <div className="flex-1 flex flex-col h-full">
-      <Header 
-        title="Settings" 
+      <PageHeader
+        variant="settings"
+        title="Settings"
         subtitle="Manage your system preferences and configurations"
-        actions={
-          hasChanges ? (
-            <div className="flex items-center gap-2 text-sm text-amber-600">
-              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-              Unsaved changes
-            </div>
-          ) : (
-            <div></div>
-          )
-        }
-      />
+      >
+        {hasChanges && (
+          <div className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+            Unsaved changes
+          </div>
+        )}
+      </PageHeader>
 
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <main className="flex-1 overflow-y-auto p-6 space-y-6">

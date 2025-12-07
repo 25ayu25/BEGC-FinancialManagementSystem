@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import PageHeader from "@/components/layout/PageHeader";
 
 // Modals
 import SetLabPortionModal from "@/components/insurance/modals/SetLabPortionModal";
@@ -405,81 +406,70 @@ export default function InsuranceLabPage() {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-10 px-4 sm:px-6">
-      {/* Header & Filters */}
-      <div className="flex flex-col gap-4 pt-2">
-        <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-            Lab Finance
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Track lab insurance and technician payments.
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{showingLabel}</p>
-        </div>
+    <div>
+      {/* Header */}
+      <PageHeader
+        variant="labFinance"
+        title="Lab Finance"
+        subtitle="Track lab insurance and technician payments"
+      >
+        <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:items-center">
+          {/* Month selector */}
+          <div className="flex flex-col">
+            <span className="text-[11px] text-slate-400 mb-1">
+              Month
+            </span>
+            <Select
+              value={month.toString()}
+              onValueChange={(v) => setMonth(parseInt(v))}
+              disabled={viewMode === "year"}
+            >
+              <SelectTrigger className="w-full sm:w-[140px] bg-slate-800/50 border-slate-700 text-slate-100">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <SelectItem key={m} value={m.toString()}>
+                    {new Date(2000, m - 1).toLocaleString("default", {
+                      month: "long",
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm px-4 py-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <p className="text-[11px] text-muted-foreground max-w-xs">
-            Month controls the cards; Year controls the table below.
-          </p>
+          {/* Year selector */}
+          <div className="flex flex-col">
+            <span className="text-[11px] text-slate-400 mb-1">
+              Year
+            </span>
+            <Select
+              value={year.toString()}
+              onValueChange={(v) => setYear(parseInt(v))}
+            >
+              <SelectTrigger className="w-full sm:w-[100px] bg-slate-800/50 border-slate-700 text-slate-100">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2023, 2024, 2025, 2026].map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <div className="flex flex-col gap-3 w-full md:w-auto sm:flex-row sm:items-end sm:justify-end">
-            {/* Month selector */}
-            <div className="flex-1 sm:flex-none flex flex-col">
-              <span className="text-[11px] text-muted-foreground mb-1">
-                Month
-              </span>
-              <Select
-                value={month.toString()}
-                onValueChange={(v) => setMonth(parseInt(v))}
-                disabled={viewMode === "year"}
-              >
-                <SelectTrigger className="w-full sm:w-[140px] bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <SelectItem key={m} value={m.toString()}>
-                      {new Date(2000, m - 1).toLocaleString("default", {
-                        month: "long",
-                      })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Year selector */}
-            <div className="flex-1 sm:flex-none flex flex-col">
-              <span className="text-[11px] text-muted-foreground mb-1">
-                Year
-              </span>
-              <Select
-                value={year.toString()}
-                onValueChange={(v) => setYear(parseInt(v))}
-              >
-                <SelectTrigger className="w-full sm:w-[100px] bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2023, 2024, 2025, 2026].map((y) => (
-                    <SelectItem key={y} value={y.toString()}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* View mode toggle */}
-            <div className="inline-flex rounded-full bg-slate-100 p-1 text-xs self-start sm:self-auto">
-              <button
-                type="button"
-                className={cn(
-                  "px-3 py-1 rounded-full",
-                  viewMode === "monthly"
-                    ? "bg-white shadow-sm"
-                    : "text-slate-600"
+          {/* View mode toggle */}
+          <div className="inline-flex rounded-full bg-slate-800/50 p-1 text-xs self-start sm:self-auto">
+            <button
+              type="button"
+              className={cn(
+                "px-3 py-1 rounded-full",
+                viewMode === "monthly"
+                    ? "bg-slate-700 text-white shadow-sm"
+                    : "text-slate-400"
                 )}
                 onClick={() => setViewMode("monthly")}
               >
@@ -489,7 +479,7 @@ export default function InsuranceLabPage() {
                 type="button"
                 className={cn(
                   "px-3 py-1 rounded-full",
-                  viewMode === "year" ? "bg-white shadow-sm" : "text-slate-600"
+                  viewMode === "year" ? "bg-slate-700 text-white shadow-sm" : "text-slate-400"
                 )}
                 onClick={() => setViewMode("year")}
               >
@@ -497,7 +487,10 @@ export default function InsuranceLabPage() {
               </button>
             </div>
           </div>
-        </div>
+        </PageHeader>
+
+      <div className="max-w-6xl mx-auto space-y-6 pb-10 px-4 sm:px-6">
+        <div className="text-xs text-muted-foreground mt-4">{showingLabel}</div>
 
         {/* Primary Actions Toolbar */}
         <div className="flex flex-col gap-2 border-b border-gray-200 pb-4">
