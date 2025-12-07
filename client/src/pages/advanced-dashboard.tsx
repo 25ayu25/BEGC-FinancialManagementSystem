@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 
@@ -160,11 +160,21 @@ function InsuranceProvidersUSD({
           <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance
           Providers
         </CardTitle>
-        <Link href={viewAllHref}>
-          <Button variant="outline" size="sm">
-            View all
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {displayTotal > 0 && (
+            <span className="text-xs text-slate-500">
+              Total:{" "}
+              <span className="font-mono font-semibold text-slate-700">
+                ${fmtUSD(displayTotal)}
+              </span>
+            </span>
+          )}
+          <Link href={viewAllHref}>
+            <Button variant="outline" size="sm" aria-label="View all providers">
+              View all
+            </Button>
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {sorted.length === 0 ? (
@@ -398,9 +408,19 @@ export default function AdvancedDashboard() {
       const { data } = await api.get(url);
       return data;
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
-  const { data: departments } = useQuery({ queryKey: ["/api/departments"] });
+  const { data: departments } = useQuery({
+    queryKey: ["/api/departments"],
+    queryFn: async () => {
+      const { data } = await api.get("/api/departments");
+      return data;
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   const { data: rawIncome } = useQuery({
     queryKey: [
@@ -422,6 +442,8 @@ export default function AdvancedDashboard() {
       const { data } = await api.get(url);
       return data;
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: prevRawIncome } = useQuery({
@@ -441,6 +463,8 @@ export default function AdvancedDashboard() {
       const { data } = await api.get(url);
       return data;
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   /* ---------- income series ---------- */
@@ -672,12 +696,11 @@ export default function AdvancedDashboard() {
     !hasPreviousPeriodUSD;
 
   const currentRevenueValue =
-    monthTotalSSP ?? parseFloat(dashboardData?.totalIncomeSSP || "0");
+    monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
   const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
-  const currentInsuranceValue = parseFloat(
-    dashboardData?.totalIncomeUSD || "0"
-  );
-  const currentPatientsValue = dashboardData?.totalPatients || 0;
+  const currentInsuranceValue =
+    monthTotalUSD || parseFloat(dashboardData?.totalIncomeUSD || "0");
+  const currentPatientsValue = Number(dashboardData?.totalPatients ?? 0);
 
   const showNoDataYetRevenue = currentRevenueValue === 0;
   const showNoDataYetExpenses = currentExpenseValue === 0;
@@ -696,6 +719,13 @@ export default function AdvancedDashboard() {
       </div>
     );
   }
+
+  const handleExpensesKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpenExpenses(true);
+    }
+  };
 
   /* ========= RENDER ========= */
 
@@ -719,12 +749,16 @@ export default function AdvancedDashboard() {
 
             {/* controls (no search bar) */}
             <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto justify-end">
-              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <Select
+                value={timeRange}
+                onValueChange={handleTimeRangeChange}
+              >
                 <SelectTrigger
                   className={cn(
                     headerControlStyles,
                     "w-full sm:w-[170px] rounded-full px-3"
                   )}
+                  aria-label="Select time range"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -956,6 +990,10 @@ export default function AdvancedDashboard() {
                 <Card
                   className="border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
                   onClick={() => setOpenExpenses(true)}
+                  onKeyDown={handleExpensesKeyDown}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="View expense breakdown"
                   title="Click to view expense breakdown"
                 >
                   <CardContent className="p-4 sm:p-3">
@@ -1120,6 +1158,7 @@ export default function AdvancedDashboard() {
                         )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
                       : `&year=${yearToSend}&month=${monthToSend}`
                   }`}
+                  aria-label="View insurance breakdown"
                 >
                   <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
                     <CardContent className="p-4 sm:p-3">
@@ -1166,9 +1205,7 @@ export default function AdvancedDashboard() {
                                 {insuranceChangePct.toFixed(1)}{" "}
                                 {comparisonLabel}
                               </span>
-                            ) : shouldShowNoComparisonUSD &&
-                              insuranceChangePct !== undefined &&
-                              insuranceChangePct !== null ? (
+                            ) : shouldShowNoComparisonUSD ? (
                               <span className="text-xs font-medium text-slate-500">
                                 No data to compare
                               </span>
@@ -1198,6 +1235,7 @@ export default function AdvancedDashboard() {
                 {/* Patient Volume */}
                 <Link
                   href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
+                  aria-label="View patient volume details"
                 >
                   <Card className="border-0 shadow-md bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
                     <CardContent className="p-4 sm:p-3">
