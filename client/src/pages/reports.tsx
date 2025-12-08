@@ -137,8 +137,9 @@ export default function Reports() {
         subtitle="Generate and manage monthly financial reports"
       >
           <HeaderActionGroup>
+            {/* Month selector styled to match HeaderAction light variant */}
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-32 bg-white shadow-sm">
+              <SelectTrigger className="w-32 bg-white shadow-sm rounded-md">
                 <SelectValue placeholder="Month" />
               </SelectTrigger>
               <SelectContent>
@@ -150,8 +151,9 @@ export default function Reports() {
               </SelectContent>
             </Select>
 
+            {/* Year selector styled to match HeaderAction light variant */}
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-24 bg-white shadow-sm">
+              <SelectTrigger className="w-24 bg-white shadow-sm rounded-md">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>

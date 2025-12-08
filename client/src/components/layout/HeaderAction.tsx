@@ -77,7 +77,9 @@ export default function HeaderAction({
       )}
       {...props}
     >
+      {/* Icon wrapper prevents icon from shrinking in flex layout */}
       {icon && <span className="flex-shrink-0">{icon}</span>}
+      {/* Text wrapper allows for proper text truncation if needed */}
       <span>{children}</span>
     </button>
   );
