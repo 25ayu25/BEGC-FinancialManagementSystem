@@ -62,7 +62,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-blue-700 via-cyan-600 to-sky-600",
     overlayPattern: "bg-radial-gradient",
     patternClass: "pattern-tech-grid",
-    accentBorder: "bg-gradient-to-r from-cyan-400 to-blue-400",
+    accentBorder: "h-[3px] bg-gradient-to-r from-cyan-400 to-blue-400",
     boxShadow: "shadow-[0_4px_28px_rgba(6,182,212,0.3)]",
     title: "text-white",
     subtitle: "text-cyan-50",
@@ -74,7 +74,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-emerald-600 via-green-500 to-teal-500",
     overlayPattern: "bg-radial-gradient-top-left",
     patternClass: "",
-    accentBorder: "bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400",
+    accentBorder: "h-[3px] bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400",
     boxShadow: "shadow-[0_4px_24px_rgba(16,185,129,0.3)]",
     title: "text-white",
     subtitle: "text-emerald-50",
@@ -96,7 +96,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-rose-600 via-pink-500 to-red-500",
     overlayPattern: "bg-radial-gradient-center",
     patternClass: "pattern-pulse-wave",
-    accentBorder: "bg-gradient-to-r from-rose-400 via-pink-400 to-red-400",
+    accentBorder: "h-[3px] bg-gradient-to-r from-rose-400 via-pink-400 to-red-400",
     boxShadow: "shadow-[0_4px_24px_rgba(244,63,94,0.3)]",
     title: "text-white",
     subtitle: "text-rose-50",
@@ -108,7 +108,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-indigo-700 via-blue-600 to-indigo-600",
     overlayPattern: "bg-radial-gradient-center",
     patternClass: "",
-    accentBorder: "bg-gradient-to-r from-indigo-400 via-blue-400 to-indigo-400",
+    accentBorder: "h-[3px] bg-gradient-to-r from-indigo-400 via-blue-400 to-indigo-400",
     boxShadow: "shadow-[0_4px_24px_rgba(99,102,241,0.35)]",
     title: "text-white",
     subtitle: "text-indigo-100",
@@ -119,7 +119,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-slate-600 via-gray-500 to-zinc-500",
     overlayPattern: "bg-radial-gradient",
     patternClass: "pattern-diagonal",
-    accentBorder: "bg-gradient-to-r from-slate-400 via-gray-300 to-zinc-400",
+    accentBorder: "h-[3px] bg-gradient-to-r from-slate-400 via-gray-300 to-zinc-400",
     boxShadow: "shadow-[0_4px_20px_rgba(71,85,105,0.3)]",
     title: "text-white",
     subtitle: "text-slate-100",
@@ -141,7 +141,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-500",
     overlayPattern: "bg-radial-gradient",
     patternClass: "pattern-diagonal",
-    accentBorder: "bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400",
+    accentBorder: "h-[3px] bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400",
     boxShadow: "shadow-[0_4px_24px_rgba(245,158,11,0.35)]",
     title: "text-white",
     subtitle: "text-amber-50",
@@ -152,7 +152,7 @@ const variantStyles: Record<
     baseGradient: "bg-gradient-to-br from-[#0B1220] to-[#111827]",
     overlayPattern: "",
     patternClass: "",
-    accentBorder: "[border-bottom:2px_solid_transparent] [border-image:linear-gradient(to_right,#10B981,#2DD4BF)_1]",
+    accentBorder: "h-[2px] bg-gradient-to-r from-[#10B981] to-[#2DD4BF]",
     boxShadow: "shadow-md",
     title: "text-white",
     subtitle: "text-slate-400",
@@ -241,9 +241,9 @@ export default function PageHeader({
         </div>
       </div>
 
-      {/* Layer 5: 3px gradient accent border at bottom */}
+      {/* Layer 5: Gradient accent border at bottom (height varies by variant) */}
       {styles.accentBorder && (
-        <div className={cn("absolute bottom-0 left-0 right-0 h-[3px]", styles.accentBorder)} />
+        <div className={cn("absolute bottom-0 left-0 right-0", styles.accentBorder)} />
       )}
     </div>
   );
