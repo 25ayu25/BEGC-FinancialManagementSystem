@@ -416,7 +416,7 @@ export default function InsuranceLabPage() {
         <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:items-center">
           {/* Month selector */}
           <div className="flex flex-col">
-            <span className="text-[11px] text-slate-400 mb-1">
+            <span className="text-xs text-white/90 mb-1 font-medium">
               Month
             </span>
             <Select
@@ -424,7 +424,7 @@ export default function InsuranceLabPage() {
               onValueChange={(v) => setMonth(parseInt(v))}
               disabled={viewMode === "year"}
             >
-              <SelectTrigger className="w-full sm:w-[140px] bg-slate-800/50 border-slate-700 text-slate-100">
+              <SelectTrigger className="w-full sm:w-[140px] bg-white/95 border-white/80 text-gray-800 hover:bg-white shadow-md">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -441,14 +441,14 @@ export default function InsuranceLabPage() {
 
           {/* Year selector */}
           <div className="flex flex-col">
-            <span className="text-[11px] text-slate-400 mb-1">
+            <span className="text-xs text-white/90 mb-1 font-medium">
               Year
             </span>
             <Select
               value={year.toString()}
               onValueChange={(v) => setYear(parseInt(v))}
             >
-              <SelectTrigger className="w-full sm:w-[100px] bg-slate-800/50 border-slate-700 text-slate-100">
+              <SelectTrigger className="w-full sm:w-[100px] bg-white/95 border-white/80 text-gray-800 hover:bg-white shadow-md">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -462,14 +462,14 @@ export default function InsuranceLabPage() {
           </div>
 
           {/* View mode toggle */}
-          <div className="inline-flex rounded-full bg-slate-800/50 p-1 text-xs self-start sm:self-auto">
+          <div className="inline-flex rounded-full bg-white/95 p-1 text-xs self-start sm:self-auto shadow-md">
             <button
               type="button"
               className={cn(
-                "px-3 py-1 rounded-full",
+                "px-3 py-1.5 rounded-full font-medium transition-all",
                 viewMode === "monthly"
-                    ? "bg-slate-700 text-white shadow-sm"
-                    : "text-slate-400"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm"
+                    : "text-gray-600 hover:text-gray-800"
                 )}
                 onClick={() => setViewMode("monthly")}
               >
@@ -478,8 +478,8 @@ export default function InsuranceLabPage() {
               <button
                 type="button"
                 className={cn(
-                  "px-3 py-1 rounded-full",
-                  viewMode === "year" ? "bg-slate-700 text-white shadow-sm" : "text-slate-400"
+                  "px-3 py-1.5 rounded-full font-medium transition-all",
+                  viewMode === "year" ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-800"
                 )}
                 onClick={() => setViewMode("year")}
               >
