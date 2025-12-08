@@ -777,9 +777,9 @@ export default function InsurancePage() {
                 setCNotes("");
                 setShowClaim(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-white/80 text-gray-700 hover:bg-gray-50 hover:shadow-lg shadow-md transition-all font-medium"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 text-emerald-600" />
               Add Claim
             </button>
 
@@ -791,17 +791,17 @@ export default function InsurancePage() {
                 setPAmount("0"); setPCurrency("USD"); setPNotes("");
                 setShowPayment(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-white/80 text-gray-700 hover:bg-gray-50 hover:shadow-lg shadow-md transition-all font-medium"
             >
-              <CreditCard className="h-4 w-4" />
+              <CreditCard className="h-4 w-4 text-emerald-600" />
               Record Payment
             </button>
 
             <button 
               onClick={() => exportClaimsCsv(claims, providers)} 
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-white/80 text-gray-700 hover:bg-gray-50 hover:shadow-lg shadow-md transition-all"
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4 text-emerald-600" />
               Export CSV
             </button>
 
