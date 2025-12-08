@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileText, Lock, Trash2, Calendar } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
+import HeaderAction, { HeaderActionGroup } from "@/components/layout/HeaderAction";
 
 /** Helper: month name from 1-based month */
 function monthName(month1Based: number) {
@@ -135,9 +136,10 @@ export default function Reports() {
         title="Monthly Reports"
         subtitle="Generate and manage monthly financial reports"
       >
-          <div className="flex items-center space-x-3">
+          <HeaderActionGroup>
+            {/* Month selector styled to match HeaderAction light variant */}
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-32 bg-white shadow-sm rounded-md">
                 <SelectValue placeholder="Month" />
               </SelectTrigger>
               <SelectContent>
@@ -149,8 +151,9 @@ export default function Reports() {
               </SelectContent>
             </Select>
 
+            {/* Year selector styled to match HeaderAction light variant */}
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-24">
+              <SelectTrigger className="w-24 bg-white shadow-sm rounded-md">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
@@ -162,14 +165,15 @@ export default function Reports() {
               </SelectContent>
             </Select>
 
-            <Button
+            <HeaderAction
+              variant="light"
+              icon={<Calendar className="h-4 w-4" />}
               onClick={() => generateReport(parseInt(selectedYear), parseInt(selectedMonth))}
               data-testid="button-generate-report"
             >
-              <Calendar className="h-4 w-4 mr-2" />
               Generate Report
-            </Button>
-          </div>
+            </HeaderAction>
+          </HeaderActionGroup>
       </PageHeader>
 
       <main className="flex-1 overflow-y-auto p-6">

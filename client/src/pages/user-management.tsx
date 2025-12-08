@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import PageHeader from "@/components/layout/PageHeader";
+import HeaderAction from "@/components/layout/HeaderAction";
 
 interface User {
   id: string;
@@ -230,10 +231,13 @@ export default function UserManagementPage() {
       >
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700" data-testid="button-add-user">
-              <UserPlus className="w-4 h-4 mr-2" />
+            <HeaderAction
+              variant="light"
+              icon={<UserPlus className="w-4 h-4" />}
+              data-testid="button-add-user"
+            >
               Add User
-            </Button>
+            </HeaderAction>
           </DialogTrigger>
               <DialogContent className="sm:max-w-lg bg-white">
                 <DialogHeader>

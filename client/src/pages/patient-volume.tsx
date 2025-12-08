@@ -36,6 +36,7 @@ import {
 
 import AppContainer from "@/components/layout/AppContainer";
 import PageHeader from "@/components/layout/PageHeader";
+import HeaderAction from "@/components/layout/HeaderAction";
 
 type PatientVolume = {
   id: string;
@@ -212,13 +213,13 @@ export default function PatientVolumePage() {
         title="Patient Volume Tracking"
         subtitle="Monthly & multi-period summary"
       >
-        <Button
-          className="bg-cyan-600 hover:bg-cyan-700"
+        <HeaderAction
+          variant="light"
+          icon={<Plus className="w-4 h-4" />}
           onClick={() => setAddOpen(true)}
         >
-          <Plus className="w-4 h-4 mr-2" />
           Add Volume
-        </Button>
+        </HeaderAction>
       </PageHeader>
 
       <AppContainer className="space-y-6 py-6">
