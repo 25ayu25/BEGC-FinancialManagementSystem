@@ -46,15 +46,15 @@ const variantStyles: Record<
     subtitle: "text-slate-200",
   },
   
-  // 2. Insurance Overview — "Luminous Teal" (PREMIUM)
+  // 2. Insurance Overview — "Glass Ledger" (PREMIUM, SUBTLE, FUTURE-PROOF)
   insuranceOverview: {
-    baseGradient: "bg-gradient-to-br from-teal-600 via-cyan-500 to-emerald-500",
-    overlayPattern: "bg-radial-gradient",
-    patternClass: "pattern-dots",
-    accentBorder: "bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400",
-    boxShadow: "shadow-[0_4px_20px_rgba(20,184,166,0.25)]",
-    title: "text-white",
-    subtitle: "text-cyan-50",
+    baseGradient: "bg-white/10 backdrop-blur-md",
+    overlayPattern: "",
+    patternClass: "",
+    accentBorder: "border-b border-teal-200/30 ring-1 ring-teal-300/20",
+    boxShadow: "shadow-sm",
+    title: "text-slate-900",
+    subtitle: "text-slate-600",
   },
   
   // 3. Lab Finance — "Electric Cyan Science" (PREMIUM)
@@ -147,16 +147,15 @@ const variantStyles: Record<
     subtitle: "text-amber-50",
   },
   
-  // 11. Claim Reconciliation — "Royal Purple Excellence" (PREMIUM)
+  // 11. Claim Reconciliation — "Obsidian Stripe" (FUTURE-PROOF, TIMELESS)
   claimReconciliation: {
-    baseGradient: "bg-gradient-to-br from-purple-700 via-violet-600 to-fuchsia-600",
-    overlayPattern: "bg-radial-gradient-center",
+    baseGradient: "bg-gradient-to-br from-[#0B1220] to-[#111827]",
+    overlayPattern: "",
     patternClass: "",
-    accentBorder: "bg-gradient-to-r from-purple-400 via-fuchsia-400 to-violet-400",
-    boxShadow: "shadow-[0_4px_24px_rgba(139,92,246,0.35)]",
+    accentBorder: "[border-bottom:2px_solid_transparent] [border-image:linear-gradient(to_right,#10B981,#2DD4BF)_1]",
+    boxShadow: "shadow-md",
     title: "text-white",
-    subtitle: "text-purple-100",
-    animation: "glow-pulse",
+    subtitle: "text-slate-400",
   },
 };
 
@@ -185,8 +184,8 @@ export default function PageHeader({
   return (
     <div
       className={cn(
-        // Base sticky positioning - z-[60] to be above sidebar overlay on mobile
-        "sticky top-0 z-[60] shadow-lg",
+        // Base sticky positioning - z-40 allows dropdowns (z-[70]) to appear above
+        "sticky top-0 z-40 shadow-lg",
         // Position relative for layering
         "relative overflow-hidden",
         // Box shadow for elevation
