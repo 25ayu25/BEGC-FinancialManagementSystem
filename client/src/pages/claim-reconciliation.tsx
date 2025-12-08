@@ -69,6 +69,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 import PageHeader from "@/components/layout/PageHeader";
+import HeaderAction from "@/components/layout/HeaderAction";
 
 /* -------------------------------------------------------------------------- */
 /* Types */
@@ -626,18 +627,15 @@ export default function ClaimReconciliation() {
         title="Claim Reconciliation"
         subtitle="Upload claim and remittance files, then review matches, underpayments, and outstanding balances"
       >
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="gap-2 bg-white/10 hover:bg-white/20 border-white/40 text-white hover:text-white"
+        <HeaderAction
+          variant="dark"
+          icon={<Info className="w-4 h-4" />}
           onClick={() => setShowHelp((v) => !v)}
         >
-          <Info className="w-4 h-4" />
           <span className="hidden sm:inline">
             {showHelp ? "Hide help" : "Show help"}
           </span>
-        </Button>
+        </HeaderAction>
       </PageHeader>
 
       <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">

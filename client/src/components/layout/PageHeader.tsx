@@ -33,6 +33,7 @@ const variantStyles: Record<
     title: string;
     subtitle: string;
     animation?: string;
+    actionVariant: "light" | "dark"; // Determines which HeaderAction variant to use
   }
 > = {
   // 1. Trends — "Aurora Analytics Bar" (UNCHANGED - keeping simple)
@@ -44,6 +45,7 @@ const variantStyles: Record<
     boxShadow: "",
     title: "text-white",
     subtitle: "text-slate-200",
+    actionVariant: "light",
   },
   
   // 2. Insurance Overview — "Modern Teal Professional" (PREMIUM, WORLD-CLASS)
@@ -55,6 +57,7 @@ const variantStyles: Record<
     boxShadow: "shadow-md",
     title: "text-white",
     subtitle: "text-teal-50",
+    actionVariant: "light",
   },
   
   // 3. Lab Finance — "Electric Cyan Science" (PREMIUM)
@@ -67,6 +70,7 @@ const variantStyles: Record<
     title: "text-white",
     subtitle: "text-cyan-50",
     animation: "breathing-glow",
+    actionVariant: "light",
   },
   
   // 4. Insurance Balance — "Emerald Fortune" (PREMIUM)
@@ -78,6 +82,7 @@ const variantStyles: Record<
     boxShadow: "shadow-[0_4px_24px_rgba(16,185,129,0.3)]",
     title: "text-white",
     subtitle: "text-emerald-50",
+    actionVariant: "light",
   },
   
   // 5. Manzali Report — "Editorial Masthead" (UNCHANGED - keeping simple)
@@ -89,6 +94,7 @@ const variantStyles: Record<
     boxShadow: "ring-1 ring-neutral-200",
     title: "font-serif text-neutral-900",
     subtitle: "text-neutral-600",
+    actionVariant: "light",
   },
   
   // 6. Patient Volume — "Medical Coral Life" (PREMIUM)
@@ -101,6 +107,7 @@ const variantStyles: Record<
     title: "text-white",
     subtitle: "text-rose-50",
     animation: "glow-pulse",
+    actionVariant: "light",
   },
   
   // 7. User Management — "Indigo Royal Command" (PREMIUM)
@@ -112,6 +119,7 @@ const variantStyles: Record<
     boxShadow: "shadow-[0_4px_24px_rgba(99,102,241,0.35)]",
     title: "text-white",
     subtitle: "text-indigo-100",
+    actionVariant: "light",
   },
   
   // 8. Settings — "Platinum Steel System" (PREMIUM)
@@ -123,6 +131,7 @@ const variantStyles: Record<
     boxShadow: "shadow-[0_4px_20px_rgba(71,85,105,0.3)]",
     title: "text-white",
     subtitle: "text-slate-100",
+    actionVariant: "light",
   },
   
   // 9. Add Transaction — "Action Ribbon" (UNCHANGED - keeping simple)
@@ -134,6 +143,7 @@ const variantStyles: Record<
     boxShadow: "",
     title: "text-white",
     subtitle: "text-emerald-200",
+    actionVariant: "light",
   },
   
   // 10. Monthly Reports — "Amber Gold Archive" (PREMIUM)
@@ -145,6 +155,7 @@ const variantStyles: Record<
     boxShadow: "shadow-[0_4px_24px_rgba(245,158,11,0.35)]",
     title: "text-white",
     subtitle: "text-amber-50",
+    actionVariant: "light",
   },
   
   // 11. Claim Reconciliation — "Obsidian Stripe" (FUTURE-PROOF, TIMELESS)
@@ -156,8 +167,17 @@ const variantStyles: Record<
     boxShadow: "shadow-md",
     title: "text-white",
     subtitle: "text-slate-400",
+    actionVariant: "dark",
   },
 };
+
+/**
+ * Get the recommended HeaderAction variant for a given PageHeader variant.
+ * This ensures visual consistency between the header background and action buttons.
+ */
+export function getHeaderActionVariant(variant: PageHeaderVariant): "light" | "dark" {
+  return variantStyles[variant].actionVariant;
+}
 
 /**
  * PageHeader Component - Premium world-class sticky header with multi-layer depth
@@ -171,6 +191,7 @@ const variantStyles: Record<
  * - Responsive layout
  * - High contrast text (white on vibrant backgrounds for readability)
  * - Respects prefers-reduced-motion for accessibility
+ * - Standardized action button styling via actionVariant property
  */
 export default function PageHeader({
   title,
