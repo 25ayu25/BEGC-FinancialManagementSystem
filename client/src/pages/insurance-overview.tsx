@@ -250,7 +250,7 @@ export default function InsuranceOverview() {
                 className={`
                   ${isMobile 
                     ? 'fixed bottom-0 left-0 right-0 rounded-t-2xl z-50' 
-                    : 'absolute right-0 mt-2 w-56 rounded-xl z-10'
+                    : 'absolute right-0 mt-2 w-56 rounded-xl z-[70]'
                   }
                   bg-white/95 backdrop-blur-md shadow-xl border border-gray-200/60
                   transition-all duration-200 ease-out
@@ -554,7 +554,7 @@ export default function InsuranceOverview() {
                   className={`
                     ${isMobile 
                       ? 'fixed bottom-0 left-0 right-0 rounded-t-2xl z-50' 
-                      : 'absolute right-0 mt-2 w-56 rounded-xl z-10'
+                      : 'absolute right-0 mt-2 w-56 rounded-xl z-[70]'
                     }
                     bg-white/95 backdrop-blur-md shadow-xl border border-gray-200/60
                     transition-all duration-200 ease-out
