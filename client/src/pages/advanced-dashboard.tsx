@@ -1,7 +1,9 @@
 "use client";
+
 import { useState, useMemo, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
 import {
   TrendingUp,
   TrendingDown,
@@ -36,10 +39,12 @@ import {
   CreditCard,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
+
 import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
+
 /* ========= number helpers ========= */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
@@ -47,9 +52,11 @@ const fmtUSD = (v: number) => {
   const one = Number(v.toFixed(1));
   return Number.isInteger(one) ? nf0.format(one) : nf1.format(one);
 };
+
 /* ========= header styles ========= */
 const headerControlStyles =
   "h-9 bg-slate-900/60 text-slate-100 border border-slate-600/50 hover:border-cyan-400/80 hover:bg-slate-800/80 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40 focus-visible:ring-offset-0";
+
 /* ========= helper: normalize range ========= */
 function computeRangeParams(
   timeRange: string,
@@ -59,6 +66,7 @@ function computeRangeParams(
   const today = new Date();
   const fallbackY = today.getFullYear();
   const fallbackM = today.getMonth() + 1;
+
   if (timeRange === "last-month") {
     const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     return {
@@ -80,6 +88,7 @@ function computeRangeParams(
     monthToSend: selectedMonth ?? fallbackM,
   };
 }
+
 /* ========= Insurance Providers Card ========= */
 function InsuranceProvidersUSD({
   breakdown,
@@ -119,19 +128,22 @@ function InsuranceProvidersUSD({
       .map(([name, amount]) => ({ name, amount: Number(amount) }))
       .filter((r) => r.amount > 0);
   }, [breakdown]);
+
   const computedTotal = rows.reduce((s, r) => s + r.amount, 0);
   const displayTotal = computedTotal > 0 ? computedTotal : Number(totalUSD || 0);
   const sorted = [...rows].sort((a, b) => b.amount - a.amount);
+
   const palette = [
-    "#00A3A3cc",
-    "#4F46E5cc",
-    "#F59E0Bcc",
-    "#EF4444cc",
-    "#10B981cc",
-    "#8B5CF6cc",
-    "#EA580Ccc",
-    "#06B6D4cc",
+    "#00A3A3",
+    "#4F46E5",
+    "#F59E0B",
+    "#EF4444",
+    "#10B981",
+    "#8B5CF6",
+    "#EA580C",
+    "#06B6D4",
   ];
+
   const base = `/insurance-providers?range=${timeRange}`;
   const viewAllHref =
     timeRange === "custom" && customStartDate && customEndDate
@@ -140,19 +152,6 @@ function InsuranceProvidersUSD({
           "yyyy-MM-dd"
         )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
       : `${base}&year=${selectedYear}&month=${selectedMonth}`;
-
-  let conicGradient = '';
-  let currentPct = 0;
-  const segments = sorted.map((item, idx) => {
-    const color = palette[idx % palette.length];
-    const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
-    conicGradient += `${color} ${currentPct}% ${currentPct + pct}%, `;
-    currentPct += pct;
-    return { name: item.name, amount: item.amount, pct, color };
-  });
-  if (conicGradient) {
-    conicGradient = conicGradient.slice(0, -2);
-  }
 
   return (
     <Card className="border border-slate-200 shadow-sm">
@@ -177,49 +176,57 @@ function InsuranceProvidersUSD({
           </Link>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {sorted.length === 0 ? (
           <div className="text-sm text-slate-500">
             No insurance receipts for this period.
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-            <div className="relative flex-shrink-0 w-36 h-36">
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{ background: `conic-gradient(${conicGradient})` }}
-              />
-              <div className="absolute inset-8 rounded-full bg-white shadow-inner" />
-            </div>
-            <div className="flex-1 space-y-3">
-              {segments.map((seg, idx) => (
+          <div className="space-y-2">
+            {sorted.map((item, idx) => {
+              const pct = displayTotal > 0 ? (item.amount / displayTotal) * 100 : 0;
+              const color = palette[idx % palette.length];
+              return (
                 <div
-                  key={`${seg.name}-${idx}`}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors"
-                  title={`${seg.name}: $${fmtUSD(seg.amount)} (${seg.pct.toFixed(1)}%)`}
+                  key={`${item.name}-${idx}`}
+                  className="p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4"
+                  style={{ borderLeftColor: color }}
                 >
-                  <span
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: seg.color }}
-                  />
-                  <span className="text-sm font-medium text-slate-700 flex-1">
-                    {seg.name}
-                  </span>
-                  <span className="text-sm font-mono text-slate-900">
-                    ${fmtUSD(seg.amount)}
-                  </span>
-                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                    {seg.pct.toFixed(1)}%
-                  </span>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
+                        ${fmtUSD(item.amount)}
+                      </span>
+                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-2.5 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
+
 /* ========= Quick Actions Card ========= */
 function QuickActionsCard() {
   return (
@@ -230,7 +237,7 @@ function QuickActionsCard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <a href="/transactions" className="block group">
             <Button
               variant="outline"
@@ -238,7 +245,7 @@ function QuickActionsCard() {
             >
               <div className="flex items-center gap-3">
                 <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
-                  <Plus className="h-5 w-5 text-teal-600" />
+                  <Plus className="h-4 w-4 text-teal-600" />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-medium text-slate-900">
@@ -249,7 +256,7 @@ function QuickActionsCard() {
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
             </Button>
           </a>
           <a href="/patient-volume" className="block group">
@@ -259,7 +266,7 @@ function QuickActionsCard() {
             >
               <div className="flex items-center gap-3">
                 <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
-                  <Users className="h-5 w-5 text-blue-600" />
+                  <Users className="h-4 w-4 text-blue-600" />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-medium text-slate-900">
@@ -270,7 +277,7 @@ function QuickActionsCard() {
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
             </Button>
           </a>
           <a href="/reports" className="block group">
@@ -280,7 +287,7 @@ function QuickActionsCard() {
             >
               <div className="flex items-center gap-3">
                 <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
-                  <FileText className="h-5 w-5 text-purple-600" />
+                  <FileText className="h-4 w-4 text-purple-600" />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-medium text-slate-900">
@@ -291,7 +298,7 @@ function QuickActionsCard() {
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
             </Button>
           </a>
           <a href="/users" className="block group">
@@ -301,7 +308,7 @@ function QuickActionsCard() {
             >
               <div className="flex items-center gap-3">
                 <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
-                  <Settings className="h-5 w-5 text-orange-600" />
+                  <Settings className="h-4 w-4 text-orange-600" />
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-medium text-slate-900">
@@ -312,7 +319,7 @@ function QuickActionsCard() {
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
             </Button>
           </a>
         </div>
@@ -320,6 +327,7 @@ function QuickActionsCard() {
     </Card>
   );
 }
+
 /* ========= Page ========= */
 export default function AdvancedDashboard() {
   const {
@@ -333,12 +341,15 @@ export default function AdvancedDashboard() {
     setSpecificMonth,
     periodLabel,
   } = useDateFilter();
+
   const [openExpenses, setOpenExpenses] = useState(false);
+
   const { rangeToSend, yearToSend, monthToSend } = computeRangeParams(
     timeRange,
     selectedYear ?? null,
     selectedMonth ?? null
   );
+
   const handleTimeRangeChange = (
     range:
       | "current-month"
@@ -348,6 +359,7 @@ export default function AdvancedDashboard() {
       | "month-select"
       | "custom"
   ) => setTimeRange(range);
+
   const now = new Date();
   const thisYear = now.getFullYear();
   const years = useMemo(
@@ -368,11 +380,13 @@ export default function AdvancedDashboard() {
     { label: "November", value: 11 },
     { label: "December", value: 12 },
   ];
+
   // still used for "Last Sync" in System Status, but not in header anymore
   const lastUpdatedLabel = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(now);
+
   /* ---------- data ---------- */
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: [
@@ -397,6 +411,7 @@ export default function AdvancedDashboard() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+
   const { data: departments } = useQuery({
     queryKey: ["/api/departments"],
     queryFn: async () => {
@@ -406,6 +421,7 @@ export default function AdvancedDashboard() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+
   const { data: rawIncome } = useQuery({
     queryKey: [
       "/api/income-trends",
@@ -429,6 +445,7 @@ export default function AdvancedDashboard() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+
   const { data: prevRawIncome } = useQuery({
     queryKey: ["/api/income-trends", "prev-month", yearToSend, monthToSend],
     enabled: timeRange === "current-month",
@@ -441,6 +458,7 @@ export default function AdvancedDashboard() {
       );
       const prevYear = prevMonthDate.getFullYear();
       const prevMonth = prevMonthDate.getMonth() + 1;
+
       const url = `/api/income-trends/${prevYear}/${prevMonth}?range=current-month`;
       const { data } = await api.get(url);
       return data;
@@ -448,6 +466,7 @@ export default function AdvancedDashboard() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+
   /* ---------- income series ---------- */
   let incomeSeries: Array<{
     day: number;
@@ -457,6 +476,7 @@ export default function AdvancedDashboard() {
     label: string;
     fullDate: string;
   }> = [];
+
   if (
     timeRange === "custom" &&
     customStartDate &&
@@ -508,23 +528,28 @@ export default function AdvancedDashboard() {
       }
     }
   }
+
   const isCurrentMonthRange = timeRange === "current-month";
+
   const daysInCurrentMonth = new Date(yearToSend, monthToSend, 0).getDate();
   const lastDayWithIncome = incomeSeries.reduce(
     (max, d) =>
       d.amountSSP !== 0 || d.amountUSD !== 0 ? Math.max(max, d.day) : max,
     0
   );
+
   const today = new Date();
   const isThisCalendarMonth =
     yearToSend === today.getFullYear() &&
     monthToSend === today.getMonth() + 1;
+
   const effectiveCurrentDay =
     lastDayWithIncome > 0
       ? lastDayWithIncome
       : isThisCalendarMonth
       ? Math.min(today.getDate(), daysInCurrentMonth)
       : daysInCurrentMonth;
+
   const currentMonthDate = new Date(yearToSend, monthToSend - 1, 1);
   const prevMonthDate = new Date(
     currentMonthDate.getFullYear(),
@@ -536,24 +561,29 @@ export default function AdvancedDashboard() {
     prevMonthDate.getMonth() + 1,
     0
   ).getDate();
+
   const daysToCompare =
     effectiveCurrentDay > 0 ? Math.min(effectiveCurrentDay, daysInPrevMonth) : 0;
+
   const currentMTDIncomeSSP =
     daysToCompare > 0
       ? incomeSeries
           .filter((d) => d.day <= daysToCompare)
           .reduce((s, d) => s + d.amountSSP, 0)
       : 0;
+
   const currentMTDIncomeUSD =
     daysToCompare > 0
       ? incomeSeries
           .filter((d) => d.day <= daysToCompare)
           .reduce((s, d) => s + d.amountUSD, 0)
       : 0;
+
   let prevIncomeByDay: Record<
     number,
     { amountSSP: number; amountUSD: number }
   > = {};
+
   if (Array.isArray(prevRawIncome)) {
     const prevDays = daysInPrevMonth;
     for (const r of prevRawIncome as any[]) {
@@ -580,6 +610,7 @@ export default function AdvancedDashboard() {
       }
     }
   }
+
   const prevMTDIncomeSSP =
     isCurrentMonthRange && daysToCompare > 0
       ? Array.from({ length: daysToCompare }, (_, idx) => idx + 1).reduce(
@@ -587,6 +618,7 @@ export default function AdvancedDashboard() {
           0
         )
       : 0;
+
   const prevMTDIncomeUSD =
     isCurrentMonthRange && daysToCompare > 0
       ? Array.from({ length: daysToCompare }, (_, idx) => idx + 1).reduce(
@@ -594,34 +626,43 @@ export default function AdvancedDashboard() {
           0
         )
       : 0;
+
   let incomeChangeSSP_MTD: number | null = null;
   let incomeChangeUSD_MTD: number | null = null;
+
   if (isCurrentMonthRange && daysToCompare > 0 && prevMTDIncomeSSP > 0) {
     incomeChangeSSP_MTD =
       ((currentMTDIncomeSSP - prevMTDIncomeSSP) / prevMTDIncomeSSP) * 100;
   }
+
   if (isCurrentMonthRange && daysToCompare > 0 && prevMTDIncomeUSD > 0) {
     incomeChangeUSD_MTD =
       ((currentMTDIncomeUSD - prevMTDIncomeUSD) / prevMTDIncomeUSD) * 100;
   }
+
   const monthTotalSSP = incomeSeries.reduce((s, d) => s + d.amountSSP, 0);
   const monthTotalUSD = incomeSeries.reduce((s, d) => s + d.amountUSD, 0);
   const sspIncome = parseFloat(dashboardData?.totalIncomeSSP || "0");
   const totalExpenses = parseFloat(dashboardData?.totalExpenses || "0");
   const sspRevenue = monthTotalSSP || sspIncome;
   const sspNetIncome = sspRevenue - totalExpenses;
+
   const isCurrent = isCurrentMonthRange;
+
   const revenueChangePct =
     isCurrent && incomeChangeSSP_MTD !== null
       ? incomeChangeSSP_MTD
       : dashboardData?.changes?.incomeChangeSSP;
+
   const insuranceChangePct =
     isCurrent && incomeChangeUSD_MTD !== null
       ? incomeChangeUSD_MTD
       : dashboardData?.changes?.incomeChangeUSD;
+
   const prevMonthLabel = `${prevMonthDate.toLocaleString("default", {
     month: "short",
   })} ${prevMonthDate.getFullYear()}`;
+
   const comparisonLabel = (() => {
     if (isCurrent) return `vs same days last month (${prevMonthLabel})`;
     switch (timeRange) {
@@ -636,31 +677,38 @@ export default function AdvancedDashboard() {
         return "vs previous period";
     }
   })();
+
   const hasPreviousPeriodSSP =
     !!dashboardData?.previousPeriod &&
     (dashboardData.previousPeriod.totalIncomeSSP !== 0 ||
       dashboardData.previousPeriod.totalExpensesSSP !== 0);
+
   const hasPreviousPeriodUSD =
     !!dashboardData?.previousPeriod &&
     dashboardData.previousPeriod.totalIncomeUSD !== 0;
+
   const shouldShowNoComparisonSSP =
     (timeRange === "year" || timeRange === "last-3-months") &&
     !hasPreviousPeriodSSP;
+
   const shouldShowNoComparisonUSD =
     (timeRange === "year" || timeRange === "last-3-months") &&
     !hasPreviousPeriodUSD;
+
   const currentRevenueValue =
     monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
   const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
   const currentInsuranceValue =
     monthTotalUSD || parseFloat(dashboardData?.totalIncomeUSD || "0");
   const currentPatientsValue = Number(dashboardData?.totalPatients ?? 0);
+
   const showNoDataYetRevenue = currentRevenueValue === 0;
   const showNoDataYetExpenses = currentExpenseValue === 0;
   const showNoDataYetNetIncome =
     currentRevenueValue === 0 && currentExpenseValue === 0;
   const showNoDataYetInsurance = currentInsuranceValue === 0;
   const showNoDataYetPatients = currentPatientsValue === 0;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
@@ -671,13 +719,16 @@ export default function AdvancedDashboard() {
       </div>
     );
   }
+
   const handleExpensesKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       setOpenExpenses(true);
     }
   };
+
   /* ========= RENDER ========= */
+
   return (
     <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
       {/* HEADER */}
@@ -685,6 +736,7 @@ export default function AdvancedDashboard() {
         <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
           {/* header glow */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
+
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
             <div className="flex-shrink-0">
               <h1 className="text-2xl font-semibold text-white tracking-tight">
@@ -694,6 +746,7 @@ export default function AdvancedDashboard() {
                 Key financials · {periodLabel}
               </p>
             </div>
+
             {/* controls (no search bar) */}
             <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto justify-end">
               <Select
@@ -718,6 +771,7 @@ export default function AdvancedDashboard() {
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>
               </Select>
+
               {timeRange === "month-select" && (
                 <>
                   <Select
@@ -742,6 +796,7 @@ export default function AdvancedDashboard() {
                       ))}
                     </SelectContent>
                   </Select>
+
                   <Select
                     value={String(selectedMonth)}
                     onValueChange={(val) =>
@@ -766,6 +821,7 @@ export default function AdvancedDashboard() {
                   </Select>
                 </>
               )}
+
               {timeRange === "custom" && (
                 <div className="flex items-center gap-2">
                   <Popover>
@@ -797,7 +853,9 @@ export default function AdvancedDashboard() {
                       />
                     </PopoverContent>
                   </Popover>
+
                   <span className="text-slate-500">–</span>
+
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -829,27 +887,32 @@ export default function AdvancedDashboard() {
               )}
             </div>
           </div>
+
           {/* neon horizon line */}
           <div className="relative z-10 h-[3px] bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 shadow-[0_0_26px_rgba(34,211,238,0.95),0_0_42px_rgba(59,130,246,0.8)]" />
         </div>
       </header>
+
       {/* MAIN: light background, slight sidebar-edge glow */}
       <main className="relative min-h-0 overflow-y-auto bg-slate-50">
         {/* soft glow under header into content */}
         <div className="pointer-events-none absolute inset-x-0 -top-8 h-20 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
+
         {/* subtle vertical glow echoing the header along sidebar edge – slightly reduced */}
         <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-sky-500/10 via-cyan-400/4 to-transparent" />
-        <div className="relative z-10 px-6 md:px-8 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-10">
+
+        <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-8">
           {/* full-width main surface with slightly softer hover */}
           <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden transition-shadow duration-300 hover:shadow-[0_22px_72px_rgba(15,23,42,0.22)] hover:border-slate-200">
             {/* inner top glow so KPI cards look lit */}
             <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/18 via-sky-400/8 to-transparent" />
-            <div className="relative px-6 md:px-8 pt-8 pb-12">
+
+            <div className="relative px-4 md:px-6 pt-6 pb-10">
               {/* KPI CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7">
                 {/* Total Revenue */}
                 <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                  <CardContent className="p-5">
+                  <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
@@ -903,7 +966,7 @@ export default function AdvancedDashboard() {
                       </div>
                       <div
                         className={cn(
-                          "p-3 rounded-xl shadow-sm",
+                          "p-2.5 rounded-xl shadow-sm",
                           revenueChangePct !== undefined &&
                             revenueChangePct !== null &&
                             revenueChangePct < 0
@@ -914,14 +977,15 @@ export default function AdvancedDashboard() {
                         {revenueChangePct !== undefined &&
                         revenueChangePct !== null &&
                         revenueChangePct < 0 ? (
-                          <TrendingDown className="h-6 w-6 text-red-600" />
+                          <TrendingDown className="h-5 w-5 text-red-600" />
                         ) : (
-                          <TrendingUp className="h-6 w-6 text-emerald-600" />
+                          <TrendingUp className="h-5 w-5 text-emerald-600" />
                         )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Total Expenses */}
                 <Card
                   className="border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
@@ -932,7 +996,7 @@ export default function AdvancedDashboard() {
                   aria-label="View expense breakdown"
                   title="Click to view expense breakdown"
                 >
-                  <CardContent className="p-5">
+                  <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
@@ -989,7 +1053,7 @@ export default function AdvancedDashboard() {
                       </div>
                       <div
                         className={cn(
-                          "p-3 rounded-xl shadow-sm",
+                          "p-2.5 rounded-xl shadow-sm",
                           dashboardData?.changes?.expenseChangeSSP !==
                             undefined &&
                             dashboardData.changes.expenseChangeSSP < 0
@@ -1000,17 +1064,18 @@ export default function AdvancedDashboard() {
                         {dashboardData?.changes?.expenseChangeSSP !==
                           undefined &&
                         dashboardData.changes.expenseChangeSSP < 0 ? (
-                          <TrendingDown className="h-6 w-6 text-emerald-600" />
+                          <TrendingDown className="h-5 w-5 text-emerald-600" />
                         ) : (
-                          <CreditCard className="h-6 w-6 text-red-600" />
+                          <CreditCard className="h-5 w-5 text-red-600" />
                         )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Net Income */}
                 <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-100 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                  <CardContent className="p-5">
+                  <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
@@ -1074,12 +1139,13 @@ export default function AdvancedDashboard() {
                           ) : null}
                         </div>
                       </div>
-                      <div className="bg-blue-100 p-3 rounded-xl shadow-sm">
-                        <DollarSign className="h-6 w-6 text-blue-600" />
+                      <div className="bg-blue-100 p-2.5 rounded-xl shadow-sm">
+                        <DollarSign className="h-5 w-5 text-blue-600" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Insurance (USD) */}
                 <Link
                   href={`/insurance-providers?range=${rangeToSend}${
@@ -1095,7 +1161,7 @@ export default function AdvancedDashboard() {
                   aria-label="View insurance breakdown"
                 >
                   <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                    <CardContent className="p-5">
+                    <CardContent className="p-4 sm:p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
@@ -1158,20 +1224,21 @@ export default function AdvancedDashboard() {
                             )}
                           </div>
                         </div>
-                        <div className="bg-purple-100 p-3 rounded-xl shadow-sm">
-                          <Shield className="h-6 w-6 text-purple-600" />
+                        <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
+                          <Shield className="h-5 w-5 text-purple-600" />
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 </Link>
+
                 {/* Patient Volume */}
                 <Link
                   href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
                   aria-label="View patient volume details"
                 >
                   <Card className="border-0 shadow-md bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                    <CardContent className="p-5">
+                    <CardContent className="p-4 sm:p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
@@ -1196,17 +1263,18 @@ export default function AdvancedDashboard() {
                             )}
                           </div>
                         </div>
-                        <div className="bg-teal-100 p-3 rounded-xl shadow-sm">
-                          <Users className="h-6 w-6 text-teal-600" />
+                        <div className="bg-teal-100 p-2.5 rounded-xl shadow-sm">
+                          <Users className="h-5 w-5 text-teal-600" />
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 </Link>
               </div>
+
               {/* MAIN GRID INSIDE SURFACE */}
-              <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8 mb-10">
-                <div className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+                <div className="space-y-6">
                   <RevenueAnalyticsDaily
                     timeRange={rangeToSend}
                     selectedYear={yearToSend}
@@ -1218,7 +1286,8 @@ export default function AdvancedDashboard() {
                     <QuickActionsCard />
                   </div>
                 </div>
-                <div className="space-y-8">
+
+                <div className="space-y-6">
                   <DepartmentsPanel
                     departments={
                       Array.isArray(departments) ? (departments as any[]) : []
@@ -1226,6 +1295,7 @@ export default function AdvancedDashboard() {
                     departmentBreakdown={dashboardData?.departmentBreakdown}
                     totalSSP={sspRevenue}
                   />
+
                   <InsuranceProvidersUSD
                     breakdown={dashboardData?.insuranceBreakdown}
                     totalUSD={parseFloat(
@@ -1237,6 +1307,7 @@ export default function AdvancedDashboard() {
                     customStartDate={customStartDate ?? undefined}
                     customEndDate={customEndDate ?? undefined}
                   />
+
                   <Card className="border border-slate-200 shadow-sm self-start">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -1245,7 +1316,7 @@ export default function AdvancedDashboard() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-slate-600">
                             Database
@@ -1284,10 +1355,12 @@ export default function AdvancedDashboard() {
                   </Card>
                 </div>
               </div>
+
               {/* mobile quick actions */}
               <div className="lg:hidden mb-4">
                 <QuickActionsCard />
               </div>
+
               <ExpensesDrawer
                 open={openExpenses}
                 onOpenChange={setOpenExpenses}
