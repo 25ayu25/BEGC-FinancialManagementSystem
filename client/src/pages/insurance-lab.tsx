@@ -479,7 +479,9 @@ export default function InsuranceLabPage() {
                 type="button"
                 className={cn(
                   "px-3 py-1.5 rounded-full font-medium transition-all",
-                  viewMode === "year" ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-800"
+                  viewMode === "year"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm"
+                    : "text-gray-600 hover:text-gray-800"
                 )}
                 onClick={() => setViewMode("year")}
               >
