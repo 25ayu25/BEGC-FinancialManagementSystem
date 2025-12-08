@@ -630,7 +630,7 @@ export default function ClaimReconciliation() {
           type="button"
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="gap-2 bg-white/10 hover:bg-white/20 border-white/40 text-white hover:text-white"
           onClick={() => setShowHelp((v) => !v)}
         >
           <Info className="w-4 h-4" />
