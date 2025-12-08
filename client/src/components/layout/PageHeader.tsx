@@ -46,15 +46,15 @@ const variantStyles: Record<
     subtitle: "text-slate-200",
   },
   
-  // 2. Insurance Overview — "Glass Ledger" (PREMIUM, SUBTLE, FUTURE-PROOF)
+  // 2. Insurance Overview — "Modern Teal Professional" (PREMIUM, WORLD-CLASS)
   insuranceOverview: {
-    baseGradient: "bg-white/10 backdrop-blur-md",
+    baseGradient: "bg-gradient-to-br from-[#0D9488] via-[#14B8A6] to-[#0E7490]",
     overlayPattern: "",
     patternClass: "",
-    accentBorder: "border-b border-teal-200/30 ring-1 ring-teal-300/20",
-    boxShadow: "shadow-sm",
-    title: "text-slate-900",
-    subtitle: "text-slate-600",
+    accentBorder: "h-[2px] bg-gradient-to-r from-[#5EEAD4] to-[#22D3EE]",
+    boxShadow: "shadow-md",
+    title: "text-white",
+    subtitle: "text-teal-50",
   },
   
   // 3. Lab Finance — "Electric Cyan Science" (PREMIUM)
@@ -186,31 +186,34 @@ export default function PageHeader({
       className={cn(
         // Base sticky positioning - z-40 allows dropdowns (z-[70]) to appear above
         "sticky top-0 z-40 shadow-lg",
-        // Position relative for layering
-        "relative overflow-hidden",
+        // Position relative for layering - removed overflow-hidden to allow dropdowns to display
+        "relative",
         // Box shadow for elevation
         styles.boxShadow,
         // Custom additional classes
         className
       )}
     >
-      {/* Layer 1: Base gradient background */}
-      <div className={cn("absolute inset-0", styles.baseGradient)} />
-      
-      {/* Layer 2: Overlay effects (radial gradient for luminosity) */}
-      {styles.overlayPattern && (
-        <div className={cn("absolute inset-0 opacity-40", styles.overlayPattern)} />
-      )}
-      
-      {/* Layer 3: Pattern/texture overlay */}
-      {styles.patternClass && (
-        <div className={cn("absolute inset-0 opacity-10", styles.patternClass)} />
-      )}
-      
-      {/* Layer 4: Optional animation layer */}
-      {styles.animation && (
-        <div className={cn("absolute inset-0", styles.animation)} />
-      )}
+      {/* Background container with overflow-hidden to clip decorative layers */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Layer 1: Base gradient background */}
+        <div className={cn("absolute inset-0", styles.baseGradient)} />
+        
+        {/* Layer 2: Overlay effects (radial gradient for luminosity) */}
+        {styles.overlayPattern && (
+          <div className={cn("absolute inset-0 opacity-40", styles.overlayPattern)} />
+        )}
+        
+        {/* Layer 3: Pattern/texture overlay */}
+        {styles.patternClass && (
+          <div className={cn("absolute inset-0 opacity-10", styles.patternClass)} />
+        )}
+        
+        {/* Layer 4: Optional animation layer */}
+        {styles.animation && (
+          <div className={cn("absolute inset-0", styles.animation)} />
+        )}
+      </div>
 
       {/* Content Layer - relative positioning to appear above backgrounds */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">

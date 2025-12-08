@@ -515,22 +515,22 @@ export default function InsuranceOverview() {
               className={`
                 flex items-center justify-between gap-2 
                 px-3 sm:px-4 py-2.5 sm:py-2 
-                bg-white/90 backdrop-blur-sm border border-gray-200/80 text-gray-700 
-                rounded-xl hover:bg-white hover:border-blue-200
+                bg-white/95 backdrop-blur-sm border border-white/40 text-white
+                rounded-xl hover:bg-white/100 hover:text-gray-700 hover:border-white
                 transition-all duration-200 ease-out
-                shadow-sm hover:shadow-md hover:shadow-blue-100/50
+                shadow-md hover:shadow-lg hover:shadow-teal-200/50
                 min-h-[44px]
-                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
+                focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white
               `}
             >
               <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-blue-600" />
+                <Filter className="w-4 h-4" />
                 <span className="text-sm sm:text-base font-medium truncate">
                   {isMobile ? currentFilterLabel.split(' ')[0] : currentFilterLabel}
                 </span>
               </div>
               <svg
-                className={`w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ease-out ${showFilterDropdown ? 'rotate-180' : 'rotate-0'}`}
+                className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ease-out ${showFilterDropdown ? 'rotate-180' : 'rotate-0'}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -605,11 +605,10 @@ export default function InsuranceOverview() {
             className={`
               flex items-center justify-center gap-2 
               px-3 sm:px-4 py-2.5 sm:py-2
-              bg-gradient-to-r from-blue-600 to-blue-700 
-              text-white rounded-lg font-medium
-              hover:from-blue-700 hover:to-blue-800
+              bg-white/95 backdrop-blur-sm border border-white/40 text-white
+              rounded-xl hover:bg-white/100 hover:text-gray-700 hover:border-white
               active:scale-95
-              shadow-lg shadow-blue-500/30
+              shadow-md hover:shadow-lg hover:shadow-teal-200/50
               disabled:opacity-50 disabled:cursor-not-allowed
               ${transitions.base}
               min-h-[44px] min-w-[44px]
