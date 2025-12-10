@@ -569,7 +569,7 @@ export default function PatientVolumePage() {
   }, [rawVolumes, daysInMonth, year, monthIndex, aggregationLevel]);
 
   const avgPerActiveDay = activeDays ? totalPatients / activeDays : 0;
-  const peakDay = peakCount > 0 ? chartData.find(d => d.count === peakCount)?.day || null : null;
+  // peakDay is not used anymore, using peakLabel instead
 
   // --- Additional Analytics Metrics ---
   // Median calculation
@@ -1287,7 +1287,8 @@ export default function PatientVolumePage() {
                   className="h-72"
                 >
                   <ResponsiveContainer width="100%" height="100%">
-                  {chartType === "bar" ? (
+                    <>
+                      {chartType === "bar" ? (
                     <BarChart data={combinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
@@ -1533,8 +1534,9 @@ export default function PatientVolumePage() {
                         </div>
                       </div>
                     </div>
-                  ) : null}
-                </ResponsiveContainer>
+                      ) : null}
+                    </>
+                  </ResponsiveContainer>
               </motion.div>
             </AnimatePresence>
             ) : (
