@@ -54,7 +54,8 @@ import {
   Download,
   FileText,
   Target,
-  Activity
+  Activity,
+  Grid3x3
 } from "lucide-react";
 
 import {
@@ -484,6 +485,50 @@ export default function PatientVolumePage() {
       percentage: total > 0 ? (counts[i] / total) * 100 : 0
     }));
   }, [filteredVolumes]);
+
+  // Heatmap data for calendar view
+  const heatmapData = useMemo(() => {
+    const data: Array<{ date: Date; count: number; dayOfWeek: number; weekOfPeriod: number }> = [];
+    const maxCount = Math.max(...filteredVolumes.map(v => Number(v.patientCount || 0)));
+    
+    // Create a map of dates to counts for quick lookup
+    const dateCountMap = new Map<string, number>();
+    filteredVolumes.forEach(v => {
+      const d = parseISO(v.date);
+      const key = format(d, "yyyy-MM-dd");
+      dateCountMap.set(key, (dateCountMap.get(key) || 0) + Number(v.patientCount || 0));
+    });
+    
+    // Generate all days in the date range
+    let currentDate = startOfDay(dateRange.start);
+    const endDate = endOfDay(dateRange.end);
+    let weekNumber = 0;
+    let lastSunday = startOfWeek(currentDate, { weekStartsOn: 0 });
+    
+    while (currentDate <= endDate) {
+      const key = format(currentDate, "yyyy-MM-dd");
+      const count = dateCountMap.get(key) || 0;
+      const dayOfWeek = getDay(currentDate);
+      
+      // Calculate week number
+      const currentSunday = startOfWeek(currentDate, { weekStartsOn: 0 });
+      if (currentSunday.getTime() !== lastSunday.getTime()) {
+        weekNumber++;
+        lastSunday = currentSunday;
+      }
+      
+      data.push({
+        date: currentDate,
+        count,
+        dayOfWeek,
+        weekOfPeriod: weekNumber
+      });
+      
+      currentDate = addDays(currentDate, 1);
+    }
+    
+    return { data, maxCount };
+  }, [filteredVolumes, dateRange]);
 
   // --- Export Functions ---
   const exportToCSV = () => {
@@ -952,6 +997,18 @@ export default function PatientVolumePage() {
                 >
                   <AreaChart className="w-4 h-4" />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2",
+                    chartType === "heatmap" && "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                  )}
+                  onClick={() => setChartType("heatmap")}
+                  title="Heatmap Calendar"
+                >
+                  <Grid3x3 className="w-4 h-4" />
+                </Button>
               </div>
 
               {/* Additional options */}
@@ -1172,6 +1229,79 @@ export default function PatientVolumePage() {
                         fill="url(#colorCount)"
                       />
                     </RechartsAreaChart>
+                  ) : chartType === "heatmap" ? (
+                    <div className="w-full h-full overflow-auto">
+                      <div className="min-w-max">
+                        <div className="mb-4 flex items-center gap-2 text-xs text-slate-600">
+                          <span>Less</span>
+                          <div className="flex gap-1">
+                            {[0, 1, 2, 3, 4].map(level => {
+                              const intensity = level === 0 ? 0 : (level / 4);
+                              return (
+                                <div 
+                                  key={level}
+                                  className="w-4 h-4 rounded-sm border border-slate-200"
+                                  style={{ 
+                                    backgroundColor: level === 0 
+                                      ? "#f1f5f9" 
+                                      : `rgba(20, 184, 166, ${0.2 + intensity * 0.8})`
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                          <span>More</span>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          {/* Day labels */}
+                          <div className="flex gap-1 mb-2">
+                            <div className="w-12 text-xs text-slate-500"></div>
+                            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+                              <div key={idx} className="w-3 text-[10px] text-slate-500 text-center">
+                                {day[0]}
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Group by weeks */}
+                          {Array.from(new Set(heatmapData.data.map(d => d.weekOfPeriod))).map(weekNum => {
+                            const weekData = heatmapData.data.filter(d => d.weekOfPeriod === weekNum);
+                            const weekStart = weekData[0]?.date;
+                            
+                            return (
+                              <div key={weekNum} className="flex gap-1 items-center">
+                                <div className="w-12 text-[10px] text-slate-500 text-right pr-2">
+                                  {weekStart ? format(weekStart, "MMM d") : ""}
+                                </div>
+                                {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => {
+                                  const dayData = weekData.find(d => d.dayOfWeek === dayOfWeek);
+                                  if (!dayData) {
+                                    return <div key={dayOfWeek} className="w-3 h-3" />;
+                                  }
+                                  
+                                  const intensity = heatmapData.maxCount > 0 
+                                    ? dayData.count / heatmapData.maxCount 
+                                    : 0;
+                                  const bgColor = dayData.count === 0 
+                                    ? "#f1f5f9" 
+                                    : `rgba(20, 184, 166, ${0.2 + intensity * 0.8})`;
+                                  
+                                  return (
+                                    <div
+                                      key={dayOfWeek}
+                                      className="w-3 h-3 rounded-sm border border-slate-200 cursor-pointer hover:ring-2 hover:ring-teal-400 transition-all"
+                                      style={{ backgroundColor: bgColor }}
+                                      title={`${format(dayData.date, "MMM d, yyyy")}: ${dayData.count} patients`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   ) : null}
                 </ResponsiveContainer>
               </div>
