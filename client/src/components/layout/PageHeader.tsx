@@ -97,16 +97,16 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 6. Patient Volume — "Medical Coral Life" (PREMIUM)
+  // 6. Patient Volume — "Modern Teal Analytics" (PREMIUM, WORLD-CLASS)
   patientVolume: {
-    baseGradient: "bg-gradient-to-br from-rose-600 via-pink-500 to-red-500",
+    baseGradient: "bg-gradient-to-br from-[#0D9488] via-[#06B6D4] to-[#3B82F6]",
     overlayPattern: "bg-radial-gradient-center",
-    patternClass: "pattern-pulse-wave",
-    accentBorder: "h-[3px] bg-gradient-to-r from-rose-400 via-pink-400 to-red-400",
-    boxShadow: "shadow-[0_4px_24px_rgba(244,63,94,0.3)]",
+    patternClass: "",
+    accentBorder: "h-[3px] bg-gradient-to-r from-[#5EEAD4] via-[#22D3EE] to-[#60A5FA]",
+    boxShadow: "shadow-[0_8px_32px_rgba(13,148,136,0.4)]",
     title: "text-white",
-    subtitle: "text-rose-50",
-    animation: "glow-pulse",
+    subtitle: "text-teal-50",
+    animation: "",
     actionVariant: "light",
   },
   
