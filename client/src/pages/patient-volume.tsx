@@ -1,6 +1,30 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO, addMonths, isSameMonth, startOfWeek, endOfWeek, subWeeks, subMonths, startOfQuarter, startOfYear, subDays, getDay } from "date-fns";
+import { 
+  format, 
+  parseISO, 
+  addMonths, 
+  isSameMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  subWeeks, 
+  subMonths, 
+  startOfQuarter, 
+  startOfYear, 
+  subDays, 
+  getDay,
+  endOfMonth,
+  startOfMonth,
+  subQuarters,
+  subYears,
+  differenceInDays,
+  eachWeekOfInterval,
+  eachMonthOfInterval,
+  startOfDay,
+  endOfDay,
+  isWithinInterval,
+  addDays
+} from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,11 +105,17 @@ export default function PatientVolumePage() {
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(initialMonthDate);
   const [mode, setMode] = useState<"chart" | "table">("chart");
-  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "heatmap">("bar");
+  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "heatmap">("line");
   const [showTrendLine, setShowTrendLine] = useState(false);
   const [targetValue, setTargetValue] = useState<number | null>(null);
   const [comparisonPeriod, setComparisonPeriod] = useState<"none" | "prevMonth" | "sameMonthLastYear">("none");
   const [dateRangeFilter, setDateRangeFilter] = useState<"month" | "7days" | "30days" | "quarter" | "year">("month");
+  const [timePeriod, setTimePeriod] = useState<string>("thisMonth");
+  const [showComparison, setShowComparison] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<{ start: Date | undefined; end: Date | undefined }>({
+    start: undefined,
+    end: undefined,
+  });
   const [addOpen, setAddOpen] = useState(false);
   const [newEntry, setNewEntry] = useState<{ date: Date; patientCount: string; notes: string }>({
     date: new Date(),
@@ -94,6 +124,83 @@ export default function PatientVolumePage() {
   });
 
   const queryClient = useQueryClient();
+
+  // --- Helper functions for date range calculation ---
+  const getDateRangeForPeriod = (period: string, customStart?: Date, customEnd?: Date): { start: Date; end: Date } => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    
+    switch (period) {
+      case "thisMonth":
+        return {
+          start: startOfMonth(now),
+          end: endOfMonth(now)
+        };
+      case "lastMonth": {
+        const lastMonth = subMonths(now, 1);
+        return {
+          start: startOfMonth(lastMonth),
+          end: endOfMonth(lastMonth)
+        };
+      }
+      case "last3Months": {
+        const threeMonthsAgo = subMonths(now, 2);
+        return {
+          start: startOfMonth(threeMonthsAgo),
+          end: endOfMonth(now)
+        };
+      }
+      case "last6Months": {
+        const sixMonthsAgo = subMonths(now, 5);
+        return {
+          start: startOfMonth(sixMonthsAgo),
+          end: endOfMonth(now)
+        };
+      }
+      case "thisQuarter":
+        return {
+          start: startOfQuarter(now),
+          end: endOfMonth(now)
+        };
+      case "lastQuarter": {
+        const lastQuarter = subQuarters(now, 1);
+        return {
+          start: startOfQuarter(lastQuarter),
+          end: endOfMonth(addMonths(startOfQuarter(lastQuarter), 2))
+        };
+      }
+      case "thisYear":
+        return {
+          start: startOfYear(now),
+          end: endOfMonth(now)
+        };
+      case "lastYear": {
+        const lastYear = subYears(now, 1);
+        return {
+          start: startOfYear(lastYear),
+          end: new Date(currentYear - 1, 11, 31)
+        };
+      }
+      case "custom":
+        return {
+          start: customStart || startOfMonth(now),
+          end: customEnd || endOfMonth(now)
+        };
+      default:
+        return {
+          start: startOfMonth(selectedMonth),
+          end: endOfMonth(selectedMonth)
+        };
+    }
+  };
+
+  const getAggregationLevel = (start: Date, end: Date): "daily" | "weekly" | "monthly" => {
+    const days = differenceInDays(end, start);
+    if (days <= 31) return "daily";
+    if (days <= 180) return "weekly";
+    return "monthly";
+  };
 
   // --- Derived helpers for quick chips ---
   const now = new Date();
@@ -105,29 +212,187 @@ export default function PatientVolumePage() {
 
   const goPrevMonth = () => setSelectedMonth(addMonths(selectedMonth, -1));
   const goNextMonth = () => setSelectedMonth(addMonths(selectedMonth, +1));
-  const jumpThisMonth = () => setSelectedMonth(thisMonthAnchor);
-  const jumpLastMonth = () => setSelectedMonth(lastMonthAnchor);
+  const jumpThisMonth = () => {
+    setSelectedMonth(thisMonthAnchor);
+    setTimePeriod("thisMonth");
+  };
+  const jumpLastMonth = () => {
+    setSelectedMonth(lastMonthAnchor);
+    setTimePeriod("lastMonth");
+  };
 
-  // --- Fetch the selected month's volumes ---
+  // Calculate date range based on current selection
+  const dateRange = useMemo(() => {
+    return getDateRangeForPeriod(
+      timePeriod, 
+      customDateRange.start, 
+      customDateRange.end
+    );
+  }, [timePeriod, customDateRange, selectedMonth]);
+
+  const aggregationLevel = useMemo(() => {
+    return getAggregationLevel(dateRange.start, dateRange.end);
+  }, [dateRange]);
+
+  // --- Fetch data for the selected period ---
   const year = selectedMonth.getFullYear();
   const monthIndex = selectedMonth.getMonth(); // 0-based
   const monthNumber = monthIndex + 1;          // 1-based
 
+  // Determine which API query to use based on period
+  const apiQueryParams = useMemo(() => {
+    const startYear = dateRange.start.getFullYear();
+    const startMonth = dateRange.start.getMonth() + 1;
+    const endYear = dateRange.end.getFullYear();
+    const endMonth = dateRange.end.getMonth() + 1;
+    
+    // If it's a single month, use the simple endpoint
+    if (startYear === endYear && startMonth === endMonth) {
+      return { year: startYear, month: startMonth, range: "current-month" };
+    }
+    
+    // For multiple months, we'll need to fetch and combine
+    const months: Array<{ year: number; month: number }> = [];
+    let current = new Date(startYear, startMonth - 1, 1);
+    const end = new Date(endYear, endMonth - 1, 1);
+    
+    while (current <= end) {
+      months.push({ year: current.getFullYear(), month: current.getMonth() + 1 });
+      current = addMonths(current, 1);
+    }
+    
+    return { months, range: "multi-month" };
+  }, [dateRange]);
+
   const { data: rawVolumes = [], isLoading } = useQuery<PatientVolume[]>({
-    queryKey: ["/api/patient-volume/period", year, monthNumber],
+    queryKey: ["/api/patient-volume/period", apiQueryParams],
     queryFn: async () => {
-      const resp = await api.get(`/api/patient-volume/period/${year}/${monthNumber}`);
-      return Array.isArray(resp.data) ? resp.data : [];
+      if (apiQueryParams.range === "current-month") {
+        const resp = await api.get(`/api/patient-volume/period/${apiQueryParams.year}/${apiQueryParams.month}`);
+        return Array.isArray(resp.data) ? resp.data : [];
+      } else {
+        // Fetch multiple months and combine
+        const allData: PatientVolume[] = [];
+        for (const { year: y, month: m } of apiQueryParams.months || []) {
+          const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
+          if (Array.isArray(resp.data)) {
+            allData.push(...resp.data);
+          }
+        }
+        return allData;
+      }
     },
   });
 
-  // --- Normalize & aggregate to days ---
+  // --- Normalize & aggregate data based on aggregation level ---
   const daysInMonth = useMemo(
     () => new Date(year, monthIndex + 1, 0).getDate(),
     [year, monthIndex]
   );
 
+  // Filter volumes to only include those in the date range
+  const filteredVolumes = useMemo(() => {
+    return rawVolumes.filter(v => {
+      const d = parseISO(v.date);
+      return isWithinInterval(d, { start: dateRange.start, end: dateRange.end });
+    });
+  }, [rawVolumes, dateRange]);
+
+  // Aggregate data based on aggregation level
+  const { chartData, xTicks, totalPatients, activeDays, peakCount, peakLabel } = useMemo(() => {
+    if (aggregationLevel === "daily") {
+      // Daily aggregation (existing logic)
+      const days = differenceInDays(dateRange.end, dateRange.start) + 1;
+      const buckets = Array.from({ length: days }, () => 0);
+      
+      for (const v of filteredVolumes) {
+        const d = parseISO(v.date);
+        const dayOffset = differenceInDays(d, dateRange.start);
+        if (dayOffset >= 0 && dayOffset < days) {
+          buckets[dayOffset] += Number(v.patientCount || 0);
+        }
+      }
+      
+      const data = buckets.map((count, idx) => ({
+        label: format(addDays(dateRange.start, idx), "MMM d"),
+        day: idx + 1,
+        count: count > 0 ? count : 0
+      }));
+      
+      const ticks = Array.from({ length: days }, (_, i) => i + 1);
+      const total = buckets.reduce((s, n) => s + n, 0);
+      const active = buckets.filter(c => c > 0).length;
+      const peak = Math.max(0, ...buckets);
+      const peakIdx = peak > 0 ? buckets.findIndex(n => n === peak) : null;
+      const peakLbl = peakIdx !== null ? format(addDays(dateRange.start, peakIdx), "EEE, MMM d, yyyy") : "—";
+      
+      return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
+      
+    } else if (aggregationLevel === "weekly") {
+      // Weekly aggregation
+      const weeks = eachWeekOfInterval({ start: dateRange.start, end: dateRange.end }, { weekStartsOn: 0 });
+      const buckets = weeks.map(weekStart => {
+        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+        const count = filteredVolumes
+          .filter(v => {
+            const d = parseISO(v.date);
+            return isWithinInterval(d, { start: weekStart, end: weekEnd });
+          })
+          .reduce((s, v) => s + Number(v.patientCount || 0), 0);
+        return { weekStart, weekEnd, count };
+      });
+      
+      const data = buckets.map((bucket, idx) => ({
+        label: `${format(bucket.weekStart, "MMM d")}`,
+        week: idx + 1,
+        count: bucket.count
+      }));
+      
+      const ticks = buckets.map((_, idx) => idx + 1);
+      const total = buckets.reduce((s, b) => s + b.count, 0);
+      const active = buckets.filter(b => b.count > 0).length;
+      const peak = Math.max(0, ...buckets.map(b => b.count));
+      const peakIdx = peak > 0 ? buckets.findIndex(b => b.count === peak) : null;
+      const peakLbl = peakIdx !== null ? `Week of ${format(buckets[peakIdx].weekStart, "MMM d, yyyy")}` : "—";
+      
+      return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
+      
+    } else {
+      // Monthly aggregation
+      const months = eachMonthOfInterval({ start: dateRange.start, end: dateRange.end });
+      const buckets = months.map(monthStart => {
+        const monthEnd = endOfMonth(monthStart);
+        const count = filteredVolumes
+          .filter(v => {
+            const d = parseISO(v.date);
+            return isWithinInterval(d, { start: monthStart, end: monthEnd });
+          })
+          .reduce((s, v) => s + Number(v.patientCount || 0), 0);
+        return { monthStart, monthEnd, count };
+      });
+      
+      const data = buckets.map((bucket, idx) => ({
+        label: format(bucket.monthStart, "MMM yyyy"),
+        month: idx + 1,
+        count: bucket.count
+      }));
+      
+      const ticks = buckets.map((_, idx) => idx + 1);
+      const total = buckets.reduce((s, b) => s + b.count, 0);
+      const active = buckets.filter(b => b.count > 0).length;
+      const peak = Math.max(0, ...buckets.map(b => b.count));
+      const peakIdx = peak > 0 ? buckets.findIndex(b => b.count === peak) : null;
+      const peakLbl = peakIdx !== null ? format(buckets[peakIdx].monthStart, "MMMM yyyy") : "—";
+      
+      return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
+    }
+  }, [filteredVolumes, aggregationLevel, dateRange]);
+
+  // For backwards compatibility, create dayBuckets for table view
   const dayBuckets = useMemo(() => {
+    if (aggregationLevel !== "daily") {
+      return Array.from({ length: daysInMonth }, () => 0);
+    }
     const buckets = Array.from({ length: daysInMonth }, () => 0);
     for (const v of rawVolumes) {
       const d = parseISO(v.date);
@@ -137,17 +402,14 @@ export default function PatientVolumePage() {
       }
     }
     return buckets;
-  }, [rawVolumes, daysInMonth, year, monthIndex]);
+  }, [rawVolumes, daysInMonth, year, monthIndex, aggregationLevel]);
 
-  const activeDays = dayBuckets.filter((c) => c > 0).length;
-  const totalPatients = dayBuckets.reduce((s, n) => s + n, 0);
   const avgPerActiveDay = activeDays ? totalPatients / activeDays : 0;
-  const peakCount = Math.max(0, ...dayBuckets);
-  const peakDay = peakCount > 0 ? dayBuckets.findIndex((n) => n === peakCount) + 1 : null;
+  const peakDay = peakCount > 0 ? chartData.find(d => d.count === peakCount)?.day || null : null;
 
   // --- Additional Analytics Metrics ---
   // Median calculation
-  const sortedCounts = [...dayBuckets].filter(c => c > 0).sort((a, b) => a - b);
+  const sortedCounts = chartData.filter(d => d.count > 0).map(d => d.count).sort((a, b) => a - b);
   const medianPatients = sortedCounts.length > 0
     ? sortedCounts.length % 2 === 0
       ? (sortedCounts[sortedCounts.length / 2 - 1] + sortedCounts[sortedCounts.length / 2]) / 2
@@ -156,10 +418,12 @@ export default function PatientVolumePage() {
 
   // Projected monthly total (based on current average for remaining ACTIVE days)
   const today = new Date();
-  const currentDayOfMonth = isSameMonth(selectedMonth, today) ? today.getDate() : daysInMonth;
-  const remainingDays = daysInMonth - currentDayOfMonth;
+  const isCurrentPeriod = isWithinInterval(today, { start: dateRange.start, end: dateRange.end });
+  const currentDayOfPeriod = isCurrentPeriod ? differenceInDays(today, dateRange.start) + 1 : differenceInDays(dateRange.end, dateRange.start) + 1;
+  const totalDaysInPeriod = differenceInDays(dateRange.end, dateRange.start) + 1;
+  const remainingDays = totalDaysInPeriod - currentDayOfPeriod;
   // Estimate remaining active days based on current active day ratio
-  const activeDayRatio = activeDays > 0 ? activeDays / currentDayOfMonth : 0.7; // default to 70% if no data
+  const activeDayRatio = activeDays > 0 ? activeDays / currentDayOfPeriod : 0.7; // default to 70% if no data
   const estimatedRemainingActiveDays = Math.round(remainingDays * activeDayRatio);
   const projectedTotal = totalPatients + (avgPerActiveDay * estimatedRemainingActiveDays);
 
@@ -207,12 +471,10 @@ export default function PatientVolumePage() {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const counts = Array(7).fill(0);
     
-    rawVolumes.forEach(v => {
+    filteredVolumes.forEach(v => {
       const d = parseISO(v.date);
-      if (d.getFullYear() === year && d.getMonth() === monthIndex) {
-        const dayOfWeek = getDay(d);
-        counts[dayOfWeek] += Number(v.patientCount || 0);
-      }
+      const dayOfWeek = getDay(d);
+      counts[dayOfWeek] += Number(v.patientCount || 0);
     });
     
     const total = counts.reduce((s, n) => s + n, 0);
@@ -221,21 +483,12 @@ export default function PatientVolumePage() {
       count: counts[i],
       percentage: total > 0 ? (counts[i] / total) * 100 : 0
     }));
-  }, [rawVolumes, year, monthIndex]);
-
-  const chartData = useMemo(
-    () => dayBuckets.map((count, idx) => ({ day: idx + 1, count: count > 0 ? count : 0 })),
-    [dayBuckets]
-  );
-  const xTicks = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
+  }, [filteredVolumes]);
 
   // --- Export Functions ---
   const exportToCSV = () => {
-    const headers = ["Date", "Patient Count"];
-    const rows = Array.from({ length: daysInMonth }, (_, i) => {
-      const d = new Date(year, monthIndex, i + 1, 12);
-      return [format(d, "yyyy-MM-dd"), dayBuckets[i] || 0];
-    });
+    const headers = ["Period", "Patient Count"];
+    const rows = chartData.map(d => [d.label, d.count]);
     
     const csv = [
       headers.join(","),
@@ -246,19 +499,38 @@ export default function PatientVolumePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `patient-volume-${format(selectedMonth, "yyyy-MM")}.csv`;
+    const periodLabel = timePeriod === "custom" 
+      ? `${format(dateRange.start, "yyyy-MM-dd")}-to-${format(dateRange.end, "yyyy-MM-dd")}`
+      : timePeriod;
+    a.download = `patient-volume-${periodLabel}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: "CSV exported successfully" });
   };
 
+  const getPeriodLabel = () => {
+    switch (timePeriod) {
+      case "thisMonth": return "This Month";
+      case "lastMonth": return "Last Month";
+      case "last3Months": return "Last 3 Months";
+      case "last6Months": return "Last 6 Months";
+      case "thisQuarter": return "This Quarter";
+      case "lastQuarter": return "Last Quarter";
+      case "thisYear": return "This Year";
+      case "lastYear": return "Last Year";
+      case "custom": return `${format(dateRange.start, "MMM d, yyyy")} - ${format(dateRange.end, "MMM d, yyyy")}`;
+      default: return monthTitle;
+    }
+  };
+
   const exportToPDF = async () => {
     try {
+      const periodLabel = getPeriodLabel();
       // Print-friendly report using browser print
       const printContent = `
         <html>
           <head>
-            <title>Patient Volume Report - ${monthTitle}</title>
+            <title>Patient Volume Report - ${periodLabel}</title>
             <style>
               body { font-family: Arial, sans-serif; padding: 20px; }
               h1 { color: #0D9488; }
@@ -273,7 +545,7 @@ export default function PatientVolumePage() {
           </head>
           <body>
             <h1>Patient Volume Report</h1>
-            <p><strong>Period:</strong> ${monthTitle}</p>
+            <p><strong>Period:</strong> ${periodLabel}</p>
             <div class="metrics">
               <div class="metric">
                 <div class="metric-label">Total Patients</div>
@@ -284,20 +556,16 @@ export default function PatientVolumePage() {
                 <div class="metric-value">${Math.round(avgPerActiveDay * 10) / 10}</div>
               </div>
               <div class="metric">
-                <div class="metric-label">Peak Day</div>
+                <div class="metric-label">Peak ${aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}</div>
                 <div class="metric-value">${peakCount}</div>
               </div>
             </div>
             <table>
               <thead>
-                <tr><th>Date</th><th>Day of Week</th><th>Patient Count</th></tr>
+                <tr><th>Period</th><th>Patient Count</th></tr>
               </thead>
               <tbody>
-                ${Array.from({ length: daysInMonth }, (_, i) => {
-                  const d = new Date(year, monthIndex, i + 1, 12);
-                  const count = dayBuckets[i] || 0;
-                  return `<tr><td>${format(d, "MMM d, yyyy")}</td><td>${format(d, "EEEE")}</td><td>${count}</td></tr>`;
-                }).join("")}
+                ${chartData.map(d => `<tr><td>${d.label}</td><td>${d.count}</td></tr>`).join("")}
               </tbody>
             </table>
           </body>
@@ -385,14 +653,12 @@ export default function PatientVolumePage() {
   const TooltipBox = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     const p = payload[0].payload;
-    const d = new Date(year, monthIndex, p.day, 12);
-    const dayOfWeek = format(d, "EEEE");
     const diffFromAvg = p.count - avgPerActiveDay;
     const percentDiff = avgPerActiveDay > 0 ? ((diffFromAvg / avgPerActiveDay) * 100).toFixed(1) : "0";
     
     return (
       <div className="bg-white border border-slate-200 rounded-md shadow-md px-3 py-2">
-        <div className="font-medium text-slate-900 mb-1">{format(d, "EEE, MMM d, yyyy")}</div>
+        <div className="font-medium text-slate-900 mb-1">{p.label}</div>
         <div className="text-sm text-slate-700">
           Patients: <span className="font-semibold">{p.count}</span>
         </div>
@@ -435,25 +701,23 @@ export default function PatientVolumePage() {
             <CardContent className="p-4">
               <div className="text-xs text-slate-600">Total Patients</div>
               <div className="text-2xl font-semibold">{totalPatients.toLocaleString()}</div>
-              <div className="text-xs text-slate-500">{monthTitle}</div>
+              <div className="text-xs text-slate-500">{getPeriodLabel()}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Average / Active Day</div>
+              <div className="text-xs text-slate-600">Average / Active {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}</div>
               <div className="text-2xl font-semibold">
                 {activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}
               </div>
-              <div className="text-xs text-slate-500">{activeDays} active days</div>
+              <div className="text-xs text-slate-500">{activeDays} active {aggregationLevel === "daily" ? "days" : aggregationLevel === "weekly" ? "weeks" : "months"}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Peak Day</div>
+              <div className="text-xs text-slate-600">Peak {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}</div>
               <div className="text-2xl font-semibold">{peakCount}</div>
-              <div className="text-xs text-slate-500">
-                {peakDay ? format(new Date(year, monthIndex, peakDay, 12), "EEE, MMM d, yyyy") : "—"}
-              </div>
+              <div className="text-xs text-slate-500">{peakLabel}</div>
             </CardContent>
           </Card>
         </div>
@@ -517,62 +781,109 @@ export default function PatientVolumePage() {
                 Projected Monthly Total
               </div>
               <div className="text-2xl font-semibold">
-                {isSameMonth(selectedMonth, new Date()) 
+                {isCurrentPeriod 
                   ? Math.round(projectedTotal).toLocaleString()
                   : totalPatients.toLocaleString()}
               </div>
               <div className="text-xs text-slate-500">
-                {isSameMonth(selectedMonth, new Date()) ? "Based on current trend" : "Final total"}
+                {isCurrentPeriod ? "Based on current trend" : "Final total"}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Controls: month navigation + quick chips + month picker + chart controls + exports */}
+        {/* Controls: period selection + chart controls + exports */}
         <div className="flex flex-col gap-3">
-          {/* Row 1: Navigation and period selection */}
+          {/* Row 1: Period selection and navigation */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={goPrevMonth} title="Previous month">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
+              {/* Time Period Dropdown */}
+              <Select value={timePeriod} onValueChange={(value) => {
+                setTimePeriod(value);
+                // Update selectedMonth for single month periods
+                if (value === "thisMonth") {
+                  setSelectedMonth(thisMonthAnchor);
+                } else if (value === "lastMonth") {
+                  setSelectedMonth(lastMonthAnchor);
+                }
+              }}>
+                <SelectTrigger className="h-8 w-[180px]">
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="thisMonth">This Month</SelectItem>
+                  <SelectItem value="lastMonth">Last Month</SelectItem>
+                  <SelectItem value="last3Months">Last 3 Months</SelectItem>
+                  <SelectItem value="last6Months">Last 6 Months</SelectItem>
+                  <SelectItem value="thisQuarter">This Quarter</SelectItem>
+                  <SelectItem value="lastQuarter">Last Quarter</SelectItem>
+                  <SelectItem value="thisYear">This Year</SelectItem>
+                  <SelectItem value="lastYear">Last Year</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="h-8">
-                    <CalendarIcon className="w-4 h-4 mr-2" />
-                    {monthTitle}
+              {/* Custom Date Range Picker (shown when custom is selected) */}
+              {timePeriod === "custom" && (
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="h-8">
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {customDateRange.start ? format(customDateRange.start, "MMM d, yyyy") : "Start Date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
+                      <Calendar
+                        mode="single"
+                        selected={customDateRange.start}
+                        onSelect={(d) => setCustomDateRange(prev => ({ ...prev, start: d }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="h-8">
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {customDateRange.end ? format(customDateRange.end, "MMM d, yyyy") : "End Date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
+                      <Calendar
+                        mode="single"
+                        selected={customDateRange.end}
+                        onSelect={(d) => setCustomDateRange(prev => ({ ...prev, end: d }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </>
+              )}
+
+              {/* Month navigation arrows (for fine-tuning) */}
+              {(timePeriod === "thisMonth" || timePeriod === "lastMonth") && (
+                <>
+                  <div className="mx-1 h-6 w-px bg-slate-200" />
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={goPrevMonth} title="Previous month">
+                    <ChevronLeft className="w-4 h-4" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
-                  <Calendar
-                    mode="single"
-                    selected={selectedMonth}
-                    onSelect={(d) => d && setSelectedMonth(new Date(d.getFullYear(), d.getMonth(), 1, 12))}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={goNextMonth} title="Next month">
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
 
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={goNextMonth} title="Next month">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-
+              {/* Compare Toggle */}
               <div className="mx-1 h-6 w-px bg-slate-200" />
-
               <Button
-                variant={isThisMonth ? "default" : "outline"}
-                className={cn("h-8", isThisMonth ? "bg-slate-900 text-white hover:bg-slate-800" : "")}
-                onClick={jumpThisMonth}
+                variant={showComparison ? "default" : "outline"}
+                size="sm"
+                className={cn("h-8", showComparison && "bg-purple-600 hover:bg-purple-700")}
+                onClick={() => setShowComparison(!showComparison)}
               >
-                This month
-              </Button>
-              <Button
-                variant={isLastMonth ? "default" : "outline"}
-                className={cn("h-8", isLastMonth ? "bg-slate-900 text-white hover:bg-slate-800" : "")}
-                onClick={jumpLastMonth}
-              >
-                Last month
+                Compare
               </Button>
             </div>
 
@@ -726,12 +1037,13 @@ export default function PatientVolumePage() {
                     <BarChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
-                        dataKey="day"
-                        ticks={xTicks}
+                        dataKey="label"
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         axisLine={{ stroke: "#e5e7eb" }}
                         tickLine={false}
-                        label={{ value: "Day", position: "insideBottomRight", offset: -14, style: { fill: "#64748b", fontSize: 11 } }}
+                        angle={aggregationLevel === "daily" && chartData.length > 15 ? -45 : 0}
+                        textAnchor={aggregationLevel === "daily" && chartData.length > 15 ? "end" : "middle"}
+                        height={aggregationLevel === "daily" && chartData.length > 15 ? 60 : 30}
                       />
                       <YAxis
                         tick={{ fontSize: 11, fill: "#64748b" }}
@@ -754,23 +1066,24 @@ export default function PatientVolumePage() {
                         const nonZeroData = chartData.filter(d => d.count > 0);
                         if (nonZeroData.length < 2) return null;
                         
-                        const n = nonZeroData.length;
-                        const sumX = nonZeroData.reduce((s, d) => s + d.day, 0);
-                        const sumY = nonZeroData.reduce((s, d) => s + d.count, 0);
-                        const sumXY = nonZeroData.reduce((s, d) => s + d.day * d.count, 0);
-                        const sumX2 = nonZeroData.reduce((s, d) => s + d.day * d.day, 0);
+                        const dataWithIndex = nonZeroData.map((d, i) => ({ ...d, index: i }));
+                        const n = dataWithIndex.length;
+                        const sumX = dataWithIndex.reduce((s, d) => s + d.index, 0);
+                        const sumY = dataWithIndex.reduce((s, d) => s + d.count, 0);
+                        const sumXY = dataWithIndex.reduce((s, d) => s + d.index * d.count, 0);
+                        const sumX2 = dataWithIndex.reduce((s, d) => s + d.index * d.index, 0);
                         
                         const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
                         const intercept = (sumY - slope * sumX) / n;
                         
-                        const y1 = slope * 1 + intercept;
-                        const y2 = slope * daysInMonth + intercept;
+                        const y1 = slope * 0 + intercept;
+                        const y2 = slope * (chartData.length - 1) + intercept;
                         
                         return (
                           <ReferenceLine
                             segment={[
-                              { x: 1, y: Math.max(0, y1) },
-                              { x: daysInMonth, y: Math.max(0, y2) }
+                              { x: chartData[0].label, y: Math.max(0, y1) },
+                              { x: chartData[chartData.length - 1].label, y: Math.max(0, y2) }
                             ]}
                             stroke="#3b82f6"
                             strokeDasharray="5 5"
@@ -784,12 +1097,13 @@ export default function PatientVolumePage() {
                     <RechartsLineChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
-                        dataKey="day"
-                        ticks={xTicks}
+                        dataKey="label"
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         axisLine={{ stroke: "#e5e7eb" }}
                         tickLine={false}
-                        label={{ value: "Day", position: "insideBottomRight", offset: -14, style: { fill: "#64748b", fontSize: 11 } }}
+                        angle={aggregationLevel === "daily" && chartData.length > 15 ? -45 : 0}
+                        textAnchor={aggregationLevel === "daily" && chartData.length > 15 ? "end" : "middle"}
+                        height={aggregationLevel === "daily" && chartData.length > 15 ? 60 : 30}
                       />
                       <YAxis
                         tick={{ fontSize: 11, fill: "#64748b" }}
@@ -826,12 +1140,13 @@ export default function PatientVolumePage() {
                       </defs>
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
-                        dataKey="day"
-                        ticks={xTicks}
+                        dataKey="label"
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         axisLine={{ stroke: "#e5e7eb" }}
                         tickLine={false}
-                        label={{ value: "Day", position: "insideBottomRight", offset: -14, style: { fill: "#64748b", fontSize: 11 } }}
+                        angle={aggregationLevel === "daily" && chartData.length > 15 ? -45 : 0}
+                        textAnchor={aggregationLevel === "daily" && chartData.length > 15 ? "end" : "middle"}
+                        height={aggregationLevel === "daily" && chartData.length > 15 ? 60 : 30}
                       />
                       <YAxis
                         tick={{ fontSize: 11, fill: "#64748b" }}
