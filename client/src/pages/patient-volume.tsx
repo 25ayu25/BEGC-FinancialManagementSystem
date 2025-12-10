@@ -154,17 +154,22 @@ export default function PatientVolumePage() {
       : sortedCounts[Math.floor(sortedCounts.length / 2)]
     : 0;
 
-  // Projected monthly total (based on current average for remaining days)
+  // Projected monthly total (based on current average for remaining ACTIVE days)
   const today = new Date();
   const currentDayOfMonth = isSameMonth(selectedMonth, today) ? today.getDate() : daysInMonth;
   const remainingDays = daysInMonth - currentDayOfMonth;
-  const projectedTotal = totalPatients + (avgPerActiveDay * remainingDays);
+  // Estimate remaining active days based on current active day ratio
+  const activeDayRatio = activeDays > 0 ? activeDays / currentDayOfMonth : 0.7; // default to 70% if no data
+  const estimatedRemainingActiveDays = Math.round(remainingDays * activeDayRatio);
+  const projectedTotal = totalPatients + (avgPerActiveDay * estimatedRemainingActiveDays);
 
   // Week-over-Week Growth - fetch previous week data
   const { data: prevWeekVolumes = [] } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/prevWeek", year, monthNumber],
     queryFn: async () => {
-      const prevWeekStart = subWeeks(selectedMonth, 1);
+      const weekStart = startOfWeek(selectedMonth);
+      const prevWeekStart = subWeeks(weekStart, 1);
+      const prevWeekEnd = subDays(weekStart, 1);
       const prevYear = prevWeekStart.getFullYear();
       const prevMonth = prevWeekStart.getMonth() + 1;
       const resp = await api.get(`/api/patient-volume/period/${prevYear}/${prevMonth}`);
@@ -174,12 +179,13 @@ export default function PatientVolumePage() {
 
   // Calculate current week total (last 7 days of selected month)
   const currentWeekTotal = dayBuckets.slice(-7).reduce((s, n) => s + n, 0);
+  const prevWeekStart = subWeeks(selectedMonth, 1);
+  const prevWeekEnd = subDays(selectedMonth, 1);
   const prevWeekTotal = prevWeekVolumes
     .filter(v => {
       const d = parseISO(v.date);
-      return d.getMonth() === selectedMonth.getMonth() - 1;
+      return d.getTime() >= prevWeekStart.getTime() && d.getTime() <= prevWeekEnd.getTime();
     })
-    .slice(-7)
     .reduce((s, v) => s + Number(v.patientCount || 0), 0);
   const weekOverWeekGrowth = prevWeekTotal > 0 ? ((currentWeekTotal - prevWeekTotal) / prevWeekTotal) * 100 : 0;
 
@@ -248,7 +254,7 @@ export default function PatientVolumePage() {
 
   const exportToPDF = async () => {
     try {
-      // Simple PDF export using browser print
+      // Print-friendly report using browser print
       const printContent = `
         <html>
           <head>
@@ -289,13 +295,14 @@ export default function PatientVolumePage() {
               <tbody>
                 ${Array.from({ length: daysInMonth }, (_, i) => {
                   const d = new Date(year, monthIndex, i + 1, 12);
-                  return `<tr><td>${format(d, "MMM d, yyyy")}</td><td>${format(d, "EEEE")}</td><td>${dayBuckets[i] || 0}</td></tr>`;
+                  const count = dayBuckets[i] || 0;
+                  return `<tr><td>${format(d, "MMM d, yyyy")}</td><td>${format(d, "EEEE")}</td><td>${count}</td></tr>`;
                 }).join("")}
               </tbody>
             </table>
           </body>
         </html>
-      `;
+      `.trim();
       
       const printWindow = window.open("", "_blank");
       if (printWindow) {
@@ -304,11 +311,11 @@ export default function PatientVolumePage() {
         printWindow.focus();
         setTimeout(() => {
           printWindow.print();
-          toast({ title: "PDF export ready - print dialog opened" });
+          toast({ title: "Print report ready" });
         }, 250);
       }
     } catch (error) {
-      toast({ title: "Failed to export PDF", variant: "destructive" });
+      toast({ title: "Failed to generate report", variant: "destructive" });
     }
   };
 
@@ -585,9 +592,10 @@ export default function PatientVolumePage() {
                 size="sm"
                 className="h-8"
                 onClick={exportToPDF}
+                title="Print report"
               >
                 <FileText className="w-3.5 h-3.5 mr-1.5" />
-                PDF
+                Print
               </Button>
             </div>
           </div>
@@ -741,17 +749,35 @@ export default function PatientVolumePage() {
                           label={{ value: `Target: ${targetValue}`, position: "insideTopRight", fill: "#f59e0b", fontSize: 11 }}
                         />
                       )}
-                      {showTrendLine && chartData.length > 1 && (
-                        <ReferenceLine
-                          segment={[
-                            { x: 1, y: chartData[0].count },
-                            { x: daysInMonth, y: chartData[chartData.length - 1].count }
-                          ]}
-                          stroke="#3b82f6"
-                          strokeDasharray="5 5"
-                          strokeWidth={2}
-                        />
-                      )}
+                      {showTrendLine && chartData.length > 1 && (() => {
+                        // Calculate linear regression trend line
+                        const nonZeroData = chartData.filter(d => d.count > 0);
+                        if (nonZeroData.length < 2) return null;
+                        
+                        const n = nonZeroData.length;
+                        const sumX = nonZeroData.reduce((s, d) => s + d.day, 0);
+                        const sumY = nonZeroData.reduce((s, d) => s + d.count, 0);
+                        const sumXY = nonZeroData.reduce((s, d) => s + d.day * d.count, 0);
+                        const sumX2 = nonZeroData.reduce((s, d) => s + d.day * d.day, 0);
+                        
+                        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                        const intercept = (sumY - slope * sumX) / n;
+                        
+                        const y1 = slope * 1 + intercept;
+                        const y2 = slope * daysInMonth + intercept;
+                        
+                        return (
+                          <ReferenceLine
+                            segment={[
+                              { x: 1, y: Math.max(0, y1) },
+                              { x: daysInMonth, y: Math.max(0, y2) }
+                            ]}
+                            stroke="#3b82f6"
+                            strokeDasharray="5 5"
+                            strokeWidth={2}
+                          />
+                        );
+                      })()}
                       <Bar dataKey="count" name="Patients" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
                     </BarChart>
                   ) : chartType === "line" ? (
@@ -901,7 +927,7 @@ export default function PatientVolumePage() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ day, percentage }) => `${day.substring(0, 3)}: ${percentage.toFixed(1)}%`}
+                      label={({ day, percentage }) => percentage > 0 ? `${day.slice(0, 3)}: ${percentage.toFixed(1)}%` : ""}
                       labelLine={true}
                     >
                       {weekdayDistribution.map((entry, index) => (
