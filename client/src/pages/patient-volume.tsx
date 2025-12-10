@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest, api } from "@/lib/queryClient";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar as CalendarIcon,
   Users,
@@ -113,6 +114,7 @@ export default function PatientVolumePage() {
   const [dateRangeFilter, setDateRangeFilter] = useState<"month" | "7days" | "30days" | "quarter" | "year">("month");
   const [timePeriod, setTimePeriod] = useState<string>("thisMonth");
   const [showComparison, setShowComparison] = useState(false);
+  const [comparisonTimePeriod, setComparisonTimePeriod] = useState<string>("previousPeriod");
   const [customDateRange, setCustomDateRange] = useState<{ start: Date | undefined; end: Date | undefined }>({
     start: undefined,
     end: undefined,
@@ -285,6 +287,84 @@ export default function PatientVolumePage() {
     },
   });
 
+  // --- Comparison Period Data ---
+  const comparisonDateRange = useMemo(() => {
+    if (!showComparison) return null;
+    
+    const periodDays = differenceInDays(dateRange.end, dateRange.start);
+    
+    if (comparisonTimePeriod === "previousPeriod") {
+      // Go back by the same number of days as the current period
+      return {
+        start: subDays(dateRange.start, periodDays + 1),
+        end: subDays(dateRange.start, 1)
+      };
+    } else if (comparisonTimePeriod === "previousYear") {
+      // Same period last year
+      return {
+        start: subYears(dateRange.start, 1),
+        end: subYears(dateRange.end, 1)
+      };
+    }
+    
+    return null;
+  }, [showComparison, comparisonTimePeriod, dateRange]);
+
+  const comparisonApiQueryParams = useMemo(() => {
+    if (!comparisonDateRange) return null;
+    
+    const startYear = comparisonDateRange.start.getFullYear();
+    const startMonth = comparisonDateRange.start.getMonth() + 1;
+    const endYear = comparisonDateRange.end.getFullYear();
+    const endMonth = comparisonDateRange.end.getMonth() + 1;
+    
+    if (startYear === endYear && startMonth === endMonth) {
+      return { year: startYear, month: startMonth, range: "current-month" };
+    }
+    
+    const months: Array<{ year: number; month: number }> = [];
+    let current = new Date(startYear, startMonth - 1, 1);
+    const end = new Date(endYear, endMonth - 1, 1);
+    
+    while (current <= end) {
+      months.push({ year: current.getFullYear(), month: current.getMonth() + 1 });
+      current = addMonths(current, 1);
+    }
+    
+    return { months, range: "multi-month" };
+  }, [comparisonDateRange]);
+
+  const { data: rawComparisonVolumes = [] } = useQuery<PatientVolume[]>({
+    queryKey: ["/api/patient-volume/comparison", comparisonApiQueryParams],
+    queryFn: async () => {
+      if (!comparisonApiQueryParams) return [];
+      
+      if (comparisonApiQueryParams.range === "current-month") {
+        const resp = await api.get(`/api/patient-volume/period/${comparisonApiQueryParams.year}/${comparisonApiQueryParams.month}`);
+        return Array.isArray(resp.data) ? resp.data : [];
+      } else {
+        const allData: PatientVolume[] = [];
+        for (const { year: y, month: m } of comparisonApiQueryParams.months || []) {
+          const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
+          if (Array.isArray(resp.data)) {
+            allData.push(...resp.data);
+          }
+        }
+        return allData;
+      }
+    },
+    enabled: showComparison && comparisonDateRange !== null,
+  });
+
+  // Filter comparison volumes to only include those in the comparison date range
+  const filteredComparisonVolumes = useMemo(() => {
+    if (!comparisonDateRange) return [];
+    return rawComparisonVolumes.filter(v => {
+      const d = parseISO(v.date);
+      return isWithinInterval(d, { start: comparisonDateRange.start, end: comparisonDateRange.end });
+    });
+  }, [rawComparisonVolumes, comparisonDateRange]);
+
   // --- Normalize & aggregate data based on aggregation level ---
   const daysInMonth = useMemo(
     () => new Date(year, monthIndex + 1, 0).getDate(),
@@ -388,6 +468,89 @@ export default function PatientVolumePage() {
       return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
     }
   }, [filteredVolumes, aggregationLevel, dateRange]);
+
+  // Aggregate comparison data based on aggregation level
+  const comparisonChartData = useMemo(() => {
+    if (!showComparison || !comparisonDateRange || filteredComparisonVolumes.length === 0) {
+      return null;
+    }
+
+    if (aggregationLevel === "daily") {
+      const days = differenceInDays(comparisonDateRange.end, comparisonDateRange.start) + 1;
+      const buckets = Array.from({ length: days }, () => 0);
+      
+      for (const v of filteredComparisonVolumes) {
+        const d = parseISO(v.date);
+        const dayOffset = differenceInDays(d, comparisonDateRange.start);
+        if (dayOffset >= 0 && dayOffset < days) {
+          buckets[dayOffset] += Number(v.patientCount || 0);
+        }
+      }
+      
+      return buckets.map((count, idx) => ({
+        label: format(addDays(comparisonDateRange.start, idx), "MMM d"),
+        count
+      }));
+    } else if (aggregationLevel === "weekly") {
+      const weeks = eachWeekOfInterval({ start: comparisonDateRange.start, end: comparisonDateRange.end }, { weekStartsOn: 0 });
+      const buckets = weeks.map(weekStart => {
+        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+        const count = filteredComparisonVolumes
+          .filter(v => {
+            const d = parseISO(v.date);
+            return isWithinInterval(d, { start: weekStart, end: weekEnd });
+          })
+          .reduce((s, v) => s + Number(v.patientCount || 0), 0);
+        return { weekStart, count };
+      });
+      
+      return buckets.map((bucket, idx) => ({
+        label: `${format(bucket.weekStart, "MMM d")}`,
+        count: bucket.count
+      }));
+    } else {
+      const months = eachMonthOfInterval({ start: comparisonDateRange.start, end: comparisonDateRange.end });
+      const buckets = months.map(monthStart => {
+        const monthEnd = endOfMonth(monthStart);
+        const count = filteredComparisonVolumes
+          .filter(v => {
+            const d = parseISO(v.date);
+            return isWithinInterval(d, { start: monthStart, end: monthEnd });
+          })
+          .reduce((s, v) => s + Number(v.patientCount || 0), 0);
+        return { monthStart, count };
+      });
+      
+      return buckets.map((bucket, idx) => ({
+        label: format(bucket.monthStart, "MMM yyyy"),
+        count: bucket.count
+      }));
+    }
+  }, [showComparison, comparisonDateRange, filteredComparisonVolumes, aggregationLevel]);
+
+  // Calculate comparison total for KPI display
+  const comparisonTotal = useMemo(() => {
+    if (!comparisonChartData) return 0;
+    return comparisonChartData.reduce((s, d) => s + d.count, 0);
+  }, [comparisonChartData]);
+
+  const percentageChange = useMemo(() => {
+    if (!comparisonTotal || comparisonTotal === 0) return 0;
+    return ((totalPatients - comparisonTotal) / comparisonTotal) * 100;
+  }, [totalPatients, comparisonTotal]);
+
+  // Combine main and comparison data for charts
+  const combinedChartData = useMemo(() => {
+    if (!showComparison || !comparisonChartData) {
+      return chartData.map(d => ({ ...d, comparisonCount: null }));
+    }
+    
+    // Merge comparison data with main data by matching labels
+    return chartData.map((d, idx) => ({
+      ...d,
+      comparisonCount: comparisonChartData[idx]?.count || 0
+    }));
+  }, [chartData, comparisonChartData, showComparison]);
 
   // For backwards compatibility, create dayBuckets for table view
   const dayBuckets = useMemo(() => {
@@ -746,7 +909,20 @@ export default function PatientVolumePage() {
             <CardContent className="p-4">
               <div className="text-xs text-slate-600">Total Patients</div>
               <div className="text-2xl font-semibold">{totalPatients.toLocaleString()}</div>
-              <div className="text-xs text-slate-500">{getPeriodLabel()}</div>
+              {showComparison && comparisonTotal > 0 && (
+                <div className="text-xs mt-1 flex items-center gap-1">
+                  <span className={cn(
+                    "font-medium",
+                    percentageChange > 0 ? "text-green-600" : percentageChange < 0 ? "text-red-600" : "text-slate-500"
+                  )}>
+                    {percentageChange > 0 ? "+" : ""}{percentageChange.toFixed(1)}%
+                  </span>
+                  <span className="text-slate-500">vs comparison</span>
+                </div>
+              )}
+              {!showComparison && (
+                <div className="text-xs text-slate-500">{getPeriodLabel()}</div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -930,6 +1106,19 @@ export default function PatientVolumePage() {
               >
                 Compare
               </Button>
+
+              {/* Comparison Period Dropdown (shown when comparison is enabled) */}
+              {showComparison && (
+                <Select value={comparisonTimePeriod} onValueChange={setComparisonTimePeriod}>
+                  <SelectTrigger className="h-8 w-[160px]">
+                    <SelectValue placeholder="Compare to..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="previousPeriod">Previous Period</SelectItem>
+                    <SelectItem value="previousYear">Previous Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Export buttons */}
@@ -1088,19 +1277,27 @@ export default function PatientVolumePage() {
             {isLoading ? (
               <div className="py-14 text-center text-slate-500">Loading…</div>
             ) : mode === "chart" ? (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={chartType}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="h-72"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
                   {chartType === "bar" ? (
-                    <BarChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
+                    <BarChart data={combinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
                         dataKey="label"
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         axisLine={{ stroke: "#e5e7eb" }}
                         tickLine={false}
-                        angle={aggregationLevel === "daily" && chartData.length > 15 ? -45 : 0}
-                        textAnchor={aggregationLevel === "daily" && chartData.length > 15 ? "end" : "middle"}
-                        height={aggregationLevel === "daily" && chartData.length > 15 ? 60 : 30}
+                        angle={aggregationLevel === "daily" && combinedChartData.length > 15 ? -45 : 0}
+                        textAnchor={aggregationLevel === "daily" && combinedChartData.length > 15 ? "end" : "middle"}
+                        height={aggregationLevel === "daily" && combinedChartData.length > 15 ? 60 : 30}
                       />
                       <YAxis
                         tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1110,6 +1307,7 @@ export default function PatientVolumePage() {
                         label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
                       />
                       <Tooltip content={<TooltipBox />} />
+                      <Legend />
                       {targetValue && (
                         <ReferenceLine 
                           y={targetValue} 
@@ -1118,9 +1316,9 @@ export default function PatientVolumePage() {
                           label={{ value: `Target: ${targetValue}`, position: "insideTopRight", fill: "#f59e0b", fontSize: 11 }}
                         />
                       )}
-                      {showTrendLine && chartData.length > 1 && (() => {
+                      {showTrendLine && combinedChartData.length > 1 && (() => {
                         // Calculate linear regression trend line
-                        const nonZeroData = chartData.filter(d => d.count > 0);
+                        const nonZeroData = combinedChartData.filter(d => d.count > 0);
                         if (nonZeroData.length < 2) return null;
                         
                         const dataWithIndex = nonZeroData.map((d, i) => ({ ...d, index: i }));
@@ -1134,13 +1332,13 @@ export default function PatientVolumePage() {
                         const intercept = (sumY - slope * sumX) / n;
                         
                         const y1 = slope * 0 + intercept;
-                        const y2 = slope * (chartData.length - 1) + intercept;
+                        const y2 = slope * (combinedChartData.length - 1) + intercept;
                         
                         return (
                           <ReferenceLine
                             segment={[
-                              { x: chartData[0].label, y: Math.max(0, y1) },
-                              { x: chartData[chartData.length - 1].label, y: Math.max(0, y2) }
+                              { x: combinedChartData[0].label, y: Math.max(0, y1) },
+                              { x: combinedChartData[combinedChartData.length - 1].label, y: Math.max(0, y2) }
                             ]}
                             stroke="#3b82f6"
                             strokeDasharray="5 5"
@@ -1148,19 +1346,22 @@ export default function PatientVolumePage() {
                           />
                         );
                       })()}
-                      <Bar dataKey="count" name="Patients" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
+                      <Bar dataKey="count" name="Current Period" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
+                      {showComparison && (
+                        <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26} />
+                      )}
                     </BarChart>
                   ) : chartType === "line" ? (
-                    <RechartsLineChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
+                    <RechartsLineChart data={combinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
                         dataKey="label"
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         axisLine={{ stroke: "#e5e7eb" }}
                         tickLine={false}
-                        angle={aggregationLevel === "daily" && chartData.length > 15 ? -45 : 0}
-                        textAnchor={aggregationLevel === "daily" && chartData.length > 15 ? "end" : "middle"}
-                        height={aggregationLevel === "daily" && chartData.length > 15 ? 60 : 30}
+                        angle={aggregationLevel === "daily" && combinedChartData.length > 15 ? -45 : 0}
+                        textAnchor={aggregationLevel === "daily" && combinedChartData.length > 15 ? "end" : "middle"}
+                        height={aggregationLevel === "daily" && combinedChartData.length > 15 ? 60 : 30}
                       />
                       <YAxis
                         tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1170,6 +1371,7 @@ export default function PatientVolumePage() {
                         label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
                       />
                       <Tooltip content={<TooltipBox />} />
+                      <Legend />
                       {targetValue && (
                         <ReferenceLine 
                           y={targetValue} 
@@ -1181,18 +1383,35 @@ export default function PatientVolumePage() {
                       <Line 
                         type="monotone" 
                         dataKey="count" 
+                        name="Current Period"
                         stroke="#14b8a6" 
                         strokeWidth={2.5}
                         dot={{ fill: "#14b8a6", r: 3 }}
                         activeDot={{ r: 5 }}
                       />
+                      {showComparison && (
+                        <Line 
+                          type="monotone" 
+                          dataKey="comparisonCount" 
+                          name="Comparison Period"
+                          stroke="#a78bfa" 
+                          strokeWidth={2.5}
+                          strokeDasharray="5 5"
+                          dot={{ fill: "#a78bfa", r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      )}
                     </RechartsLineChart>
                   ) : chartType === "area" ? (
-                    <RechartsAreaChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
+                    <RechartsAreaChart data={combinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
                       <defs>
                         <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8}/>
                           <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.1}/>
+                        </linearGradient>
+                        <linearGradient id="colorComparison" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.05}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
@@ -1201,9 +1420,9 @@ export default function PatientVolumePage() {
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         axisLine={{ stroke: "#e5e7eb" }}
                         tickLine={false}
-                        angle={aggregationLevel === "daily" && chartData.length > 15 ? -45 : 0}
-                        textAnchor={aggregationLevel === "daily" && chartData.length > 15 ? "end" : "middle"}
-                        height={aggregationLevel === "daily" && chartData.length > 15 ? 60 : 30}
+                        angle={aggregationLevel === "daily" && combinedChartData.length > 15 ? -45 : 0}
+                        textAnchor={aggregationLevel === "daily" && combinedChartData.length > 15 ? "end" : "middle"}
+                        height={aggregationLevel === "daily" && combinedChartData.length > 15 ? 60 : 30}
                       />
                       <YAxis
                         tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1213,6 +1432,7 @@ export default function PatientVolumePage() {
                         label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
                       />
                       <Tooltip content={<TooltipBox />} />
+                      <Legend />
                       {targetValue && (
                         <ReferenceLine 
                           y={targetValue} 
@@ -1224,10 +1444,21 @@ export default function PatientVolumePage() {
                       <Area 
                         type="monotone" 
                         dataKey="count" 
+                        name="Current Period"
                         stroke="#14b8a6" 
                         strokeWidth={2}
                         fill="url(#colorCount)"
                       />
+                      {showComparison && (
+                        <Area 
+                          type="monotone" 
+                          dataKey="comparisonCount" 
+                          name="Comparison Period"
+                          stroke="#a78bfa" 
+                          strokeWidth={2}
+                          fill="url(#colorComparison)"
+                        />
+                      )}
                     </RechartsAreaChart>
                   ) : chartType === "heatmap" ? (
                     <div className="w-full h-full overflow-auto">
@@ -1304,7 +1535,8 @@ export default function PatientVolumePage() {
                     </div>
                   ) : null}
                 </ResponsiveContainer>
-              </div>
+              </motion.div>
+            </AnimatePresence>
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[480px]">
