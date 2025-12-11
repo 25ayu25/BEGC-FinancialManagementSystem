@@ -1,28 +1,31 @@
 /**
- * UTC Date Utilities
+ * UTC Date Utilities - DEPRECATED CLIENT-SIDE MODULE
  * 
- * Centralized date handling utilities that enforce UTC timezone for consistent
- * date filtering across frontend and backend. This prevents timezone-related
- * off-by-one errors in date range queries.
+ * ⚠️ DEPRECATION NOTICE:
+ * This module is no longer actively used in the client-side codebase.
+ * It has been superseded by @/lib/dateRanges.ts which is the canonical
+ * source of truth for all date range calculations.
  * 
- * ⚠️ IMPORTANT - DATE RANGE CALCULATION:
- * For date range preset calculations (e.g., "This Year", "Last 6 Months"), 
- * use the canonical @/lib/dateRanges.ts module instead of getUTCDateRange() below.
- * The dateRanges.ts module is the source of truth used by all analytics pages
- * and ensures consistent behavior across the application.
+ * ⚠️ DO NOT USE getUTCDateRange() from this module!
+ * Use getDateRange() from @/lib/dateRanges.ts instead, which provides:
+ * - Consistent behavior across all analytics pages (Insurance Overview, Trends, Department Analytics)
+ * - Proper handling of edge cases (December-anchoring bug, year boundaries)
+ * - Well-tested and documented preset logic
  * 
- * This module should primarily be used for:
- * - UTC date construction (createUTCDate, getUTCMonthStart, etc.)
- * - Date parsing and formatting (parseUTCDate, formatDateForAPI)
- * - Low-level UTC date operations
+ * This module is kept for historical reference only. Any remaining utility
+ * functions (createUTCDate, parseUTCDate, etc.) that might be needed should
+ * be migrated to dateRanges.ts or a separate low-level utilities module.
  * 
- * Key Principles:
- * 1. All date calculations for API queries must be done in UTC
- * 2. Date strings sent to backend must be timezone-agnostic (YYYY-MM-DD)
- * 3. Date boundaries are treated as UTC midnight (00:00:00.000Z)
- * 4. End dates are exclusive in SQL queries (date < end, not date <= end)
+ * Historical Context:
+ * This module previously caused inconsistencies such as:
+ * - December-anchored "This Year" ranges instead of January-anchored
+ * - Off-by-one month errors in rolling windows
+ * - Different behavior between Insurance Overview and other analytics pages
+ * 
+ * These issues have been resolved by using the canonical @/lib/dateRanges.ts.
  * 
  * @module utcDateUtils
+ * @deprecated Use @/lib/dateRanges.ts instead
  */
 
 /**
@@ -155,6 +158,9 @@ export function getLastCompleteMonthUTC(): { year: number; month: number } {
 
 /**
  * Calculate date range for common filter presets in UTC
+ * 
+ * @deprecated DO NOT USE THIS FUNCTION! Use getDateRange() from @/lib/dateRanges.ts instead.
+ * This function is kept for historical reference only and may have inconsistent behavior.
  * 
  * @param preset - Filter preset key
  * @param referenceDate - Reference date for calculations (default: now)

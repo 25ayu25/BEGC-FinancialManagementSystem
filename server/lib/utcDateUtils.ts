@@ -123,6 +123,22 @@ export function getLastCompleteMonthUTC(): { year: number; month: number } {
 /**
  * Calculate date range for common filter presets in UTC
  * 
+ * IMPORTANT: These preset keys and logic MUST match the canonical frontend
+ * date range helper in client/src/lib/dateRanges.ts to ensure consistency
+ * across Insurance Overview, Trends, and Department Analytics pages.
+ * 
+ * Supported preset keys (aligned with frontend):
+ * - last-month: Last complete calendar month
+ * - last-quarter: Last 3 complete calendar months (rolling window)
+ * - last-6-months: Last 6 complete calendar months (rolling window)
+ * - last-12-months: Last 12 complete calendar months (rolling window)
+ * - this-year: January 1 of current year through last complete month
+ * - last-year: Full previous calendar year (Jan 1 - Dec 31)
+ * 
+ * Legacy preset keys (maintained for backward compatibility):
+ * - current-month: Current month (may be incomplete)
+ * - ytd: Year to date (may include incomplete current month)
+ * 
  * @param preset - Filter preset key
  * @param referenceDate - Reference date for calculations (default: now)
  * @returns Object with startDate and endDate in UTC
@@ -133,23 +149,20 @@ export function getUTCDateRange(
 ): { startDate: Date; endDate: Date } {
   const currentYear = referenceDate.getUTCFullYear();
   const currentMonth = referenceDate.getUTCMonth() + 1; // 1-indexed
+  const lastComplete = getLastCompleteMonthUTC();
   
   switch (preset) {
-    case 'current-month': {
-      const start = getUTCMonthStart(currentYear, currentMonth);
-      const end = getUTCNextMonthStart(currentYear, currentMonth);
-      return { startDate: start, endDate: end };
-    }
-    
     case 'last-month': {
-      const { year, month } = getLastCompleteMonthUTC();
+      // Last complete calendar month
+      const { year, month } = lastComplete;
       const start = getUTCMonthStart(year, month);
       const end = getUTCNextMonthStart(year, month);
       return { startDate: start, endDate: end };
     }
     
-    case 'last-3-months': {
-      const lastComplete = getLastCompleteMonthUTC();
+    case 'last-quarter': {
+      // Last 3 complete calendar months (rolling window)
+      // This matches the frontend's "Last Quarter" preset
       const startMonth = lastComplete.month - 2;
       const startYear = startMonth < 1 ? lastComplete.year - 1 : lastComplete.year;
       const adjustedStartMonth = startMonth < 1 ? startMonth + 12 : startMonth;
@@ -160,7 +173,7 @@ export function getUTCDateRange(
     }
     
     case 'last-6-months': {
-      const lastComplete = getLastCompleteMonthUTC();
+      // Last 6 complete calendar months (rolling window)
       const startMonth = lastComplete.month - 5;
       const startYear = startMonth < 1 ? lastComplete.year - 1 : lastComplete.year;
       const adjustedStartMonth = startMonth < 1 ? startMonth + 12 : startMonth;
@@ -170,37 +183,49 @@ export function getUTCDateRange(
       return { startDate: start, endDate: end };
     }
     
-    case 'this-quarter': {
-      const quarterStartMonth = Math.floor((currentMonth - 1) / 3) * 3 + 1;
-      const start = getUTCMonthStart(currentYear, quarterStartMonth);
-      const end = referenceDate;
-      return { startDate: start, endDate: end };
-    }
-    
-    case 'last-quarter': {
-      const currentQuarterStartMonth = Math.floor((currentMonth - 1) / 3) * 3 + 1;
-      const lastQuarterStartMonth = currentQuarterStartMonth - 3;
+    case 'last-12-months': {
+      // Last 12 complete calendar months (rolling window)
+      // This matches the frontend's "Last 12 Months" preset
+      const startMonth = lastComplete.month - 11;
+      const startYear = startMonth < 1 ? lastComplete.year - 1 : lastComplete.year;
+      const adjustedStartMonth = startMonth < 1 ? startMonth + 12 : startMonth;
       
-      let quarterYear = currentYear;
-      let adjustedQuarterStartMonth = lastQuarterStartMonth;
-      
-      if (lastQuarterStartMonth < 1) {
-        quarterYear = currentYear - 1;
-        adjustedQuarterStartMonth = lastQuarterStartMonth + 12;
-      }
-      
-      const start = getUTCMonthStart(quarterYear, adjustedQuarterStartMonth);
-      const endMonth = adjustedQuarterStartMonth + 3;
-      const endYear = endMonth > 12 ? quarterYear + 1 : quarterYear;
-      const adjustedEndMonth = endMonth > 12 ? endMonth - 12 : endMonth;
-      const end = getUTCMonthStart(endYear, adjustedEndMonth);
-      
+      const start = getUTCMonthStart(startYear, adjustedStartMonth);
+      const end = getUTCNextMonthStart(lastComplete.year, lastComplete.month);
       return { startDate: start, endDate: end };
     }
     
     case 'this-year': {
+      // January 1 of current year through last complete month
+      // CRITICAL: Always starts at Jan 1, never December of previous year
+      // This fixes the December-anchoring bug
       const start = getUTCYearStart(currentYear);
-      const lastComplete = getLastCompleteMonthUTC();
+      const end = getUTCNextMonthStart(lastComplete.year, lastComplete.month);
+      return { startDate: start, endDate: end };
+    }
+    
+    case 'last-year': {
+      // Full previous calendar year (Jan 1 - Dec 31)
+      const start = getUTCYearStart(currentYear - 1);
+      const end = getUTCYearStart(currentYear);
+      return { startDate: start, endDate: end };
+    }
+    
+    // ===== Legacy presets (maintained for backward compatibility) =====
+    
+    case 'current-month': {
+      const start = getUTCMonthStart(currentYear, currentMonth);
+      const end = getUTCNextMonthStart(currentYear, currentMonth);
+      return { startDate: start, endDate: end };
+    }
+    
+    case 'last-3-months': {
+      // Legacy alias for 'last-quarter' 
+      const startMonth = lastComplete.month - 2;
+      const startYear = startMonth < 1 ? lastComplete.year - 1 : lastComplete.year;
+      const adjustedStartMonth = startMonth < 1 ? startMonth + 12 : startMonth;
+      
+      const start = getUTCMonthStart(startYear, adjustedStartMonth);
       const end = getUTCNextMonthStart(lastComplete.year, lastComplete.month);
       return { startDate: start, endDate: end };
     }
@@ -211,13 +236,8 @@ export function getUTCDateRange(
       return { startDate: start, endDate: end };
     }
     
-    case 'last-year': {
-      const start = getUTCYearStart(currentYear - 1);
-      const end = getUTCYearStart(currentYear);
-      return { startDate: start, endDate: end };
-    }
-    
     default: {
+      // Default to current month
       const start = getUTCMonthStart(currentYear, currentMonth);
       const end = getUTCNextMonthStart(currentYear, currentMonth);
       return { startDate: start, endDate: end };
