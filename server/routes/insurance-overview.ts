@@ -67,7 +67,7 @@ const router = Router();
  */
 router.get("/analytics", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const preset = (req.query.preset as string) || 'current-month';
+    const preset = (req.query.preset as string) || 'last-month';
     
     let start: Date;
     let end: Date;
