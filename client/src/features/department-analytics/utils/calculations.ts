@@ -22,7 +22,9 @@ export interface DepartmentMetrics {
 
 export interface MonthlyTrendData {
   month: string;
-  date: Date;
+  fullMonth?: string;
+  year: number;
+  monthNum: number;
   revenue: number;
   departmentBreakdown: Record<string, number>;
 }
@@ -217,16 +219,38 @@ export function formatSSP(amount: number, compact: boolean = false): string {
 }
 
 /**
- * Safely format a date string to a readable format
+ * Safely format a month to a readable format
+ * Can accept either a short month string or a MonthlyTrendData-like object
  */
-export function formatMonthSafely(dateString: string | null | undefined, formatPattern: string = 'MMM yyyy'): string {
-  if (!dateString) return '-';
+export function formatMonthSafely(
+  monthData: string | { month?: string; fullMonth?: string; year?: number; monthNum?: number } | null | undefined,
+  formatPattern: string = 'MMM yyyy'
+): string {
+  if (!monthData) return '-';
+  
   try {
-    const date = parseISO(dateString);
-    if (!isValid(date)) return '-';
-    return format(date, formatPattern);
+    // If it's a string, return it directly (already formatted like "Nov")
+    if (typeof monthData === 'string') {
+      return monthData;
+    }
+    
+    // If it's an object with fullMonth, use that for full format
+    if (monthData.fullMonth) {
+      return monthData.fullMonth;
+    }
+    
+    // If it's an object with year and monthNum, construct a date
+    if (monthData.year && monthData.monthNum) {
+      const date = new Date(monthData.year, monthData.monthNum - 1, 1);
+      if (isValid(date)) {
+        return format(date, formatPattern);
+      }
+    }
+    
+    // Fallback to month field
+    return monthData.month || '-';
   } catch (err) {
-    console.warn(`Failed to format date: ${dateString}`, err);
+    console.warn(`Failed to format month:`, monthData, err);
     return '-';
   }
 }
