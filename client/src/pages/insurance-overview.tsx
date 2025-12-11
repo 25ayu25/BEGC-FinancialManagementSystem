@@ -4,11 +4,31 @@
  * Read-only analytics dashboard showing insurance revenue insights.
  * Fetches data from transactions table where type='income' and currency='USD'.
  * 
+ * ==========================================
+ * DATE FILTER IMPLEMENTATION - IMPORTANT
+ * ==========================================
+ * This page now uses the CANONICAL date range logic from @/lib/dateRanges.ts,
+ * which is the same logic used by Trends and Department Analytics pages.
+ * 
+ * Prior to this fix, Insurance Overview used a bespoke date calculation in
+ * utcDateUtils.ts which had inconsistencies causing:
+ * - "This Year" and "Year to Date" to show December-anchored ranges
+ * - Off-by-one month errors in various presets
+ * 
+ * The canonical dateRanges.ts logic ensures:
+ * - "This Year": January 1 of current year → last complete month
+ * - "Last Year": Full previous calendar year (Jan 1 → Dec 31)
+ * - "Last 6 Months": Rolling 6-month window of complete months
+ * - "Last 12 Months": Rolling 12-month window of complete months
+ * 
+ * All date calculations are done consistently across all analytics pages.
+ * ==========================================
+ * 
  * Features:
  * - Revenue Overview Card (Total Revenue, Active Providers, vs Last Month, Sparkline)
  * - Share by Provider Chart (Interactive donut chart + clickable legend)
  * - Provider Performance Cards (Top providers with rank, revenue, share, comparison)
- * - Independent filter dropdown (Current Month, Last Month, Last 3 Months, YTD, etc.)
+ * - Independent filter dropdown (Last Month, Last Quarter, Last 6 Months, etc.)
  * - Mobile-first responsive design
  * - Smooth animations and micro-interactions
  * - Loading skeleton states
@@ -21,8 +41,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
-import { getDateRange, type RangeKey } from "@/lib/dateRanges";
-import { getUTCDateRange, formatDateForAPI, createUTCDate } from "@/lib/utcDateUtils";
+import { getDateRange, formatDateForAPI, type RangeKey } from "@/lib/dateRanges";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
@@ -66,17 +85,15 @@ interface AnalyticsData {
   }>;
 }
 
-type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'last-6-months' | 'this-quarter' | 'last-quarter' | 'this-year' | 'ytd' | 'last-year' | 'custom';
+// Use canonical date range keys from dateRanges.ts for consistency with Trends and Department Analytics
+type FilterPreset = RangeKey | 'custom';
 
 const filterOptions: Array<{ value: FilterPreset; label: string }> = [
-  { value: 'current-month', label: 'Current Month' },
   { value: 'last-month', label: 'Last Month' },
-  { value: 'last-3-months', label: 'Last 3 Months' },
-  { value: 'last-6-months', label: 'Last 6 Months' },
-  { value: 'this-quarter', label: 'This Quarter' },
   { value: 'last-quarter', label: 'Last Quarter' },
+  { value: 'last-6-months', label: 'Last 6 Months' },
+  { value: 'last-12-months', label: 'Last 12 Months' },
   { value: 'this-year', label: 'This Year' },
-  { value: 'ytd', label: 'Year to Date' },
   { value: 'last-year', label: 'Last Year' },
   { value: 'custom', label: 'Custom Range' },
 ];
@@ -132,30 +149,21 @@ export default function InsuranceOverview() {
     ],
   });
 
-  // Helper function to calculate date ranges in UTC on frontend
-  // This ensures consistent date boundaries regardless of local timezone
-  // All dates are calculated and sent to backend in UTC to prevent off-by-one errors
+  // Helper function to calculate date ranges using canonical dateRanges.ts logic
+  // This ensures Insurance Overview uses the same date logic as Trends and Department Analytics
   const calculateDateRange = (preset: FilterPreset, providedStartDate?: Date, providedEndDate?: Date): { startDate?: Date; endDate?: Date } => {
-    // Use provided dates for custom ranges (already in local time, will be converted to UTC for API)
+    // Use provided dates for custom ranges
     if (providedStartDate && providedEndDate) {
-      // Convert local dates to UTC dates at midnight
-      const startYear = providedStartDate.getFullYear();
-      const startMonth = providedStartDate.getMonth() + 1; // 1-indexed
-      const startDay = providedStartDate.getDate();
-      const endYear = providedEndDate.getFullYear();
-      const endMonth = providedEndDate.getMonth() + 1; // 1-indexed
-      const endDay = providedEndDate.getDate();
-      
       return { 
-        startDate: createUTCDate(startYear, startMonth, startDay),
-        endDate: createUTCDate(endYear, endMonth, endDay)
+        startDate: providedStartDate,
+        endDate: providedEndDate
       };
     }
     
-    // Use UTC date range calculator for all presets
-    // This ensures consistent date boundaries across all timezones
-    const { startDate, endDate } = getUTCDateRange(preset, now);
-    return { startDate, endDate };
+    // Use canonical date range calculator from dateRanges.ts
+    // This ensures consistent date boundaries with Trends and Department Analytics pages
+    const range = getDateRange(preset as RangeKey, now);
+    return { startDate: range.startDate, endDate: range.endDate };
   };
 
   const fetchAnalytics = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
@@ -613,11 +621,8 @@ export default function InsuranceOverview() {
   }
 
   // Determine whether to show projection based on the selected filter
-  // Hide projection for:
-  // - current-month: visually confusing and speculative with sparse data (per requirements)
-  // - last-month, last-year, last-quarter: completed historical periods
-  // - last-3-months, last-6-months: completed historical periods
-  const showProjection = !['current-month', 'last-month', 'last-year', 'last-quarter', 'last-3-months', 'last-6-months'].includes(selectedFilter);
+  // Hide projection for completed historical periods
+  const showProjection = !['last-month', 'last-year', 'last-quarter', 'last-6-months', 'last-12-months'].includes(selectedFilter);
 
   return (
     <div className={fadeIn}>

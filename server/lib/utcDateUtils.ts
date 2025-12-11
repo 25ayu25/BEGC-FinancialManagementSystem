@@ -4,6 +4,12 @@
  * Server-side date handling utilities that enforce UTC timezone for consistent
  * date filtering. This mirrors the client-side utilities to ensure consistency.
  * 
+ * ⚠️ IMPORTANT - DATE RANGE CALCULATION:
+ * The getUTCDateRange() function below is primarily used as a fallback when
+ * clients don't send explicit date parameters. In most cases, the frontend
+ * calculates date ranges using the canonical @/lib/dateRanges.ts and sends
+ * explicit startDate/endDate parameters, which is the preferred approach.
+ * 
  * Key Principles:
  * 1. All date calculations must be done in UTC
  * 2. Parse YYYY-MM-DD strings as UTC dates
