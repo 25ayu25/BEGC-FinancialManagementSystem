@@ -169,7 +169,7 @@ export function RevenueOverviewCard({
                 <div>
                   <p className="text-xs text-gray-600 mb-0.5">Best Performing Month</p>
                   <p className="text-sm font-semibold text-gray-900">
-                    {format(new Date(bestMonth.month), 'MMMM yyyy')}
+                    {format(typeof bestMonth.month === 'string' ? new Date(bestMonth.month) : bestMonth.month, 'MMMM yyyy')}
                   </p>
                   <p className="text-lg font-bold text-yellow-700">
                     {formatCurrency(bestMonth.revenue)}
