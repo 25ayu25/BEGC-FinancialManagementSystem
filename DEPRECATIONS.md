@@ -12,6 +12,16 @@ This document tracks features that have been deprecated or removed from the Bahr
 
 Insurance Overview v1 was an analytics page that provided aggregate views of insurance-related financial data. Despite more than 15 pull requests attempting to fix date filter behavior (particularly for presets like "This Year"), the page remained unreliable and caused repeated regressions.
 
+**Technical Issues:**
+- **Timezone handling inconsistencies:** UTC vs local time calculations causing off-by-one month errors
+- **December-anchoring bug:** "This Year" filter incorrectly starting in December of previous year instead of January
+- **Rolling window edge cases:** Last N months calculations failing at year boundaries
+- **Database query date leakage:** GROUP BY operations returning months outside requested date range
+- **Frontend-backend misalignment:** Different date calculation logic between client and server
+- **State management complexity:** Multiple sources of truth for date filtering causing synchronization issues
+
+After 15+ fix attempts addressing various aspects of the problem, the fundamental architecture proved too fragile for reliable date filtering.
+
 ### Impact
 
 - **Frontend:** Removed `/insurance-overview` route, page component, and all related UI components
