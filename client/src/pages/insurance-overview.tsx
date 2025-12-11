@@ -428,7 +428,7 @@ export default function InsuranceOverview() {
                     mode="single"
                     selected={customDateRange.start}
                     onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
-                    disabled={(date) => date > new Date()}
+                    disabled={(date) => date > now}
                     initialFocus
                   />
                 </PopoverContent>
@@ -457,8 +457,7 @@ export default function InsuranceOverview() {
                     onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
                     initialFocus
                     disabled={(date) => {
-                      const today = new Date();
-                      if (date > today) return true;
+                      if (date > now) return true;
                       if (customDateRange.start && date < customDateRange.start) return true;
                       return false;
                     }}
