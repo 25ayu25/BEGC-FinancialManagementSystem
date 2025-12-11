@@ -80,6 +80,39 @@ export function RevenueTrendChart({
     label: format(typeof point.month === 'string' ? new Date(point.month) : point.month, dateFormat)
   }));
 
+  // Get period label showing exact date range
+  const getPeriodLabel = () => {
+    if (!chartData.length) return '';
+    const first = chartData[0].month;
+    const last = chartData[chartData.length - 1].month;
+    return `${format(first, 'MMMM yyyy')} – ${format(last, 'MMMM yyyy')}`;
+  };
+
+  // Calculate growth metrics
+  const getGrowthMetrics = () => {
+    if (chartData.length < 2) return null;
+    
+    const firstMonthRevenue = chartData[0]?.revenue || 0;
+    const lastMonthRevenue = chartData[chartData.length - 1]?.revenue || 0;
+    const periodGrowth = firstMonthRevenue > 0 
+      ? ((lastMonthRevenue - firstMonthRevenue) / firstMonthRevenue) * 100 
+      : 0;
+
+    const bestMonth = chartData.reduce((max, curr) => 
+      curr.revenue > max.revenue ? curr : max, chartData[0]);
+
+    const totalRevenue = chartData.reduce((sum, d) => sum + d.revenue, 0);
+    const avgRevenue = totalRevenue / chartData.length;
+
+    return {
+      periodGrowth,
+      bestMonth,
+      avgRevenue
+    };
+  };
+
+  const growthMetrics = getGrowthMetrics();
+
   // Calculate trend line (linear regression)
   const calculateTrendLine = () => {
     if (chartData.length < 2) return null;
@@ -154,8 +187,13 @@ export function RevenueTrendChart({
       
       <div className="relative z-10">
         {/* Header with Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            {chartData.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">{getPeriodLabel()}</p>
+            )}
+          </div>
           
           <div className="flex items-center gap-2 flex-wrap">
             {/* Chart Type Selector */}
@@ -216,6 +254,30 @@ export function RevenueTrendChart({
             )}
           </div>
         </div>
+
+        {/* Growth Metrics Card */}
+        {!showProviderBreakdown && growthMetrics && chartData.length >= 2 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+            <div className="bg-white/50 rounded-lg p-3 border border-gray-200/60">
+              <span className="text-gray-600 block mb-1">Period Growth</span>
+              <span className={`text-lg font-semibold ${growthMetrics.periodGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {growthMetrics.periodGrowth >= 0 ? '+' : ''}{growthMetrics.periodGrowth.toFixed(1)}%
+              </span>
+            </div>
+            <div className="bg-white/50 rounded-lg p-3 border border-gray-200/60">
+              <span className="text-gray-600 block mb-1">Best Month</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {format(growthMetrics.bestMonth.month, 'MMM yyyy')}
+              </span>
+            </div>
+            <div className="bg-white/50 rounded-lg p-3 border border-gray-200/60">
+              <span className="text-gray-600 block mb-1">Monthly Avg</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {formatCurrency(growthMetrics.avgRevenue)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Chart */}
         <div className="h-80">
