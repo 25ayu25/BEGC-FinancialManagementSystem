@@ -133,6 +133,8 @@ export default function InsuranceOverview() {
 
   // Helper function to calculate date ranges on frontend with stable timestamp
   // This prevents timezone-related off-by-one errors when the backend calculates ranges
+  // Only calculates explicit dates for timezone-sensitive presets ('this-year', 'ytd', 'last-year')
+  // Other presets (like 'current-month', 'last-3-months') are handled correctly by the backend
   const calculateDateRange = (preset: FilterPreset, providedStartDate?: Date, providedEndDate?: Date): { startDate?: Date; endDate?: Date } => {
     // Use provided dates for custom ranges
     if (providedStartDate && providedEndDate) {
