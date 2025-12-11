@@ -87,17 +87,12 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
     }
     case 'this-year': {
       // For "This Year": January 1 of current year through last complete month
-      // Special case: If we're in January, there is no complete month yet in current year,
-      // so we return no data by setting end before start (will be handled by empty result)
+      // Special case: If we're in January, there are no complete months yet,
+      // so we include partial January data by using today as the end date
       const start = new Date(currentYear, 0, 1);
       
-      // Calculate last complete month
-      // If current month is January (0), last complete month is December of previous year
-      // But since we want "This Year" to show current year only, we handle this edge case
       if (currentMonth === 0) {
-        // In January, there are no complete months yet in the current year
-        // Return a range that will result in no data (or just January so far)
-        // Use current date as end to include partial January data
+        // In January, include partial month data (Jan 1 to today)
         const end = now;
         return { start, end };
       }
