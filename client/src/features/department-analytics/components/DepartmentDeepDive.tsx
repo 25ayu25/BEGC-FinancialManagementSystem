@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { X, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DepartmentMetrics } from "../utils/calculations";
-import { formatSSP } from "../utils/calculations";
-import { format } from "date-fns";
+import { formatSSP, formatMonthSafely } from "../utils/calculations";
 import {
   ResponsiveContainer,
   LineChart,
@@ -30,7 +29,7 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
   if (!department) return null;
 
   const chartData = department.monthlyData.map(d => ({
-    month: format(new Date(d.month), 'MMM yyyy'),
+    month: formatMonthSafely(d.month),
     revenue: d.revenue,
   }));
 
@@ -171,7 +170,7 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
                       >
                         <td className="py-2 px-3 text-sm text-gray-900">
                           <div className="flex items-center gap-2">
-                            {format(new Date(month.month), 'MMM yyyy')}
+                            {formatMonthSafely(month.month)}
                             {isHighlight && (
                               <span className="text-xs bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded font-semibold">
                                 BEST

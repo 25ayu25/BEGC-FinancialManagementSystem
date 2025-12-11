@@ -4,6 +4,8 @@
  * Utility functions for calculating department metrics, rankings, trends, and insights
  */
 
+import { format, isValid, parseISO } from 'date-fns';
+
 export interface DepartmentMetrics {
   id: string;
   name: string;
@@ -212,6 +214,21 @@ export function formatSSP(amount: number, compact: boolean = false): string {
     }
   }
   return Math.round(amount).toLocaleString();
+}
+
+/**
+ * Safely format a date string to a readable format
+ */
+export function formatMonthSafely(dateString: string | null | undefined, formatPattern: string = 'MMM yyyy'): string {
+  if (!dateString) return '-';
+  try {
+    const date = parseISO(dateString);
+    if (!isValid(date)) return '-';
+    return format(date, formatPattern);
+  } catch (err) {
+    console.warn(`Failed to format date: ${dateString}`, err);
+    return '-';
+  }
 }
 
 /**

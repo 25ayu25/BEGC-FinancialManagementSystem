@@ -18,9 +18,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DepartmentMetrics } from "../utils/calculations";
-import { formatSSP } from "../utils/calculations";
+import { formatSSP, formatMonthSafely } from "../utils/calculations";
 import { useState } from "react";
-import { format } from "date-fns";
 
 interface DepartmentComparisonTableProps {
   metrics: DepartmentMetrics[];
@@ -222,7 +221,7 @@ export function DepartmentComparisonTable({ metrics, onDepartmentClick }: Depart
                     {dept.bestMonth ? (
                       <div className="text-sm">
                         <div className="text-gray-900 font-medium">
-                          {format(new Date(dept.bestMonth.month), 'MMM yyyy')}
+                          {formatMonthSafely(dept.bestMonth.month)}
                         </div>
                         <div className="text-xs text-gray-500 tabular-nums">
                           SSP {formatSSP(dept.bestMonth.revenue, true)}
