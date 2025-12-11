@@ -4,11 +4,31 @@
  * Read-only analytics dashboard showing insurance revenue insights.
  * Fetches data from transactions table where type='income' and currency='USD'.
  * 
+ * ==========================================
+ * DATE FILTER IMPLEMENTATION - IMPORTANT
+ * ==========================================
+ * This page now uses the CANONICAL date range logic from @/lib/dateRanges.ts,
+ * which is the same logic used by Trends and Department Analytics pages.
+ * 
+ * Prior to this fix, Insurance Overview used a bespoke date calculation in
+ * utcDateUtils.ts which had inconsistencies causing:
+ * - "This Year" and "Year to Date" to show December-anchored ranges
+ * - Off-by-one month errors in various presets
+ * 
+ * The canonical dateRanges.ts logic ensures:
+ * - "This Year": January 1 of current year → last complete month
+ * - "Last Year": Full previous calendar year (Jan 1 → Dec 31)
+ * - "Last 6 Months": Rolling 6-month window of complete months
+ * - "Last 12 Months": Rolling 12-month window of complete months
+ * 
+ * All date calculations are done consistently across all analytics pages.
+ * ==========================================
+ * 
  * Features:
  * - Revenue Overview Card (Total Revenue, Active Providers, vs Last Month, Sparkline)
  * - Share by Provider Chart (Interactive donut chart + clickable legend)
  * - Provider Performance Cards (Top providers with rank, revenue, share, comparison)
- * - Independent filter dropdown (Current Month, Last Month, Last 3 Months, YTD, etc.)
+ * - Independent filter dropdown (Last Month, Last Quarter, Last 6 Months, etc.)
  * - Mobile-first responsive design
  * - Smooth animations and micro-interactions
  * - Loading skeleton states

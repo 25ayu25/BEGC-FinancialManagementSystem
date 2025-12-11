@@ -1,8 +1,27 @@
 /**
- * Centralized Date Range Helper
+ * Centralized Date Range Helper - CANONICAL SOURCE OF TRUTH
  * 
- * Provides canonical date range definitions for consistent date filtering
- * across the application, particularly for the Trends & Comparisons page.
+ * This module provides the OFFICIAL date range definitions that MUST be used
+ * consistently across ALL analytics pages in the application:
+ * - Trends & Comparisons page (dashboard.tsx)
+ * - Department Analytics page (department-analytics.tsx)
+ * - Insurance Overview page (insurance-overview.tsx)
+ * 
+ * DO NOT create alternative date calculation logic elsewhere. All pages should
+ * import and use getDateRange() from this module to ensure consistent behavior.
+ * 
+ * Historical Context:
+ * Prior implementations used various bespoke date calculation approaches
+ * (e.g., utcDateUtils.ts) which caused inconsistencies and bugs such as:
+ * - December-anchored "This Year" ranges instead of January-anchored
+ * - Off-by-one month errors in rolling windows
+ * - Inconsistent behavior between different analytics pages
+ * 
+ * This canonical implementation fixes those issues by:
+ * - Using "complete months" as the atomic unit (never partial months)
+ * - "This Year" always starts January 1 and goes to last complete month
+ * - "Last Year" is always the full previous calendar year (Jan-Dec)
+ * - Rolling windows (6/12 months) count backwards from last complete month
  */
 
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";

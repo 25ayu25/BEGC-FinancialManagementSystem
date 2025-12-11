@@ -5,6 +5,17 @@
  * date filtering across frontend and backend. This prevents timezone-related
  * off-by-one errors in date range queries.
  * 
+ * ⚠️ IMPORTANT - DATE RANGE CALCULATION:
+ * For date range preset calculations (e.g., "This Year", "Last 6 Months"), 
+ * use the canonical @/lib/dateRanges.ts module instead of getUTCDateRange() below.
+ * The dateRanges.ts module is the source of truth used by all analytics pages
+ * and ensures consistent behavior across the application.
+ * 
+ * This module should primarily be used for:
+ * - UTC date construction (createUTCDate, getUTCMonthStart, etc.)
+ * - Date parsing and formatting (parseUTCDate, formatDateForAPI)
+ * - Low-level UTC date operations
+ * 
  * Key Principles:
  * 1. All date calculations for API queries must be done in UTC
  * 2. Date strings sent to backend must be timezone-agnostic (YYYY-MM-DD)
