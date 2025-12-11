@@ -17,7 +17,7 @@
  * @module InsuranceOverview
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
@@ -80,6 +80,10 @@ const filterOptions: Array<{ value: FilterPreset; label: string }> = [
 ];
 
 export default function InsuranceOverview() {
+  // Stable timestamp for consistent date calculations across the component lifecycle
+  // Memoized with empty dependency array to ensure it's created once per component mount
+  const now = useMemo(() => new Date(), []);
+  
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -424,7 +428,7 @@ export default function InsuranceOverview() {
                     mode="single"
                     selected={customDateRange.start}
                     onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
-                    disabled={(date) => date > new Date()}
+                    disabled={(date) => date > now}
                     initialFocus
                   />
                 </PopoverContent>
@@ -453,8 +457,7 @@ export default function InsuranceOverview() {
                     onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
                     initialFocus
                     disabled={(date) => {
-                      const today = new Date();
-                      if (date > today) return true;
+                      if (date > now) return true;
                       if (customDateRange.start && date < customDateRange.start) return true;
                       return false;
                     }}
