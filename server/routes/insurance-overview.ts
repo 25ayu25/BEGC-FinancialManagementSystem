@@ -548,9 +548,9 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
         
         // Skip transaction outside date range - this prevents data leakage from edge months
-        if (!monthMap.has(key)) continue;
-        
         const monthData = monthMap.get(key);
+        if (!monthData) continue;
+        
         monthData.revenue += Number(row.amount);
       }
       
@@ -598,9 +598,9 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
         
         // Skip transaction outside date range - this prevents data leakage from edge months
-        if (!monthMap.has(key)) continue;
-        
         const monthData = monthMap.get(key);
+        if (!monthData) continue;
+        
         monthData.revenue += Number(row.amount);
       }
       
