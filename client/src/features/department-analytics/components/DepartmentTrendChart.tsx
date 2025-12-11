@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { DepartmentMetrics, MonthlyTrendData } from "../utils/calculations";
 import { formatSSP } from "../utils/calculations";
 import { useState, useMemo } from "react";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import {
   ResponsiveContainer,
   LineChart as RechartsLineChart,
@@ -52,8 +52,19 @@ export function DepartmentTrendChart({ metrics, trendData }: DepartmentTrendChar
 
   const chartData = useMemo(() => {
     return trendData.map(monthData => {
+      // Safely parse and format the month
+      let formattedMonth = '-';
+      try {
+        const date = parseISO(monthData.month);
+        if (isValid(date)) {
+          formattedMonth = format(date, 'MMM yyyy');
+        }
+      } catch (err) {
+        console.warn(`Failed to format date: ${monthData.month}`, err);
+      }
+      
       const dataPoint: any = {
-        month: format(new Date(monthData.month), 'MMM yyyy'),
+        month: formattedMonth,
         date: monthData.month,
       };
 

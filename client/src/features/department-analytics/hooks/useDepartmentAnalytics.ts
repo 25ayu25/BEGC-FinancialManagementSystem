@@ -22,8 +22,23 @@ import {
   subYears,
   startOfQuarter,
   endOfQuarter,
-  format
+  format,
+  isValid,
+  parseISO
 } from "date-fns";
+
+/**
+ * Safely parse a date string and validate it
+ */
+function parseDateSafely(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null;
+  try {
+    const date = parseISO(dateString);
+    return isValid(date) ? date : null;
+  } catch {
+    return null;
+  }
+}
 
 export type FilterPreset = 
   | 'this-year' 
@@ -132,12 +147,21 @@ export function useDepartmentAnalytics(
         departmentBreakdown?: Record<string, number>;
       }>;
       
-      return data.map(item => ({
-        month: item.month,
-        date: new Date(item.month),
-        revenue: item.revenue,
-        departmentBreakdown: item.departmentBreakdown || {},
-      })) as MonthlyTrendData[];
+      return data
+        .map(item => {
+          const parsedDate = parseDateSafely(item.month);
+          if (!parsedDate) {
+            console.warn(`Invalid date in trend data: ${item.month}`);
+            return null;
+          }
+          return {
+            month: item.month,
+            date: parsedDate,
+            revenue: item.revenue,
+            departmentBreakdown: item.departmentBreakdown || {},
+          };
+        })
+        .filter((item): item is MonthlyTrendData => item !== null);
     },
     enabled: !!dateRange.startDate && !!dateRange.endDate,
   });
@@ -159,12 +183,21 @@ export function useDepartmentAnalytics(
         departmentBreakdown?: Record<string, number>;
       }>;
       
-      return data.map(item => ({
-        month: item.month,
-        date: new Date(item.month),
-        revenue: item.revenue,
-        departmentBreakdown: item.departmentBreakdown || {},
-      })) as MonthlyTrendData[];
+      return data
+        .map(item => {
+          const parsedDate = parseDateSafely(item.month);
+          if (!parsedDate) {
+            console.warn(`Invalid date in previous trend data: ${item.month}`);
+            return null;
+          }
+          return {
+            month: item.month,
+            date: parsedDate,
+            revenue: item.revenue,
+            departmentBreakdown: item.departmentBreakdown || {},
+          };
+        })
+        .filter((item): item is MonthlyTrendData => item !== null);
     },
     enabled: !!prevDateRange.startDate && !!prevDateRange.endDate,
   });
