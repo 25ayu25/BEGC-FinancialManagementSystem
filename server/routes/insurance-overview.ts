@@ -29,6 +29,13 @@ const router = Router();
 /* ------------------------------------------------------------------ */
 
 /**
+ * Get the first day of the month for a given date in UTC
+ */
+function getMonthStart(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+/**
  * Calculate date range based on preset filter
  */
 function calculateDateRange(preset: string): { start: Date; end: Date } {
@@ -438,11 +445,6 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
       // 2. Initialize ONLY the months in the requested range
       const monthMap = new Map<string, any>();
       
-      // Helper to get first day of month
-      const getMonthStart = (date: Date) => {
-        return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-      };
-      
       // Get month boundaries
       const startMonth = getMonthStart(start);
       const endMonth = getMonthStart(end);
@@ -463,7 +465,8 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         const txDate = new Date(row.date);
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
         
-        if (!monthMap.has(key)) continue; // Skip transactions outside requested range
+        // Skip transaction outside date range - this prevents data leakage from edge months
+        if (!monthMap.has(key)) continue;
         
         const monthData = monthMap.get(key);
         monthData[row.provider_name] = (monthData[row.provider_name] || 0) + Number(row.amount);
@@ -505,11 +508,6 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
       // 2. Initialize ONLY the months in the requested range
       const monthMap = new Map<string, { month: Date; revenue: number }>();
       
-      // Helper to get first day of month
-      const getMonthStart = (date: Date) => {
-        return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-      };
-      
       // Get month boundaries
       const startMonth = getMonthStart(start);
       const endMonth = getMonthStart(end);
@@ -530,10 +528,11 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         const txDate = new Date(row.date);
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
         
+        // Skip transaction outside date range - this prevents data leakage from edge months
+        if (!monthMap.has(key)) continue;
+        
         const monthData = monthMap.get(key);
-        if (monthData) {
-          monthData.revenue += Number(row.amount);
-        }
+        monthData.revenue += Number(row.amount);
       }
       
       // 4. Convert to array and sort
@@ -559,11 +558,6 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
       // 2. Initialize ONLY the months in the requested range
       const monthMap = new Map<string, { month: Date; revenue: number }>();
       
-      // Helper to get first day of month
-      const getMonthStart = (date: Date) => {
-        return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-      };
-      
       // Get month boundaries
       const startMonth = getMonthStart(start);
       const endMonth = getMonthStart(end);
@@ -584,11 +578,10 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         const txDate = new Date(row.date);
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
         
-        const monthData = monthMap.get(key);
-        if (!monthData) {
-          continue; // Skip transactions outside requested range
-        }
+        // Skip transaction outside date range - this prevents data leakage from edge months
+        if (!monthMap.has(key)) continue;
         
+        const monthData = monthMap.get(key);
         monthData.revenue += Number(row.amount);
       }
       

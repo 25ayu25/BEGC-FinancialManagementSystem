@@ -94,9 +94,18 @@ export function RevenueTrendChart({
     
     const firstMonthRevenue = chartData[0]?.revenue || 0;
     const lastMonthRevenue = chartData[chartData.length - 1]?.revenue || 0;
-    const periodGrowth = firstMonthRevenue > 0 
-      ? ((lastMonthRevenue - firstMonthRevenue) / firstMonthRevenue) * 100 
-      : 0;
+    
+    // Handle edge case: if firstMonth is 0 but lastMonth is positive, show as "New"
+    let periodGrowth: number | null = null;
+    let growthLabel: string | null = null;
+    
+    if (firstMonthRevenue === 0 && lastMonthRevenue > 0) {
+      growthLabel = 'New'; // New revenue stream
+    } else if (firstMonthRevenue > 0) {
+      periodGrowth = ((lastMonthRevenue - firstMonthRevenue) / firstMonthRevenue) * 100;
+    } else {
+      periodGrowth = 0;
+    }
 
     const bestMonth = chartData.reduce((max, curr) => 
       curr.revenue > max.revenue ? curr : max, chartData[0]);
@@ -106,6 +115,7 @@ export function RevenueTrendChart({
 
     return {
       periodGrowth,
+      growthLabel,
       bestMonth,
       avgRevenue
     };
@@ -260,9 +270,18 @@ export function RevenueTrendChart({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
             <div className="bg-white/50 rounded-lg p-3 border border-gray-200/60">
               <span className="text-gray-600 block mb-1">Period Growth</span>
-              <span className={`text-lg font-semibold ${growthMetrics.periodGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {growthMetrics.periodGrowth >= 0 ? '+' : ''}{growthMetrics.periodGrowth.toFixed(1)}%
-              </span>
+              {growthMetrics.growthLabel ? (
+                <span className="text-lg font-semibold text-blue-600">
+                  {growthMetrics.growthLabel}
+                </span>
+              ) : (
+                <span className={`text-lg font-semibold flex items-center gap-1 ${
+                  (growthMetrics.periodGrowth ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {(growthMetrics.periodGrowth ?? 0) >= 0 ? '↑' : '↓'}
+                  {(growthMetrics.periodGrowth ?? 0) >= 0 ? '+' : ''}{(growthMetrics.periodGrowth ?? 0).toFixed(1)}%
+                </span>
+              )}
             </div>
             <div className="bg-white/50 rounded-lg p-3 border border-gray-200/60">
               <span className="text-gray-600 block mb-1">Best Month</span>
