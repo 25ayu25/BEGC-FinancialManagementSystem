@@ -86,13 +86,25 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
       return { start, end };
     }
     case 'this-year': {
+      // For "This Year": January 1 of current year through last complete month
+      // Special case: If we're in January, there is no complete month yet in current year,
+      // so we return no data by setting end before start (will be handled by empty result)
       const start = new Date(currentYear, 0, 1);
       
-      // Use LAST COMPLETE MONTH as end (not today)
-      // This matches Trends page behavior
-      const lastCompleteMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const lastCompleteYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-      const end = new Date(lastCompleteYear, lastCompleteMonth + 1, 0); // Last day of last complete month
+      // Calculate last complete month
+      // If current month is January (0), last complete month is December of previous year
+      // But since we want "This Year" to show current year only, we handle this edge case
+      if (currentMonth === 0) {
+        // In January, there are no complete months yet in the current year
+        // Return a range that will result in no data (or just January so far)
+        // Use current date as end to include partial January data
+        const end = now;
+        return { start, end };
+      }
+      
+      // For other months, use last complete month
+      const lastCompleteMonth = currentMonth - 1;
+      const end = new Date(currentYear, lastCompleteMonth + 1, 0); // Last day of last complete month
       
       return { start, end };
     }
@@ -151,17 +163,13 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
     let start: Date;
     let end: Date;
     
-    // Handle custom date range
-    if (preset === 'custom') {
-      const startDateParam = req.query.startDate as string;
-      const endDateParam = req.query.endDate as string;
-      
-      if (!startDateParam || !endDateParam) {
-        return res.status(400).json({ 
-          error: 'startDate and endDate are required for custom preset' 
-        });
-      }
-      
+    // Check if explicit dates are provided (from frontend date range calculation)
+    // The frontend may send explicit dates to ensure consistent timezone handling
+    const startDateParam = req.query.startDate as string | undefined;
+    const endDateParam = req.query.endDate as string | undefined;
+    
+    if (startDateParam && endDateParam) {
+      // Use explicit dates provided by frontend (handles all presets including 'this-year', 'ytd', etc.)
       start = new Date(startDateParam);
       end = new Date(endDateParam);
       
@@ -178,6 +186,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
         });
       }
     } else {
+      // Fall back to backend calculation if no explicit dates provided
       const dateRange = calculateDateRange(preset);
       start = dateRange.start;
       end = dateRange.end;
@@ -404,19 +413,29 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
     let start: Date;
     let end: Date;
     
-    if (preset === 'custom') {
-      const startDateParam = req.query.startDate as string;
-      const endDateParam = req.query.endDate as string;
+    // Check if explicit dates are provided (from frontend date range calculation)
+    const startDateParam = req.query.startDate as string | undefined;
+    const endDateParam = req.query.endDate as string | undefined;
+    
+    if (startDateParam && endDateParam) {
+      // Use explicit dates provided by frontend (handles all presets)
+      start = new Date(startDateParam);
+      end = new Date(endDateParam);
       
-      if (!startDateParam || !endDateParam) {
+      // Validate dates
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return res.status(400).json({ 
-          error: 'startDate and endDate are required for custom preset' 
+          error: 'Invalid date format. Use ISO date strings.' 
         });
       }
       
-      start = new Date(startDateParam);
-      end = new Date(endDateParam);
+      if (start > end) {
+        return res.status(400).json({ 
+          error: 'startDate must be before or equal to endDate' 
+        });
+      }
     } else {
+      // Fall back to backend calculation if no explicit dates provided
       const dateRange = calculateDateRange(preset);
       start = dateRange.start;
       end = dateRange.end;
