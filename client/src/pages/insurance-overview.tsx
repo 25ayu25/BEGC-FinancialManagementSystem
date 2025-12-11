@@ -41,6 +41,11 @@ interface AnalyticsData {
     totalRevenue: number;
     activeProviders: number;
     vsLastMonth: number;
+    avgRevenuePerProvider?: number;
+    projectedMonthlyTotal?: number | null;
+    ytdRevenue?: number;
+    bestMonth?: { month: Date | string; revenue: number } | null;
+    trendData?: number[];
   };
   providerShares: Array<{
     name: string;
@@ -57,12 +62,16 @@ interface AnalyticsData {
   }>;
 }
 
-type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'ytd' | 'last-year' | 'custom';
+type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'last-6-months' | 'this-quarter' | 'last-quarter' | 'this-year' | 'ytd' | 'last-year' | 'custom';
 
 const filterOptions: Array<{ value: FilterPreset; label: string }> = [
   { value: 'current-month', label: 'Current Month' },
   { value: 'last-month', label: 'Last Month' },
   { value: 'last-3-months', label: 'Last 3 Months' },
+  { value: 'last-6-months', label: 'Last 6 Months' },
+  { value: 'this-quarter', label: 'This Quarter' },
+  { value: 'last-quarter', label: 'Last Quarter' },
+  { value: 'this-year', label: 'This Year' },
   { value: 'ytd', label: 'Year to Date' },
   { value: 'last-year', label: 'Last Year' },
   { value: 'custom', label: 'Custom Range' },
@@ -86,6 +95,14 @@ export default function InsuranceOverview() {
       totalRevenue: 125750.50,
       activeProviders: 8,
       vsLastMonth: 12.5,
+      avgRevenuePerProvider: 15718.81,
+      projectedMonthlyTotal: 135000,
+      ytdRevenue: 1425000,
+      bestMonth: {
+        month: new Date(2024, 8, 1).toISOString(),
+        revenue: 145000
+      },
+      trendData: [95000, 102000, 118000, 125000, 145000, 138000, 142000, 135000, 128000, 125000, 123000, 125750]
     },
     providerShares: [
       { name: "Blue Cross", value: 45000, color: "#3b82f6" },
@@ -633,6 +650,11 @@ export default function InsuranceOverview() {
               totalRevenue={data.overview.totalRevenue}
               activeProviders={data.overview.activeProviders}
               vsLastMonth={data.overview.vsLastMonth}
+              avgRevenuePerProvider={data.overview.avgRevenuePerProvider}
+              projectedMonthlyTotal={data.overview.projectedMonthlyTotal}
+              ytdRevenue={data.overview.ytdRevenue}
+              bestMonth={data.overview.bestMonth}
+              trendData={data.overview.trendData}
             />
           </div>
 
