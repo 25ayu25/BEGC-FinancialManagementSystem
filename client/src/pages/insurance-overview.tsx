@@ -572,6 +572,13 @@ export default function InsuranceOverview() {
     );
   }
 
+  // Determine whether to show projection based on the selected filter
+  // Hide projection for:
+  // - current-month: visually confusing and speculative with sparse data (per requirements)
+  // - last-month, last-year, last-quarter: completed historical periods
+  // - last-3-months, last-6-months: completed historical periods
+  const showProjection = !['current-month', 'last-month', 'last-year', 'last-quarter', 'last-3-months', 'last-6-months'].includes(selectedFilter);
+
   return (
     <div className={fadeIn}>
       {/* Page Header with Filter - Mobile Responsive */}
@@ -747,6 +754,7 @@ export default function InsuranceOverview() {
               ytdRevenue={data.overview.ytdRevenue}
               bestMonth={data.overview.bestMonth}
               trendData={data.overview.trendData}
+              showProjection={showProjection}
             />
           </div>
 

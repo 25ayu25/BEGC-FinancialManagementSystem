@@ -13,6 +13,7 @@ interface RevenueOverviewCardProps {
   ytdRevenue?: number;
   bestMonth?: { month: Date | string; revenue: number } | null;
   trendData?: number[];
+  showProjection?: boolean; // Whether to display the Projected KPI
 }
 
 // Animated counter hook with faster, smoother animation
@@ -54,6 +55,7 @@ export function RevenueOverviewCard({
   ytdRevenue,
   bestMonth,
   trendData = [],
+  showProjection = true, // Default to true for backward compatibility
 }: RevenueOverviewCardProps) {
   const isPositive = vsLastMonth >= 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
@@ -135,7 +137,7 @@ export function RevenueOverviewCard({
           )}
 
           {/* Projected Monthly Total */}
-          {projectedMonthlyTotal !== null && projectedMonthlyTotal !== undefined && (
+          {showProjection && projectedMonthlyTotal !== null && projectedMonthlyTotal !== undefined && (
             <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 border border-amber-200/40 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <Target className="w-4 h-4 text-amber-600" />

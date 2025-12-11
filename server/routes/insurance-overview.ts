@@ -80,7 +80,7 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
     }
     case 'this-year': {
       const start = new Date(currentYear, 0, 1);
-      const end = new Date(currentYear, 11, 31);
+      const end = now; // Use today instead of Dec 31 for YTD consistency
       return { start, end };
     }
     case 'ytd': {
