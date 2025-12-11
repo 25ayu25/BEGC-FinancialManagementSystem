@@ -136,8 +136,9 @@ export default function InsuranceOverview() {
       return { startDate: providedStartDate, endDate: providedEndDate };
     }
     
-    // For 'this-year' and 'ytd' (which are equivalent in dateRanges.ts),
-    // calculate the range from January 1 of current year to last complete month
+    // For 'this-year' and 'ytd' presets: Both represent "year to date" functionality.
+    // We map both to the 'this-year' RangeKey when calling getDateRange, which
+    // calculates the range from January 1 of current year to last complete month
     if (preset === 'this-year' || preset === 'ytd') {
       const dateRange = getDateRange('this-year', now);
       return { startDate: dateRange.startDate, endDate: dateRange.endDate };
@@ -163,7 +164,8 @@ export default function InsuranceOverview() {
       // Calculate date range using helper function
       const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
       
-      // Pass calculated dates to API if available
+      // Pass calculated dates to API if available (fixes timezone bug)
+      // The API supports explicit dates for all presets, not just 'custom'
       if (effectiveStartDate && effectiveEndDate) {
         url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
@@ -206,7 +208,8 @@ export default function InsuranceOverview() {
         url += '&byProvider=true';
       }
       
-      // Pass calculated dates to API if available
+      // Pass calculated dates to API if available (fixes timezone bug)
+      // The API supports explicit dates for all presets, not just 'custom'
       if (effectiveStartDate && effectiveEndDate) {
         url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
