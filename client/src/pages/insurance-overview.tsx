@@ -133,20 +133,26 @@ export default function InsuranceOverview() {
 
   // Helper function to calculate date ranges on frontend with stable timestamp
   // This prevents timezone-related off-by-one errors when the backend calculates ranges
-  // Only calculates explicit dates for timezone-sensitive presets ('this-year', 'ytd', 'last-year')
-  // Other presets (like 'current-month', 'last-3-months') are handled correctly by the backend
+  // Sends explicit dates for timezone-sensitive presets to ensure consistency
   const calculateDateRange = (preset: FilterPreset, providedStartDate?: Date, providedEndDate?: Date): { startDate?: Date; endDate?: Date } => {
     // Use provided dates for custom ranges
     if (providedStartDate && providedEndDate) {
       return { startDate: providedStartDate, endDate: providedEndDate };
     }
     
-    // For 'this-year' and 'ytd' presets: Both represent "year to date" functionality.
-    // We map both to the 'this-year' RangeKey when calling getDateRange, which
-    // calculates the range from January 1 of current year to last complete month
-    if (preset === 'this-year' || preset === 'ytd') {
+    // For 'this-year': Show full year to date (up to last complete month)
+    // This excludes the current incomplete month for cleaner data visualization
+    if (preset === 'this-year') {
       const dateRange = getDateRange('this-year', now);
       return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+    
+    // For 'ytd': Show year to date including current incomplete month
+    // This is useful for real-time tracking of current year performance
+    if (preset === 'ytd') {
+      const startDate = new Date(now.getFullYear(), 0, 1); // January 1 of current year
+      const endDate = now; // Today
+      return { startDate, endDate };
     }
     
     // For 'last-year', calculate the full previous calendar year
