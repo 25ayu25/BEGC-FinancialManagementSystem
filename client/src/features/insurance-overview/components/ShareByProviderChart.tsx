@@ -3,7 +3,6 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from "rechar
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile } from "../hooks/useMediaQuery";
 import { formatCurrency } from "@/lib/currency";
-import { Trophy } from "lucide-react";
 
 interface ProviderShare {
   name: string;
@@ -40,11 +39,6 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
   // Filter out hidden providers
   const visibleData = chartData.filter((_, index) => !hiddenProviders.has(index));
   const total = visibleData.reduce((sum, item) => sum + item.value, 0);
-
-  // Find top performer (highest value)
-  const topPerformerIndex = chartData.reduce((maxIdx, item, idx, arr) => 
-    item.value > arr[maxIdx].value ? idx : maxIdx, 0
-  );
 
   // Toggle provider visibility
   const toggleProvider = (index: number) => {
@@ -152,12 +146,11 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
             </ResponsiveContainer>
           </div>
 
-          {/* Interactive Legend with TOP PERFORMER Badge */}
+          {/* Interactive Legend - Provider List */}
           <div className="w-full lg:w-1/2 space-y-2 sm:space-y-3">
             {chartData.map((item, index) => {
               const percentage = total > 0 ? (item.value / total) * 100 : 0;
               const isHidden = hiddenProviders.has(index);
-              const isTopPerformer = index === topPerformerIndex;
               
               return (
                 <button
@@ -167,8 +160,7 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
                     w-full flex items-center justify-between p-2 sm:p-3 rounded-lg
                     ${transitions.base}
                     ${isHidden ? 'opacity-40 bg-gray-50' : 'hover:bg-gray-50 hover:shadow-sm'}
-                    ${isTopPerformer && !isHidden ? 'ring-2 ring-yellow-300/50 bg-gradient-to-r from-yellow-50/50 to-amber-50/30' : ''}
-                    cursor-pointer group relative
+                    cursor-pointer group
                   `}
                 >
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -183,23 +175,15 @@ export function ShareByProviderChart({ data }: ShareByProviderChartProps) {
                         opacity: isHidden ? 0.3 : 1
                       }}
                     />
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-sm sm:text-base text-gray-700 truncate ${isHidden ? 'line-through' : ''}`}>
-                        {item.name}
-                      </span>
-                      {isTopPerformer && !isHidden && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 text-xs font-bold shadow-sm">
-                          <Trophy className="w-3 h-3" />
-                          TOP
-                        </span>
-                      )}
-                    </div>
+                    <span className={`text-sm sm:text-base text-gray-700 truncate ${isHidden ? 'line-through' : ''}`}>
+                      {item.name}
+                    </span>
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className={`text-sm sm:text-base font-semibold text-gray-900 ${isHidden ? 'opacity-50' : ''}`}>
                       {formatCurrency(item.value || 0)}
                     </p>
-                    <p className={`text-xs font-medium ${isHidden ? 'text-gray-400' : isTopPerformer ? 'text-yellow-700' : 'text-gray-500'}`}>
+                    <p className={`text-xs font-medium ${isHidden ? 'text-gray-400' : 'text-gray-500'}`}>
                       {percentage.toFixed(1)}%
                     </p>
                   </div>

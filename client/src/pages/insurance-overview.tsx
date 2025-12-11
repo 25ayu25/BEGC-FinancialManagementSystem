@@ -83,7 +83,7 @@ export default function InsuranceOverview() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState<FilterPreset>('current-month');
+  const [selectedFilter, setSelectedFilter] = useState<FilterPreset>('this-year');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [customDateRange, setCustomDateRange] = useState<{ start: Date | undefined; end: Date | undefined }>({ 
     start: undefined, 
@@ -758,6 +758,8 @@ export default function InsuranceOverview() {
                 providers={trendProviders}
                 title="Revenue Trend Over Time"
                 showProviderBreakdown={showProviderBreakdown}
+                defaultChartType="area"
+                currentPreset={selectedFilter}
               />
             </div>
           )}

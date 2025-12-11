@@ -40,6 +40,8 @@ interface RevenueTrendChartProps {
   providers?: Array<{ id: string; name: string }>;
   title?: string;
   showProviderBreakdown?: boolean;
+  defaultChartType?: ChartType;
+  currentPreset?: string;
 }
 
 type ChartType = 'line' | 'area' | 'bar';
@@ -59,17 +61,23 @@ export function RevenueTrendChart({
   data, 
   providers = [],
   title = "Revenue Trend",
-  showProviderBreakdown = false
+  showProviderBreakdown = false,
+  defaultChartType = 'area',
+  currentPreset = 'current-month'
 }: RevenueTrendChartProps) {
-  const [chartType, setChartType] = useState<ChartType>('area');
+  const [chartType, setChartType] = useState<ChartType>(defaultChartType);
   const [showTrendLine, setShowTrendLine] = useState(false);
   const [hiddenProviders, setHiddenProviders] = useState<Set<string>>(new Set());
+
+  // Determine date format based on preset
+  const isYearlyView = currentPreset === 'this-year' || currentPreset === 'last-year';
+  const dateFormat = isYearlyView ? 'MMM' : 'MMM yyyy';
 
   // Format data for chart
   const chartData = data.map(point => ({
     ...point,
     month: typeof point.month === 'string' ? new Date(point.month) : point.month,
-    label: format(typeof point.month === 'string' ? new Date(point.month) : point.month, 'MMM yyyy')
+    label: format(typeof point.month === 'string' ? new Date(point.month) : point.month, dateFormat)
   }));
 
   // Calculate trend line (linear regression)
