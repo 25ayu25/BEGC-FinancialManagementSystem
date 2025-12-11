@@ -18,12 +18,13 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon } from "lucide-react";
+import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
+import { RevenueTrendChart } from "@/features/insurance-overview/components/RevenueTrendChart";
 import { 
   RevenueOverviewSkeleton, 
   ChartSkeleton, 
@@ -35,12 +36,18 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/layout/PageHeader";
+import { exportToCSV, exportToPDF } from "@/features/insurance-overview/utils/export";
 
 interface AnalyticsData {
   overview: {
     totalRevenue: number;
     activeProviders: number;
     vsLastMonth: number;
+    avgRevenuePerProvider?: number;
+    projectedMonthlyTotal?: number | null;
+    ytdRevenue?: number;
+    bestMonth?: { month: Date | string; revenue: number } | null;
+    trendData?: number[];
   };
   providerShares: Array<{
     name: string;
@@ -57,12 +64,16 @@ interface AnalyticsData {
   }>;
 }
 
-type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'ytd' | 'last-year' | 'custom';
+type FilterPreset = 'current-month' | 'last-month' | 'last-3-months' | 'last-6-months' | 'this-quarter' | 'last-quarter' | 'this-year' | 'ytd' | 'last-year' | 'custom';
 
 const filterOptions: Array<{ value: FilterPreset; label: string }> = [
   { value: 'current-month', label: 'Current Month' },
   { value: 'last-month', label: 'Last Month' },
   { value: 'last-3-months', label: 'Last 3 Months' },
+  { value: 'last-6-months', label: 'Last 6 Months' },
+  { value: 'this-quarter', label: 'This Quarter' },
+  { value: 'last-quarter', label: 'Last Quarter' },
+  { value: 'this-year', label: 'This Year' },
   { value: 'ytd', label: 'Year to Date' },
   { value: 'last-year', label: 'Last Year' },
   { value: 'custom', label: 'Custom Range' },
@@ -79,6 +90,10 @@ export default function InsuranceOverview() {
     end: undefined 
   });
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [trendProviders, setTrendProviders] = useState<any[]>([]);
+  const [loadingTrend, setLoadingTrend] = useState(false);
+  const [showProviderBreakdown, setShowProviderBreakdown] = useState(false);
 
   // Mock data for development/demo when API is unavailable
   const getMockData = (): AnalyticsData => ({
@@ -86,6 +101,14 @@ export default function InsuranceOverview() {
       totalRevenue: 125750.50,
       activeProviders: 8,
       vsLastMonth: 12.5,
+      avgRevenuePerProvider: 15718.81,
+      projectedMonthlyTotal: 135000,
+      ytdRevenue: 1425000,
+      bestMonth: {
+        month: new Date(2024, 8, 1).toISOString(),
+        revenue: 145000
+      },
+      trendData: [95000, 102000, 118000, 125000, 145000, 138000, 142000, 135000, 128000, 125000, 123000, 125750]
     },
     providerShares: [
       { name: "Blue Cross", value: 45000, color: "#3b82f6" },
@@ -138,15 +161,54 @@ export default function InsuranceOverview() {
     }
   };
 
+  const fetchTrendData = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
+    try {
+      setLoadingTrend(true);
+      
+      // Use last 6 months for trend by default
+      let trendPreset = preset === 'current-month' || preset === 'last-month' ? 'last-6-months' : preset;
+      
+      let url = `/api/insurance-overview/trends?preset=${trendPreset}`;
+      
+      if (showProviderBreakdown) {
+        url += '&byProvider=true';
+      }
+      
+      if (preset === 'custom' && startDate && endDate) {
+        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      }
+
+      const response = await api.get(url);
+      setTrendData(response.data.trends || []);
+      setTrendProviders(response.data.providers || []);
+    } catch (err: any) {
+      console.error("Error fetching trend data:", err);
+      // Use mock trend data if API fails
+      const mockTrends = [
+        { month: new Date(2024, 5, 1).toISOString(), revenue: 95000 },
+        { month: new Date(2024, 6, 1).toISOString(), revenue: 102000 },
+        { month: new Date(2024, 7, 1).toISOString(), revenue: 118000 },
+        { month: new Date(2024, 8, 1).toISOString(), revenue: 125000 },
+        { month: new Date(2024, 9, 1).toISOString(), revenue: 145000 },
+        { month: new Date(2024, 10, 1).toISOString(), revenue: 138000 },
+      ];
+      setTrendData(mockTrends);
+    } finally {
+      setLoadingTrend(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedFilter === 'custom') {
       if (customDateRange.start && customDateRange.end) {
         fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
+        fetchTrendData(selectedFilter, customDateRange.start, customDateRange.end);
       }
     } else {
       fetchAnalytics(selectedFilter);
+      fetchTrendData(selectedFilter);
     }
-  }, [selectedFilter, customDateRange]);
+  }, [selectedFilter, customDateRange, showProviderBreakdown]);
 
   // Memoized handlers to prevent re-renders
   const handleFilterChange = useCallback((preset: FilterPreset) => {
@@ -169,10 +231,23 @@ export default function InsuranceOverview() {
   const handleRefresh = useCallback(() => {
     if (selectedFilter === 'custom' && customDateRange.start && customDateRange.end) {
       fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
+      fetchTrendData(selectedFilter, customDateRange.start, customDateRange.end);
     } else {
       fetchAnalytics(selectedFilter);
+      fetchTrendData(selectedFilter);
     }
   }, [selectedFilter, customDateRange.start, customDateRange.end]);
+
+  // Export handlers
+  const handleExportCSV = useCallback(() => {
+    if (!data) return;
+    exportToCSV(data, trendData, currentFilterLabel);
+  }, [data, trendData, currentFilterLabel]);
+
+  const handleExportPDF = useCallback(() => {
+    if (!data) return;
+    exportToPDF(data, trendData, currentFilterLabel);
+  }, [data, trendData, currentFilterLabel]);
 
   // Toggle dropdown without causing re-renders
   const toggleDropdown = useCallback(() => {
@@ -507,7 +582,43 @@ export default function InsuranceOverview() {
         title="Insurance Overview"
         subtitle="Revenue analytics from insurance transactions (USD only)"
       >
-        <div className="flex gap-2 sm:gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {/* Export Buttons - Show only on desktop or when data is available */}
+          {!isMobile && data && (
+            <>
+              <button
+                onClick={handleExportCSV}
+                className={`
+                  flex items-center gap-2 px-3 py-2
+                  bg-white border border-white/80 text-gray-700
+                  rounded-xl hover:bg-gray-50 hover:shadow-lg
+                  transition-all duration-200
+                  shadow-md
+                  min-h-[44px]
+                `}
+                title="Export to CSV"
+              >
+                <Download className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-medium">CSV</span>
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className={`
+                  flex items-center gap-2 px-3 py-2
+                  bg-white border border-white/80 text-gray-700
+                  rounded-xl hover:bg-gray-50 hover:shadow-lg
+                  transition-all duration-200
+                  shadow-md
+                  min-h-[44px]
+                `}
+                title="Export to PDF"
+              >
+                <FileText className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-medium">PDF</span>
+              </button>
+            </>
+          )}
+          
           {/* Filter Dropdown */}
           <div className="relative">
             <button
@@ -633,19 +744,36 @@ export default function InsuranceOverview() {
               totalRevenue={data.overview.totalRevenue}
               activeProviders={data.overview.activeProviders}
               vsLastMonth={data.overview.vsLastMonth}
+              avgRevenuePerProvider={data.overview.avgRevenuePerProvider}
+              projectedMonthlyTotal={data.overview.projectedMonthlyTotal}
+              ytdRevenue={data.overview.ytdRevenue}
+              bestMonth={data.overview.bestMonth}
+              trendData={data.overview.trendData}
             />
           </div>
 
+          {/* Revenue Trend Chart */}
+          {trendData.length > 0 && (
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '50ms' }}>
+              <RevenueTrendChart
+                data={trendData}
+                providers={trendProviders}
+                title="Revenue Trend Over Time"
+                showProviderBreakdown={showProviderBreakdown}
+              />
+            </div>
+          )}
+
           {/* Share by Provider Chart */}
           {data.providerShares.length > 0 && (
-            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms' }}>
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '150ms' }}>
               <ShareByProviderChart data={data.providerShares} />
             </div>
           )}
 
           {/* Provider Performance Cards */}
           {data.topProviders.length > 0 && (
-            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '250ms' }}>
               <ProviderPerformanceCards providers={data.topProviders} />
             </div>
           )}
