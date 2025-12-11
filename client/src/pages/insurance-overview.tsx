@@ -18,7 +18,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon } from "lucide-react";
+import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
@@ -36,6 +36,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/layout/PageHeader";
+import { exportToCSV, exportToPDF } from "@/features/insurance-overview/utils/export";
 
 interface AnalyticsData {
   overview: {
@@ -230,10 +231,23 @@ export default function InsuranceOverview() {
   const handleRefresh = useCallback(() => {
     if (selectedFilter === 'custom' && customDateRange.start && customDateRange.end) {
       fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
+      fetchTrendData(selectedFilter, customDateRange.start, customDateRange.end);
     } else {
       fetchAnalytics(selectedFilter);
+      fetchTrendData(selectedFilter);
     }
   }, [selectedFilter, customDateRange.start, customDateRange.end]);
+
+  // Export handlers
+  const handleExportCSV = useCallback(() => {
+    if (!data) return;
+    exportToCSV(data, trendData, currentFilterLabel);
+  }, [data, trendData, currentFilterLabel]);
+
+  const handleExportPDF = useCallback(() => {
+    if (!data) return;
+    exportToPDF(data, trendData, currentFilterLabel);
+  }, [data, trendData, currentFilterLabel]);
 
   // Toggle dropdown without causing re-renders
   const toggleDropdown = useCallback(() => {
@@ -568,7 +582,43 @@ export default function InsuranceOverview() {
         title="Insurance Overview"
         subtitle="Revenue analytics from insurance transactions (USD only)"
       >
-        <div className="flex gap-2 sm:gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {/* Export Buttons - Show only on desktop or when data is available */}
+          {!isMobile && data && (
+            <>
+              <button
+                onClick={handleExportCSV}
+                className={`
+                  flex items-center gap-2 px-3 py-2
+                  bg-white border border-white/80 text-gray-700
+                  rounded-xl hover:bg-gray-50 hover:shadow-lg
+                  transition-all duration-200
+                  shadow-md
+                  min-h-[44px]
+                `}
+                title="Export to CSV"
+              >
+                <Download className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-medium">CSV</span>
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className={`
+                  flex items-center gap-2 px-3 py-2
+                  bg-white border border-white/80 text-gray-700
+                  rounded-xl hover:bg-gray-50 hover:shadow-lg
+                  transition-all duration-200
+                  shadow-md
+                  min-h-[44px]
+                `}
+                title="Export to PDF"
+              >
+                <FileText className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-medium">PDF</span>
+              </button>
+            </>
+          )}
+          
           {/* Filter Dropdown */}
           <div className="relative">
             <button
