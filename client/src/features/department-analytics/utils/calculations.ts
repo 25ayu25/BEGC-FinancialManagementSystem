@@ -261,7 +261,8 @@ export function formatMonthSafely(
     }
     
     // If it's an object with year and monthNum, construct a date
-    if (monthData.year && monthData.monthNum) {
+    // Use explicit null/undefined checks to handle monthNum: 0 (January) correctly
+    if (monthData.year != null && monthData.monthNum != null) {
       const date = new Date(monthData.year, monthData.monthNum - 1, 1);
       if (isValid(date)) {
         return format(date, formatPattern);

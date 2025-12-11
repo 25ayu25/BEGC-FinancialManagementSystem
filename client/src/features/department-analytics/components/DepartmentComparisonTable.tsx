@@ -87,7 +87,13 @@ export function DepartmentComparisonTable({ metrics, onDepartmentClick }: Depart
         : bVal.localeCompare(aVal);
     }
 
-    return sortDirection === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    // Both values should be numbers at this point
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    
+    // Fallback (should never reach here)
+    return 0;
   });
 
   if (metrics.length === 0) {
