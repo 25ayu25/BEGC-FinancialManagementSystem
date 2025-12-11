@@ -4,7 +4,7 @@
  * Utility functions for calculating department metrics, rankings, trends, and insights
  */
 
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 
 export interface DepartmentMetrics {
   id: string;
@@ -222,8 +222,8 @@ export function formatSSP(amount: number, compact: boolean = false): string {
 export function formatMonthSafely(dateString: string | null | undefined, formatPattern: string = 'MMM yyyy'): string {
   if (!dateString) return '-';
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '-';
+    const date = parseISO(dateString);
+    if (!isValid(date)) return '-';
     return format(date, formatPattern);
   } catch (err) {
     console.warn(`Failed to format date: ${dateString}`, err);
