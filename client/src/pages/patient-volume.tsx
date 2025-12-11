@@ -1287,8 +1287,7 @@ export default function PatientVolumePage() {
                   className="h-72"
                 >
                   <ResponsiveContainer width="100%" height="100%">
-                    <>
-                      {chartType === "bar" ? (
+                    {chartType === "bar" ? (
                     <BarChart data={combinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
                       <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                       <XAxis
@@ -1535,7 +1534,6 @@ export default function PatientVolumePage() {
                       </div>
                     </div>
                       ) : null}
-                    </>
                   </ResponsiveContainer>
               </motion.div>
             </AnimatePresence>
