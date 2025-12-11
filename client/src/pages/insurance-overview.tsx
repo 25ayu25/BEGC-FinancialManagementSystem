@@ -24,6 +24,7 @@ import { api } from "@/lib/queryClient";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
+import { RevenueTrendChart } from "@/features/insurance-overview/components/RevenueTrendChart";
 import { 
   RevenueOverviewSkeleton, 
   ChartSkeleton, 
@@ -88,6 +89,10 @@ export default function InsuranceOverview() {
     end: undefined 
   });
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [trendProviders, setTrendProviders] = useState<any[]>([]);
+  const [loadingTrend, setLoadingTrend] = useState(false);
+  const [showProviderBreakdown, setShowProviderBreakdown] = useState(false);
 
   // Mock data for development/demo when API is unavailable
   const getMockData = (): AnalyticsData => ({
@@ -155,15 +160,54 @@ export default function InsuranceOverview() {
     }
   };
 
+  const fetchTrendData = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
+    try {
+      setLoadingTrend(true);
+      
+      // Use last 6 months for trend by default
+      let trendPreset = preset === 'current-month' || preset === 'last-month' ? 'last-6-months' : preset;
+      
+      let url = `/api/insurance-overview/trends?preset=${trendPreset}`;
+      
+      if (showProviderBreakdown) {
+        url += '&byProvider=true';
+      }
+      
+      if (preset === 'custom' && startDate && endDate) {
+        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      }
+
+      const response = await api.get(url);
+      setTrendData(response.data.trends || []);
+      setTrendProviders(response.data.providers || []);
+    } catch (err: any) {
+      console.error("Error fetching trend data:", err);
+      // Use mock trend data if API fails
+      const mockTrends = [
+        { month: new Date(2024, 5, 1).toISOString(), revenue: 95000 },
+        { month: new Date(2024, 6, 1).toISOString(), revenue: 102000 },
+        { month: new Date(2024, 7, 1).toISOString(), revenue: 118000 },
+        { month: new Date(2024, 8, 1).toISOString(), revenue: 125000 },
+        { month: new Date(2024, 9, 1).toISOString(), revenue: 145000 },
+        { month: new Date(2024, 10, 1).toISOString(), revenue: 138000 },
+      ];
+      setTrendData(mockTrends);
+    } finally {
+      setLoadingTrend(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedFilter === 'custom') {
       if (customDateRange.start && customDateRange.end) {
         fetchAnalytics(selectedFilter, customDateRange.start, customDateRange.end);
+        fetchTrendData(selectedFilter, customDateRange.start, customDateRange.end);
       }
     } else {
       fetchAnalytics(selectedFilter);
+      fetchTrendData(selectedFilter);
     }
-  }, [selectedFilter, customDateRange]);
+  }, [selectedFilter, customDateRange, showProviderBreakdown]);
 
   // Memoized handlers to prevent re-renders
   const handleFilterChange = useCallback((preset: FilterPreset) => {
@@ -658,16 +702,28 @@ export default function InsuranceOverview() {
             />
           </div>
 
+          {/* Revenue Trend Chart */}
+          {trendData.length > 0 && (
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '50ms' }}>
+              <RevenueTrendChart
+                data={trendData}
+                providers={trendProviders}
+                title="Revenue Trend Over Time"
+                showProviderBreakdown={showProviderBreakdown}
+              />
+            </div>
+          )}
+
           {/* Share by Provider Chart */}
           {data.providerShares.length > 0 && (
-            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms' }}>
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '150ms' }}>
               <ShareByProviderChart data={data.providerShares} />
             </div>
           )}
 
           {/* Provider Performance Cards */}
           {data.topProviders.length > 0 && (
-            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
+            <div className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '250ms' }}>
               <ProviderPerformanceCards providers={data.topProviders} />
             </div>
           )}
