@@ -35,6 +35,9 @@ import InsuranceOverview from "@/pages/insurance-overview";
 // --- NEW: Insurance Lab Page ---
 import InsuranceLabPage from "@/pages/insurance-lab";
 
+// Department Analytics page
+import DepartmentAnalytics from "@/pages/department-analytics";
+
 function Router() {
   return (
     <Switch>
@@ -100,6 +103,7 @@ function Router() {
                     <Route path="/transactions" component={Transactions} />
                     <Route path="/reports" component={Reports} />
                     <Route path="/patient-volume" component={PatientVolume} />
+                    <Route path="/department-analytics" component={DepartmentAnalytics} />
                     <Route path="/insurance-providers" component={InsuranceProviders} />
                     <Route path="/insurance" component={Insurance} />
                     <Route path="/insurance-overview" component={InsuranceOverview} />

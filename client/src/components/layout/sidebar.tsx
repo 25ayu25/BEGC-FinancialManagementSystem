@@ -44,6 +44,7 @@ const insuranceItems: NavItem[] = [
 const navigationAfter: NavItem[] = [
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
+  { name: "Department Analytics", href: "/department-analytics", icon: Building2 },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
