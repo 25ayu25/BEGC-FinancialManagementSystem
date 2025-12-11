@@ -573,8 +573,10 @@ export default function InsuranceOverview() {
   }
 
   // Determine whether to show projection based on the selected filter
-  // Hide projection for: current-month (too speculative), last-month (completed), last-year (completed)
-  // and other completed historical periods as per requirements
+  // Hide projection for:
+  // - current-month: visually confusing and speculative with sparse data (per requirements)
+  // - last-month, last-year, last-quarter: completed historical periods
+  // - last-3-months, last-6-months: completed historical periods
   const showProjection = !['current-month', 'last-month', 'last-year', 'last-quarter', 'last-3-months', 'last-6-months'].includes(selectedFilter);
 
   return (
