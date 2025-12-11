@@ -125,7 +125,7 @@ export function getLastCompleteMonthUTC(): { year: number; month: number } {
  * 
  * IMPORTANT: These preset keys and logic MUST match the canonical frontend
  * date range helper in client/src/lib/dateRanges.ts to ensure consistency
- * across Insurance Overview, Trends, and Department Analytics pages.
+ * across Trends and Department Analytics pages.
  * 
  * Supported preset keys (aligned with frontend):
  * - last-month: Last complete calendar month

@@ -5,7 +5,6 @@
  * consistently across ALL analytics pages in the application:
  * - Trends & Comparisons page (dashboard.tsx)
  * - Department Analytics page (department-analytics.tsx)
- * - Insurance Overview page (insurance-overview.tsx)
  * 
  * DO NOT create alternative date calculation logic elsewhere. All pages should
  * import and use getDateRange() from this module to ensure consistent behavior.

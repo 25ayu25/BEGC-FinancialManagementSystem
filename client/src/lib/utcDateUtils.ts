@@ -8,7 +8,7 @@
  * 
  * ⚠️ DO NOT USE getUTCDateRange() from this module!
  * Use getDateRange() from @/lib/dateRanges.ts instead, which provides:
- * - Consistent behavior across all analytics pages (Insurance Overview, Trends, Department Analytics)
+ * - Consistent behavior across all analytics pages (Trends, Department Analytics)
  * - Proper handling of edge cases (December-anchoring bug, year boundaries)
  * - Well-tested and documented preset logic
  * 
