@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 
 export type PageHeaderVariant =
   | "trends"
-  | "insuranceOverview"
   | "labFinance"
   | "insuranceBalance"
   | "manzaliReport"
@@ -48,19 +47,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 2. Insurance Overview — "Modern Teal Professional" (PREMIUM, WORLD-CLASS)
-  insuranceOverview: {
-    baseGradient: "bg-gradient-to-br from-[#0D9488] via-[#14B8A6] to-[#0E7490]",
-    overlayPattern: "",
-    patternClass: "",
-    accentBorder: "h-[2px] bg-gradient-to-r from-[#5EEAD4] to-[#22D3EE]",
-    boxShadow: "shadow-md",
-    title: "text-white",
-    subtitle: "text-teal-50",
-    actionVariant: "light",
-  },
-  
-  // 3. Lab Finance — "Electric Cyan Science" (PREMIUM)
+  // 2. Lab Finance — "Electric Cyan Science" (PREMIUM)
   labFinance: {
     baseGradient: "bg-gradient-to-br from-blue-700 via-cyan-600 to-sky-600",
     overlayPattern: "bg-radial-gradient",
@@ -73,7 +60,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 4. Insurance Balance — "Emerald Fortune" (PREMIUM)
+  // 3. Insurance Balance — "Emerald Fortune" (PREMIUM)
   insuranceBalance: {
     baseGradient: "bg-gradient-to-br from-emerald-600 via-green-500 to-teal-500",
     overlayPattern: "bg-radial-gradient-top-left",
@@ -85,7 +72,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 5. Manzali Report — "Editorial Masthead" (UNCHANGED - keeping simple)
+  // 4. Manzali Report — "Editorial Masthead" (UNCHANGED - keeping simple)
   manzaliReport: {
     baseGradient: "bg-neutral-50",
     overlayPattern: "",
@@ -97,7 +84,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 6. Patient Volume — "Modern Teal Analytics" (PREMIUM, WORLD-CLASS)
+  // 5. Patient Volume — "Modern Teal Analytics" (PREMIUM, WORLD-CLASS)
   patientVolume: {
     baseGradient: "bg-gradient-to-br from-[#0D9488] via-[#06B6D4] to-[#3B82F6]",
     overlayPattern: "bg-radial-gradient-center",
@@ -110,7 +97,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 7. User Management — "Indigo Royal Command" (PREMIUM)
+  // 6. User Management — "Indigo Royal Command" (PREMIUM)
   userManagement: {
     baseGradient: "bg-gradient-to-br from-indigo-700 via-blue-600 to-indigo-600",
     overlayPattern: "bg-radial-gradient-center",
@@ -122,7 +109,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 8. Settings — "Platinum Steel System" (PREMIUM)
+  // 7. Settings — "Platinum Steel System" (PREMIUM)
   settings: {
     baseGradient: "bg-gradient-to-br from-slate-600 via-gray-500 to-zinc-500",
     overlayPattern: "bg-radial-gradient",
@@ -134,7 +121,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 9. Add Transaction — "Action Ribbon" (UNCHANGED - keeping simple)
+  // 8. Add Transaction — "Action Ribbon" (UNCHANGED - keeping simple)
   addTransaction: {
     baseGradient: "bg-gradient-to-r from-emerald-700 to-teal-600",
     overlayPattern: "",
@@ -146,7 +133,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 10. Monthly Reports — "Amber Gold Archive" (PREMIUM)
+  // 9. Monthly Reports — "Amber Gold Archive" (PREMIUM)
   monthlyReports: {
     baseGradient: "bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-500",
     overlayPattern: "bg-radial-gradient",
@@ -158,7 +145,7 @@ const variantStyles: Record<
     actionVariant: "light",
   },
   
-  // 11. Claim Reconciliation — "Obsidian Stripe" (FUTURE-PROOF, TIMELESS)
+  // 10. Claim Reconciliation — "Obsidian Stripe" (FUTURE-PROOF, TIMELESS)
   claimReconciliation: {
     baseGradient: "bg-gradient-to-br from-[#0B1220] to-[#111827]",
     overlayPattern: "",
@@ -184,7 +171,7 @@ export function getHeaderActionVariant(variant: PageHeaderVariant): "light" | "d
  * 
  * Features:
  * - Sticky positioning at top of viewport (z-index: 60 for mobile compatibility)
- * - 11 distinct variants with unique aesthetics
+ * - 10 distinct variants with unique aesthetics
  * - Multi-layer depth: base gradient + overlay + pattern + accent border
  * - Sophisticated animations and glow effects
  * - Support for optional subtitle and right-side controls

@@ -11,7 +11,6 @@ import {
   X,
   ShieldCheck,   // main insurance ledger
   ListChecks,    // providers sub-link
-  PieChart,      // insurance overview
   ChevronDown,
   FlaskConical,  // <--- NEW ICON for Lab Finance
   TrendingUp,    // Trends & Comparisons
@@ -34,7 +33,6 @@ const navigationBefore: NavItem[] = [
 ];
 
 const insuranceItems: NavItem[] = [
-  { name: "Overview", href: "/insurance-overview", icon: PieChart },
   { name: "Match Payments", href: "/claim-reconciliation", icon: ListChecks },
   // --- NEW ITEM ADDED HERE ---
   { name: "Lab Finance", href: "/insurance/lab", icon: FlaskConical },
