@@ -64,9 +64,18 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
       return { start, end };
     }
     case 'last-quarter': {
-      const lastQuarterStartMonth = Math.floor(currentMonth / 3) * 3 - 3;
-      const start = new Date(currentYear, lastQuarterStartMonth, 1);
-      const end = new Date(currentYear, lastQuarterStartMonth + 3, 0);
+      const currentQuarterStartMonth = Math.floor(currentMonth / 3) * 3;
+      let lastQuarterStartMonth = currentQuarterStartMonth - 3;
+      let lastQuarterYear = currentYear;
+      
+      // Handle year boundary crossing
+      if (lastQuarterStartMonth < 0) {
+        lastQuarterStartMonth += 12;
+        lastQuarterYear -= 1;
+      }
+      
+      const start = new Date(lastQuarterYear, lastQuarterStartMonth, 1);
+      const end = new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0);
       return { start, end };
     }
     case 'this-year': {
@@ -286,6 +295,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
     } : null;
 
     // Provider shares for donut chart
+    // Colors are assigned dynamically for consistent visualization across components
     const colors = [
       "#3b82f6", "#10b981", "#f59e0b", "#ef4444", 
       "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"
@@ -294,10 +304,11 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
     const providerShares = result.rows.map((row, index) => ({
       name: row.provider_name,
       value: Number(row.current_revenue),
-      color: colors[index % colors.length],
+      color: colors[index % colors.length], // Assign color by provider rank
     }));
 
     // Top providers with performance cards (show all)
+    // Colors match the donut chart for visual consistency
     const topProviders = result.rows.map((row, index) => {
       const currentRevenue = Number(row.current_revenue);
       const previousRevenue = Number(row.previous_revenue);
@@ -313,7 +324,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
         revenue: currentRevenue,
         share,
         vsLastMonth: changePercent,
-        color: colors[index % colors.length],
+        color: colors[index % colors.length], // Matches providerShares color
       };
     });
 
