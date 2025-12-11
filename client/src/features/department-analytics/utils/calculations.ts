@@ -13,10 +13,22 @@ export interface DepartmentMetrics {
   revenue: number;
   share: number;
   avgPerMonth: number;
-  bestMonth: { month: string; revenue: number } | null;
+  bestMonth: { 
+    month: string; 
+    fullMonth?: string;
+    year?: number;
+    monthNum?: number;
+    revenue: number;
+  } | null;
   growth: number;
   rank: number;
-  monthlyData: Array<{ month: string; revenue: number }>;
+  monthlyData: Array<{ 
+    month: string; 
+    fullMonth?: string;
+    year?: number;
+    monthNum?: number;
+    revenue: number;
+  }>;
   color?: string;
 }
 
@@ -50,7 +62,13 @@ export function calculateDepartmentMetrics(
 
   // Calculate total revenue per department for current period
   const deptRevenue = new Map<string, number>();
-  const deptMonthlyData = new Map<string, Array<{ month: string; revenue: number }>>();
+  const deptMonthlyData = new Map<string, Array<{ 
+    month: string; 
+    fullMonth?: string;
+    year?: number;
+    monthNum?: number;
+    revenue: number;
+  }>>();
 
   trendData.forEach((monthData) => {
     Object.entries(monthData.departmentBreakdown || {}).forEach(([deptId, amount]) => {
@@ -61,6 +79,9 @@ export function calculateDepartmentMetrics(
       }
       deptMonthlyData.get(deptId)!.push({
         month: monthData.month,
+        fullMonth: monthData.fullMonth,
+        year: monthData.year,
+        monthNum: monthData.monthNum,
         revenue: amount,
       });
     });
@@ -234,8 +255,8 @@ export function formatMonthSafely(
       return monthData;
     }
     
-    // If it's an object with fullMonth, use that for full format
-    if (monthData.fullMonth) {
+    // If it's an object with fullMonth, use that for 'MMMM yyyy' format
+    if (monthData.fullMonth && (formatPattern === 'MMMM yyyy' || formatPattern === 'MMM yyyy')) {
       return monthData.fullMonth;
     }
     
@@ -247,7 +268,7 @@ export function formatMonthSafely(
       }
     }
     
-    // Fallback to month field
+    // Fallback to month field (short month name)
     return monthData.month || '-';
   } catch (err) {
     console.warn(`Failed to format month:`, monthData, err);

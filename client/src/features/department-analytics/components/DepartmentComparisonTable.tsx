@@ -221,7 +221,7 @@ export function DepartmentComparisonTable({ metrics, onDepartmentClick }: Depart
                     {dept.bestMonth ? (
                       <div className="text-sm">
                         <div className="text-gray-900 font-medium">
-                          {formatMonthSafely(dept.bestMonth.month)}
+                          {dept.bestMonth.fullMonth || formatMonthSafely(dept.bestMonth)}
                         </div>
                         <div className="text-xs text-gray-500 tabular-nums">
                           SSP {formatSSP(dept.bestMonth.revenue, true)}

@@ -73,7 +73,7 @@ export default function DepartmentAnalytics() {
         (dept) => dept.share.toFixed(2),
         (dept) => dept.growth.toFixed(2),
         (dept) => dept.avgPerMonth.toFixed(2),
-        (dept) => dept.bestMonth ? formatMonthSafely(dept.bestMonth.month) : '-',
+        (dept) => dept.bestMonth ? (dept.bestMonth.fullMonth || formatMonthSafely(dept.bestMonth)) : '-',
         (dept) => dept.bestMonth ? dept.bestMonth.revenue.toFixed(2) : '-',
       ];
       
