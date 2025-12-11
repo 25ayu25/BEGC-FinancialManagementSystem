@@ -21,6 +21,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
+import { getDateRange, type RangeKey } from "@/lib/dateRanges";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
@@ -80,6 +81,7 @@ const filterOptions: Array<{ value: FilterPreset; label: string }> = [
 ];
 
 export default function InsuranceOverview() {
+  const now = new Date();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,9 +134,22 @@ export default function InsuranceOverview() {
       setError(null);
 
       let url = `/api/insurance-overview/analytics?preset=${preset}`;
+      let effectiveStartDate = startDate;
+      let effectiveEndDate = endDate;
       
-      if (preset === 'custom' && startDate && endDate) {
-        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      // For filters with known timezone issues, calculate dates on frontend with stable `now`
+      if (preset === 'this-year' || preset === 'ytd') {
+        const dateRange = getDateRange('this-year', now);
+        effectiveStartDate = dateRange.startDate;
+        effectiveEndDate = dateRange.endDate;
+      } else if (preset === 'last-year') {
+        const dateRange = getDateRange('last-year', now);
+        effectiveStartDate = dateRange.startDate;
+        effectiveEndDate = dateRange.endDate;
+      }
+      
+      if ((preset === 'custom' || preset === 'this-year' || preset === 'ytd' || preset === 'last-year') && effectiveStartDate && effectiveEndDate) {
+        url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
 
       const response = await api.get(url);
@@ -167,13 +182,26 @@ export default function InsuranceOverview() {
       
       // Use the selected preset directly - the API will return appropriate granularity
       let url = `/api/insurance-overview/trends?preset=${preset}`;
+      let effectiveStartDate = startDate;
+      let effectiveEndDate = endDate;
+      
+      // For filters with known timezone issues, calculate dates on frontend with stable `now`
+      if (preset === 'this-year' || preset === 'ytd') {
+        const dateRange = getDateRange('this-year', now);
+        effectiveStartDate = dateRange.startDate;
+        effectiveEndDate = dateRange.endDate;
+      } else if (preset === 'last-year') {
+        const dateRange = getDateRange('last-year', now);
+        effectiveStartDate = dateRange.startDate;
+        effectiveEndDate = dateRange.endDate;
+      }
       
       if (showProviderBreakdown) {
         url += '&byProvider=true';
       }
       
-      if (preset === 'custom' && startDate && endDate) {
-        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      if ((preset === 'custom' || preset === 'this-year' || preset === 'ytd' || preset === 'last-year') && effectiveStartDate && effectiveEndDate) {
+        url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
 
       const response = await api.get(url);
