@@ -128,27 +128,43 @@ export default function InsuranceOverview() {
     ],
   });
 
+  // Helper function to calculate date ranges on frontend with stable timestamp
+  // This prevents timezone-related off-by-one errors when the backend calculates ranges
+  const calculateDateRange = (preset: FilterPreset, providedStartDate?: Date, providedEndDate?: Date): { startDate?: Date; endDate?: Date } => {
+    // Use provided dates for custom ranges
+    if (providedStartDate && providedEndDate) {
+      return { startDate: providedStartDate, endDate: providedEndDate };
+    }
+    
+    // For 'this-year' and 'ytd' (which are equivalent in dateRanges.ts),
+    // calculate the range from January 1 of current year to last complete month
+    if (preset === 'this-year' || preset === 'ytd') {
+      const dateRange = getDateRange('this-year', now);
+      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+    
+    // For 'last-year', calculate the full previous calendar year
+    if (preset === 'last-year') {
+      const dateRange = getDateRange('last-year', now);
+      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+    
+    // For other presets, let the backend handle the calculation
+    return {};
+  };
+
   const fetchAnalytics = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
     try {
       setLoading(true);
       setError(null);
 
       let url = `/api/insurance-overview/analytics?preset=${preset}`;
-      let effectiveStartDate = startDate;
-      let effectiveEndDate = endDate;
       
-      // For filters with known timezone issues, calculate dates on frontend with stable `now`
-      if (preset === 'this-year' || preset === 'ytd') {
-        const dateRange = getDateRange('this-year', now);
-        effectiveStartDate = dateRange.startDate;
-        effectiveEndDate = dateRange.endDate;
-      } else if (preset === 'last-year') {
-        const dateRange = getDateRange('last-year', now);
-        effectiveStartDate = dateRange.startDate;
-        effectiveEndDate = dateRange.endDate;
-      }
+      // Calculate date range using helper function
+      const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
       
-      if ((preset === 'custom' || preset === 'this-year' || preset === 'ytd' || preset === 'last-year') && effectiveStartDate && effectiveEndDate) {
+      // Pass calculated dates to API if available
+      if (effectiveStartDate && effectiveEndDate) {
         url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
 
@@ -182,25 +198,16 @@ export default function InsuranceOverview() {
       
       // Use the selected preset directly - the API will return appropriate granularity
       let url = `/api/insurance-overview/trends?preset=${preset}`;
-      let effectiveStartDate = startDate;
-      let effectiveEndDate = endDate;
       
-      // For filters with known timezone issues, calculate dates on frontend with stable `now`
-      if (preset === 'this-year' || preset === 'ytd') {
-        const dateRange = getDateRange('this-year', now);
-        effectiveStartDate = dateRange.startDate;
-        effectiveEndDate = dateRange.endDate;
-      } else if (preset === 'last-year') {
-        const dateRange = getDateRange('last-year', now);
-        effectiveStartDate = dateRange.startDate;
-        effectiveEndDate = dateRange.endDate;
-      }
+      // Calculate date range using helper function
+      const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
       
       if (showProviderBreakdown) {
         url += '&byProvider=true';
       }
       
-      if ((preset === 'custom' || preset === 'this-year' || preset === 'ytd' || preset === 'last-year') && effectiveStartDate && effectiveEndDate) {
+      // Pass calculated dates to API if available
+      if (effectiveStartDate && effectiveEndDate) {
         url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
 
