@@ -154,7 +154,7 @@ export function generateInsights(metrics: DepartmentMetrics[]): Array<{
 
   // Fastest growing department
   const fastestGrowing = [...metrics].sort((a, b) => b.growth - a.growth)[0];
-  if (fastestGrowing && fastestGrowing.growth > 10) {
+  if (fastestGrowing && typeof fastestGrowing.growth === 'number' && fastestGrowing.growth > 10) {
     insights.push({
       type: 'success',
       icon: '💡',

@@ -67,20 +67,22 @@ export default function DepartmentAnalytics() {
 
   const handleExportCSV = () => {
     try {
+      // CSV configuration
+      const csvHeaders = ['Department', 'Code', 'Revenue (SSP)', 'Share %', 'Growth %', 'Avg/Month', 'Best Month', 'Best Month Revenue'];
+      const csvFields: Array<(dept: typeof metrics[0]) => string | number> = [
+        (dept) => dept.name,
+        (dept) => dept.code,
+        (dept) => dept.revenue.toFixed(2),
+        (dept) => dept.share.toFixed(2),
+        (dept) => dept.growth.toFixed(2),
+        (dept) => dept.avgPerMonth.toFixed(2),
+        (dept) => dept.bestMonth ? format(new Date(dept.bestMonth.month), 'MMM yyyy') : '-',
+        (dept) => dept.bestMonth ? dept.bestMonth.revenue.toFixed(2) : '-',
+      ];
+      
       // Prepare CSV data
-      const headers = ['Department', 'Code', 'Revenue (SSP)', 'Share %', 'Growth %', 'Avg/Month', 'Best Month', 'Best Month Revenue'];
-      const rows = metrics.map(dept => [
-        dept.name,
-        dept.code,
-        dept.revenue.toFixed(2),
-        dept.share.toFixed(2),
-        dept.growth.toFixed(2),
-        dept.avgPerMonth.toFixed(2),
-        dept.bestMonth ? format(new Date(dept.bestMonth.month), 'MMM yyyy') : '-',
-        dept.bestMonth ? dept.bestMonth.revenue.toFixed(2) : '-',
-      ]);
-
-      const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+      const rows = metrics.map(dept => csvFields.map(fn => fn(dept)));
+      const csv = [csvHeaders, ...rows].map(row => row.join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');

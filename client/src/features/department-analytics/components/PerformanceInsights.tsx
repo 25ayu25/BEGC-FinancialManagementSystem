@@ -37,7 +37,7 @@ export function PerformanceInsights({ insights }: PerformanceInsightsProps) {
     );
   }
 
-  const getInsightStyles = (type: string) => {
+  const getInsightStyles = (type: Insight['type']) => {
     switch (type) {
       case 'warning':
         return {
