@@ -3,7 +3,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from "rechar
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile } from "../hooks/useMediaQuery";
 import { formatCurrency } from "@/lib/currency";
-import { Trophy, Award } from "lucide-react";
+import { Trophy } from "lucide-react";
 
 interface ProviderShare {
   name: string;
