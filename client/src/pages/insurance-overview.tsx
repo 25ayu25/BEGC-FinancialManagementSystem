@@ -238,6 +238,11 @@ export default function InsuranceOverview() {
     }
   }, [selectedFilter, customDateRange.start, customDateRange.end]);
 
+  // Calculate filter label before conditional returns so it's available in all states
+  const currentFilterLabel = selectedFilter === 'custom' && customDateRange.start && customDateRange.end
+    ? `${format(customDateRange.start, 'MMM d')} - ${format(customDateRange.end, 'MMM d, yyyy')}`
+    : filterOptions.find(opt => opt.value === selectedFilter)?.label || 'Current Month';
+
   // Export handlers
   const handleExportCSV = useCallback(() => {
     if (!data) return;
@@ -259,11 +264,6 @@ export default function InsuranceOverview() {
   }, []);
 
   const isMobile = useIsMobile();
-
-  // Calculate filter label before conditional returns so it's available in all states
-  const currentFilterLabel = selectedFilter === 'custom' && customDateRange.start && customDateRange.end
-    ? `${format(customDateRange.start, 'MMM d')} - ${format(customDateRange.end, 'MMM d, yyyy')}`
-    : filterOptions.find(opt => opt.value === selectedFilter)?.label || 'Current Month';
 
   // Reusable Page Header Component with Filter
   const renderPageHeader = () => (
