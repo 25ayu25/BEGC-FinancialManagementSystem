@@ -17,7 +17,7 @@
  * @module InsuranceOverview
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
@@ -80,6 +80,10 @@ const filterOptions: Array<{ value: FilterPreset; label: string }> = [
 ];
 
 export default function InsuranceOverview() {
+  // Stable timestamp for consistent date calculations across the component lifecycle
+  // Memoized with empty dependency array to ensure it's created once per component mount
+  const now = useMemo(() => new Date(), []);
+  
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
