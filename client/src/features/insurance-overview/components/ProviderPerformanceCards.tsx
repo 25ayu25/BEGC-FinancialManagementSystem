@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight, Award, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronRight } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile, useIsTablet } from "../hooks/useMediaQuery";
 import { formatCurrency } from "@/lib/currency";
@@ -17,61 +17,8 @@ interface ProviderPerformanceCardsProps {
   providers: ProviderPerformance[];
 }
 
-// Medal styling for top 3 providers - accepts provider color
-const getMedalStyle = (rank: number, providerColor?: string) => {
-  switch(rank) {
-    case 1:
-      return {
-        badge: "bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-amber-900 shadow-lg shadow-yellow-400/40",
-        card: "ring-2 ring-yellow-300/50 bg-gradient-to-br from-yellow-50/50 via-white to-amber-50/30",
-        accent: "from-yellow-400 to-amber-500",
-        glow: "shadow-yellow-200/50",
-        progressColor: providerColor || "#f59e0b"
-      };
-    case 2:
-      return {
-        badge: "bg-gradient-to-br from-gray-200 via-gray-300 to-slate-400 text-slate-800 shadow-lg shadow-gray-300/40",
-        card: "ring-2 ring-gray-200/50 bg-gradient-to-br from-gray-50/50 via-white to-slate-50/30",
-        accent: "from-gray-300 to-slate-400",
-        glow: "shadow-gray-200/50",
-        progressColor: providerColor || "#6b7280"
-      };
-    case 3:
-      return {
-        badge: "bg-gradient-to-br from-orange-300 via-orange-400 to-amber-600 text-orange-900 shadow-lg shadow-orange-300/40",
-        card: "ring-2 ring-orange-200/50 bg-gradient-to-br from-orange-50/50 via-white to-amber-50/30",
-        accent: "from-orange-400 to-amber-600",
-        glow: "shadow-orange-200/50",
-        progressColor: providerColor || "#f97316"
-      };
-    default:
-      return {
-        badge: "bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-800 shadow-md shadow-blue-200/30",
-        card: "ring-1 ring-blue-100/60 bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/20",
-        accent: "from-blue-500 to-blue-600",
-        glow: "shadow-blue-100/30",
-        progressColor: providerColor || "#3b82f6"
-      };
-  }
-};
-
 export function ProviderPerformanceCards({ providers }: ProviderPerformanceCardsProps) {
   const isMobile = useIsMobile();
-  const isTablet = useIsTablet();
-  const [mobileIndex, setMobileIndex] = useState(0);
-
-  // Determine how many cards to show at once on mobile
-  const visibleProviders = isMobile 
-    ? [providers[mobileIndex]] 
-    : providers;
-
-  const handlePrevious = useCallback(() => {
-    setMobileIndex((prev) => (prev > 0 ? prev - 1 : providers.length - 1));
-  }, [providers.length]);
-
-  const handleNext = useCallback(() => {
-    setMobileIndex((prev) => (prev < providers.length - 1 ? prev + 1 : 0));
-  }, [providers.length]);
 
   return (
     <div className={`
@@ -88,205 +35,80 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
       <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent pointer-events-none" />
       
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Providers Performance</h2>
-          
-          {/* Mobile navigation controls */}
-          {isMobile && providers.length > 1 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePrevious}
-                className={`
-                  p-2 rounded-lg bg-white border border-gray-200
-                  hover:bg-gray-50 active:scale-95
-                  ${transitions.base}
-                `}
-                aria-label="Previous provider"
-              >
-                <ChevronLeft className="w-4 h-4 text-gray-600" />
-              </button>
-              <span className="text-sm text-gray-600 min-w-[3rem] text-center">
-                {mobileIndex + 1}/{providers.length}
-              </span>
-              <button
-                onClick={handleNext}
-                className={`
-                  p-2 rounded-lg bg-white border border-gray-200
-                  hover:bg-gray-50 active:scale-95
-                  ${transitions.base}
-                `}
-                aria-label="Next provider"
-              >
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-          )}
-        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Providers Performance</h2>
         
-        <div className={`
-          grid 
-          ${isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} 
-          gap-3 sm:gap-4
-        `}>
-          {visibleProviders.map((provider) => {
+        <div className="space-y-2">
+          {providers.map((provider) => {
             const isPositive = provider.vsLastMonth >= 0;
             const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-            const medalStyle = getMedalStyle(provider.rank, provider.color);
-            
-            // Determine performance badge
-            const isTopPerformer = provider.rank === 1;
-            const needsAttention = provider.vsLastMonth < -10; // More than 10% decline
 
             return (
               <div
                 key={provider.rank}
                 className={`
-                  rounded-xl p-4 sm:p-5
-                  ${medalStyle.card}
+                  flex items-center gap-3 sm:gap-4
+                  p-3 sm:p-4 rounded-lg
+                  bg-white/80 hover:bg-white
+                  border border-gray-200/60
                   ${transitions.base}
-                  ${hover.scale}
-                  shadow-md ${medalStyle.glow}
+                  hover:shadow-md
+                  cursor-pointer
                   group
-                  min-h-[200px]
-                  touch-manipulation
-                  backdrop-blur-sm
-                  relative
                 `}
               >
-                {/* Performance Badge - TOP PERFORMER or NEEDS ATTENTION */}
-                {(isTopPerformer || needsAttention) && (
-                  <div className="absolute top-3 right-3">
-                    {isTopPerformer && (
-                      <span 
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 text-xs font-bold shadow-md"
-                        role="status"
-                        aria-label="Top performing provider"
-                      >
-                        <Award className="w-3 h-3" />
-                        TOP PERFORMER
-                      </span>
-                    )}
-                    {needsAttention && !isTopPerformer && (
-                      <span 
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-red-500 to-rose-600 text-white text-xs font-bold shadow-md"
-                        role="alert"
-                        aria-label="Provider needs attention due to significant revenue decline"
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        NEEDS ATTENTION
-                      </span>
-                    )}
-                  </div>
-                )}
-                
-                {/* Header with Rank Number and Name */}
-                <div className="flex items-start justify-between mb-3 sm:mb-4">
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    {provider.rank <= 3 ? (
-                      <div className={`
-                        w-10 h-10 sm:w-12 sm:h-12 rounded-full 
-                        ${medalStyle.badge}
-                        flex items-center justify-center
-                        ${transitions.base}
-                        group-hover:scale-110 group-hover:rotate-12
-                        relative
-                      `}>
-                        <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
-                        <span 
-                          className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white flex items-center justify-center text-xs font-bold shadow-md"
-                          aria-label={`Rank ${provider.rank}`}
-                        >
-                          {provider.rank}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className={`
-                        w-10 h-10 sm:w-12 sm:h-12 rounded-full
-                        ${medalStyle.badge}
-                        flex items-center justify-center
-                        ${transitions.base}
-                        group-hover:scale-110
-                      `}>
-                        <span className="text-sm sm:text-base font-bold">
-                          #{provider.rank}
-                        </span>
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                        {provider.name}
-                      </h3>
-                    </div>
-                  </div>
+                {/* Rank Chip */}
+                <div className={`
+                  w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
+                  text-xs font-bold
+                  ${provider.rank === 1 
+                    ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/30' 
+                    : provider.rank === 2
+                    ? 'bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-md shadow-teal-500/30'
+                    : provider.rank === 3
+                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                    : 'bg-gray-100 text-gray-700'
+                  }
+                `}>
+                  {provider.rank}
                 </div>
 
-                {/* Revenue with animation on hover */}
-                <div className="mb-3 sm:mb-4">
-                  <p className={`
-                    text-2xl sm:text-3xl font-bold 
-                    bg-gradient-to-r from-gray-900 to-gray-700 
-                    bg-clip-text text-transparent
-                    ${transitions.base}
-                    group-hover:scale-105 origin-left
-                  `}>
+                {/* Provider Name */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm sm:text-base font-semibold text-gray-900 truncate">
+                    {provider.name}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {provider.share.toFixed(1)}% of total revenue
+                  </p>
+                </div>
+
+                {/* Revenue */}
+                <div className="text-right">
+                  <p className="text-sm sm:text-base font-bold text-gray-900">
                     {formatCurrency(provider.revenue || 0)}
                   </p>
                 </div>
 
-                {/* Progress Bar - Revenue Share with provider color */}
-                <div className="mb-3 sm:mb-4">
-                  <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-1.5">
-                    <span className="font-medium">Revenue Share</span>
-                    <span className="font-semibold">{provider.share.toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200/60 rounded-full h-2.5 overflow-hidden backdrop-blur-sm">
-                    <div
-                      className="h-2.5 rounded-full transition-[width] duration-500 ease-out shadow-sm"
-                      style={{ 
-                        width: `${Math.min(provider.share, 100)}%`,
-                        backgroundColor: medalStyle.progressColor
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* vs Last Month with enhanced badge */}
+                {/* MoM Change Chip */}
                 <div className={`
-                  flex items-center gap-1.5 p-2.5 rounded-lg
+                  flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold
                   ${isPositive 
-                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 ring-1 ring-green-200/50' 
-                    : 'bg-gradient-to-r from-red-50 to-rose-50 ring-1 ring-red-200/50'}
-                  ${transitions.base}
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' 
+                    : 'bg-rose-50 text-rose-700 border border-rose-200/60'}
+                  flex-shrink-0
                 `}>
-                  <TrendIcon 
-                    className={`w-4 h-4 sm:w-5 sm:h-5 ${isPositive ? 'text-green-600' : 'text-red-600'}`}
-                  />
-                  <span className={`text-xs sm:text-sm font-semibold ${isPositive ? 'text-green-700' : 'text-red-700'}`}>
+                  <TrendIcon className="w-3 h-3" />
+                  <span className="whitespace-nowrap">
                     {isPositive ? '+' : ''}{provider.vsLastMonth.toFixed(1)}%
                   </span>
-                  <span className="text-xs sm:text-sm text-gray-600">vs last month</span>
                 </div>
+
+                {/* Chevron for future drill-down */}
+                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             );
           })}
         </div>
-
-        {/* Mobile pagination dots */}
-        {isMobile && providers.length > 1 && (
-          <div className="flex justify-center gap-2 mt-4">
-            {providers.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setMobileIndex(index)}
-                className={`
-                  w-2 h-2 rounded-full transition-all duration-300
-                  ${index === mobileIndex ? 'bg-blue-600 w-6' : 'bg-gray-300'}
-                `}
-                aria-label={`Go to provider ${index + 1}`}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
