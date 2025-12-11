@@ -412,19 +412,29 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
     if (byProvider && !providerId) {
       // Get trends broken down by provider
       const query = `
+        WITH monthly_provider_data AS (
+          SELECT 
+            DATE_TRUNC('month', t.date) as month,
+            ip.name as provider_name,
+            ip.id as provider_id,
+            SUM(t.amount) as revenue
+          FROM transactions t
+          INNER JOIN insurance_providers ip ON t.insurance_provider_id = ip.id
+          WHERE t.type = 'income'
+            AND t.currency = 'USD'
+            AND t.date >= $1
+            AND t.date <= $2
+            AND ip.is_active = true
+          GROUP BY DATE_TRUNC('month', t.date), ip.name, ip.id
+        )
         SELECT 
-          DATE_TRUNC('month', t.date) as month,
-          ip.name as provider_name,
-          ip.id as provider_id,
-          SUM(t.amount) as revenue
-        FROM transactions t
-        INNER JOIN insurance_providers ip ON t.insurance_provider_id = ip.id
-        WHERE t.type = 'income'
-          AND t.currency = 'USD'
-          AND t.date >= $1
-          AND t.date <= $2
-          AND ip.is_active = true
-        GROUP BY DATE_TRUNC('month', t.date), ip.name, ip.id
+          month,
+          provider_name,
+          provider_id,
+          revenue
+        FROM monthly_provider_data
+        WHERE month >= DATE_TRUNC('month', $1::timestamp)
+          AND month <= DATE_TRUNC('month', $2::timestamp)
         ORDER BY month ASC, revenue DESC
       `;
       
@@ -472,16 +482,24 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
     } else if (providerId) {
       // Get trend for specific provider
       const query = `
+        WITH provider_monthly AS (
+          SELECT 
+            DATE_TRUNC('month', t.date) as month,
+            SUM(t.amount) as revenue
+          FROM transactions t
+          WHERE t.type = 'income'
+            AND t.currency = 'USD'
+            AND t.insurance_provider_id = $1
+            AND t.date >= $2
+            AND t.date <= $3
+          GROUP BY DATE_TRUNC('month', t.date)
+        )
         SELECT 
-          DATE_TRUNC('month', t.date) as month,
-          SUM(t.amount) as revenue
-        FROM transactions t
-        WHERE t.type = 'income'
-          AND t.currency = 'USD'
-          AND t.insurance_provider_id = $1
-          AND t.date >= $2
-          AND t.date <= $3
-        GROUP BY DATE_TRUNC('month', t.date)
+          month,
+          revenue
+        FROM provider_monthly
+        WHERE month >= DATE_TRUNC('month', $2::timestamp)
+          AND month <= DATE_TRUNC('month', $3::timestamp)
         ORDER BY month ASC
       `;
       
@@ -495,16 +513,24 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
     } else {
       // Get overall trend
       const query = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', date) as month,
+            SUM(amount) as revenue
+          FROM transactions
+          WHERE type = 'income'
+            AND currency = 'USD'
+            AND insurance_provider_id IS NOT NULL
+            AND date >= $1
+            AND date <= $2
+          GROUP BY DATE_TRUNC('month', date)
+        )
         SELECT 
-          DATE_TRUNC('month', date) as month,
-          SUM(amount) as revenue
-        FROM transactions
-        WHERE type = 'income'
-          AND currency = 'USD'
-          AND insurance_provider_id IS NOT NULL
-          AND date >= $1
-          AND date <= $2
-        GROUP BY DATE_TRUNC('month', date)
+          month,
+          revenue
+        FROM monthly_data
+        WHERE month >= DATE_TRUNC('month', $1::timestamp)
+          AND month <= DATE_TRUNC('month', $2::timestamp)
         ORDER BY month ASC
       `;
       
