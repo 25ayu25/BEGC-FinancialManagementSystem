@@ -15,6 +15,12 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { pool } from "../db";
 import { storage } from "../storage";
+import { 
+  parseUTCDate, 
+  getUTCDateRange, 
+  isValidDateRange,
+  getMonthStart 
+} from "../lib/utcDateUtils";
 
 const router = Router();
 
@@ -28,99 +34,7 @@ const router = Router();
 /* Helper Functions                                                    */
 /* ------------------------------------------------------------------ */
 
-/**
- * Get the first day of the month for a given date in UTC
- */
-function getMonthStart(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
-/**
- * Calculate date range based on preset filter
- */
-function calculateDateRange(preset: string): { start: Date; end: Date } {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  
-  switch (preset) {
-    case 'current-month': {
-      const start = new Date(currentYear, currentMonth, 1);
-      const end = new Date(currentYear, currentMonth + 1, 0);
-      return { start, end };
-    }
-    case 'last-month': {
-      const start = new Date(currentYear, currentMonth - 1, 1);
-      const end = new Date(currentYear, currentMonth, 0);
-      return { start, end };
-    }
-    case 'last-3-months': {
-      const start = new Date(currentYear, currentMonth - 2, 1);
-      const end = new Date(currentYear, currentMonth + 1, 0);
-      return { start, end };
-    }
-    case 'last-6-months': {
-      const start = new Date(currentYear, currentMonth - 5, 1);
-      const end = new Date(currentYear, currentMonth + 1, 0);
-      return { start, end };
-    }
-    case 'this-quarter': {
-      const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
-      const start = new Date(currentYear, quarterStartMonth, 1);
-      const end = now;
-      return { start, end };
-    }
-    case 'last-quarter': {
-      const currentQuarterStartMonth = Math.floor(currentMonth / 3) * 3;
-      let lastQuarterStartMonth = currentQuarterStartMonth - 3;
-      let lastQuarterYear = currentYear;
-      
-      // Handle year boundary crossing
-      if (lastQuarterStartMonth < 0) {
-        lastQuarterStartMonth += 12;
-        lastQuarterYear -= 1;
-      }
-      
-      const start = new Date(lastQuarterYear, lastQuarterStartMonth, 1);
-      const end = new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0);
-      return { start, end };
-    }
-    case 'this-year': {
-      // For "This Year": January 1 of current year through last complete month
-      // Special case: If we're in January, there are no complete months yet,
-      // so we include partial January data by using today as the end date
-      const start = new Date(currentYear, 0, 1);
-      
-      if (currentMonth === 0) {
-        // In January, include partial month data (Jan 1 to today)
-        const end = now;
-        return { start, end };
-      }
-      
-      // For other months, use last complete month
-      const lastCompleteMonth = currentMonth - 1;
-      const end = new Date(currentYear, lastCompleteMonth + 1, 0); // Last day of last complete month
-      
-      return { start, end };
-    }
-    case 'ytd': {
-      const start = new Date(currentYear, 0, 1);
-      const end = now;
-      return { start, end };
-    }
-    case 'last-year': {
-      const start = new Date(currentYear - 1, 0, 1);
-      const end = new Date(currentYear - 1, 11, 31);
-      return { start, end };
-    }
-    default: {
-      // Default to current month
-      const start = new Date(currentYear, currentMonth, 1);
-      const end = new Date(currentYear, currentMonth + 1, 0);
-      return { start, end };
-    }
-  }
-}
+// No legacy helper functions needed - all date handling now uses utcDateUtils
 
 /* ------------------------------------------------------------------ */
 /* API Endpoints                                                       */
@@ -158,33 +72,28 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
     let start: Date;
     let end: Date;
     
-    // Check if explicit dates are provided (from frontend date range calculation)
-    // The frontend may send explicit dates to ensure consistent timezone handling
+    // Check if explicit dates are provided (from frontend UTC date range calculation)
+    // Frontend sends YYYY-MM-DD format which is timezone-agnostic
     const startDateParam = req.query.startDate as string | undefined;
     const endDateParam = req.query.endDate as string | undefined;
     
     if (startDateParam && endDateParam) {
-      // Use explicit dates provided by frontend (handles all presets including 'this-year', 'ytd', etc.)
-      start = new Date(startDateParam);
-      end = new Date(endDateParam);
+      // Parse YYYY-MM-DD strings as UTC dates at midnight
+      // This prevents timezone interpretation issues
+      start = parseUTCDate(startDateParam);
+      end = parseUTCDate(endDateParam);
       
       // Validate dates
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      if (!isValidDateRange(start, end)) {
         return res.status(400).json({ 
-          error: 'Invalid date format. Use ISO date strings.' 
-        });
-      }
-      
-      if (start > end) {
-        return res.status(400).json({ 
-          error: 'startDate must be before or equal to endDate' 
+          error: 'Invalid date range. startDate must be before or equal to endDate' 
         });
       }
     } else {
-      // Fall back to backend calculation if no explicit dates provided
-      const dateRange = calculateDateRange(preset);
-      start = dateRange.start;
-      end = dateRange.end;
+      // Fall back to backend UTC calculation if no explicit dates provided
+      const dateRange = getUTCDateRange(preset);
+      start = dateRange.startDate;
+      end = dateRange.endDate;
     }
     
     // Calculate previous period for comparison
@@ -193,6 +102,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
     const prevEnd = new Date(start);
 
     // Optimized Query: Get revenue by provider for both current and previous periods in one query
+    // Uses exclusive end date comparison (date < end) for consistency
     const combinedQuery = `
       WITH current_revenue AS (
         SELECT 
@@ -204,7 +114,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
           AND t.type = 'income'
           AND t.currency = 'USD'
           AND t.date >= $1
-          AND t.date <= $2
+          AND t.date < $2
         WHERE ip.is_active = true
         GROUP BY ip.id, ip.name
         HAVING COALESCE(SUM(t.amount), 0) > 0
@@ -229,7 +139,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
           AND currency = 'USD'
           AND insurance_provider_id IS NOT NULL
           AND date >= $1
-          AND date <= $2
+          AND date < $2
       )
       SELECT 
         cr.provider_id,
@@ -258,10 +168,8 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
 
     const activeProviders = Number(result.rows[0]?.active_count || 0);
 
-    // Get YTD total revenue
-    const currentYear = new Date().getFullYear();
-    const ytdStart = new Date(currentYear, 0, 1);
-    const ytdEnd = new Date();
+    // Get YTD total revenue using UTC date range
+    const ytdRange = getUTCDateRange('ytd');
     const ytdQuery = `
       SELECT COALESCE(SUM(amount), 0) as ytd_revenue
       FROM transactions
@@ -269,9 +177,9 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
         AND currency = 'USD'
         AND insurance_provider_id IS NOT NULL
         AND date >= $1
-        AND date <= $2
+        AND date < $2
     `;
-    const ytdResult = await pool.query(ytdQuery, [ytdStart, ytdEnd]);
+    const ytdResult = await pool.query(ytdQuery, [ytdRange.startDate, ytdRange.endDate]);
     const ytdRevenue = Number(ytdResult.rows[0]?.ytd_revenue || 0);
 
     // Get last 12 months trend data for sparkline
@@ -284,7 +192,7 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
         AND currency = 'USD'
         AND insurance_provider_id IS NOT NULL
         AND date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')
-        AND date <= CURRENT_DATE
+        AND date < CURRENT_DATE
       GROUP BY DATE_TRUNC('month', date)
       ORDER BY month ASC
     `;
@@ -408,37 +316,32 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
     let start: Date;
     let end: Date;
     
-    // Check if explicit dates are provided (from frontend date range calculation)
+    // Check if explicit dates are provided (from frontend UTC date range calculation)
+    // Frontend sends YYYY-MM-DD format which is timezone-agnostic
     const startDateParam = req.query.startDate as string | undefined;
     const endDateParam = req.query.endDate as string | undefined;
     
     if (startDateParam && endDateParam) {
-      // Use explicit dates provided by frontend (handles all presets)
-      start = new Date(startDateParam);
-      end = new Date(endDateParam);
+      // Parse YYYY-MM-DD strings as UTC dates at midnight
+      start = parseUTCDate(startDateParam);
+      end = parseUTCDate(endDateParam);
       
       // Validate dates
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      if (!isValidDateRange(start, end)) {
         return res.status(400).json({ 
-          error: 'Invalid date format. Use ISO date strings.' 
-        });
-      }
-      
-      if (start > end) {
-        return res.status(400).json({ 
-          error: 'startDate must be before or equal to endDate' 
+          error: 'Invalid date range. startDate must be before or equal to endDate' 
         });
       }
     } else {
-      // Fall back to backend calculation if no explicit dates provided
-      const dateRange = calculateDateRange(preset);
-      start = dateRange.start;
-      end = dateRange.end;
+      // Fall back to backend UTC calculation if no explicit dates provided
+      const dateRange = getUTCDateRange(preset);
+      start = dateRange.startDate;
+      end = dateRange.endDate;
     }
 
     if (byProvider && !providerId) {
       // Get trends broken down by provider - using application-level aggregation
-      // 1. Fetch ALL transactions in date range
+      // Uses exclusive end date (date < end) for consistency
       const query = `
         SELECT 
           t.date,
@@ -450,13 +353,13 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         WHERE t.type = 'income'
           AND t.currency = 'USD'
           AND t.date >= $1
-          AND t.date <= $2
+          AND t.date < $2
           AND ip.is_active = true
       `;
       
       const txData = await pool.query(query, [start, end]);
       
-      // 2. Initialize ONLY the months in the requested range
+      // Initialize ONLY the months in the requested range
       const monthMap = new Map<string, any>();
       
       // Get month boundaries
@@ -474,7 +377,7 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         cursor.setUTCMonth(cursor.getUTCMonth() + 1);
       }
       
-      // 3. Aggregate transactions by provider into pre-initialized months
+      // Aggregate transactions by provider into pre-initialized months
       for (const row of txData.rows) {
         const txDate = new Date(row.date);
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -487,7 +390,7 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         monthData.total += Number(row.amount);
       }
       
-      // 4. Convert to array and sort
+      // Convert to array and sort
       const trends = Array.from(monthMap.values())
         .sort((a, b) => a.month.getTime() - b.month.getTime());
       
@@ -506,7 +409,7 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
       res.json({ trends, providers });
     } else if (providerId) {
       // Get trend for specific provider - using application-level aggregation
-      // 1. Fetch ALL transactions for the provider in date range
+      // Uses exclusive end date (date < end) for consistency
       const query = `
         SELECT date, amount
         FROM transactions
@@ -514,12 +417,12 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
           AND currency = 'USD'
           AND insurance_provider_id = $1
           AND date >= $2
-          AND date <= $3
+          AND date < $3
       `;
       
       const txData = await pool.query(query, [providerId, start, end]);
       
-      // 2. Initialize ONLY the months in the requested range
+      // Initialize ONLY the months in the requested range
       const monthMap = new Map<string, { month: Date; revenue: number }>();
       
       // Get month boundaries
@@ -537,7 +440,7 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         cursor.setUTCMonth(cursor.getUTCMonth() + 1);
       }
       
-      // 3. Aggregate transactions into pre-initialized months
+      // Aggregate transactions into pre-initialized months
       for (const row of txData.rows) {
         const txDate = new Date(row.date);
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -549,14 +452,14 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         monthData.revenue += Number(row.amount);
       }
       
-      // 4. Convert to array and sort
+      // Convert to array and sort
       const trends = Array.from(monthMap.values())
         .sort((a, b) => a.month.getTime() - b.month.getTime());
       
       res.json({ trends });
     } else {
       // Get overall trend - using application-level aggregation (like Trends page)
-      // 1. Fetch ALL transactions in date range (no GROUP BY)
+      // Uses exclusive end date (date < end) for consistency
       const query = `
         SELECT date, amount
         FROM transactions
@@ -564,12 +467,12 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
           AND currency = 'USD'
           AND insurance_provider_id IS NOT NULL
           AND date >= $1
-          AND date <= $2
+          AND date < $2
       `;
       
       const txData = await pool.query(query, [start, end]);
       
-      // 2. Initialize ONLY the months in the requested range
+      // Initialize ONLY the months in the requested range
       const monthMap = new Map<string, { month: Date; revenue: number }>();
       
       // Get month boundaries
@@ -587,7 +490,7 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         cursor.setUTCMonth(cursor.getUTCMonth() + 1);
       }
       
-      // 3. Aggregate transactions into pre-initialized months
+      // Aggregate transactions into pre-initialized months
       for (const row of txData.rows) {
         const txDate = new Date(row.date);
         const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -599,7 +502,7 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
         monthData.revenue += Number(row.amount);
       }
       
-      // 4. Convert to array and sort
+      // Convert to array and sort
       const trends = Array.from(monthMap.values())
         .sort((a, b) => a.month.getTime() - b.month.getTime());
       
