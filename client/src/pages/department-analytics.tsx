@@ -26,7 +26,7 @@ import {
   ChartLoadingSkeleton,
   InsightsLoadingSkeleton,
 } from "@/features/department-analytics/components/LoadingSkeletons";
-import { formatSSP } from "@/features/department-analytics/utils/calculations";
+import { formatSSP, formatMonthSafely } from "@/features/department-analytics/utils/calculations";
 import { toast } from "@/hooks/use-toast";
 
 const filterOptions: Array<{ value: FilterPreset; label: string }> = [
@@ -76,15 +76,7 @@ export default function DepartmentAnalytics() {
         (dept) => dept.share.toFixed(2),
         (dept) => dept.growth.toFixed(2),
         (dept) => dept.avgPerMonth.toFixed(2),
-        (dept) => {
-          if (!dept.bestMonth || !dept.bestMonth.month) return '-';
-          try {
-            const date = parseISO(dept.bestMonth.month);
-            return isValid(date) ? format(date, 'MMM yyyy') : '-';
-          } catch {
-            return '-';
-          }
-        },
+        (dept) => dept.bestMonth ? formatMonthSafely(dept.bestMonth.month) : '-',
         (dept) => dept.bestMonth ? dept.bestMonth.revenue.toFixed(2) : '-',
       ];
       

@@ -9,9 +9,8 @@ import { Button } from "@/components/ui/button";
 import { LineChart, AreaChart as AreaChartIcon, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DepartmentMetrics, MonthlyTrendData } from "../utils/calculations";
-import { formatSSP } from "../utils/calculations";
+import { formatSSP, formatMonthSafely } from "../utils/calculations";
 import { useState, useMemo } from "react";
-import { format, isValid, parseISO } from "date-fns";
 import {
   ResponsiveContainer,
   LineChart as RechartsLineChart,
@@ -52,19 +51,8 @@ export function DepartmentTrendChart({ metrics, trendData }: DepartmentTrendChar
 
   const chartData = useMemo(() => {
     return trendData.map(monthData => {
-      // Safely parse and format the month
-      let formattedMonth = '-';
-      try {
-        const date = parseISO(monthData.month);
-        if (isValid(date)) {
-          formattedMonth = format(date, 'MMM yyyy');
-        }
-      } catch (err) {
-        console.warn(`Failed to format date: ${monthData.month}`, err);
-      }
-      
       const dataPoint: any = {
-        month: formattedMonth,
+        month: formatMonthSafely(monthData.month),
         date: monthData.month,
       };
 

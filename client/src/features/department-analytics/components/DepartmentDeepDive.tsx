@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { X, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DepartmentMetrics } from "../utils/calculations";
-import { formatSSP } from "../utils/calculations";
-import { format, isValid, parseISO } from "date-fns";
+import { formatSSP, formatMonthSafely } from "../utils/calculations";
 import {
   ResponsiveContainer,
   LineChart,
@@ -29,21 +28,10 @@ interface DepartmentDeepDiveProps {
 export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDiveProps) {
   if (!department) return null;
 
-  const chartData = department.monthlyData.map(d => {
-    let formattedMonth = '-';
-    try {
-      const date = parseISO(d.month);
-      if (isValid(date)) {
-        formattedMonth = format(date, 'MMM yyyy');
-      }
-    } catch (err) {
-      console.warn(`Failed to format date in deep dive: ${d.month}`, err);
-    }
-    return {
-      month: formattedMonth,
-      revenue: d.revenue,
-    };
-  });
+  const chartData = department.monthlyData.map(d => ({
+    month: formatMonthSafely(d.month),
+    revenue: d.revenue,
+  }));
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -182,14 +170,7 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
                       >
                         <td className="py-2 px-3 text-sm text-gray-900">
                           <div className="flex items-center gap-2">
-                            {(() => {
-                              try {
-                                const date = parseISO(month.month);
-                                return isValid(date) ? format(date, 'MMM yyyy') : '-';
-                              } catch {
-                                return '-';
-                              }
-                            })()}
+                            {formatMonthSafely(month.month)}
                             {isHighlight && (
                               <span className="text-xs bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded font-semibold">
                                 BEST
