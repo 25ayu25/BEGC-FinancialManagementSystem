@@ -14,9 +14,6 @@
  * @module utcDateUtils
  */
 
-import { formatInTimeZone } from 'date-fns-tz';
-import { format } from 'date-fns';
-
 /**
  * Create a UTC date at midnight (00:00:00.000Z)
  * This ensures consistent date boundaries regardless of local timezone

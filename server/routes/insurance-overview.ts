@@ -34,24 +34,7 @@ const router = Router();
 /* Helper Functions                                                    */
 /* ------------------------------------------------------------------ */
 
-/**
- * DEPRECATED: Use getMonthStart from utcDateUtils instead
- * Get the first day of the month for a given date in UTC
- */
-function getMonthStartLegacy(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
-/**
- * DEPRECATED: Replaced by getUTCDateRange from utcDateUtils
- * Calculate date range based on preset filter
- */
-function calculateDateRange(preset: string): { start: Date; end: Date } {
-  // This function is deprecated and kept only for backward compatibility
-  // Use getUTCDateRange from utcDateUtils for new code
-  const { startDate, endDate } = getUTCDateRange(preset);
-  return { start: startDate, end: endDate };
-}
+// No legacy helper functions needed - all date handling now uses utcDateUtils
 
 /* ------------------------------------------------------------------ */
 /* API Endpoints                                                       */
