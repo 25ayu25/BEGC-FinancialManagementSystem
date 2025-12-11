@@ -29,6 +29,13 @@ const router = Router();
 /* ------------------------------------------------------------------ */
 
 /**
+ * Get the first day of the month for a given date in UTC
+ */
+function getMonthStart(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+/**
  * Calculate date range based on preset filter
  */
 function calculateDateRange(preset: string): { start: Date; end: Date } {
@@ -80,7 +87,13 @@ function calculateDateRange(preset: string): { start: Date; end: Date } {
     }
     case 'this-year': {
       const start = new Date(currentYear, 0, 1);
-      const end = now; // Use today instead of Dec 31 for YTD consistency
+      
+      // Use LAST COMPLETE MONTH as end (not today)
+      // This matches Trends page behavior
+      const lastCompleteMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      const lastCompleteYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+      const end = new Date(lastCompleteYear, lastCompleteMonth + 1, 0); // Last day of last complete month
+      
       return { start, end };
     }
     case 'ytd': {
@@ -410,135 +423,171 @@ router.get("/trends", async (req: Request, res: Response, next: NextFunction) =>
     }
 
     if (byProvider && !providerId) {
-      // Get trends broken down by provider
+      // Get trends broken down by provider - using application-level aggregation
+      // 1. Fetch ALL transactions in date range
       const query = `
-        WITH monthly_provider_data AS (
-          SELECT 
-            DATE_TRUNC('month', t.date) as month,
-            ip.name as provider_name,
-            ip.id as provider_id,
-            SUM(t.amount) as revenue
-          FROM transactions t
-          INNER JOIN insurance_providers ip ON t.insurance_provider_id = ip.id
-          WHERE t.type = 'income'
-            AND t.currency = 'USD'
-            AND t.date >= $1
-            AND t.date <= $2
-            AND ip.is_active = true
-          GROUP BY DATE_TRUNC('month', t.date), ip.name, ip.id
-        )
         SELECT 
-          month,
-          provider_name,
-          provider_id,
-          revenue
-        FROM monthly_provider_data
-        WHERE month >= DATE_TRUNC('month', $1::timestamp)
-          AND month <= DATE_TRUNC('month', $2::timestamp)
-        ORDER BY month ASC, revenue DESC
-      `;
-      
-      const result = await pool.query(query, [start, end]);
-      
-      // Transform into format suitable for recharts multi-line
-      const monthMap = new Map<string, any>();
-      
-      result.rows.forEach(row => {
-        const monthKey = new Date(row.month).toISOString();
-        if (!monthMap.has(monthKey)) {
-          monthMap.set(monthKey, {
-            month: new Date(row.month),
-            total: 0
-          });
-        }
-        const monthData = monthMap.get(monthKey);
-        monthData[row.provider_name] = Number(row.revenue);
-        monthData.total += Number(row.revenue);
-      });
-      
-      const trends = Array.from(monthMap.values()).sort((a, b) => 
-        a.month.getTime() - b.month.getTime()
-      );
-      
-      // Get provider list for chart legends
-      const providersQuery = `
-        SELECT DISTINCT ip.id, ip.name
-        FROM insurance_providers ip
-        INNER JOIN transactions t ON t.insurance_provider_id = ip.id
+          t.date,
+          ip.name as provider_name,
+          ip.id as provider_id,
+          t.amount
+        FROM transactions t
+        INNER JOIN insurance_providers ip ON t.insurance_provider_id = ip.id
         WHERE t.type = 'income'
           AND t.currency = 'USD'
           AND t.date >= $1
           AND t.date <= $2
           AND ip.is_active = true
-        ORDER BY ip.name
       `;
-      const providersResult = await pool.query(providersQuery, [start, end]);
-      const providers = providersResult.rows.map(row => ({
-        id: row.id,
-        name: row.name
-      }));
+      
+      const txData = await pool.query(query, [start, end]);
+      
+      // 2. Initialize ONLY the months in the requested range
+      const monthMap = new Map<string, any>();
+      
+      // Get month boundaries
+      const startMonth = getMonthStart(start);
+      const endMonth = getMonthStart(end);
+      
+      // Pre-populate ONLY valid months
+      const cursor = new Date(startMonth);
+      while (cursor <= endMonth) {
+        const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+        monthMap.set(key, {
+          month: new Date(cursor),
+          total: 0
+        });
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      }
+      
+      // 3. Aggregate transactions by provider into pre-initialized months
+      for (const row of txData.rows) {
+        const txDate = new Date(row.date);
+        const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
+        
+        // Skip transaction outside date range - this prevents data leakage from edge months
+        if (!monthMap.has(key)) continue;
+        
+        const monthData = monthMap.get(key);
+        monthData[row.provider_name] = (monthData[row.provider_name] || 0) + Number(row.amount);
+        monthData.total += Number(row.amount);
+      }
+      
+      // 4. Convert to array and sort
+      const trends = Array.from(monthMap.values())
+        .sort((a, b) => a.month.getTime() - b.month.getTime());
+      
+      // Get provider list (unique providers that have transactions in this period)
+      const providerSet = new Map<string, { id: string; name: string }>();
+      for (const row of txData.rows) {
+        if (!providerSet.has(row.provider_id)) {
+          providerSet.set(row.provider_id, {
+            id: row.provider_id,
+            name: row.provider_name
+          });
+        }
+      }
+      const providers = Array.from(providerSet.values()).sort((a, b) => a.name.localeCompare(b.name));
       
       res.json({ trends, providers });
     } else if (providerId) {
-      // Get trend for specific provider
+      // Get trend for specific provider - using application-level aggregation
+      // 1. Fetch ALL transactions for the provider in date range
       const query = `
-        WITH provider_monthly AS (
-          SELECT 
-            DATE_TRUNC('month', t.date) as month,
-            SUM(t.amount) as revenue
-          FROM transactions t
-          WHERE t.type = 'income'
-            AND t.currency = 'USD'
-            AND t.insurance_provider_id = $1
-            AND t.date >= $2
-            AND t.date <= $3
-          GROUP BY DATE_TRUNC('month', t.date)
-        )
-        SELECT 
-          month,
-          revenue
-        FROM provider_monthly
-        WHERE month >= DATE_TRUNC('month', $2::timestamp)
-          AND month <= DATE_TRUNC('month', $3::timestamp)
-        ORDER BY month ASC
+        SELECT date, amount
+        FROM transactions
+        WHERE type = 'income'
+          AND currency = 'USD'
+          AND insurance_provider_id = $1
+          AND date >= $2
+          AND date <= $3
       `;
       
-      const result = await pool.query(query, [providerId, start, end]);
-      const trends = result.rows.map(row => ({
-        month: new Date(row.month),
-        revenue: Number(row.revenue)
-      }));
+      const txData = await pool.query(query, [providerId, start, end]);
+      
+      // 2. Initialize ONLY the months in the requested range
+      const monthMap = new Map<string, { month: Date; revenue: number }>();
+      
+      // Get month boundaries
+      const startMonth = getMonthStart(start);
+      const endMonth = getMonthStart(end);
+      
+      // Pre-populate ONLY valid months
+      const cursor = new Date(startMonth);
+      while (cursor <= endMonth) {
+        const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+        monthMap.set(key, {
+          month: new Date(cursor),
+          revenue: 0
+        });
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      }
+      
+      // 3. Aggregate transactions into pre-initialized months
+      for (const row of txData.rows) {
+        const txDate = new Date(row.date);
+        const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
+        
+        // Skip transaction outside date range - this prevents data leakage from edge months
+        if (!monthMap.has(key)) continue;
+        
+        const monthData = monthMap.get(key);
+        monthData.revenue += Number(row.amount);
+      }
+      
+      // 4. Convert to array and sort
+      const trends = Array.from(monthMap.values())
+        .sort((a, b) => a.month.getTime() - b.month.getTime());
       
       res.json({ trends });
     } else {
-      // Get overall trend
+      // Get overall trend - using application-level aggregation (like Trends page)
+      // 1. Fetch ALL transactions in date range (no GROUP BY)
       const query = `
-        WITH monthly_data AS (
-          SELECT 
-            DATE_TRUNC('month', date) as month,
-            SUM(amount) as revenue
-          FROM transactions
-          WHERE type = 'income'
-            AND currency = 'USD'
-            AND insurance_provider_id IS NOT NULL
-            AND date >= $1
-            AND date <= $2
-          GROUP BY DATE_TRUNC('month', date)
-        )
-        SELECT 
-          month,
-          revenue
-        FROM monthly_data
-        WHERE month >= DATE_TRUNC('month', $1::timestamp)
-          AND month <= DATE_TRUNC('month', $2::timestamp)
-        ORDER BY month ASC
+        SELECT date, amount
+        FROM transactions
+        WHERE type = 'income'
+          AND currency = 'USD'
+          AND insurance_provider_id IS NOT NULL
+          AND date >= $1
+          AND date <= $2
       `;
       
-      const result = await pool.query(query, [start, end]);
-      const trends = result.rows.map(row => ({
-        month: new Date(row.month),
-        revenue: Number(row.revenue)
-      }));
+      const txData = await pool.query(query, [start, end]);
+      
+      // 2. Initialize ONLY the months in the requested range
+      const monthMap = new Map<string, { month: Date; revenue: number }>();
+      
+      // Get month boundaries
+      const startMonth = getMonthStart(start);
+      const endMonth = getMonthStart(end);
+      
+      // Pre-populate ONLY valid months
+      const cursor = new Date(startMonth);
+      while (cursor <= endMonth) {
+        const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+        monthMap.set(key, {
+          month: new Date(cursor),
+          revenue: 0
+        });
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      }
+      
+      // 3. Aggregate transactions into pre-initialized months
+      for (const row of txData.rows) {
+        const txDate = new Date(row.date);
+        const key = `${txDate.getUTCFullYear()}-${String(txDate.getUTCMonth() + 1).padStart(2, '0')}`;
+        
+        // Skip transaction outside date range - this prevents data leakage from edge months
+        if (!monthMap.has(key)) continue;
+        
+        const monthData = monthMap.get(key);
+        monthData.revenue += Number(row.amount);
+      }
+      
+      // 4. Convert to array and sort
+      const trends = Array.from(monthMap.values())
+        .sort((a, b) => a.month.getTime() - b.month.getTime());
       
       res.json({ trends });
     }
