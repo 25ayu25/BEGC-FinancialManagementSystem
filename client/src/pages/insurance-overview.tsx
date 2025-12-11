@@ -21,6 +21,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
+import { getDateRange, type RangeKey } from "@/lib/dateRanges";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
@@ -130,6 +131,32 @@ export default function InsuranceOverview() {
     ],
   });
 
+  // Helper function to calculate date ranges on frontend with stable timestamp
+  // This prevents timezone-related off-by-one errors when the backend calculates ranges
+  const calculateDateRange = (preset: FilterPreset, providedStartDate?: Date, providedEndDate?: Date): { startDate?: Date; endDate?: Date } => {
+    // Use provided dates for custom ranges
+    if (providedStartDate && providedEndDate) {
+      return { startDate: providedStartDate, endDate: providedEndDate };
+    }
+    
+    // For 'this-year' and 'ytd' presets: Both represent "year to date" functionality.
+    // We map both to the 'this-year' RangeKey when calling getDateRange, which
+    // calculates the range from January 1 of current year to last complete month
+    if (preset === 'this-year' || preset === 'ytd') {
+      const dateRange = getDateRange('this-year', now);
+      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+    
+    // For 'last-year', calculate the full previous calendar year
+    if (preset === 'last-year') {
+      const dateRange = getDateRange('last-year', now);
+      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+    
+    // For other presets, let the backend handle the calculation
+    return {};
+  };
+
   const fetchAnalytics = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
     try {
       setLoading(true);
@@ -137,8 +164,13 @@ export default function InsuranceOverview() {
 
       let url = `/api/insurance-overview/analytics?preset=${preset}`;
       
-      if (preset === 'custom' && startDate && endDate) {
-        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      // Calculate date range using helper function
+      const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
+      
+      // Pass calculated dates to API if available (fixes timezone bug)
+      // The API supports explicit dates for all presets, not just 'custom'
+      if (effectiveStartDate && effectiveEndDate) {
+        url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
 
       const response = await api.get(url);
@@ -172,12 +204,17 @@ export default function InsuranceOverview() {
       // Use the selected preset directly - the API will return appropriate granularity
       let url = `/api/insurance-overview/trends?preset=${preset}`;
       
+      // Calculate date range using helper function
+      const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
+      
       if (showProviderBreakdown) {
         url += '&byProvider=true';
       }
       
-      if (preset === 'custom' && startDate && endDate) {
-        url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      // Pass calculated dates to API if available (fixes timezone bug)
+      // The API supports explicit dates for all presets, not just 'custom'
+      if (effectiveStartDate && effectiveEndDate) {
+        url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
       }
 
       const response = await api.get(url);
