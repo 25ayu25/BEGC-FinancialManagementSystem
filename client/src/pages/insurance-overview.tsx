@@ -22,6 +22,7 @@ import { Filter, RefreshCw, AlertTriangle, FileX, Calendar as CalendarIcon, Down
 import { format } from "date-fns";
 import { api } from "@/lib/queryClient";
 import { getDateRange, type RangeKey } from "@/lib/dateRanges";
+import { getUTCDateRange, formatDateForAPI, createUTCDate } from "@/lib/utcDateUtils";
 import { RevenueOverviewCard } from "@/features/insurance-overview/components/RevenueOverviewCard";
 import { ShareByProviderChart } from "@/features/insurance-overview/components/ShareByProviderChart";
 import { ProviderPerformanceCards } from "@/features/insurance-overview/components/ProviderPerformanceCards";
@@ -131,38 +132,30 @@ export default function InsuranceOverview() {
     ],
   });
 
-  // Helper function to calculate date ranges on frontend with stable timestamp
-  // This prevents timezone-related off-by-one errors when the backend calculates ranges
-  // Sends explicit dates for timezone-sensitive presets to ensure consistency
+  // Helper function to calculate date ranges in UTC on frontend
+  // This ensures consistent date boundaries regardless of local timezone
+  // All dates are calculated and sent to backend in UTC to prevent off-by-one errors
   const calculateDateRange = (preset: FilterPreset, providedStartDate?: Date, providedEndDate?: Date): { startDate?: Date; endDate?: Date } => {
-    // Use provided dates for custom ranges
+    // Use provided dates for custom ranges (already in local time, will be converted to UTC for API)
     if (providedStartDate && providedEndDate) {
-      return { startDate: providedStartDate, endDate: providedEndDate };
+      // Convert local dates to UTC dates at midnight
+      const startYear = providedStartDate.getFullYear();
+      const startMonth = providedStartDate.getMonth() + 1; // 1-indexed
+      const startDay = providedStartDate.getDate();
+      const endYear = providedEndDate.getFullYear();
+      const endMonth = providedEndDate.getMonth() + 1; // 1-indexed
+      const endDay = providedEndDate.getDate();
+      
+      return { 
+        startDate: createUTCDate(startYear, startMonth, startDay),
+        endDate: createUTCDate(endYear, endMonth, endDay)
+      };
     }
     
-    // For 'this-year': Show full year to date (up to last complete month)
-    // This excludes the current incomplete month for cleaner data visualization
-    if (preset === 'this-year') {
-      const dateRange = getDateRange('this-year', now);
-      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
-    }
-    
-    // For 'ytd': Show year to date including current incomplete month
-    // This is useful for real-time tracking of current year performance
-    if (preset === 'ytd') {
-      const startDate = new Date(now.getFullYear(), 0, 1); // January 1 of current year
-      const endDate = now; // Today
-      return { startDate, endDate };
-    }
-    
-    // For 'last-year', calculate the full previous calendar year
-    if (preset === 'last-year') {
-      const dateRange = getDateRange('last-year', now);
-      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
-    }
-    
-    // For other presets, let the backend handle the calculation
-    return {};
+    // Use UTC date range calculator for all presets
+    // This ensures consistent date boundaries across all timezones
+    const { startDate, endDate } = getUTCDateRange(preset, now);
+    return { startDate, endDate };
   };
 
   const fetchAnalytics = async (preset: FilterPreset, startDate?: Date, endDate?: Date) => {
@@ -172,13 +165,13 @@ export default function InsuranceOverview() {
 
       let url = `/api/insurance-overview/analytics?preset=${preset}`;
       
-      // Calculate date range using helper function
+      // Calculate date range using UTC helper function
       const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
       
-      // Pass calculated dates to API if available (fixes timezone bug)
-      // The API supports explicit dates for all presets, not just 'custom'
+      // Always pass explicit UTC dates to API using timezone-agnostic YYYY-MM-DD format
+      // This ensures the backend receives and interprets dates consistently
       if (effectiveStartDate && effectiveEndDate) {
-        url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
+        url += `&startDate=${formatDateForAPI(effectiveStartDate)}&endDate=${formatDateForAPI(effectiveEndDate)}`;
       }
 
       const response = await api.get(url);
@@ -212,17 +205,16 @@ export default function InsuranceOverview() {
       // Use the selected preset directly - the API will return appropriate granularity
       let url = `/api/insurance-overview/trends?preset=${preset}`;
       
-      // Calculate date range using helper function
+      // Calculate date range using UTC helper function
       const { startDate: effectiveStartDate, endDate: effectiveEndDate } = calculateDateRange(preset, startDate, endDate);
       
       if (showProviderBreakdown) {
         url += '&byProvider=true';
       }
       
-      // Pass calculated dates to API if available (fixes timezone bug)
-      // The API supports explicit dates for all presets, not just 'custom'
+      // Always pass explicit UTC dates to API using timezone-agnostic YYYY-MM-DD format
       if (effectiveStartDate && effectiveEndDate) {
-        url += `&startDate=${effectiveStartDate.toISOString()}&endDate=${effectiveEndDate.toISOString()}`;
+        url += `&startDate=${formatDateForAPI(effectiveStartDate)}&endDate=${formatDateForAPI(effectiveEndDate)}`;
       }
 
       const response = await api.get(url);
