@@ -14,39 +14,13 @@ import {
   type MonthlyTrendData
 } from "../utils/calculations";
 import { 
-  startOfYear, 
-  endOfYear, 
-  startOfMonth, 
-  endOfMonth, 
-  subMonths,
-  subYears,
-  startOfQuarter,
-  endOfQuarter,
-  format,
-  isValid,
-  parseISO
-} from "date-fns";
+  getDateRange,
+  formatDateForAPI,
+  type RangeKey
+} from "@/lib/dateRanges";
+import { format } from "date-fns";
 
-/**
- * Safely parse a date string and validate it
- */
-function parseDateSafely(dateString: string | null | undefined): Date | null {
-  if (!dateString) return null;
-  try {
-    const date = parseISO(dateString);
-    return isValid(date) ? date : null;
-  } catch {
-    return null;
-  }
-}
-
-export type FilterPreset = 
-  | 'this-year' 
-  | 'last-year' 
-  | 'last-6-months' 
-  | 'last-3-months' 
-  | 'this-quarter' 
-  | 'custom';
+export type FilterPreset = RangeKey | 'custom';
 
 interface DateRange {
   startDate: Date;
@@ -59,40 +33,17 @@ interface DateRange {
 function getDateRangeForPreset(preset: FilterPreset, customRange?: DateRange): DateRange {
   const now = new Date();
   
-  switch (preset) {
-    case 'this-year':
-      return {
-        startDate: startOfYear(now),
-        endDate: endOfYear(now),
-      };
-    case 'last-year':
-      return {
-        startDate: startOfYear(subYears(now, 1)),
-        endDate: endOfYear(subYears(now, 1)),
-      };
-    case 'last-6-months':
-      return {
-        startDate: startOfMonth(subMonths(now, 5)),
-        endDate: endOfMonth(now),
-      };
-    case 'last-3-months':
-      return {
-        startDate: startOfMonth(subMonths(now, 2)),
-        endDate: endOfMonth(now),
-      };
-    case 'this-quarter':
-      return {
-        startDate: startOfQuarter(now),
-        endDate: endOfQuarter(now),
-      };
-    case 'custom':
-      return customRange || { startDate: startOfYear(now), endDate: endOfYear(now) };
-    default:
-      return {
-        startDate: startOfYear(now),
-        endDate: endOfYear(now),
-      };
+  // For custom range, return it directly
+  if (preset === 'custom') {
+    return customRange || { startDate: new Date(now.getFullYear(), 0, 1), endDate: now };
   }
+  
+  // Use the centralized date range helper for standard presets
+  const range = getDateRange(preset as RangeKey, now);
+  return {
+    startDate: range.startDate,
+    endDate: range.endDate,
+  };
 }
 
 /**
@@ -136,32 +87,28 @@ export function useDepartmentAnalytics(
   } = useQuery({
     queryKey: ['monthly-revenue', dateRange.startDate, dateRange.endDate],
     queryFn: async () => {
-      const startStr = format(dateRange.startDate, 'yyyy-MM-dd');
-      const endStr = format(dateRange.endDate, 'yyyy-MM-dd');
+      const startStr = formatDateForAPI(dateRange.startDate);
+      const endStr = formatDateForAPI(dateRange.endDate);
       const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
       
-      // Transform API response to our format
+      // Transform API response to our format (same pattern as dashboard.tsx)
       const data = response.data as Array<{
         month: string;
+        fullMonth: string;
+        year: number;
+        monthNum: number;
         revenue: number;
         departmentBreakdown?: Record<string, number>;
       }>;
       
-      return data
-        .map(item => {
-          const parsedDate = parseDateSafely(item.month);
-          if (!parsedDate) {
-            console.warn(`Invalid date in trend data: ${item.month}`);
-            return null;
-          }
-          return {
-            month: item.month,
-            date: parsedDate,
-            revenue: item.revenue,
-            departmentBreakdown: item.departmentBreakdown || {},
-          };
-        })
-        .filter((item): item is MonthlyTrendData => item !== null);
+      return data.map((item): MonthlyTrendData => ({
+        month: item.month,
+        fullMonth: item.fullMonth,
+        year: item.year,
+        monthNum: item.monthNum,
+        revenue: item.revenue || 0,
+        departmentBreakdown: item.departmentBreakdown || {},
+      }));
     },
     enabled: !!dateRange.startDate && !!dateRange.endDate,
   });
@@ -173,31 +120,27 @@ export function useDepartmentAnalytics(
   } = useQuery({
     queryKey: ['monthly-revenue-prev', prevDateRange.startDate, prevDateRange.endDate],
     queryFn: async () => {
-      const startStr = format(prevDateRange.startDate, 'yyyy-MM-dd');
-      const endStr = format(prevDateRange.endDate, 'yyyy-MM-dd');
+      const startStr = formatDateForAPI(prevDateRange.startDate);
+      const endStr = formatDateForAPI(prevDateRange.endDate);
       const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
       
       const data = response.data as Array<{
         month: string;
+        fullMonth: string;
+        year: number;
+        monthNum: number;
         revenue: number;
         departmentBreakdown?: Record<string, number>;
       }>;
       
-      return data
-        .map(item => {
-          const parsedDate = parseDateSafely(item.month);
-          if (!parsedDate) {
-            console.warn(`Invalid date in previous trend data: ${item.month}`);
-            return null;
-          }
-          return {
-            month: item.month,
-            date: parsedDate,
-            revenue: item.revenue,
-            departmentBreakdown: item.departmentBreakdown || {},
-          };
-        })
-        .filter((item): item is MonthlyTrendData => item !== null);
+      return data.map((item): MonthlyTrendData => ({
+        month: item.month,
+        fullMonth: item.fullMonth,
+        year: item.year,
+        monthNum: item.monthNum,
+        revenue: item.revenue || 0,
+        departmentBreakdown: item.departmentBreakdown || {},
+      }));
     },
     enabled: !!prevDateRange.startDate && !!prevDateRange.endDate,
   });

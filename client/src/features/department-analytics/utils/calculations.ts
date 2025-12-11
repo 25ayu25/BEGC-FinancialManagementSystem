@@ -13,16 +13,30 @@ export interface DepartmentMetrics {
   revenue: number;
   share: number;
   avgPerMonth: number;
-  bestMonth: { month: string; revenue: number } | null;
+  bestMonth: { 
+    month: string; 
+    fullMonth?: string;
+    year?: number;
+    monthNum?: number;
+    revenue: number;
+  } | null;
   growth: number;
   rank: number;
-  monthlyData: Array<{ month: string; revenue: number }>;
+  monthlyData: Array<{ 
+    month: string; 
+    fullMonth?: string;
+    year?: number;
+    monthNum?: number;
+    revenue: number;
+  }>;
   color?: string;
 }
 
 export interface MonthlyTrendData {
   month: string;
-  date: Date;
+  fullMonth?: string;
+  year: number;
+  monthNum: number;
   revenue: number;
   departmentBreakdown: Record<string, number>;
 }
@@ -48,7 +62,13 @@ export function calculateDepartmentMetrics(
 
   // Calculate total revenue per department for current period
   const deptRevenue = new Map<string, number>();
-  const deptMonthlyData = new Map<string, Array<{ month: string; revenue: number }>>();
+  const deptMonthlyData = new Map<string, Array<{ 
+    month: string; 
+    fullMonth?: string;
+    year?: number;
+    monthNum?: number;
+    revenue: number;
+  }>>();
 
   trendData.forEach((monthData) => {
     Object.entries(monthData.departmentBreakdown || {}).forEach(([deptId, amount]) => {
@@ -59,6 +79,9 @@ export function calculateDepartmentMetrics(
       }
       deptMonthlyData.get(deptId)!.push({
         month: monthData.month,
+        fullMonth: monthData.fullMonth,
+        year: monthData.year,
+        monthNum: monthData.monthNum,
         revenue: amount,
       });
     });
@@ -217,16 +240,39 @@ export function formatSSP(amount: number, compact: boolean = false): string {
 }
 
 /**
- * Safely format a date string to a readable format
+ * Safely format a month to a readable format
+ * Can accept either a short month string or a MonthlyTrendData-like object
  */
-export function formatMonthSafely(dateString: string | null | undefined, formatPattern: string = 'MMM yyyy'): string {
-  if (!dateString) return '-';
+export function formatMonthSafely(
+  monthData: string | { month?: string; fullMonth?: string; year?: number; monthNum?: number } | null | undefined,
+  formatPattern: string = 'MMM yyyy'
+): string {
+  if (!monthData) return '-';
+  
   try {
-    const date = parseISO(dateString);
-    if (!isValid(date)) return '-';
-    return format(date, formatPattern);
+    // If it's a string, return it directly (already formatted like "Nov")
+    if (typeof monthData === 'string') {
+      return monthData;
+    }
+    
+    // If it's an object with fullMonth, use that for 'MMMM yyyy' format
+    if (monthData.fullMonth && (formatPattern === 'MMMM yyyy' || formatPattern === 'MMM yyyy')) {
+      return monthData.fullMonth;
+    }
+    
+    // If it's an object with year and monthNum, construct a date
+    // Use explicit null/undefined checks to handle monthNum: 0 (January) correctly
+    if (monthData.year != null && monthData.monthNum != null) {
+      const date = new Date(monthData.year, monthData.monthNum - 1, 1);
+      if (isValid(date)) {
+        return format(date, formatPattern);
+      }
+    }
+    
+    // Fallback to month field (short month name)
+    return monthData.month || '-';
   } catch (err) {
-    console.warn(`Failed to format date: ${dateString}`, err);
+    console.warn(`Failed to format month:`, monthData, err);
     return '-';
   }
 }

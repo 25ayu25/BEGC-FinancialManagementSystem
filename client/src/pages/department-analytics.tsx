@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Download, FileText, Calendar as CalendarIcon, Building2 } from "lucide-react";
-import { format, isValid, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/layout/PageHeader";
 import HeaderAction from "@/components/layout/HeaderAction";
@@ -28,13 +28,10 @@ import {
 } from "@/features/department-analytics/components/LoadingSkeletons";
 import { formatSSP, formatMonthSafely } from "@/features/department-analytics/utils/calculations";
 import { toast } from "@/hooks/use-toast";
+import { filterOptions as centralizedFilterOptions } from "@/lib/dateRanges";
 
 const filterOptions: Array<{ value: FilterPreset; label: string }> = [
-  { value: 'this-year', label: 'This Year' },
-  { value: 'last-year', label: 'Last Year' },
-  { value: 'last-6-months', label: 'Last 6 Months' },
-  { value: 'last-3-months', label: 'Last 3 Months' },
-  { value: 'this-quarter', label: 'This Quarter' },
+  ...centralizedFilterOptions,
   { value: 'custom', label: 'Custom Range' },
 ];
 
@@ -76,7 +73,7 @@ export default function DepartmentAnalytics() {
         (dept) => dept.share.toFixed(2),
         (dept) => dept.growth.toFixed(2),
         (dept) => dept.avgPerMonth.toFixed(2),
-        (dept) => dept.bestMonth ? formatMonthSafely(dept.bestMonth.month) : '-',
+        (dept) => dept.bestMonth ? (dept.bestMonth.fullMonth || formatMonthSafely(dept.bestMonth)) : '-',
         (dept) => dept.bestMonth ? dept.bestMonth.revenue.toFixed(2) : '-',
       ];
       

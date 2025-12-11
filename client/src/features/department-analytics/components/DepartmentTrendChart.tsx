@@ -52,7 +52,7 @@ export function DepartmentTrendChart({ metrics, trendData }: DepartmentTrendChar
   const chartData = useMemo(() => {
     return trendData.map(monthData => {
       const dataPoint: any = {
-        month: formatMonthSafely(monthData.month),
+        month: monthData.fullMonth || formatMonthSafely(monthData),
         date: monthData.month,
       };
 
