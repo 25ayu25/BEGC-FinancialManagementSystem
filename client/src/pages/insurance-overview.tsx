@@ -165,10 +165,8 @@ export default function InsuranceOverview() {
     try {
       setLoadingTrend(true);
       
-      // Use last 6 months for trend by default
-      let trendPreset = preset === 'current-month' || preset === 'last-month' ? 'last-6-months' : preset;
-      
-      let url = `/api/insurance-overview/trends?preset=${trendPreset}`;
+      // Use the selected preset directly - the API will return appropriate granularity
+      let url = `/api/insurance-overview/trends?preset=${preset}`;
       
       if (showProviderBreakdown) {
         url += '&byProvider=true';

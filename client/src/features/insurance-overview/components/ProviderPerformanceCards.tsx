@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, ChevronLeft, ChevronRight, Award, AlertTriangle } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
 import { useIsMobile, useIsTablet } from "../hooks/useMediaQuery";
 import { formatCurrency } from "@/lib/currency";
@@ -132,6 +132,10 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
             const isPositive = provider.vsLastMonth >= 0;
             const TrendIcon = isPositive ? TrendingUp : TrendingDown;
             const medalStyle = getMedalStyle(provider.rank, provider.color);
+            
+            // Determine performance badge
+            const isTopPerformer = provider.rank === 1;
+            const needsAttention = provider.vsLastMonth < -10; // More than 10% decline
 
             return (
               <div
@@ -146,37 +150,62 @@ export function ProviderPerformanceCards({ providers }: ProviderPerformanceCards
                   min-h-[200px]
                   touch-manipulation
                   backdrop-blur-sm
+                  relative
                 `}
               >
-                {/* Header with Rank and Name */}
+                {/* Performance Badge - TOP PERFORMER or NEEDS ATTENTION */}
+                {(isTopPerformer || needsAttention) && (
+                  <div className="absolute top-3 right-3">
+                    {isTopPerformer && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 text-xs font-bold shadow-md">
+                        <Award className="w-3 h-3" />
+                        TOP PERFORMER
+                      </span>
+                    )}
+                    {needsAttention && !isTopPerformer && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-red-500 to-rose-600 text-white text-xs font-bold shadow-md">
+                        <AlertTriangle className="w-3 h-3" />
+                        NEEDS ATTENTION
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                {/* Header with Rank Number and Name */}
                 <div className="flex items-start justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     {provider.rank <= 3 ? (
                       <div className={`
-                        w-8 h-8 sm:w-10 sm:h-10 rounded-full 
+                        w-10 h-10 sm:w-12 sm:h-12 rounded-full 
                         ${medalStyle.badge}
                         flex items-center justify-center
                         ${transitions.base}
                         group-hover:scale-110 group-hover:rotate-12
+                        relative
                       `}>
-                        <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white flex items-center justify-center text-xs font-bold shadow-md">
+                          {provider.rank}
+                        </span>
                       </div>
                     ) : (
                       <div className={`
-                        w-8 h-8 sm:w-10 sm:h-10 rounded-full
+                        w-10 h-10 sm:w-12 sm:h-12 rounded-full
                         ${medalStyle.badge}
                         flex items-center justify-center
                         ${transitions.base}
                         group-hover:scale-110
                       `}>
-                        <span className="text-xs sm:text-sm font-bold">
+                        <span className="text-sm sm:text-base font-bold">
                           #{provider.rank}
                         </span>
                       </div>
                     )}
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                      {provider.name}
-                    </h3>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                        {provider.name}
+                      </h3>
+                    </div>
                   </div>
                 </div>
 

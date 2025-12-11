@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Building2, DollarSign, Target, Calendar, TrendingUpIcon } from "lucide-react";
 import { transitions, shadows, hover } from "../utils/animations";
 import { formatCurrency } from "@/lib/currency";
-import { Sparkline } from "./Sparkline";
 import { format } from "date-fns";
 
 interface RevenueOverviewCardProps {
@@ -61,13 +60,6 @@ export function RevenueOverviewCard({
   
   // Animated revenue counter with faster speed (500ms)
   const animatedRevenue = useAnimatedCounter(Math.round(totalRevenue), 500);
-  
-  // Determine sparkline trend
-  const sparklineTrend = trendData.length >= 2 && trendData[trendData.length - 1] > trendData[0] 
-    ? 'up' 
-    : trendData.length >= 2 && trendData[trendData.length - 1] < trendData[0] 
-    ? 'down' 
-    : 'neutral';
 
   return (
     <div className={`
@@ -89,34 +81,21 @@ export function RevenueOverviewCard({
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue Overview</h2>
         
         <div className="space-y-5">
-          {/* Total Revenue with Sparkline Trend */}
+          {/* Total Revenue Section */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                {/* Prominent USD Currency Label */}
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border border-emerald-200/60 text-emerald-700 text-xs font-semibold">
-                  <DollarSign className="w-3 h-3" />
-                  USD
-                </span>
-              </div>
-              {/* Sparkline */}
-              {trendData.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Sparkline 
-                    data={trendData} 
-                    trend={sparklineTrend}
-                    width={100}
-                    height={32}
-                  />
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              {/* Prominent USD Currency Label */}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border border-emerald-200/60 text-emerald-700 text-xs font-semibold">
+                <DollarSign className="w-3 h-3" />
+                USD
+              </span>
             </div>
             <div className="flex items-end justify-between gap-4">
               <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
                 {formatCurrency(animatedRevenue)}
               </p>
-              {/* Single Trend indicator */}
+              {/* Trend indicator with vs Last Month */}
               <div className={`
                 flex items-center gap-2 px-3 py-2 rounded-lg
                 ${isPositive 
