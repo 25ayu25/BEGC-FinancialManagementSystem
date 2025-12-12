@@ -12,7 +12,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Download, FileText, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import PageHeader from "@/components/layout/PageHeader";
 import HeaderAction from "@/components/layout/HeaderAction";
 import { useInsuranceOverview, type FilterPreset } from "@/features/insurance-overview/hooks/useInsuranceOverview";
 import { InsuranceKPICards } from "@/features/insurance-overview/components/InsuranceKPICards";
@@ -126,87 +125,96 @@ export default function InsuranceOverview() {
         </div>
 
         {/* Content */}
-        <div className="relative z-10">
-          <PageHeader
-            title="Insurance Overview"
-            subtitle="Comprehensive insurance provider analytics and performance tracking"
-            className="text-white"
-          >
-            <div className="flex flex-wrap gap-3">
-              {/* Date filter */}
-              <Select value={selectedFilter} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-[180px] bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white transition-colors">
-                  <SelectValue placeholder="Select period" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filterOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Custom date picker */}
-              {showCustomDatePicker && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-[240px] justify-start text-left font-normal bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white",
-                        !customDateRange.start && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customDateRange.start && customDateRange.end ? (
-                        <>
-                          {format(customDateRange.start, "MMM d, yyyy")} -{" "}
-                          {format(customDateRange.end, "MMM d, yyyy")}
-                        </>
-                      ) : (
-                        <span>Pick date range</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <div className="p-3 space-y-3">
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Start Date</label>
-                        <Calendar
-                          mode="single"
-                          selected={customDateRange.start}
-                          onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">End Date</label>
-                        <Calendar
-                          mode="single"
-                          selected={customDateRange.end}
-                          onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
-                        />
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
-
-              {/* Export buttons */}
-              <HeaderAction
-                icon={<Download className="w-4 h-4" />}
-                label="Export CSV"
-                onClick={handleExportCSV}
-                className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white text-violet-700"
-              />
-              <HeaderAction
-                icon={<FileText className="w-4 h-4" />}
-                label="Export PDF"
-                onClick={handleExportPDF}
-                className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white text-violet-700"
-              />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            {/* Left: Title and Subtitle */}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                Insurance Overview
+              </h1>
+              <p className="mt-1 text-sm sm:text-base text-violet-100">
+                Comprehensive insurance provider analytics and performance tracking
+              </p>
             </div>
-          </PageHeader>
+
+            {/* Right: Controls */}
+            <div className="flex-shrink-0 flex items-center gap-2">
+              <div className="flex flex-wrap gap-3">
+                {/* Date filter */}
+                <Select value={selectedFilter} onValueChange={handleFilterChange}>
+                  <SelectTrigger className="w-[180px] bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white transition-colors">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filterOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Custom date picker */}
+                {showCustomDatePicker && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white",
+                          !customDateRange.start && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customDateRange.start && customDateRange.end ? (
+                          <>
+                            {format(customDateRange.start, "MMM d, yyyy")} -{" "}
+                            {format(customDateRange.end, "MMM d, yyyy")}
+                          </>
+                        ) : (
+                          <span>Pick date range</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Start Date</label>
+                          <Calendar
+                            mode="single"
+                            selected={customDateRange.start}
+                            onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">End Date</label>
+                          <Calendar
+                            mode="single"
+                            selected={customDateRange.end}
+                            onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+
+                {/* Export buttons */}
+                <HeaderAction
+                  icon={<Download className="w-4 h-4" />}
+                  label="Export CSV"
+                  onClick={handleExportCSV}
+                  className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white text-violet-700"
+                />
+                <HeaderAction
+                  icon={<FileText className="w-4 h-4" />}
+                  label="Export PDF"
+                  onClick={handleExportPDF}
+                  className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white text-violet-700"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
