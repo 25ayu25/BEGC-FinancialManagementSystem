@@ -45,17 +45,17 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+      <DialogContent className="max-w-5xl max-h-[95vh] bg-white dark:bg-gray-900 shadow-2xl border-2 border-violet-200 dark:border-violet-800 overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
             {provider.name} - Deep Dive Analysis
           </DialogTitle>
-          <DialogDescription>
-            Comprehensive performance metrics and trends
+          <DialogDescription className="text-base text-gray-600 dark:text-gray-400">
+            Comprehensive performance metrics and 12-month trends
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6 px-1">
+        <div className="overflow-y-auto max-h-[calc(95vh-120px)] space-y-6 py-4">
           {/* Key Metrics Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card>
@@ -99,22 +99,11 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
             </Card>
           </div>
 
-          {/* Status and Claims Info */}
-          <div className="flex items-center justify-between p-4 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Badge variant="default" className="bg-violet-600">
-                {provider.status}
-              </Badge>
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                {provider.claimsCount.toLocaleString()} claims processed
-              </span>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-600 dark:text-gray-400">Avg Claim Value</p>
-              <p className="text-lg font-bold text-violet-600">
-                {formatUSD(provider.avgClaim)}
-              </p>
-            </div>
+          {/* Provider Status Badge */}
+          <div className="flex items-center justify-center p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl border border-violet-200 dark:border-violet-800">
+            <Badge className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white px-6 py-2 text-base font-semibold shadow-lg">
+              {provider.status}
+            </Badge>
           </div>
 
           {/* Revenue Trend Chart */}
