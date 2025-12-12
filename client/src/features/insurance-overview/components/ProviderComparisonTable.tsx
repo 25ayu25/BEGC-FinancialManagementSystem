@@ -228,7 +228,7 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
                     );
                   } else {
                     return (
-                      <div className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-purple-600 text-white text-sm font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-purple-600 text-white text-sm font-bold shadow-xl transform hover:scale-110 transition-transform">
                         {rank}
                       </div>
                     );
