@@ -74,12 +74,31 @@ function getCategoryIcon(categoryName: string) {
   return Package;
 }
 
-// Get status badge based on percentage
-function getStatusBadge(percentage: number) {
-  if (percentage >= 15) return { label: 'TOP SPENDER', color: 'bg-red-100 text-red-700 border-red-300' };
-  if (percentage >= 10) return { label: 'HIGH SPEND', color: 'bg-orange-100 text-orange-700 border-orange-300' };
-  if (percentage >= 5) return { label: 'MODERATE', color: 'bg-blue-100 text-blue-700 border-blue-300' };
-  return { label: 'LOW SPEND', color: 'bg-gray-100 text-gray-700 border-gray-300' };
+// Get status badge based on rank and percentage
+function getStatusBadge(rank: number, percentage: number) {
+  // Only #1 gets TOP SPENDER if it's >= 15%
+  if (rank === 1 && percentage >= 15) {
+    return { label: 'TOP SPENDER', color: 'bg-red-100 text-red-700 border-red-300' };
+  }
+  // HIGH SPEND for >= 10%
+  if (percentage >= 10) {
+    return { label: 'HIGH SPEND', color: 'bg-orange-100 text-orange-700 border-orange-300' };
+  }
+  // MODERATE for >= 5%
+  if (percentage >= 5) {
+    return { label: 'MODERATE', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' };
+  }
+  // LOW SPEND for < 5%
+  return { label: 'LOW SPEND', color: 'bg-slate-100 text-slate-600 border-slate-300' };
+}
+
+// Get rank badge gradient based on rank
+function getRankGradient(rank: number) {
+  if (rank === 1) return "bg-gradient-to-br from-yellow-400 to-amber-500"; // Gold
+  if (rank === 2) return "bg-gradient-to-br from-gray-300 to-gray-400"; // Silver
+  if (rank === 3) return "bg-gradient-to-br from-orange-400 to-amber-600"; // Bronze
+  if (rank <= 6) return "bg-gradient-to-br from-blue-400 to-blue-500"; // Dark blue
+  return "bg-gradient-to-br from-blue-300 to-blue-400"; // Light blue
 }
 
 function Sparkline({ data, colorClass }: { data: Array<{ month: string; amount: number }>; colorClass: string }) {
@@ -143,24 +162,29 @@ export function CategoryPerformanceGrid({
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {metrics.map((category, index) => {
+        const rank = index + 1;
         const growthIcon = category.growth > 5 ? TrendingUp : category.growth < -5 ? TrendingDown : Minus;
         const growthColor = category.growth > 5 ? "text-red-600" : category.growth < -5 ? "text-green-600" : "text-gray-500";
         const GrowthIcon = growthIcon;
         const CategoryIcon = getCategoryIcon(category.name);
-        const statusBadge = getStatusBadge(category.percentage);
+        const statusBadge = getStatusBadge(rank, category.percentage);
         const sparklineColor = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
 
-        // Rank badge gradient
-        let rankBadgeClass = "bg-gradient-to-br from-blue-400 to-blue-600";
-        if (index === 0) rankBadgeClass = "bg-gradient-to-br from-yellow-400 to-amber-500";
-        if (index === 1) rankBadgeClass = "bg-gradient-to-br from-gray-300 to-gray-400";
-        if (index === 2) rankBadgeClass = "bg-gradient-to-br from-orange-400 to-amber-600";
+        // Rank badge gradient with improved differentiation
+        const rankBadgeClass = getRankGradient(rank);
+
+        // Rank icon gradient
+        let rankIconClass = "bg-gradient-to-br from-blue-400 to-blue-600";
+        if (index === 0) rankIconClass = "bg-gradient-to-br from-yellow-400 to-amber-500";
+        if (index === 1) rankIconClass = "bg-gradient-to-br from-gray-400 to-gray-500";
+        if (index === 2) rankIconClass = "bg-gradient-to-br from-orange-400 to-amber-600";
 
         return (
           <Card
             key={category.id}
             className={cn(
-              "relative overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer border-2 hover:-translate-y-1 group",
+              "group relative overflow-hidden cursor-pointer border-2 transition-all duration-300",
+              "hover:shadow-xl hover:-translate-y-1",
               index === 0 && "border-yellow-300 bg-gradient-to-br from-yellow-50/50 to-amber-50/50",
               index === 1 && "border-gray-300 bg-gradient-to-br from-gray-50/50 to-slate-50/50",
               index === 2 && "border-orange-300 bg-gradient-to-br from-orange-50/50 to-amber-50/50",
@@ -169,7 +193,7 @@ export function CategoryPerformanceGrid({
             onClick={() => onCategoryClick?.(category)}
           >
             {/* Gradient overlay effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-gray-50/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-gray-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             
             <CardContent className="p-6 relative">
               {/* Header: Rank Badge, Icon, and Growth */}
@@ -186,10 +210,7 @@ export function CategoryPerformanceGrid({
                   {/* Category Icon */}
                   <div className={cn(
                     "w-10 h-10 rounded-full flex items-center justify-center shadow-md",
-                    index === 0 && "bg-gradient-to-br from-yellow-400 to-amber-500",
-                    index === 1 && "bg-gradient-to-br from-gray-400 to-gray-500",
-                    index === 2 && "bg-gradient-to-br from-orange-400 to-amber-600",
-                    index > 2 && "bg-gradient-to-br from-blue-400 to-blue-600"
+                    rankIconClass
                   )}>
                     <CategoryIcon className="w-5 h-5 text-white" />
                   </div>
@@ -213,12 +234,12 @@ export function CategoryPerformanceGrid({
               </Badge>
 
               {/* Total Amount */}
-              <div className="text-2xl font-bold text-gray-900 mb-1">
+              <div className="text-2xl font-bold text-gray-900 mb-1 font-mono tabular-nums">
                 {formatSSP(category.total)}
               </div>
 
               {/* Percentage of Total */}
-              <div className="text-sm text-gray-600 font-medium mb-4">
+              <div className="text-sm text-gray-600 font-medium mb-4 font-mono tabular-nums">
                 {category.percentage.toFixed(1)}% of total expenses
               </div>
 

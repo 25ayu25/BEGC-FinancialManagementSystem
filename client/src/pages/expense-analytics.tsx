@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Download, FileText, Calendar as CalendarIcon, Receipt } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Download, FileText, Calendar as CalendarIcon, Receipt, Lightbulb } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useExpenseAnalytics, type FilterPreset } from "@/features/expense-analytics/hooks/useExpenseAnalytics";
@@ -36,6 +38,7 @@ export default function ExpenseAnalytics() {
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryMetrics | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   // Generate stable particle positions
   const particles = useMemo(() => {
@@ -246,6 +249,20 @@ export default function ExpenseAnalytics() {
                 variant="outline"
                 size="sm"
                 className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl text-orange-700 transition-all hover:scale-105"
+                onClick={() => setInsightsOpen(true)}
+                disabled={isLoading}
+              >
+                <Lightbulb className="w-4 h-4 mr-2" />
+                Insights
+                {insights.length > 0 && (
+                  <Badge className="ml-2 bg-amber-500 text-white">{insights.length}</Badge>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl text-orange-700 transition-all hover:scale-105"
                 onClick={handleExportCSV}
                 disabled={isLoading || metrics.length === 0}
               >
@@ -271,8 +288,23 @@ export default function ExpenseAnalytics() {
       {/* KPI Cards */}
       <ExpenseKPICards kpis={kpis} isLoading={isLoading} />
 
-      {/* Insights */}
-      <ExpenseInsights insights={insights} isLoading={isLoading} />
+      {/* Insights Sheet - Collapsible */}
+      <Sheet open={insightsOpen} onOpenChange={setInsightsOpen}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-amber-500" />
+              Key Insights
+            </SheetTitle>
+            <SheetDescription>
+              Data-driven observations for the selected period
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <ExpenseInsights insights={insights} isLoading={isLoading} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Expense Trend Chart */}
       <ExpenseTrendChart 

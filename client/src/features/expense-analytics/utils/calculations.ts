@@ -27,9 +27,10 @@ export interface CategoryMetrics {
 }
 
 export interface ExpenseInsight {
-  type: 'concentration' | 'growth' | 'stable' | 'warning';
+  type: 'concentration' | 'growth' | 'stable' | 'warning' | 'alert' | 'info' | 'trend';
   message: string;
   priority: number;
+  severity: 'high' | 'medium' | 'low';
 }
 
 /**
@@ -157,48 +158,109 @@ export function calculateKPIs(
  */
 export function generateInsights(
   metrics: CategoryMetrics[],
-  kpis: ReturnType<typeof calculateKPIs>
+  kpis: ReturnType<typeof calculateKPIs>,
+  trendData: MonthlyExpenseData[]
 ): ExpenseInsight[] {
   const insights: ExpenseInsight[] = [];
 
-  // Concentration insight
+  // 1. Concentration insight (Blue - Info)
   if (metrics.length >= 3) {
-    const topThreeTotal = metrics.slice(0, 3).reduce((sum, m) => sum + m.total, 0);
+    const topThree = metrics.slice(0, 3);
+    const topThreeTotal = topThree.reduce((sum, m) => sum + m.total, 0);
     const percentage = kpis.totalExpenses > 0
       ? (topThreeTotal / kpis.totalExpenses) * 100
       : 0;
 
-    if (percentage >= 60) {
+    if (percentage >= 50) {
+      const names = topThree.map(m => m.name).join(', ');
       insights.push({
         type: 'concentration',
-        message: `Top 3 categories account for ${percentage.toFixed(0)}% of total expenses.`,
+        message: `Top 3 categories (${names}) account for ${percentage.toFixed(0)}% of total spending`,
         priority: 1,
+        severity: 'medium',
       });
     }
   }
 
-  // Growth insights
-  metrics.forEach((metric, index) => {
-    if (index < 5 && Math.abs(metric.growth) > 15) {
-      const direction = metric.growth > 0 ? 'increased' : 'decreased';
-      insights.push({
-        type: metric.growth > 0 ? 'growth' : 'stable',
-        message: `${metric.name} ${direction} ${Math.abs(metric.growth).toFixed(0)}% compared to the previous period.`,
-        priority: 2,
-      });
-    }
-  });
+  // 2. Growth alert (Red - Alert) - only for significant growth (> 50%)
+  const highGrowthCategories = metrics
+    .filter((m, index) => index < 5 && m.growth > 50)
+    .sort((a, b) => b.growth - a.growth);
 
-  // Stability insight
-  metrics.forEach((metric, index) => {
-    if (index < 3 && Math.abs(metric.growth) < 5) {
-      insights.push({
-        type: 'stable',
-        message: `${metric.name} spending is stable over the selected period.`,
-        priority: 3,
-      });
+  if (highGrowthCategories.length > 0) {
+    const top = highGrowthCategories[0];
+    insights.push({
+      type: 'alert',
+      message: `⚠️ ${top.name} surged ${Math.abs(top.growth).toFixed(0)}% - investigate cause`,
+      priority: 0,
+      severity: 'high',
+    });
+  }
+
+  // 3. Stability insight (Green - Stable) - check variance in last 3 months
+  if (trendData.length >= 3) {
+    const recentMonths = trendData.slice(-3);
+    
+    for (let i = 0; i < Math.min(3, metrics.length); i++) {
+      const category = metrics[i];
+      const recentAmounts = recentMonths
+        .map(month => {
+          const breakdown = normalizeBreakdown(month.expenseBreakdown);
+          return breakdown[category.name] || 0;
+        })
+        .filter(amt => amt > 0);
+
+      if (recentAmounts.length >= 3) {
+        const avg = recentAmounts.reduce((sum, val) => sum + val, 0) / recentAmounts.length;
+        const variance = recentAmounts.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / recentAmounts.length;
+        const stdDev = Math.sqrt(variance);
+        const coefficientOfVariation = avg > 0 ? (stdDev / avg) * 100 : 0;
+
+        if (coefficientOfVariation < 15) {
+          insights.push({
+            type: 'stable',
+            message: `✓ ${category.name} spending is stable over the last 3 months (±${coefficientOfVariation.toFixed(0)}% variance)`,
+            priority: 4,
+            severity: 'low',
+          });
+          break; // Only show one stability insight
+        }
+      }
     }
-  });
+  }
+
+  // 4. Category dominance (Amber - Warning) - if any category > 20%
+  const dominantCategories = metrics.filter((m, index) => index < 3 && m.percentage > 20);
+  if (dominantCategories.length > 0) {
+    const dominant = dominantCategories[0];
+    insights.push({
+      type: 'warning',
+      message: `⚠️ ${dominant.name} represents ${dominant.percentage.toFixed(0)}% of all expenses - consider cost optimization`,
+      priority: 2,
+      severity: 'medium',
+    });
+  }
+
+  // 5. Trend insight (Blue - Info) - average monthly spending
+  if (trendData.length > 0) {
+    insights.push({
+      type: 'info',
+      message: `📈 Total expenses averaged ${formatSSP(kpis.avgMonthlyExpenses)} per month across the period`,
+      priority: 5,
+      severity: 'low',
+    });
+  }
+
+  // 6. New categories insight (Blue - Info) - categories with 100% growth but low previous value
+  const newCategories = metrics.filter(m => m.growth === 100 && m.total > 0);
+  if (newCategories.length > 0) {
+    insights.push({
+      type: 'info',
+      message: `🆕 ${newCategories.length} new expense ${newCategories.length === 1 ? 'category' : 'categories'} added this period`,
+      priority: 6,
+      severity: 'low',
+    });
+  }
 
   // Sort by priority and limit to top 5
   return insights.sort((a, b) => a.priority - b.priority).slice(0, 5);

@@ -36,20 +36,21 @@ interface ExpenseTrendChartProps {
 
 type ChartType = 'area' | 'line' | 'bar';
 
+// More muted colors (reduced saturation by ~20%)
 const CHART_COLORS = [
-  "#ef4444", // red-500
-  "#f97316", // orange-500
-  "#f59e0b", // amber-500
-  "#14b8a6", // teal-500
-  "#3b82f6", // blue-500
-  "#8b5cf6", // violet-500
-  "#ec4899", // pink-500
-  "#10b981", // green-500
+  "#dc2626", // red-600 (more muted)
+  "#ea580c", // orange-600
+  "#d97706", // amber-600
+  "#0d9488", // teal-600
+  "#2563eb", // blue-600
+  "#7c3aed", // violet-600
+  "#db2777", // pink-600
+  "#059669", // green-600
 ];
 
 export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTrendChartProps) {
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
-  const [chartType, setChartType] = useState<ChartType>('area');
+  const [chartType, setChartType] = useState<ChartType>('line'); // Default to Line chart
 
   const topCategories = useMemo(() => {
     return metrics.slice(0, 8);
@@ -313,38 +314,38 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
           <CardTitle className="text-gray-900">Expense Trends</CardTitle>
           
           {/* Chart Type Toggle */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
             <Button
-              variant={chartType === 'area' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartType('area')}
-              className={cn(
-                "transition-all",
-                chartType === 'area' && "bg-gradient-to-r from-red-500 to-orange-500 text-white"
-              )}
-            >
-              <AreaChartIcon className="w-4 h-4 mr-1" />
-              Area
-            </Button>
-            <Button
-              variant={chartType === 'line' ? 'default' : 'outline'}
+              variant={chartType === 'line' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setChartType('line')}
               className={cn(
-                "transition-all",
-                chartType === 'line' && "bg-gradient-to-r from-red-500 to-orange-500 text-white"
+                "transition-all duration-200",
+                chartType === 'line' && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
               )}
             >
               <LineChartIcon className="w-4 h-4 mr-1" />
               Line
             </Button>
             <Button
-              variant={chartType === 'bar' ? 'default' : 'outline'}
+              variant={chartType === 'area' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setChartType('area')}
+              className={cn(
+                "transition-all duration-200",
+                chartType === 'area' && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
+              )}
+            >
+              <AreaChartIcon className="w-4 h-4 mr-1" />
+              Area
+            </Button>
+            <Button
+              variant={chartType === 'bar' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setChartType('bar')}
               className={cn(
-                "transition-all",
-                chartType === 'bar' && "bg-gradient-to-r from-red-500 to-orange-500 text-white"
+                "transition-all duration-200",
+                chartType === 'bar' && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
               )}
             >
               <BarChart3 className="w-4 h-4 mr-1" />
@@ -361,21 +362,24 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
         <div className="flex flex-wrap gap-2 mb-6">
           {topCategories.map((category, index) => {
             const isHidden = hiddenCategories.has(category.name);
+            const color = CHART_COLORS[index % CHART_COLORS.length];
             return (
-              <Badge
+              <button
                 key={category.name}
-                variant={isHidden ? "outline" : "default"}
-                className="cursor-pointer px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105"
-                style={{
-                  backgroundColor: isHidden ? 'transparent' : CHART_COLORS[index % CHART_COLORS.length],
-                  color: isHidden ? CHART_COLORS[index % CHART_COLORS.length] : 'white',
-                  borderColor: CHART_COLORS[index % CHART_COLORS.length],
-                  borderWidth: '2px',
-                }}
                 onClick={() => toggleCategory(category.name)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-md",
+                  "border-2 cursor-pointer",
+                  isHidden ? "opacity-50 scale-95 grayscale" : "opacity-100 scale-100 hover:scale-105"
+                )}
+                style={{
+                  backgroundColor: isHidden ? 'transparent' : `${color}15`,
+                  borderColor: `${color}80`,
+                  color: color,
+                }}
               >
                 {category.name}
-              </Badge>
+              </button>
             );
           })}
         </div>
