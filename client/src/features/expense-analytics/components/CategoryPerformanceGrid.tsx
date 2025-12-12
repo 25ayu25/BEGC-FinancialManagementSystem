@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, Minus, User, Building2, FlaskConical, Stethos
 import { formatSSP } from "../utils/calculations";
 import type { CategoryMetrics } from "../utils/calculations";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface CategoryPerformanceGridProps {
   metrics: CategoryMetrics[];
@@ -180,18 +181,23 @@ export function CategoryPerformanceGrid({
         if (index === 2) rankIconClass = "bg-gradient-to-br from-orange-400 to-amber-600";
 
         return (
-          <Card
+          <motion.div
             key={category.id}
-            className={cn(
-              "group relative overflow-hidden cursor-pointer border-2 transition-all duration-300",
-              "hover:shadow-xl hover:-translate-y-1",
-              index === 0 && "border-yellow-300 bg-gradient-to-br from-yellow-50/50 to-amber-50/50",
-              index === 1 && "border-gray-300 bg-gradient-to-br from-gray-50/50 to-slate-50/50",
-              index === 2 && "border-orange-300 bg-gradient-to-br from-orange-50/50 to-amber-50/50",
-              index > 2 && "border-blue-200 bg-white"
-            )}
-            onClick={() => onCategoryClick?.(category)}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
           >
+            <Card
+              className={cn(
+                "group relative overflow-hidden cursor-pointer border-2 transition-all duration-300",
+                "hover:shadow-xl hover:-translate-y-1",
+                index === 0 && "border-yellow-300 bg-gradient-to-br from-yellow-50/50 to-amber-50/50",
+                index === 1 && "border-gray-300 bg-gradient-to-br from-gray-50/50 to-slate-50/50",
+                index === 2 && "border-orange-300 bg-gradient-to-br from-orange-50/50 to-amber-50/50",
+                index > 2 && "border-blue-200 bg-white"
+              )}
+              onClick={() => onCategoryClick?.(category)}
+            >
             {/* Gradient overlay effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-gray-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             
@@ -256,6 +262,7 @@ export function CategoryPerformanceGrid({
               )}
             </CardContent>
           </Card>
+          </motion.div>
         );
       })}
     </div>
