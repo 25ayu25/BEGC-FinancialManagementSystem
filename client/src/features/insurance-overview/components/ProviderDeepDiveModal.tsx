@@ -45,8 +45,8 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
             {provider.name} - Deep Dive Analysis
           </DialogTitle>
@@ -55,7 +55,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto space-y-6 px-1">
           {/* Key Metrics Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card>

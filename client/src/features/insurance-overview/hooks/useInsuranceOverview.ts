@@ -78,11 +78,43 @@ export function useInsuranceOverview(
     },
   });
 
-  // Fetch current period transactions with insurance
+  // Fetch current period monthly trend data (includes all months even with $0 revenue)
+  const { 
+    data: currentTrendData = [], 
+    isLoading: loadingCurrentTrend,
+    error: currentError
+  } = useQuery({
+    queryKey: ['insurance-monthly-revenue', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const startStr = formatDateForAPI(dateRange.startDate);
+      const endStr = formatDateForAPI(dateRange.endDate);
+      const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
+      
+      return response.data || [];
+    },
+    enabled: !!dateRange.startDate && !!dateRange.endDate,
+  });
+
+  // Fetch previous period monthly trend data for comparison
+  const { 
+    data: prevTrendData = [], 
+    isLoading: loadingPrevTrend 
+  } = useQuery({
+    queryKey: ['insurance-monthly-revenue-prev', prevDateRange.startDate, prevDateRange.endDate],
+    queryFn: async () => {
+      const startStr = formatDateForAPI(prevDateRange.startDate);
+      const endStr = formatDateForAPI(prevDateRange.endDate);
+      const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
+      
+      return response.data || [];
+    },
+    enabled: !!prevDateRange.startDate && !!prevDateRange.endDate,
+  });
+
+  // Fetch current period transactions for claim counts and KPIs
   const { 
     data: currentTransactions = [], 
-    isLoading: loadingCurrent,
-    error: currentError
+    isLoading: loadingCurrent
   } = useQuery({
     queryKey: ['insurance-transactions', dateRange.startDate, dateRange.endDate],
     queryFn: async () => {
@@ -95,7 +127,7 @@ export function useInsuranceOverview(
     enabled: !!dateRange.startDate && !!dateRange.endDate,
   });
 
-  // Fetch previous period transactions for comparison
+  // Fetch previous period transactions for comparison KPIs
   const { 
     data: prevTransactions = [], 
     isLoading: loadingPrev 
@@ -111,18 +143,20 @@ export function useInsuranceOverview(
     enabled: !!prevDateRange.startDate && !!prevDateRange.endDate,
   });
 
-  // Calculate metrics
+  // Calculate metrics using trend data and transactions
   const metrics = useMemo(() => {
-    if (!providers.length || !currentTransactions.length) {
+    if (!providers.length) {
       return [];
     }
     
     return calculateProviderMetrics(
       providers.filter(p => p.isActive),
+      currentTrendData,
+      prevTrendData,
       currentTransactions,
       prevTransactions
     );
-  }, [providers, currentTransactions, prevTransactions]);
+  }, [providers, currentTrendData, prevTrendData, currentTransactions, prevTransactions]);
 
   // Generate insights
   const insights = useMemo(() => {
@@ -169,7 +203,7 @@ export function useInsuranceOverview(
     };
   }, [metrics, currentTransactions, prevTransactions]);
 
-  const isLoading = loadingProviders || loadingCurrent || loadingPrev;
+  const isLoading = loadingProviders || loadingCurrentTrend || loadingPrevTrend || loadingCurrent || loadingPrev;
   const error = currentError;
 
   return {
