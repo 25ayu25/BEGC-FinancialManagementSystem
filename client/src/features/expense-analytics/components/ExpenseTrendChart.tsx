@@ -151,6 +151,11 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
   const addOpacityToHex = (hex: string, opacity: number): string => {
     // Remove # if present
     const cleanHex = hex.replace('#', '');
+    // Validate hex format (must be 6 characters)
+    if (cleanHex.length !== 6) {
+      console.warn(`Invalid hex color: ${hex}`);
+      return hex; // Return original if invalid
+    }
     // Convert opacity (0-1) to hex (00-FF)
     const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
     return `#${cleanHex}${alpha}`;
