@@ -192,7 +192,7 @@ export function useDepartmentAnalytics(
     return {
       totalRevenue: currentTotal,
       activeDepartments: metrics.length, // metrics already filtered to departments with revenue
-      growth: Math.round(periodGrowth * 10) / 10, // Round to 1 decimal
+      growth: Number(periodGrowth.toFixed(1)), // Round to 1 decimal
     };
   }, [metrics, prevTrendData]);
 
