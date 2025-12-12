@@ -21,7 +21,7 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { LineChartIcon, AreaChartIcon, BarChart3, Eye, EyeOff } from "lucide-react";
-import { formatSSP, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, type ProviderMetrics } from "../utils/calculations";
 
 interface RevenueTrendChartProps {
   metrics: ProviderMetrics[];
@@ -93,7 +93,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -122,7 +122,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -150,7 +150,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -175,7 +175,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -201,7 +201,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',

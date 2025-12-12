@@ -23,7 +23,7 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { TrendingUp, TrendingDown, Award, BarChart3 } from "lucide-react";
-import { formatSSP, formatPercentage, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, formatPercentage, type ProviderMetrics } from "../utils/calculations";
 
 interface ProviderDeepDiveModalProps {
   provider: ProviderMetrics | null;
@@ -72,7 +72,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
               <CardContent className="p-4">
                 <p className="text-xs text-gray-600 dark:text-gray-400 uppercase mb-1">Total Revenue</p>
                 <p className="text-xl font-bold text-violet-600">
-                  {formatSSP(provider.revenue)}
+                  {formatUSD(provider.revenue)}
                 </p>
               </CardContent>
             </Card>
@@ -112,7 +112,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
             <div className="text-right">
               <p className="text-xs text-gray-600 dark:text-gray-400">Avg Claim Value</p>
               <p className="text-lg font-bold text-violet-600">
-                {formatSSP(provider.avgClaim)}
+                {formatUSD(provider.avgClaim)}
               </p>
             </div>
           </div>
@@ -137,7 +137,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
                     <XAxis dataKey="month" stroke="#6b7280" />
                     <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
                     <Tooltip 
-                      formatter={(value: any) => formatSSP(value)}
+                      formatter={(value: any) => formatUSD(value)}
                       contentStyle={{ 
                         backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                         border: '1px solid #e5e7eb',
@@ -168,7 +168,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
                     className="p-3 border rounded-lg hover:border-violet-400 transition-colors"
                   >
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{month.month}</p>
-                    <p className="text-sm font-bold">{formatSSP(month.revenue)}</p>
+                    <p className="text-sm font-bold">{formatUSD(month.revenue)}</p>
                   </div>
                 ))}
               </div>
@@ -186,7 +186,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
                     {bestMonth ? bestMonth.month : 'N/A'}
                   </p>
                   <p className="text-lg font-bold text-green-600">
-                    {bestMonth ? formatSSP(bestMonth.revenue) : 'N/A'}
+                    {bestMonth ? formatUSD(bestMonth.revenue) : 'N/A'}
                   </p>
                 </div>
 
@@ -196,7 +196,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
                     {worstMonth.month}
                   </p>
                   <p className="text-lg font-bold text-red-600">
-                    {formatSSP(worstMonth.revenue)}
+                    {formatUSD(worstMonth.revenue)}
                   </p>
                 </div>
 
@@ -206,7 +206,7 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
                     {provider.monthlyTrend.length} months
                   </p>
                   <p className="text-lg font-bold text-blue-600">
-                    {formatSSP(avgMonthlyRevenue)}
+                    {formatUSD(avgMonthlyRevenue)}
                   </p>
                 </div>
               </div>

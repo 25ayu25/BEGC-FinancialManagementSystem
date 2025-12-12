@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Award } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatSSP, formatPercentage, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, formatPercentage, type ProviderMetrics } from "../utils/calculations";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 interface ProviderRankingCardsProps {
@@ -96,7 +96,7 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
               {/* Revenue */}
               <div className="mb-3">
                 <p className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                  {formatSSP(provider.revenue)}
+                  {formatUSD(provider.revenue)}
                 </p>
               </div>
 

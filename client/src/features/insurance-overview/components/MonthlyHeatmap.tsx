@@ -3,7 +3,7 @@
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatSSP, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, type ProviderMetrics } from "../utils/calculations";
 
 interface MonthlyHeatmapProps {
   metrics: ProviderMetrics[];
@@ -87,7 +87,7 @@ export function MonthlyHeatmap({ metrics }: MonthlyHeatmapProps) {
               ">
                 <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg whitespace-nowrap">
                   <p className="font-semibold">{month}</p>
-                  <p>{formatSSP(value)}</p>
+                  <p>{formatUSD(value)}</p>
                 </div>
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                   <div className="border-4 border-transparent border-t-gray-900"></div>

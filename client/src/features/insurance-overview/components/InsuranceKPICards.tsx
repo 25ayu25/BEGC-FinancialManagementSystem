@@ -5,7 +5,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Building2, Target, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatSSP, formatPercentage, formatCompactNumber } from "../utils/calculations";
+import { formatUSD, formatPercentage, formatCompactNumber } from "../utils/calculations";
 
 interface KPICardsProps {
   kpis: {
@@ -38,7 +38,7 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
   const cards = [
     {
       title: "Total Claims Value",
-      value: formatSSP(kpis.totalClaimsValue),
+      value: formatUSD(kpis.totalClaimsValue),
       change: kpis.prevTotalClaimsValue > 0 
         ? ((kpis.totalClaimsValue - kpis.prevTotalClaimsValue) / kpis.prevTotalClaimsValue * 100)
         : 0,
@@ -64,7 +64,7 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
     },
     {
       title: "Avg Claim Value",
-      value: formatSSP(kpis.avgClaimValue),
+      value: formatUSD(kpis.avgClaimValue),
       change: kpis.prevTotalClaimsValue > 0 && kpis.totalClaims > 0
         ? ((kpis.avgClaimValue - (kpis.prevTotalClaimsValue / kpis.totalClaims)) / (kpis.prevTotalClaimsValue / kpis.totalClaims) * 100)
         : 0,

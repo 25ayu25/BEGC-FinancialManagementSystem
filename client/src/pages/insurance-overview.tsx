@@ -29,7 +29,7 @@ import {
   ChartLoadingSkeleton,
   InsightsLoadingSkeleton,
 } from "@/features/insurance-overview/components/LoadingSkeletons";
-import { formatSSP } from "@/features/insurance-overview/utils/calculations";
+import { formatUSD } from "@/features/insurance-overview/utils/calculations";
 import { toast } from "@/hooks/use-toast";
 import { filterOptions as centralizedFilterOptions } from "@/lib/dateRanges";
 
