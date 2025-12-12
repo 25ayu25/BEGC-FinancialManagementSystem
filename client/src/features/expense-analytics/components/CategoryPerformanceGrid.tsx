@@ -75,22 +75,30 @@ function getCategoryIcon(categoryName: string) {
   return Package;
 }
 
+// Status badge styles
+const STATUS_BADGE_STYLES = {
+  topSpender: { label: 'TOP SPENDER', color: 'bg-red-100 text-red-700 border-red-300' },
+  highSpend: { label: 'HIGH SPEND', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  moderate: { label: 'MODERATE', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+  lowSpend: { label: 'LOW SPEND', color: 'bg-slate-100 text-slate-600 border-slate-300' },
+};
+
 // Get status badge based on rank and percentage
 function getStatusBadge(rank: number, percentage: number) {
   // Only #1 gets TOP SPENDER if it's >= 15%
   if (rank === 1 && percentage >= 15) {
-    return { label: 'TOP SPENDER', color: 'bg-red-100 text-red-700 border-red-300' };
+    return STATUS_BADGE_STYLES.topSpender;
   }
   // HIGH SPEND for >= 10%
   if (percentage >= 10) {
-    return { label: 'HIGH SPEND', color: 'bg-orange-100 text-orange-700 border-orange-300' };
+    return STATUS_BADGE_STYLES.highSpend;
   }
   // MODERATE for >= 5%
   if (percentage >= 5) {
-    return { label: 'MODERATE', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' };
+    return STATUS_BADGE_STYLES.moderate;
   }
   // LOW SPEND for < 5%
-  return { label: 'LOW SPEND', color: 'bg-slate-100 text-slate-600 border-slate-300' };
+  return STATUS_BADGE_STYLES.lowSpend;
 }
 
 // Get rank badge gradient based on rank

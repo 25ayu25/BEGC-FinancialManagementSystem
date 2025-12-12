@@ -159,7 +159,8 @@ export function calculateKPIs(
 export function generateInsights(
   metrics: CategoryMetrics[],
   kpis: ReturnType<typeof calculateKPIs>,
-  trendData: MonthlyExpenseData[]
+  trendData: MonthlyExpenseData[],
+  prevTrendData: MonthlyExpenseData[]
 ): ExpenseInsight[] {
   const insights: ExpenseInsight[] = [];
 

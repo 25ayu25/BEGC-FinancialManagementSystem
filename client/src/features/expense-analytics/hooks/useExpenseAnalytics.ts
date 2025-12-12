@@ -114,8 +114,8 @@ export function useExpenseAnalytics(
 
   // Generate insights
   const insights = useMemo(() => {
-    return generateInsights(metrics, kpis, trendData);
-  }, [metrics, kpis, trendData]);
+    return generateInsights(metrics, kpis, trendData, prevTrendData);
+  }, [metrics, kpis, trendData, prevTrendData]);
 
   // Prepare chart data
   const chartData = useMemo(() => {

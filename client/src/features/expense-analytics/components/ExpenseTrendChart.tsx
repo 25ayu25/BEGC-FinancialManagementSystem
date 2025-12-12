@@ -156,6 +156,14 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return `#${cleanHex}${alpha}`;
   };
 
+  // Helper function for chart button styling
+  const getChartButtonClass = (type: ChartType) => {
+    return cn(
+      "transition-all duration-200",
+      chartType === type && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
+    );
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -328,10 +336,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
               variant={chartType === 'line' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setChartType('line')}
-              className={cn(
-                "transition-all duration-200",
-                chartType === 'line' && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
-              )}
+              className={getChartButtonClass('line')}
             >
               <LineChartIcon className="w-4 h-4 mr-1" />
               Line
@@ -340,10 +345,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
               variant={chartType === 'area' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setChartType('area')}
-              className={cn(
-                "transition-all duration-200",
-                chartType === 'area' && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
-              )}
+              className={getChartButtonClass('area')}
             >
               <AreaChartIcon className="w-4 h-4 mr-1" />
               Area
@@ -352,10 +354,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
               variant={chartType === 'bar' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setChartType('bar')}
-              className={cn(
-                "transition-all duration-200",
-                chartType === 'bar' && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
-              )}
+              className={getChartButtonClass('bar')}
             >
               <BarChart3 className="w-4 h-4 mr-1" />
               Bar
