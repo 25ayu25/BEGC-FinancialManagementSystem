@@ -183,45 +183,43 @@ export default function ExecutiveStyleKPIs({
         </Card>
 
         {/* Insurance Revenue */}
-        <Link href="/insurance-providers">
-          <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
-                  <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
-                    USD <AnimatedNumber value={usdIncome} />
-                  </p>
-                  <div className="flex items-center mt-1">
-                    {data?.changes?.incomeChangeUSD !== undefined ? (
-                      <span
-                        className={`text-xs font-medium tabular-nums ${
-                          data.changes.incomeChangeUSD > 0
-                            ? "text-emerald-700"
-                            : data.changes.incomeChangeUSD < 0
-                            ? "text-red-700"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {data.changes.incomeChangeUSD > 0 ? "+" : ""}
-                        {data.changes.incomeChangeUSD.toFixed(1)}% vs last month
-                      </span>
-                    ) : (
-                      <span className="text-xs font-medium text-purple-600">
-                        {Object.keys(data?.insuranceBreakdown || {}).length === 1
-                          ? "1 provider"
-                          : `${Object.keys(data?.insuranceBreakdown || {}).length} providers`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-purple-50 p-1.5 rounded-lg">
-                  <Shield className="h-4 w-4 text-purple-600" />
+        <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-600 text-xs font-medium">Insurance (USD)</p>
+                <p className="text-base font-semibold text-slate-900 font-mono tabular-nums">
+                  USD <AnimatedNumber value={usdIncome} />
+                </p>
+                <div className="flex items-center mt-1">
+                  {data?.changes?.incomeChangeUSD !== undefined ? (
+                    <span
+                      className={`text-xs font-medium tabular-nums ${
+                        data.changes.incomeChangeUSD > 0
+                          ? "text-emerald-700"
+                          : data.changes.incomeChangeUSD < 0
+                          ? "text-red-700"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {data.changes.incomeChangeUSD > 0 ? "+" : ""}
+                      {data.changes.incomeChangeUSD.toFixed(1)}% vs last month
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-purple-600">
+                      {Object.keys(data?.insuranceBreakdown || {}).length === 1
+                        ? "1 provider"
+                        : `${Object.keys(data?.insuranceBreakdown || {}).length} providers`}
+                    </span>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </Link>
+              <div className="bg-purple-50 p-1.5 rounded-lg">
+                <Shield className="h-4 w-4 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Shared non-dimming drawer */}
