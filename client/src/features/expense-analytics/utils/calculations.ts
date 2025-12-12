@@ -35,12 +35,27 @@ export interface ExpenseInsight {
 
 /**
  * Normalize expense breakdown to consistent format
+ * Ensures all values are valid numbers, defaulting to 0 for undefined/NaN
  */
-export function normalizeBreakdown(breakdown: Record<string, number> | Array<[string, number]>): Record<string, number> {
+export function normalizeBreakdown(breakdown: Record<string, number> | Array<[string, number]> | undefined): Record<string, number> {
+  if (!breakdown) return {};
+  
+  let entries: [string, number][];
+  
   if (Array.isArray(breakdown)) {
-    return Object.fromEntries(breakdown);
+    entries = breakdown;
+  } else {
+    entries = Object.entries(breakdown);
   }
-  return breakdown;
+  
+  // Validate all values are numbers, default to 0 for undefined/NaN
+  const normalized: Record<string, number> = {};
+  
+  for (const [key, value] of entries) {
+    normalized[key] = typeof value === 'number' && !isNaN(value) ? value : 0;
+  }
+  
+  return normalized;
 }
 
 /**

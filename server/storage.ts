@@ -1891,7 +1891,7 @@ export class DatabaseStorage implements IStorage {
         const monthNum = parseInt(monthStr, 10);
         
         return {
-          month: shortMonthNames[monthNum - 1],
+          month: key, // Return in YYYY-MM format for client parsing
           fullMonth: `${monthNames[monthNum - 1]} ${year}`,
           year,
           monthNum,

@@ -6,7 +6,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/queryClient";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { 
   calculateCategoryMetrics, 
   calculateKPIs,
@@ -130,6 +130,19 @@ export function useExpenseAnalytics(
       };
     });
   }, [trendData]);
+
+  // Debug logging to identify data structure issues
+  useEffect(() => {
+    if (chartData.length > 0 && metrics.length > 0) {
+      console.log('🔍 Chart Data Debug:', {
+        trendDataSample: trendData[0],
+        chartDataSample: chartData[0],
+        metricsCategories: metrics.map(m => m.name),
+        chartDataKeys: chartData[0] ? Object.keys(chartData[0]) : [],
+        categoryKeysMatch: metrics.slice(0, 8).every(m => chartData[0] && m.name in chartData[0])
+      });
+    }
+  }, [chartData, metrics, trendData]);
 
   const isLoading = loadingTrend || loadingPrevTrend;
   const error = trendError;
