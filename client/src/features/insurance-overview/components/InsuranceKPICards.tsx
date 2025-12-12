@@ -189,15 +189,6 @@ function KPICard({ card, index, sparklineData }: { card: any; index: number; spa
                         <stop offset="100%" stopColor={card.change >= 0 ? "#10B981" : "#ef4444"} stopOpacity={0.1} />
                       </linearGradient>
                     </defs>
-                    <defs>
-                      <filter id={`glow-${index}`}>
-                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                        <feMerge>
-                          <feMergeNode in="coloredBlur"/>
-                          <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                      </filter>
-                    </defs>
                     {/* Tooltip for hover */}
                     <Tooltip 
                       content={({ payload }) => {
