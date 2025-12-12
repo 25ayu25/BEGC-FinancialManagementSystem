@@ -16,7 +16,7 @@ import {
   YAxis,
   CartesianGrid
 } from "recharts";
-import { formatSSP, formatPercentage, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, formatPercentage, type ProviderMetrics } from "../utils/calculations";
 
 interface ClaimsDistributionChartProps {
   metrics: ProviderMetrics[];
@@ -96,7 +96,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(value: any) => formatSSP(value)}
+                  formatter={(value: any) => formatUSD(value)}
                   contentStyle={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                     border: '1px solid #e5e7eb',
@@ -111,7 +111,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
               <div className="text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
                 <p className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                  {formatSSP(totalRevenue)}
+                  {formatUSD(totalRevenue)}
                 </p>
               </div>
             </div>
@@ -147,7 +147,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
                   width={90}
                 />
                 <Tooltip 
-                  formatter={(value: any) => formatSSP(value)}
+                  formatter={(value: any) => formatUSD(value)}
                   contentStyle={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                     border: '1px solid #e5e7eb',

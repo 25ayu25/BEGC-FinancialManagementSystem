@@ -99,17 +99,17 @@ export function calculateProviderMetrics(
     currency: string;
   }>
 ): ProviderMetrics[] {
-  // Filter SSP insurance transactions
-  const sspInsuranceTxs = transactions.filter(
-    t => t.insuranceProviderId && t.currency === 'SSP'
+  // Filter USD insurance transactions
+  const usdInsuranceTxs = transactions.filter(
+    t => t.insuranceProviderId && t.currency === 'USD'
   );
   
-  const prevSspInsuranceTxs = prevTransactions.filter(
-    t => t.insuranceProviderId && t.currency === 'SSP'
+  const prevUsdInsuranceTxs = prevTransactions.filter(
+    t => t.insuranceProviderId && t.currency === 'USD'
   );
 
   // Calculate total revenue for share calculation
-  const totalRevenue = sspInsuranceTxs.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalRevenue = usdInsuranceTxs.reduce((sum, t) => sum + Number(t.amount), 0);
 
   // Group by provider
   const providerData = new Map<string, {
@@ -130,7 +130,7 @@ export function calculateProviderMetrics(
   });
 
   // Process current period transactions
-  sspInsuranceTxs.forEach(t => {
+  usdInsuranceTxs.forEach(t => {
     if (!t.insuranceProviderId) return;
     
     const data = providerData.get(t.insuranceProviderId);
@@ -147,7 +147,7 @@ export function calculateProviderMetrics(
   });
 
   // Process previous period transactions
-  prevSspInsuranceTxs.forEach(t => {
+  prevUsdInsuranceTxs.forEach(t => {
     if (!t.insuranceProviderId) return;
     
     const data = providerData.get(t.insuranceProviderId);

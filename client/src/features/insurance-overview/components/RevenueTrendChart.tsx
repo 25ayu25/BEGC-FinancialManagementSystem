@@ -21,7 +21,7 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { LineChartIcon, AreaChartIcon, BarChart3, Eye, EyeOff } from "lucide-react";
-import { formatSSP, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, type ProviderMetrics } from "../utils/calculations";
 
 interface RevenueTrendChartProps {
   metrics: ProviderMetrics[];
@@ -93,7 +93,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -118,26 +118,39 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
       case 'area':
         return (
           <AreaChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" stroke="#6b7280" />
-            <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
+            <defs>
+              {visibleMetrics.map((provider, index) => (
+                <linearGradient key={provider.id} id={`gradient-${provider.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.1}/>
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+            <XAxis dataKey="month" stroke="#6b7280" style={{ fontSize: '12px' }} />
+            <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} style={{ fontSize: '12px' }} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px'
+                backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
               }}
             />
-            <Legend />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              iconType="circle"
+            />
             {visibleMetrics.map((provider, index) => (
               <Area
                 key={provider.id}
                 type="monotone"
                 dataKey={provider.name}
                 stroke={COLORS[index % COLORS.length]}
-                fill={COLORS[index % COLORS.length]}
-                fillOpacity={0.6}
+                strokeWidth={2}
+                fill={`url(#gradient-${provider.id})`}
+                animationDuration={1000}
               />
             ))}
           </AreaChart>
@@ -150,7 +163,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -175,7 +188,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <XAxis dataKey="month" stroke="#6b7280" />
             <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                 border: '1px solid #e5e7eb',
@@ -197,18 +210,30 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
       case 'stacked-area':
         return (
           <AreaChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" stroke="#6b7280" />
-            <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
+            <defs>
+              {visibleMetrics.map((provider, index) => (
+                <linearGradient key={provider.id} id={`gradient-stacked-${provider.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.9}/>
+                  <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.6}/>
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+            <XAxis dataKey="month" stroke="#6b7280" style={{ fontSize: '12px' }} />
+            <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} style={{ fontSize: '12px' }} />
             <Tooltip 
-              formatter={(value: any) => formatSSP(value)}
+              formatter={(value: any) => formatUSD(value)}
               contentStyle={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px'
+                backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
               }}
             />
-            <Legend />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              iconType="circle"
+            />
             {visibleMetrics.map((provider, index) => (
               <Area
                 key={provider.id}
@@ -216,7 +241,9 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
                 dataKey={provider.name}
                 stackId="1"
                 stroke={COLORS[index % COLORS.length]}
-                fill={COLORS[index % COLORS.length]}
+                strokeWidth={2}
+                fill={`url(#gradient-stacked-${provider.id})`}
+                animationDuration={1000}
               />
             ))}
           </AreaChart>
@@ -228,7 +255,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
   };
 
   return (
-    <Card className="border-violet-200 dark:border-violet-800">
+    <Card className="border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
@@ -239,7 +266,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
               variant={chartType === 'line' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setChartType('line')}
-              className={chartType === 'line' ? 'bg-violet-600 hover:bg-violet-700' : ''}
+              className={chartType === 'line' ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg' : 'hover:bg-violet-50 dark:hover:bg-violet-950'}
             >
               <LineChartIcon className="w-4 h-4 mr-1" />
               Line
@@ -248,7 +275,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
               variant={chartType === 'area' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setChartType('area')}
-              className={chartType === 'area' ? 'bg-violet-600 hover:bg-violet-700' : ''}
+              className={chartType === 'area' ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg' : 'hover:bg-violet-50 dark:hover:bg-violet-950'}
             >
               <AreaChartIcon className="w-4 h-4 mr-1" />
               Area
@@ -257,7 +284,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
               variant={chartType === 'bar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setChartType('bar')}
-              className={chartType === 'bar' ? 'bg-violet-600 hover:bg-violet-700' : ''}
+              className={chartType === 'bar' ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg' : 'hover:bg-violet-50 dark:hover:bg-violet-950'}
             >
               <BarChart3 className="w-4 h-4 mr-1" />
               Bar
@@ -266,7 +293,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
               variant={chartType === 'stacked-bar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setChartType('stacked-bar')}
-              className={chartType === 'stacked-bar' ? 'bg-violet-600 hover:bg-violet-700' : ''}
+              className={chartType === 'stacked-bar' ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg' : 'hover:bg-violet-50 dark:hover:bg-violet-950'}
             >
               <BarChart3 className="w-4 h-4 mr-1" />
               Stacked

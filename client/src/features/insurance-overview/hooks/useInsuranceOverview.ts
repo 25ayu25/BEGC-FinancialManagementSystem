@@ -131,12 +131,12 @@ export function useInsuranceOverview(
 
   // Calculate totals and KPIs
   const kpis = useMemo(() => {
-    // Filter SSP insurance transactions
+    // Filter USD insurance transactions
     const currentInsuranceTxs = currentTransactions.filter(
-      (t: any) => t.insuranceProviderId && t.currency === 'SSP'
+      (t: any) => t.insuranceProviderId && t.currency === 'USD'
     );
     const prevInsuranceTxs = prevTransactions.filter(
-      (t: any) => t.insuranceProviderId && t.currency === 'SSP'
+      (t: any) => t.insuranceProviderId && t.currency === 'USD'
     );
 
     const totalClaimsValue = currentInsuranceTxs.reduce(

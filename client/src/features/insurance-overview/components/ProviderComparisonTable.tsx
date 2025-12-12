@@ -23,7 +23,7 @@ import {
   TrendingUp, 
   TrendingDown 
 } from "lucide-react";
-import { formatSSP, formatPercentage, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, formatPercentage, type ProviderMetrics } from "../utils/calculations";
 
 interface ProviderComparisonTableProps {
   metrics: ProviderMetrics[];
@@ -216,9 +216,9 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
                   </TableCell>
                   <TableCell className="font-semibold">{provider.name}</TableCell>
                   <TableCell>{provider.claimsCount.toLocaleString()}</TableCell>
-                  <TableCell className="font-semibold">{formatSSP(provider.revenue)}</TableCell>
+                  <TableCell className="font-semibold">{formatUSD(provider.revenue)}</TableCell>
                   <TableCell>{formatPercentage(provider.share)}</TableCell>
-                  <TableCell>{formatSSP(provider.avgClaim)}</TableCell>
+                  <TableCell>{formatUSD(provider.avgClaim)}</TableCell>
                   <TableCell>
                     <div className={`flex items-center gap-1 font-semibold ${
                       provider.growth >= 0 
