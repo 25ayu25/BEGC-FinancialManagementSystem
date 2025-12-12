@@ -55,7 +55,7 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogOverlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
-      <DialogContent className="max-w-6xl max-h-[95vh] bg-white dark:bg-gray-900 shadow-2xl border-2 border-teal-200 dark:border-teal-800 z-50">
+      <DialogContent className="max-w-6xl max-h-[95vh] bg-white dark:bg-gray-900 shadow-2xl border-2 border-teal-200 dark:border-teal-800">
         <DialogHeader className="pb-4 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 bg-clip-text text-transparent">
             {department.name} - Deep Dive

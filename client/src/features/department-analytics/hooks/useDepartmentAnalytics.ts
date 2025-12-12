@@ -166,7 +166,6 @@ export function useDepartmentAnalytics(
   // Calculate totals for KPIs
   const totals = useMemo(() => {
     const currentTotal = metrics.reduce((sum, m) => sum + m.revenue, 0);
-    const activeCount = metrics.filter(m => m.revenue > 0).length;
     
     // Calculate previous period total from prevTrendData
     const prevTotal = prevTrendData.reduce((sum, month) => {
@@ -192,7 +191,7 @@ export function useDepartmentAnalytics(
 
     return {
       totalRevenue: currentTotal,
-      activeDepartments: activeCount,
+      activeDepartments: metrics.length, // metrics already filtered to departments with revenue
       growth: Math.round(periodGrowth * 10) / 10, // Round to 1 decimal
     };
   }, [metrics, prevTrendData]);
