@@ -4,6 +4,35 @@
  * Helper functions for processing insurance provider analytics data
  */
 
+/**
+ * Diverse color palette for providers
+ */
+export const PROVIDER_COLORS: Record<string, { primary: string; name: string }> = {
+  'CIC': { primary: '#10B981', name: 'Emerald' },      // Green
+  'CIGNA': { primary: '#6366F1', name: 'Indigo' },     // Indigo
+  'UAP': { primary: '#F59E0B', name: 'Amber' },        // Orange
+  'New Sudan': { primary: '#EC4899', name: 'Pink' },   // Pink
+  'Nile International': { primary: '#14B8A6', name: 'Teal' }, // Teal
+  'ALIMA': { primary: '#8B5CF6', name: 'Violet' },     // Violet
+  'Amanah': { primary: '#EF4444', name: 'Red' },       // Red
+};
+
+/**
+ * Get provider color by name or fallback to index-based color
+ */
+export function getProviderColor(providerName: string, index: number): string {
+  if (PROVIDER_COLORS[providerName]) {
+    return PROVIDER_COLORS[providerName].primary;
+  }
+  
+  // Fallback colors for providers not in the map
+  const fallbackColors = [
+    '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#14B8A6', 
+    '#8B5CF6', '#EF4444', '#06B6D4', '#8B5CF6', '#F97316'
+  ];
+  return fallbackColors[index % fallbackColors.length];
+}
+
 export interface InsuranceProvider {
   id: string;
   name: string;
@@ -58,8 +87,8 @@ export function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
@@ -80,6 +109,33 @@ export function formatCompactNumber(value: number): string {
     return `${(value / 1_000).toFixed(1)}K`;
   }
   return value.toFixed(0);
+}
+
+/**
+ * Month ordering helper
+ */
+const MONTH_ORDER = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Sort months chronologically
+ */
+export function sortMonthsChronologically<T extends { month: string }>(items: T[]): T[] {
+  return items.sort((a, b) => {
+    const aIndex = MONTH_ORDER.indexOf(a.month);
+    const bIndex = MONTH_ORDER.indexOf(b.month);
+    
+    // If both months are found, sort by index
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    
+    // If only one is found, put it first
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    
+    // If neither is found, maintain original order
+    return 0;
+  });
 }
 
 /**

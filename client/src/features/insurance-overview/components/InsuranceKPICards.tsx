@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, Building2, Target, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatUSD, formatPercentage, formatCompactNumber } from "../utils/calculations";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
@@ -13,8 +13,6 @@ interface KPICardsProps {
   kpis: {
     totalClaimsValue: number;
     activeProviders: number;
-    collectionRate: number;
-    avgClaimValue: number;
     topProviderRevenue: number;
     topProviderName: string;
     growth: number;
@@ -65,7 +63,7 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
         ? ((kpis.totalClaimsValue - kpis.prevTotalClaimsValue) / kpis.prevTotalClaimsValue * 100)
         : 0,
       icon: DollarSign,
-      gradient: "from-violet-500 to-purple-600",
+      gradient: "from-emerald-500 to-green-600",
       subtitle: `${kpis.totalClaims} claims`,
     },
     {
@@ -74,28 +72,8 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
       rawValue: kpis.activeProviders,
       change: 0,
       icon: Building2,
-      gradient: "from-indigo-500 to-purple-600",
+      gradient: "from-indigo-500 to-blue-600",
       subtitle: "generating revenue",
-    },
-    {
-      title: "Collection Rate",
-      value: formatPercentage(kpis.collectionRate, 0),
-      rawValue: kpis.collectionRate,
-      change: 5, // Simulated improvement
-      icon: Target,
-      gradient: "from-purple-500 to-pink-600",
-      subtitle: "of claims collected",
-    },
-    {
-      title: "Avg Claim Value",
-      value: formatUSD(kpis.avgClaimValue),
-      rawValue: kpis.avgClaimValue,
-      change: kpis.prevTotalClaimsValue > 0 && kpis.totalClaims > 0
-        ? ((kpis.avgClaimValue - (kpis.prevTotalClaimsValue / kpis.totalClaims)) / (kpis.prevTotalClaimsValue / kpis.totalClaims) * 100)
-        : 0,
-      icon: BarChart3,
-      gradient: "from-violet-600 to-indigo-600",
-      subtitle: "per claim",
     },
     {
       title: "Top Provider Revenue",
@@ -118,7 +96,7 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card, index) => (
         <KPICard key={card.title} card={card} index={index} />
       ))}
