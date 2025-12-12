@@ -147,6 +147,15 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     }
   };
 
+  // Helper function to add opacity to hex colors
+  const addOpacityToHex = (hex: string, opacity: number): string => {
+    // Remove # if present
+    const cleanHex = hex.replace('#', '');
+    // Convert opacity (0-1) to hex (00-FF)
+    const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
+    return `#${cleanHex}${alpha}`;
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -373,8 +382,8 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
                   isHidden ? "opacity-50 scale-95 grayscale" : "opacity-100 scale-100 hover:scale-105"
                 )}
                 style={{
-                  backgroundColor: isHidden ? 'transparent' : `${color}15`,
-                  borderColor: `${color}80`,
+                  backgroundColor: isHidden ? 'transparent' : addOpacityToHex(color, 0.1),
+                  borderColor: addOpacityToHex(color, 0.5),
                   color: color,
                 }}
               >

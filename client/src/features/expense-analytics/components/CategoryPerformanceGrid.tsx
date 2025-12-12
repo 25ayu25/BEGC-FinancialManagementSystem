@@ -240,12 +240,12 @@ export function CategoryPerformanceGrid({
               </Badge>
 
               {/* Total Amount */}
-              <div className="text-2xl font-bold text-gray-900 mb-1 font-mono tabular-nums">
+              <div className="text-2xl font-bold text-gray-900 mb-1 tabular-nums">
                 {formatSSP(category.total)}
               </div>
 
               {/* Percentage of Total */}
-              <div className="text-sm text-gray-600 font-medium mb-4 font-mono tabular-nums">
+              <div className="text-sm text-gray-600 font-medium mb-4 tabular-nums">
                 {category.percentage.toFixed(1)}% of total expenses
               </div>
 

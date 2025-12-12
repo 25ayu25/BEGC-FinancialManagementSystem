@@ -182,9 +182,18 @@ export function generateInsights(
     }
   }
 
-  // 2. Growth alert (Red - Alert) - only for significant growth (> 50%)
+  // 2. Growth alert (Red - Alert) - only for significant growth (> 50%), excluding new categories
   const highGrowthCategories = metrics
-    .filter((m, index) => index < 5 && m.growth > 50)
+    .filter((m, index) => {
+      // Get previous total to check if it's a new category
+      const prevTotal = prevTrendData.reduce((sum, month) => {
+        const breakdown = normalizeBreakdown(month.expenseBreakdown);
+        return sum + (breakdown[m.name] || 0);
+      }, 0);
+      
+      // Only include if growth > 50% AND had previous spending (not a new category)
+      return index < 5 && m.growth > 50 && prevTotal > 0;
+    })
     .sort((a, b) => b.growth - a.growth);
 
   if (highGrowthCategories.length > 0) {
@@ -230,7 +239,7 @@ export function generateInsights(
   }
 
   // 4. Category dominance (Amber - Warning) - if any category > 20%
-  const dominantCategories = metrics.filter((m, index) => index < 3 && m.percentage > 20);
+  const dominantCategories = metrics.filter(m => m.percentage > 20);
   if (dominantCategories.length > 0) {
     const dominant = dominantCategories[0];
     insights.push({
@@ -251,8 +260,16 @@ export function generateInsights(
     });
   }
 
-  // 6. New categories insight (Blue - Info) - categories with 100% growth but low previous value
-  const newCategories = metrics.filter(m => m.growth === 100 && m.total > 0);
+  // 6. New categories insight (Blue - Info) - categories that didn't exist in previous period
+  // These have 100% growth because previous total was 0
+  const newCategories = metrics.filter(m => {
+    const prevTotal = prevTrendData.reduce((sum, month) => {
+      const breakdown = normalizeBreakdown(month.expenseBreakdown);
+      return sum + (breakdown[m.name] || 0);
+    }, 0);
+    return m.growth === 100 && prevTotal === 0 && m.total > 0;
+  });
+  
   if (newCategories.length > 0) {
     insights.push({
       type: 'info',
