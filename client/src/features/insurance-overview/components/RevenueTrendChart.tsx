@@ -30,7 +30,7 @@ interface RevenueTrendChartProps {
 type ChartType = 'line' | 'area' | 'bar' | 'stacked-bar' | 'stacked-area';
 
 export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
-  const [chartType, setChartType] = useState<ChartType>('area');
+  const [chartType, setChartType] = useState<ChartType>('line');
   const [visibleProviders, setVisibleProviders] = useState<Set<string>>(
     new Set(metrics.slice(0, 5).map(m => m.id))
   );
@@ -48,8 +48,14 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
       Array.from(monthsSet).map(month => ({ month }))
     ).map(item => item.month);
 
+    // Check if we need to show all 12 months (when data spans multiple months in current year)
+    // If we have data spanning from early months (Jan-Apr) to later months, show all 12
+    const allMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const shouldShowAllMonths = months.length >= 4 && months.length < 12;
+    const finalMonths = shouldShowAllMonths ? allMonths : months;
+
     // Build data array
-    return months.map(month => {
+    return finalMonths.map(month => {
       const dataPoint: any = { month };
       metrics.forEach(provider => {
         if (visibleProviders.has(provider.id)) {

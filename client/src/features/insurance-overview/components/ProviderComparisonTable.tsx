@@ -44,6 +44,9 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
   const filteredAndSortedData = useMemo(() => {
     let data = [...metrics];
 
+    // Filter out providers with zero revenue
+    data = data.filter(m => m.revenue > 0);
+
     // Filter by search term
     if (searchTerm) {
       data = data.filter(m => 
@@ -134,8 +137,18 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
+        {filteredAndSortedData.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">
+              {searchTerm 
+                ? "No providers found matching your search."
+                : "No active providers with revenue in the selected period."}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
@@ -286,6 +299,8 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
               </Button>
             </div>
           </div>
+        )}
+        </>
         )}
       </CardContent>
     </Card>
