@@ -56,13 +56,30 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return metrics.slice(0, 8);
   }, [metrics]);
 
+  // Validate chart data to ensure all category values are numeric
+  const validatedChartData = useMemo(() => {
+    return chartData.map(dataPoint => {
+      const validated = { ...dataPoint };
+      
+      // Ensure all categories have valid numeric values
+      topCategories.forEach(category => {
+        const value = validated[category.name];
+        if (typeof value !== 'number' || isNaN(value)) {
+          validated[category.name] = 0;
+        }
+      });
+      
+      return validated;
+    });
+  }, [chartData, topCategories]);
+
   // Fill in missing months to prevent gaps
   const filledChartData = useMemo(() => {
-    if (chartData.length === 0) return [];
+    if (validatedChartData.length === 0) return [];
     
     // Get the date range
-    const allMonths = chartData.map(d => d.month).sort();
-    if (allMonths.length === 0) return chartData;
+    const allMonths = validatedChartData.map(d => d.month).sort();
+    if (allMonths.length === 0) return validatedChartData;
     
     const firstMonth = allMonths[0];
     const lastMonth = allMonths[allMonths.length - 1];
@@ -78,7 +95,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     
     while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
       const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-      const existingData = chartData.find(d => d.month === monthKey);
+      const existingData = validatedChartData.find(d => d.month === monthKey);
       
       if (existingData) {
         filled.push(existingData);
@@ -106,7 +123,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     }
     
     return filled;
-  }, [chartData, topCategories]);
+  }, [validatedChartData, topCategories]);
 
   const toggleCategory = (categoryName: string) => {
     setHiddenCategories(prev => {
@@ -184,19 +201,37 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     );
   }
 
+  // Empty state component
+  const EmptyState = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Expense Trends</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-80 flex flex-col items-center justify-center text-gray-500">
+          <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
+          <p className="font-medium">No expense data available</p>
+          <p className="text-sm">Data will appear once expenses are recorded for this period</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (chartData.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Expense Trends</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80 flex items-center justify-center text-gray-500">
-            No trend data available for the selected period.
-          </div>
-        </CardContent>
-      </Card>
+    return <EmptyState />;
+  }
+
+  // Check if there's actual numeric data to display
+  const hasActualData = useMemo(() => {
+    return filledChartData.some(dataPoint => 
+      topCategories.some(cat => 
+        dataPoint[cat.name] && dataPoint[cat.name] > 0
+      )
     );
+  }, [filledChartData, topCategories]);
+
+  if (!hasActualData) {
+    return <EmptyState />;
   }
 
   const renderChart = () => {
