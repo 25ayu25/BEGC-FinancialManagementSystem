@@ -39,6 +39,9 @@ import InsuranceOverview from "@/pages/insurance-overview";
 // Department Analytics page
 import DepartmentAnalytics from "@/pages/department-analytics";
 
+// Expense Analytics page
+import ExpenseAnalytics from "@/pages/expense-analytics";
+
 function Router() {
   return (
     <Switch>
@@ -105,6 +108,7 @@ function Router() {
                     <Route path="/reports" component={Reports} />
                     <Route path="/patient-volume" component={PatientVolume} />
                     <Route path="/department-analytics" component={DepartmentAnalytics} />
+                    <Route path="/expense-analytics" component={ExpenseAnalytics} />
                     <Route path="/insurance" component={Insurance} />
                     
                     {/* --- NEW ROUTE for Insurance Overview --- */}
