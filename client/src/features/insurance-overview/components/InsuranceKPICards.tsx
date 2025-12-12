@@ -2,10 +2,10 @@
  * Insurance KPI Cards Component
  */
 
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Building2, Target, BarChart3 } from "lucide-react";
-import { motion, useAnimation } from "framer-motion";
+import { motion } from "framer-motion";
 import { formatUSD, formatPercentage, formatCompactNumber } from "../utils/calculations";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 
@@ -35,32 +35,6 @@ const cardVariants = {
     }
   })
 };
-
-// Animated counter hook
-function useAnimatedCounter(end: number, duration: number = 1000) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let startTime: number;
-    let animationFrame: number;
-
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      
-      setCount(Math.floor(progress * end));
-
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate);
-      }
-    };
-
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [end, duration]);
-
-  return count;
-}
 
 // Generate mini sparkline data (deterministic based on value and change)
 function generateSparklineData(value: number, change: number) {
