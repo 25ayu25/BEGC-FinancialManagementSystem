@@ -58,19 +58,36 @@ export default function ExpenseAnalytics() {
     setIsModalOpen(true);
   };
 
+  const escapeCSV = (value: string | number): string => {
+    // Convert to string
+    const str = String(value);
+    
+    // Prevent CSV injection by prefixing formula characters with a single quote
+    if (str.match(/^[=+\-@]/)) {
+      return `"'${str.replace(/"/g, '""')}"`;
+    }
+    
+    // Escape double quotes and wrap in quotes if contains comma, quote, or newline
+    if (str.match(/[",\n\r]/)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    
+    return str;
+  };
+
   const handleExportCSV = () => {
     try {
       const csvHeaders = ['Rank', 'Category', 'Total (SSP)', 'Share %', 'Growth %', 'Avg/Month'];
       const csvRows = metrics.map((metric, index) => [
         index + 1,
-        metric.name,
+        escapeCSV(metric.name),
         metric.total.toFixed(2),
         metric.percentage.toFixed(2),
         metric.growth.toFixed(2),
         metric.avgPerMonth.toFixed(2),
       ]);
 
-      const csv = [csvHeaders, ...csvRows].map(row => row.join(',')).join('\n');
+      const csv = [csvHeaders.map(h => escapeCSV(h)), ...csvRows].map(row => row.join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');

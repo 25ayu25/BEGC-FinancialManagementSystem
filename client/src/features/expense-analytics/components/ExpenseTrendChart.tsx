@@ -150,27 +150,31 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
         <ResponsiveContainer width="100%" height={400}>
           <AreaChart data={chartData}>
             <defs>
-              {topCategories.map((category, index) => (
-                <linearGradient
-                  key={category.name}
-                  id={`color-${category.name.replace(/\s+/g, '-')}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="5%"
-                    stopColor={CHART_COLORS[index % CHART_COLORS.length]}
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor={CHART_COLORS[index % CHART_COLORS.length]}
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-              ))}
+              {topCategories.map((category, index) => {
+                // Generate safe CSS ID by removing all non-alphanumeric characters except hyphens
+                const safeId = category.name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
+                return (
+                  <linearGradient
+                    key={category.name}
+                    id={`color-${safeId}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="5%"
+                      stopColor={CHART_COLORS[index % CHART_COLORS.length]}
+                      stopOpacity={0.8}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={CHART_COLORS[index % CHART_COLORS.length]}
+                      stopOpacity={0.1}
+                    />
+                  </linearGradient>
+                );
+              })}
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
@@ -198,6 +202,8 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
             />
             {topCategories.map((category, index) => {
               if (hiddenCategories.has(category.name)) return null;
+              // Generate safe CSS ID by removing all non-alphanumeric characters except hyphens
+              const safeId = category.name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
               return (
                 <Area
                   key={category.name}
@@ -205,7 +211,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
                   dataKey={category.name}
                   stackId="1"
                   stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                  fill={`url(#color-${category.name.replace(/\s+/g, '-')})`}
+                  fill={`url(#color-${safeId})`}
                   strokeWidth={2}
                 />
               );
