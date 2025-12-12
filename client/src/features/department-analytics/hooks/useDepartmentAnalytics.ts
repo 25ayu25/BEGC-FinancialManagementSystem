@@ -163,23 +163,36 @@ export function useDepartmentAnalytics(
     return generateInsights(metrics);
   }, [metrics]);
 
-  // Calculate totals
+  // Calculate totals for KPIs
   const totals = useMemo(() => {
-    const totalRevenue = metrics.reduce((sum, m) => sum + m.revenue, 0);
-    const totalPrevRevenue = prevTrendData.reduce((sum, monthData) => {
-      const monthTotal = Object.values(monthData.departmentBreakdown || {})
-        .reduce((s, v) => s + v, 0);
+    const currentTotal = metrics.reduce((sum, m) => sum + m.revenue, 0);
+    
+    // Calculate previous period total from prevTrendData
+    const prevTotal = prevTrendData.reduce((sum, month) => {
+      const monthTotal = Object.values(month.departmentBreakdown || {}).reduce(
+        (s, amt) => s + (amt || 0), 
+        0
+      );
       return sum + monthTotal;
     }, 0);
     
-    const growth = totalPrevRevenue > 0 
-      ? ((totalRevenue - totalPrevRevenue) / totalPrevRevenue) * 100 
-      : 0;
+    // Calculate growth percentage
+    let periodGrowth = 0;
+    if (prevTotal > 0 && currentTotal > 0) {
+      periodGrowth = ((currentTotal - prevTotal) / prevTotal) * 100;
+    } else if (prevTotal === 0 && currentTotal > 0) {
+      // If there was no revenue before but there is now, that's 100% growth
+      periodGrowth = 100;
+    } else if (prevTotal > 0 && currentTotal === 0) {
+      // If there was revenue before but none now, that's -100% (decline)
+      periodGrowth = -100;
+    }
+    // else: both are 0, growth stays 0
 
     return {
-      totalRevenue,
-      activeDepartments: metrics.length,
-      growth,
+      totalRevenue: currentTotal,
+      activeDepartments: metrics.length, // metrics already filtered to departments with revenue
+      growth: Number(periodGrowth.toFixed(1)), // Round to 1 decimal
     };
   }, [metrics, prevTrendData]);
 

@@ -4,9 +4,15 @@
  * Detailed view of a single department's performance
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { X, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogOverlay,
+} from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DepartmentMetrics } from "../utils/calculations";
 import { formatSSP, formatMonthSafely } from "../utils/calculations";
@@ -47,19 +53,19 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <CardHeader className="sticky top-0 bg-white border-b z-10">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              {department.name} - Deep Dive
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6 space-y-6">
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogOverlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
+      <DialogContent className="max-w-6xl max-h-[95vh] bg-white dark:bg-gray-900 shadow-2xl border-2 border-teal-200 dark:border-teal-800">
+        <DialogHeader className="pb-4 border-b border-gray-200 dark:border-gray-700">
+          <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 bg-clip-text text-transparent">
+            {department.name} - Deep Dive
+          </DialogTitle>
+          <DialogDescription className="text-base text-gray-600 dark:text-gray-400">
+            Comprehensive performance analysis and 12-month revenue trends
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-y-auto max-h-[calc(95vh-120px)] space-y-6 py-4">
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg">
@@ -193,8 +199,8 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
               </table>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
