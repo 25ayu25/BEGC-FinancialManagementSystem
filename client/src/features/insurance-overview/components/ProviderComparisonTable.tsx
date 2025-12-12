@@ -210,25 +210,25 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
                 const getMedalBadge = (rank: number) => {
                   if (rank === 1) {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-lg font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 text-white text-xl font-bold shadow-xl transform hover:scale-110 transition-transform">
                         🥇
                       </div>
                     );
                   } else if (rank === 2) {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-gray-300 to-gray-500 text-white text-lg font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 text-white text-xl font-bold shadow-xl transform hover:scale-110 transition-transform">
                         🥈
                       </div>
                     );
                   } else if (rank === 3) {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-amber-600 to-amber-800 text-white text-lg font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-amber-600 via-amber-700 to-amber-800 text-white text-xl font-bold shadow-xl transform hover:scale-110 transition-transform">
                         🥉
                       </div>
                     );
                   } else {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-bold shadow-md">
+                      <div className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-purple-600 text-white text-sm font-bold shadow-lg">
                         {rank}
                       </div>
                     );
