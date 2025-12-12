@@ -59,7 +59,7 @@ export function ExpenseKPICards({ kpis, isLoading }: ExpenseKPICardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-gray-900">
-            <AnimatedNumber value={kpis.totalExpenses} format={formatSSP} />
+            <AnimatedNumber value={kpis.totalExpenses} formatFn={formatSSP} />
           </div>
           <div className={`text-xs flex items-center gap-1 mt-1 ${changeColor}`}>
             <ChangeTrendIcon className="w-3 h-3" />
@@ -125,7 +125,7 @@ export function ExpenseKPICards({ kpis, isLoading }: ExpenseKPICardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-gray-900">
-            <AnimatedNumber value={kpis.avgMonthlyExpenses} format={formatSSP} />
+            <AnimatedNumber value={kpis.avgMonthlyExpenses} formatFn={formatSSP} />
           </div>
           <p className="text-xs text-gray-500 mt-1">
             Average per month
