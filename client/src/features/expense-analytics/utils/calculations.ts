@@ -35,9 +35,9 @@ export interface ExpenseInsight {
 
 /**
  * Normalize expense breakdown to consistent format
- * Ensures all values are valid numbers, defaulting to 0 for undefined/NaN
+ * Ensures all values are valid numbers, defaulting to 0 for undefined/NaN/null
  */
-export function normalizeBreakdown(breakdown: Record<string, number> | Array<[string, number]> | undefined): Record<string, number> {
+export function normalizeBreakdown(breakdown: Record<string, number> | Array<[string, number]> | undefined | null): Record<string, number> {
   if (!breakdown) return {};
   
   let entries: [string, number][];
@@ -48,11 +48,12 @@ export function normalizeBreakdown(breakdown: Record<string, number> | Array<[st
     entries = Object.entries(breakdown);
   }
   
-  // Validate all values are numbers, default to 0 for undefined/NaN
+  // Validate all values are numbers, default to 0 for undefined/NaN/null/Infinity
   const normalized: Record<string, number> = {};
   
   for (const [key, value] of entries) {
-    normalized[key] = typeof value === 'number' && !isNaN(value) ? value : 0;
+    // Use Number.isFinite to exclude NaN, Infinity, and -Infinity
+    normalized[key] = typeof value === 'number' && Number.isFinite(value) ? value : 0;
   }
   
   return normalized;
@@ -74,13 +75,16 @@ export function calculateCategoryMetrics(
   const categoryMonthlyData = new Map<string, Array<{ month: string; amount: number }>>();
 
   trendData.forEach(monthData => {
+    if (!monthData) return; // Skip null/undefined entries
     const breakdown = normalizeBreakdown(monthData.expenseBreakdown);
     Object.entries(breakdown).forEach(([category, amount]) => {
+      // Extra validation to ensure amount is a valid number
+      const validAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
       const current = categoryTotals.get(category) || 0;
-      categoryTotals.set(category, current + amount);
+      categoryTotals.set(category, current + validAmount);
 
       const monthly = categoryMonthlyData.get(category) || [];
-      monthly.push({ month: monthData.month, amount });
+      monthly.push({ month: monthData.month || '', amount: validAmount });
       categoryMonthlyData.set(category, monthly);
     });
   });
@@ -88,10 +92,13 @@ export function calculateCategoryMetrics(
   // Calculate previous period totals for growth comparison
   const prevCategoryTotals = new Map<string, number>();
   prevTrendData.forEach(monthData => {
+    if (!monthData) return; // Skip null/undefined entries
     const breakdown = normalizeBreakdown(monthData.expenseBreakdown);
     Object.entries(breakdown).forEach(([category, amount]) => {
+      // Extra validation to ensure amount is a valid number
+      const validAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
       const current = prevCategoryTotals.get(category) || 0;
-      prevCategoryTotals.set(category, current + amount);
+      prevCategoryTotals.set(category, current + validAmount);
     });
   });
 
