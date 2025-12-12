@@ -11,7 +11,6 @@ import PatientVolume from "@/pages/patient-volume";
 import Settings from "@/pages/settings";
 import Security from "@/pages/security";
 import UserManagement from "@/pages/user-management";
-import InsuranceProviders from "@/pages/insurance-providers";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
@@ -103,7 +102,6 @@ function Router() {
                     <Route path="/reports" component={Reports} />
                     <Route path="/patient-volume" component={PatientVolume} />
                     <Route path="/department-analytics" component={DepartmentAnalytics} />
-                    <Route path="/insurance-providers" component={InsuranceProviders} />
                     <Route path="/insurance" component={Insurance} />
                     
                     {/* --- NEW ROUTE for Lab Finance --- */}

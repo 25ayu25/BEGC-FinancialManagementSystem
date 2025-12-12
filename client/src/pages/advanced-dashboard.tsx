@@ -93,11 +93,6 @@ function computeRangeParams(
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
-  timeRange,
-  selectedYear,
-  selectedMonth,
-  customStartDate,
-  customEndDate,
 }: {
   breakdown?:
     | Record<string, number>
@@ -108,11 +103,6 @@ function InsuranceProvidersUSD({
         total?: number;
       }>;
   totalUSD: number;
-  timeRange: string;
-  selectedYear?: number | null;
-  selectedMonth?: number | null;
-  customStartDate?: Date;
-  customEndDate?: Date;
 }) {
   const rows = useMemo(() => {
     if (!breakdown) return [] as { name: string; amount: number }[];
@@ -144,15 +134,6 @@ function InsuranceProvidersUSD({
     "#06B6D4",
   ];
 
-  const base = `/insurance-providers?range=${timeRange}`;
-  const viewAllHref =
-    timeRange === "custom" && customStartDate && customEndDate
-      ? `${base}&startDate=${format(
-          customStartDate,
-          "yyyy-MM-dd"
-        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-      : `${base}&year=${selectedYear}&month=${selectedMonth}`;
-
   return (
     <Card className="border border-slate-200 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -160,21 +141,14 @@ function InsuranceProvidersUSD({
           <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance
           Providers
         </CardTitle>
-        <div className="flex items-center gap-2">
-          {displayTotal > 0 && (
-            <span className="text-xs text-slate-500">
-              Total:{" "}
-              <span className="font-mono font-semibold text-slate-700">
-                ${fmtUSD(displayTotal)}
-              </span>
+        {displayTotal > 0 && (
+          <span className="text-xs text-slate-500">
+            Total:{" "}
+            <span className="font-mono font-semibold text-slate-700">
+              ${fmtUSD(displayTotal)}
             </span>
-          )}
-          <Link href={viewAllHref}>
-            <Button variant="outline" size="sm" aria-label="View all providers">
-              View all
-            </Button>
-          </Link>
-        </div>
+          </span>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {sorted.length === 0 ? (
@@ -1147,90 +1121,76 @@ export default function AdvancedDashboard() {
                 </Card>
 
                 {/* Insurance (USD) */}
-                <Link
-                  href={`/insurance-providers?range=${rangeToSend}${
-                    timeRange === "custom" &&
-                    customStartDate &&
-                    customEndDate
-                      ? `&startDate=${format(
-                          customStartDate,
-                          "yyyy-MM-dd"
-                        )}&endDate=${format(customEndDate, "yyyy-MM-dd")}`
-                      : `&year=${yearToSend}&month=${monthToSend}`
-                  }`}
-                  aria-label="View insurance breakdown"
-                >
-                  <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
-                    <CardContent className="p-4 sm:p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
-                            Insurance (USD)
-                          </p>
-                          <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
-                            USD{" "}
-                            <AnimatedNumber
-                              value={Math.round(
-                                parseFloat(
-                                  dashboardData?.totalIncomeUSD || "0"
-                                )
-                              )}
-                              duration={1500}
-                              formatFn={(n) => fmtUSD(Math.round(n))}
-                            />
-                          </p>
-                          <div className="flex items-center mt-1">
-                            {showNoDataYetInsurance ? (
-                              <span className="text-xs font-medium text-slate-500">
-                                No insurance claims yet
-                              </span>
-                            ) : insuranceChangePct !== undefined &&
-                              insuranceChangePct !== null &&
-                              (!(
-                                timeRange === "year" ||
-                                timeRange === "last-3-months"
-                              ) ||
-                                hasPreviousPeriodUSD) ? (
-                              <span
-                                className={cn(
-                                  "text-xs font-medium",
-                                  insuranceChangePct > 0
-                                    ? "text-emerald-600"
-                                    : insuranceChangePct < 0
-                                    ? "text-red-600"
-                                    : "text-slate-500"
-                                )}
-                              >
-                                {insuranceChangePct > 0 ? "+" : ""}
-                                {insuranceChangePct.toFixed(1)}{" "}
-                                {comparisonLabel}
-                              </span>
-                            ) : shouldShowNoComparisonUSD ? (
-                              <span className="text-xs font-medium text-slate-500">
-                                No data to compare
-                              </span>
-                            ) : (
-                              <span className="text-xs font-medium text-purple-600">
-                                {Object.keys(
-                                  dashboardData?.insuranceBreakdown || {}
-                                ).length === 1
-                                  ? "1 provider"
-                                  : `${
-                                      Object.keys(
-                                        dashboardData?.insuranceBreakdown || {}
-                                      ).length
-                                    } providers`}
-                              </span>
+                <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200">
+                  <CardContent className="p-4 sm:p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                          Insurance (USD)
+                        </p>
+                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                          USD{" "}
+                          <AnimatedNumber
+                            value={Math.round(
+                              parseFloat(
+                                dashboardData?.totalIncomeUSD || "0"
+                              )
                             )}
-                          </div>
-                        </div>
-                        <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
-                          <Shield className="h-5 w-5 text-purple-600" />
+                            duration={1500}
+                            formatFn={(n) => fmtUSD(Math.round(n))}
+                          />
+                        </p>
+                        <div className="flex items-center mt-1">
+                          {showNoDataYetInsurance ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No insurance claims yet
+                            </span>
+                          ) : insuranceChangePct !== undefined &&
+                            insuranceChangePct !== null &&
+                            (!(
+                              timeRange === "year" ||
+                              timeRange === "last-3-months"
+                            ) ||
+                              hasPreviousPeriodUSD) ? (
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                insuranceChangePct > 0
+                                  ? "text-emerald-600"
+                                  : insuranceChangePct < 0
+                                  ? "text-red-600"
+                                  : "text-slate-500"
+                              )}
+                            >
+                              {insuranceChangePct > 0 ? "+" : ""}
+                              {insuranceChangePct.toFixed(1)}{" "}
+                              {comparisonLabel}
+                            </span>
+                          ) : shouldShowNoComparisonUSD ? (
+                            <span className="text-xs font-medium text-slate-500">
+                              No data to compare
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-purple-600">
+                              {Object.keys(
+                                dashboardData?.insuranceBreakdown || {}
+                              ).length === 1
+                                ? "1 provider"
+                                : `${
+                                    Object.keys(
+                                      dashboardData?.insuranceBreakdown || {}
+                                    ).length
+                                  } providers`}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                      <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
+                        <Shield className="h-5 w-5 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Patient Volume */}
                 <Link
@@ -1301,11 +1261,6 @@ export default function AdvancedDashboard() {
                     totalUSD={parseFloat(
                       dashboardData?.totalIncomeUSD || "0"
                     )}
-                    timeRange={rangeToSend}
-                    selectedYear={yearToSend}
-                    selectedMonth={monthToSend}
-                    customStartDate={customStartDate ?? undefined}
-                    customEndDate={customEndDate ?? undefined}
                   />
 
                   <Card className="border border-slate-200 shadow-sm self-start">
