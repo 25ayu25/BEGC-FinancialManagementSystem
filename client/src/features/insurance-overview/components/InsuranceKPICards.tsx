@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatUSD, formatPercentage, formatCompactNumber } from "../utils/calculations";
-import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 
 interface KPICardsProps {
   kpis: {
@@ -35,26 +35,27 @@ const cardVariants = {
   })
 };
 
-// Generate mini sparkline data (deterministic based on value and change)
-function generateSparklineData(value: number, change: number) {
-  const points = 8;
-  const data = [];
-  const avgValue = value / (1 + change / 100);
-  
-  // Use a simple sine wave for deterministic variation
-  for (let i = 0; i < points; i++) {
-    const progress = i / (points - 1);
-    // Create deterministic variation based on the index and value
-    const phaseShift = (value % 100) / 100; // Use value to create unique but consistent patterns
-    const variation = Math.sin((progress + phaseShift) * Math.PI * 2) * 0.05;
-    const trendValue = avgValue * (1 + (change / 100) * progress + variation);
-    data.push({ value: Math.max(0, trendValue) });
-  }
-  
-  return data;
-}
-
 export function InsuranceKPICards({ kpis }: KPICardsProps) {
+  // Use real monthly data for sparklines
+  const sparklineData = useMemo(() => {
+    if (!kpis.monthlyTotals || kpis.monthlyTotals.length === 0) {
+      // Fallback: generate smooth curve if no data
+      return Array.from({ length: 12 }, (_, i) => {
+        const base = 100;
+        const wave = Math.sin(i * 0.5) * 30;
+        const trend = i * 5;
+        return { value: base + wave + trend, month: '', index: i };
+      });
+    }
+    
+    // Use real monthly USD revenue totals
+    return kpis.monthlyTotals.map((m, i) => ({ 
+      value: m.total, 
+      month: m.month,
+      index: i 
+    }));
+  }, [kpis.monthlyTotals]);
+
   const cards = [
     {
       title: "Total Claims Value",
@@ -99,18 +100,13 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card, index) => (
-        <KPICard key={card.title} card={card} index={index} />
+        <KPICard key={card.title} card={card} index={index} sparklineData={sparklineData} />
       ))}
     </div>
   );
 }
 
-function KPICard({ card, index }: { card: any; index: number }) {
-  const sparklineData = useMemo(
-    () => generateSparklineData(card.rawValue, card.change),
-    [card.rawValue, card.change]
-  );
-
+function KPICard({ card, index, sparklineData }: { card: any; index: number; sparklineData: Array<{ value: number; month: string; index: number }> }) {
   return (
     <motion.div
       custom={index}
@@ -182,8 +178,8 @@ function KPICard({ card, index }: { card: any; index: number }) {
               )}
             </div>
 
-            {/* Mini Sparkline */}
-            {card.change !== 0 && (
+            {/* Mini Sparkline with real data - show for Total Claims and Period Growth */}
+            {(index === 0 || index === 3) && sparklineData.length > 0 && (
               <div className="h-12 mt-3 opacity-60 group-hover:opacity-100 transition-opacity">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={sparklineData}>
@@ -193,6 +189,21 @@ function KPICard({ card, index }: { card: any; index: number }) {
                         <stop offset="100%" stopColor={card.change >= 0 ? "#10B981" : "#ef4444"} stopOpacity={0.1} />
                       </linearGradient>
                     </defs>
+                    {/* Tooltip for hover */}
+                    <Tooltip 
+                      content={({ payload }) => {
+                        if (!payload || !payload[0]) return null;
+                        const dataPoint = payload[0].payload;
+                        return (
+                          <div className="bg-white px-3 py-2 rounded-lg shadow-lg border border-gray-200">
+                            <p className="text-xs text-gray-600">{dataPoint.month || `Month ${dataPoint.index + 1}`}</p>
+                            <p className="text-sm font-bold text-gray-900">
+                              ${Math.round(dataPoint.value).toLocaleString()}
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
                     <Area 
                       type="monotone" 
                       dataKey="value" 
@@ -200,7 +211,8 @@ function KPICard({ card, index }: { card: any; index: number }) {
                       strokeWidth={3}
                       fill={`url(#sparklineGradient-${index})`}
                       dot={false}
-                      animationDuration={1000}
+                      animationDuration={1200}
+                      animationEasing="ease-in-out"
                     />
                   </AreaChart>
                 </ResponsiveContainer>

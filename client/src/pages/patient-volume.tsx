@@ -267,24 +267,52 @@ export default function PatientVolumePage() {
     return { months, range: "multi-month" };
   }, [dateRange]);
 
-  const { data: rawVolumes = [], isLoading } = useQuery<PatientVolume[]>({
+  const { data: rawVolumes = [], isLoading, error } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/period", apiQueryParams],
     queryFn: async () => {
-      if (apiQueryParams.range === "current-month") {
-        const resp = await api.get(`/api/patient-volume/period/${apiQueryParams.year}/${apiQueryParams.month}`);
-        return Array.isArray(resp.data) ? resp.data : [];
-      } else {
-        // Fetch multiple months and combine
-        const allData: PatientVolume[] = [];
-        for (const { year: y, month: m } of apiQueryParams.months || []) {
-          const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
-          if (Array.isArray(resp.data)) {
-            allData.push(...resp.data);
-          }
+      try {
+        if (!apiQueryParams) {
+          return [];
         }
-        return allData;
+
+        if (apiQueryParams.range === "current-month") {
+          const resp = await api.get(`/api/patient-volume/period/${apiQueryParams.year}/${apiQueryParams.month}`);
+          const data = resp.data;
+          
+          // Validate it's an array
+          if (!Array.isArray(data)) {
+            console.error("API returned non-array data:", data);
+            return [];
+          }
+          
+          return data;
+        } else {
+          // Fetch multiple months
+          const allData: PatientVolume[] = [];
+          const months = apiQueryParams.months || [];
+          
+          for (const { year: y, month: m } of months) {
+            try {
+              const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
+              if (Array.isArray(resp.data)) {
+                allData.push(...resp.data);
+              }
+            } catch (monthError) {
+              console.error(`Failed to fetch month ${y}-${m}:`, monthError);
+              // Continue with other months
+            }
+          }
+          
+          return allData;
+        }
+      } catch (error) {
+        console.error("Failed to fetch patient volume data:", error);
+        return []; // Always return empty array on error
       }
     },
+    enabled: !!apiQueryParams, // Only run query if params exist
+    retry: 2, // Retry failed requests
+    staleTime: 1 * 60 * 1000, // Cache for 1 minute
   });
 
   // --- Comparison Period Data ---
@@ -334,26 +362,39 @@ export default function PatientVolumePage() {
     return { months, range: "multi-month" };
   }, [comparisonDateRange]);
 
-  const { data: rawComparisonVolumes = [] } = useQuery<PatientVolume[]>({
+  const { data: rawComparisonVolumes = [], isLoading: isLoadingComparison } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/comparison", comparisonApiQueryParams],
     queryFn: async () => {
-      if (!comparisonApiQueryParams) return [];
-      
-      if (comparisonApiQueryParams.range === "current-month") {
-        const resp = await api.get(`/api/patient-volume/period/${comparisonApiQueryParams.year}/${comparisonApiQueryParams.month}`);
-        return Array.isArray(resp.data) ? resp.data : [];
-      } else {
-        const allData: PatientVolume[] = [];
-        for (const { year: y, month: m } of comparisonApiQueryParams.months || []) {
-          const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
-          if (Array.isArray(resp.data)) {
-            allData.push(...resp.data);
+      try {
+        if (!comparisonApiQueryParams) return [];
+        
+        if (comparisonApiQueryParams.range === "current-month") {
+          const resp = await api.get(`/api/patient-volume/period/${comparisonApiQueryParams.year}/${comparisonApiQueryParams.month}`);
+          return Array.isArray(resp.data) ? resp.data : [];
+        } else {
+          const allData: PatientVolume[] = [];
+          const months = comparisonApiQueryParams.months || [];
+          
+          for (const { year: y, month: m } of months) {
+            try {
+              const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
+              if (Array.isArray(resp.data)) {
+                allData.push(...resp.data);
+              }
+            } catch {
+              // Continue with other months
+            }
           }
+          
+          return allData;
         }
-        return allData;
+      } catch (error) {
+        console.error("Failed to fetch comparison data:", error);
+        return [];
       }
     },
-    enabled: showComparison && comparisonDateRange !== null,
+    enabled: !!comparisonApiQueryParams && showComparison,
+    retry: 1,
   });
 
   // Filter comparison volumes to only include those in the comparison date range
@@ -884,6 +925,66 @@ export default function PatientVolumePage() {
 
   // Pie chart colors
   const WEEKDAY_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#14b8a6", "#06b6d4", "#3b82f6", "#8b5cf6"];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <PageHeader
+          variant="patientVolume"
+          title="Patient Volume Tracking"
+          subtitle="Monthly & multi-period summary"
+        >
+          <HeaderAction
+            variant="light"
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setAddOpen(true)}
+          >
+            Add Volume
+          </HeaderAction>
+        </PageHeader>
+        
+        <AppContainer className="space-y-6 py-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading patient volume data...</p>
+            </div>
+          </div>
+        </AppContainer>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <PageHeader
+          variant="patientVolume"
+          title="Patient Volume Tracking"
+          subtitle="Monthly & multi-period summary"
+        >
+          <HeaderAction
+            variant="light"
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setAddOpen(true)}
+          >
+            Add Volume
+          </HeaderAction>
+        </PageHeader>
+        
+        <AppContainer className="space-y-6 py-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-red-600 mb-4">Failed to load patient volume data</p>
+              <Button onClick={() => window.location.reload()}>Retry</Button>
+            </div>
+          </div>
+        </AppContainer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
