@@ -90,7 +90,15 @@ export function useInsuranceOverview(
       const endStr = formatDateForAPI(dateRange.endDate);
       const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
       
-      return response.data || [];
+      // Transform response to match expected format
+      return (response.data || []).map((item: any) => ({
+        month: item.month,
+        fullMonth: item.fullMonth,
+        year: item.year,
+        monthNum: item.monthNum,
+        revenue: item.revenue || 0,
+        revenueUSD: item.revenueUSD || 0,
+      }));
     },
     enabled: !!dateRange.startDate && !!dateRange.endDate,
   });
@@ -106,7 +114,15 @@ export function useInsuranceOverview(
       const endStr = formatDateForAPI(prevDateRange.endDate);
       const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
       
-      return response.data || [];
+      // Transform response to match expected format
+      return (response.data || []).map((item: any) => ({
+        month: item.month,
+        fullMonth: item.fullMonth,
+        year: item.year,
+        monthNum: item.monthNum,
+        revenue: item.revenue || 0,
+        revenueUSD: item.revenueUSD || 0,
+      }));
     },
     enabled: !!prevDateRange.startDate && !!prevDateRange.endDate,
   });
