@@ -2,7 +2,7 @@
  * Insurance KPI Cards Component
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Building2, Target, BarChart3 } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
@@ -62,16 +62,19 @@ function useAnimatedCounter(end: number, duration: number = 1000) {
   return count;
 }
 
-// Generate mini sparkline data
+// Generate mini sparkline data (deterministic based on value and change)
 function generateSparklineData(value: number, change: number) {
   const points = 8;
   const data = [];
   const avgValue = value / (1 + change / 100);
   
+  // Use a simple sine wave for deterministic variation
   for (let i = 0; i < points; i++) {
     const progress = i / (points - 1);
-    const randomVariation = (Math.random() - 0.5) * 0.1;
-    const trendValue = avgValue * (1 + (change / 100) * progress + randomVariation);
+    // Create deterministic variation based on the index and value
+    const phaseShift = (value % 100) / 100; // Use value to create unique but consistent patterns
+    const variation = Math.sin((progress + phaseShift) * Math.PI * 2) * 0.05;
+    const trendValue = avgValue * (1 + (change / 100) * progress + variation);
     data.push({ value: Math.max(0, trendValue) });
   }
   
@@ -150,7 +153,10 @@ export function InsuranceKPICards({ kpis }: KPICardsProps) {
 }
 
 function KPICard({ card, index }: { card: any; index: number }) {
-  const sparklineData = generateSparklineData(card.rawValue, card.change);
+  const sparklineData = useMemo(
+    () => generateSparklineData(card.rawValue, card.change),
+    [card.rawValue, card.change]
+  );
 
   return (
     <motion.div
