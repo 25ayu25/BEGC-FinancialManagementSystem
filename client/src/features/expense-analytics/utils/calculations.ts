@@ -96,7 +96,13 @@ export function calculateCategoryMetrics(
 
     // Calculate growth vs previous period
     const prevTotal = prevCategoryTotals.get(categoryName) || 0;
-    const growth = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0;
+    let growth = 0;
+    if (prevTotal > 0) {
+      growth = ((total - prevTotal) / prevTotal) * 100;
+    } else if (total > 0) {
+      // If there was no previous spending but current spending exists, show as 100% growth
+      growth = 100;
+    }
 
     metrics.push({
       id: categoryName,
