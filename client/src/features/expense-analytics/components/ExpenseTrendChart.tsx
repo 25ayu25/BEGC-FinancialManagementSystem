@@ -201,21 +201,24 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     );
   }
 
+  // Empty state component
+  const EmptyState = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Expense Trends</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-80 flex flex-col items-center justify-center text-gray-500">
+          <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
+          <p className="font-medium">No expense data available</p>
+          <p className="text-sm">Data will appear once expenses are recorded for this period</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (chartData.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Expense Trends</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80 flex flex-col items-center justify-center text-gray-500">
-            <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
-            <p className="font-medium">No expense data available</p>
-            <p className="text-sm">Data will appear once expenses are recorded for this period</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState />;
   }
 
   // Check if there's actual numeric data to display
@@ -228,20 +231,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
   }, [filledChartData, topCategories]);
 
   if (!hasActualData) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Expense Trends</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80 flex flex-col items-center justify-center text-gray-500">
-            <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
-            <p className="font-medium">No expense data available</p>
-            <p className="text-sm">Data will appear once expenses are recorded for this period</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState />;
   }
 
   const renderChart = () => {

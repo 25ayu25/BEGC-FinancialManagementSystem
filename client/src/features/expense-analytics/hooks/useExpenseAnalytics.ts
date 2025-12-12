@@ -131,9 +131,9 @@ export function useExpenseAnalytics(
     });
   }, [trendData]);
 
-  // Debug logging to identify data structure issues
+  // Debug logging to identify data structure issues (development only)
   useEffect(() => {
-    if (chartData.length > 0 && metrics.length > 0) {
+    if (import.meta.env.DEV && chartData.length > 0 && metrics.length > 0) {
       console.log('🔍 Chart Data Debug:', {
         trendDataSample: trendData[0],
         chartDataSample: chartData[0],
