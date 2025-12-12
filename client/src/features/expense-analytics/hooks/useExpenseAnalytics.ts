@@ -11,6 +11,7 @@ import {
   calculateCategoryMetrics, 
   calculateKPIs,
   generateInsights,
+  normalizeBreakdown,
   type MonthlyExpenseData,
   type CategoryMetrics,
 } from "../utils/calculations";
@@ -119,9 +120,7 @@ export function useExpenseAnalytics(
   // Prepare chart data
   const chartData = useMemo(() => {
     return trendData.map(month => {
-      const breakdown = Array.isArray(month.expenseBreakdown)
-        ? Object.fromEntries(month.expenseBreakdown)
-        : month.expenseBreakdown;
+      const breakdown = normalizeBreakdown(month.expenseBreakdown);
       
       return {
         month: month.month,

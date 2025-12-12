@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import type { CategoryMetrics } from "../utils/calculations";
+import { generateSafeCSSId } from "../utils/calculations";
 
 interface ExpenseTrendChartProps {
   chartData: Array<Record<string, any>>;
@@ -151,8 +152,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
           <AreaChart data={chartData}>
             <defs>
               {topCategories.map((category, index) => {
-                // Generate safe CSS ID by removing all non-alphanumeric characters except hyphens
-                const safeId = category.name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
+                const safeId = generateSafeCSSId(category.name);
                 return (
                   <linearGradient
                     key={category.name}
@@ -202,8 +202,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
             />
             {topCategories.map((category, index) => {
               if (hiddenCategories.has(category.name)) return null;
-              // Generate safe CSS ID by removing all non-alphanumeric characters except hyphens
-              const safeId = category.name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
+              const safeId = generateSafeCSSId(category.name);
               return (
                 <Area
                   key={category.name}

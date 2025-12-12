@@ -63,12 +63,13 @@ export default function ExpenseAnalytics() {
     const str = String(value);
     
     // Prevent CSV injection by prefixing formula characters with a single quote
-    if (str.match(/^[=+\-@]/)) {
+    // Check for formula injection patterns: =, +, -, @, tab, carriage return
+    if (str.match(/^[=+\-@\t\r]/)) {
       return `"'${str.replace(/"/g, '""')}"`;
     }
     
-    // Escape double quotes and wrap in quotes if contains comma, quote, or newline
-    if (str.match(/[",\n\r]/)) {
+    // Escape double quotes and wrap in quotes if contains comma, quote, newline, or tab
+    if (str.match(/[",\n\r\t]/)) {
       return `"${str.replace(/"/g, '""')}"`;
     }
     

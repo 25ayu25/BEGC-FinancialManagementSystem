@@ -236,3 +236,11 @@ export function formatMonthSafely(monthData: { month: string }): string {
     return monthData.month;
   }
 }
+
+/**
+ * Generate safe CSS ID from category name
+ * Removes all non-alphanumeric characters except hyphens
+ */
+export function generateSafeCSSId(name: string): string {
+  return name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
+}
