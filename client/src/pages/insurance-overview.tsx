@@ -113,36 +113,43 @@ export default function InsuranceOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Premium Header with Violet Gradient */}
+      {/* Premium Header with Enhanced Animated Gradient */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-700 p-8 shadow-2xl">
-        {/* Animated background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
-                             radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
-                             radial-gradient(circle at 40% 20%, rgba(255, 255, 255, 0.3) 0%, transparent 50%)`
-          }} />
+        {/* Animated gradient mesh background */}
+        <div className="absolute inset-0 opacity-30">
+          <div 
+            className="absolute inset-0 animate-pulse" 
+            style={{
+              backgroundImage: `radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
+                               radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
+                               radial-gradient(circle at 40% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 50%)`,
+              animation: 'pulse 4s ease-in-out infinite'
+            }} 
+          />
         </div>
+
+        {/* Glassmorphism overlay */}
+        <div className="absolute inset-0 backdrop-blur-sm bg-white/5" />
 
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            {/* Left: Title and Subtitle */}
+            {/* Left: Title and Subtitle with glow effect */}
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-lg">
                 Insurance Overview
               </h1>
-              <p className="mt-1 text-sm sm:text-base text-violet-100">
+              <p className="mt-1 text-sm sm:text-base text-violet-100 drop-shadow-md">
                 Comprehensive insurance provider analytics and performance tracking
               </p>
             </div>
 
-            {/* Right: Controls */}
+            {/* Right: Controls with enhanced styling */}
             <div className="flex-shrink-0 flex items-center gap-2">
               <div className="flex flex-wrap gap-3">
-                {/* Date filter */}
+                {/* Date filter with enhanced glassmorphism */}
                 <Select value={selectedFilter} onValueChange={handleFilterChange}>
-                  <SelectTrigger className="w-[180px] bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white transition-colors">
+                  <SelectTrigger className="w-[180px] bg-white/95 backdrop-blur-md border-white/30 hover:bg-white transition-all hover:shadow-lg">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
@@ -161,7 +168,7 @@ export default function InsuranceOverview() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-[240px] justify-start text-left font-normal bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white",
+                          "w-[240px] justify-start text-left font-normal bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-lg transition-all",
                           !customDateRange.start && "text-muted-foreground"
                         )}
                       >
@@ -199,18 +206,18 @@ export default function InsuranceOverview() {
                   </Popover>
                 )}
 
-                {/* Export buttons */}
+                {/* Export buttons with enhanced styling */}
                 <HeaderAction
                   icon={<Download className="w-4 h-4" />}
                   label="Export CSV"
                   onClick={handleExportCSV}
-                  className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white text-violet-700"
+                  className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-lg text-violet-700 transition-all hover:scale-105"
                 />
                 <HeaderAction
                   icon={<FileText className="w-4 h-4" />}
                   label="Export PDF"
                   onClick={handleExportPDF}
-                  className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white text-violet-700"
+                  className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-lg text-violet-700 transition-all hover:scale-105"
                 />
               </div>
             </div>

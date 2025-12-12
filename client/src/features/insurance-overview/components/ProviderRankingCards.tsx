@@ -66,32 +66,51 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
           variants={cardVariants}
         >
           <Card 
-            className="relative overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group border-violet-200 dark:border-violet-800"
+            className="relative overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90"
             onClick={() => onProviderClick(provider.id)}
           >
-            {/* Gradient accent based on rank */}
-            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getMedalColor(provider.rank)}`} />
+            {/* Glassmorphism overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/60 to-transparent dark:from-gray-800/60 dark:to-transparent pointer-events-none" />
             
-            <CardContent className="p-6">
-              {/* Header with rank and badge */}
+            {/* Gradient accent based on rank with enhanced glow */}
+            <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${getMedalColor(provider.rank)}`}>
+              <div className={`absolute inset-0 bg-gradient-to-r ${getMedalColor(provider.rank)} blur-md opacity-50`} />
+            </div>
+            
+            <CardContent className="p-6 relative z-10">
+              {/* Header with enhanced rank badge and status */}
               <div className="flex items-center justify-between mb-4">
-                <div className={`
-                  flex items-center justify-center w-10 h-10 rounded-full 
-                  bg-gradient-to-r ${getMedalColor(provider.rank)} 
-                  text-white font-bold text-lg shadow-lg
-                `}>
+                <motion.div 
+                  className={`
+                    flex items-center justify-center w-12 h-12 rounded-full 
+                    bg-gradient-to-br ${getMedalColor(provider.rank)} 
+                    text-white font-bold text-xl shadow-2xl
+                    ${provider.rank <= 3 ? 'ring-4 ring-white/30 dark:ring-gray-900/30' : ''}
+                  `}
+                  whileHover={{ scale: 1.15, rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                >
                   {provider.rank <= 3 ? getMedalEmoji(provider.rank) : provider.rank}
-                </div>
+                </motion.div>
                 
-                <Badge variant={getStatusBadgeVariant(provider.status)} className="text-xs">
+                <Badge 
+                  variant={getStatusBadgeVariant(provider.status)} 
+                  className="text-xs font-semibold px-3 py-1 shadow-md"
+                >
                   {provider.status}
                 </Badge>
               </div>
 
-              {/* Provider name */}
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-violet-600 transition-colors">
-                {provider.name}
-              </h3>
+              {/* Provider logo placeholder */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">
+                  {provider.name.charAt(0)}
+                </div>
+                {/* Provider name */}
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-violet-600 transition-colors flex-1">
+                  {provider.name}
+                </h3>
+              </div>
 
               {/* Revenue */}
               <div className="mb-3">
@@ -100,7 +119,7 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
                 </p>
               </div>
 
-              {/* Share percentage with progress bar */}
+              {/* Share percentage with enhanced animated progress bar */}
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -110,13 +129,15 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
                     {formatPercentage(provider.share)}
                   </span>
                 </div>
-                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min(provider.share, 100)}%` }}
-                    transition={{ duration: 1, delay: index * 0.1 }}
-                    className="h-full bg-gradient-to-r from-violet-500 to-purple-600 rounded-full"
-                  />
+                    transition={{ duration: 1, delay: index * 0.1, ease: "easeOut" }}
+                    className="h-full bg-gradient-to-r from-violet-500 via-purple-600 to-purple-700 rounded-full relative"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent" />
+                  </motion.div>
                 </div>
               </div>
 
@@ -125,30 +146,33 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
                 <span className="text-xs text-gray-600 dark:text-gray-400">
                   {provider.claimsCount} claims
                 </span>
-                <div className={`flex items-center gap-1 text-sm font-semibold ${
-                  provider.growth >= 0 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : 'text-red-600 dark:text-red-400'
-                }`}>
+                <motion.div 
+                  className={`flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded-full ${
+                    provider.growth >= 0 
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                  }`}
+                  whileHover={{ scale: 1.1 }}
+                >
                   {provider.growth >= 0 ? (
                     <TrendingUp className="w-4 h-4" />
                   ) : (
                     <TrendingDown className="w-4 h-4" />
                   )}
                   {formatPercentage(Math.abs(provider.growth))}
-                </div>
+                </motion.div>
               </div>
 
-              {/* Sparkline chart */}
+              {/* Enhanced Sparkline chart with gradient */}
               {provider.monthlyTrend.length > 0 && (
-                <div className="h-12 mt-2">
+                <div className="h-14 mt-2 opacity-70 group-hover:opacity-100 transition-opacity">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={provider.monthlyTrend}>
                       <Line 
                         type="monotone" 
                         dataKey="revenue" 
                         stroke={provider.growth >= 0 ? "#10b981" : "#ef4444"}
-                        strokeWidth={2}
+                        strokeWidth={3}
                         dot={false}
                       />
                     </LineChart>
@@ -156,6 +180,9 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
                 </div>
               )}
             </CardContent>
+
+            {/* Hover glow effect */}
+            <div className={`absolute inset-0 bg-gradient-to-r ${getMedalColor(provider.rank)} opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none`} />
           </Card>
         </motion.div>
       ))}

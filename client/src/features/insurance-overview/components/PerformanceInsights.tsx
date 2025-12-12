@@ -62,21 +62,46 @@ export function PerformanceInsights({ insights }: PerformanceInsightsProps) {
   };
 
   return (
-    <Card className="border-violet-200 dark:border-violet-800">
-      <CardHeader>
+    <Card className="relative overflow-hidden border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
+      {/* Gradient border effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 opacity-20 blur-xl" />
+      <div className="absolute inset-[2px] bg-white dark:bg-gray-900 rounded-lg" />
+      
+      <CardHeader className="relative z-10">
         <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-          <Lightbulb className="w-5 h-5 text-violet-600" />
+          <motion.div
+            animate={{ rotate: [0, 15, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <Lightbulb className="w-6 h-6 text-violet-600" />
+          </motion.div>
           AI Performance Insights
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 relative z-10">
         {insights.length === 0 ? (
-          <Alert className={getBgColor('info')}>
-            <Info className="w-5 h-5" />
-            <AlertDescription>
-              No insights available yet. Add more data to generate insights.
-            </AlertDescription>
-          </Alert>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Alert className={`${getBgColor('info')} shadow-md`}>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Info className="w-12 h-12 text-blue-500 mb-4" />
+                </motion.div>
+                <AlertDescription className="text-base">
+                  <strong className="block mb-2">No insights available yet</strong>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Add more transaction data with insurance providers to generate AI-powered insights
+                  </span>
+                </AlertDescription>
+              </div>
+            </Alert>
+          </motion.div>
         ) : (
           insights.map((insight, index) => (
             <motion.div
@@ -85,14 +110,25 @@ export function PerformanceInsights({ insights }: PerformanceInsightsProps) {
               initial="hidden"
               animate="visible"
               variants={insightVariants}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
             >
-              <Alert className={getBgColor(insight.type)}>
+              <Alert className={`${getBgColor(insight.type)} shadow-md hover:shadow-lg transition-shadow`}>
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
+                  <motion.div 
+                    className="mt-0.5"
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: index * 0.2 }}
+                  >
                     {getIcon(insight.type)}
-                  </div>
+                  </motion.div>
                   <AlertDescription className="flex-1 text-sm leading-relaxed">
-                    <span className="text-2xl mr-2">{insight.icon}</span>
+                    <motion.span 
+                      className="text-2xl mr-2 inline-block"
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 1, delay: index * 0.3 }}
+                    >
+                      {insight.icon}
+                    </motion.span>
                     {insight.message}
                   </AlertDescription>
                 </div>
