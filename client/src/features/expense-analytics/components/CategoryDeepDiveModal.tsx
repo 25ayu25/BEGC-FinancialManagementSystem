@@ -4,7 +4,7 @@
  * Detailed view for a specific expense category
  */
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Activity, Trophy } from "lucide-react";
 import { formatSSP, formatMonthSafely } from "../utils/calculations";
@@ -75,9 +75,8 @@ export function CategoryDeepDiveModal({
   });
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogOverlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white shadow-2xl border-2 border-red-200">
+    <Dialog open={isOpen} onOpenChange={onClose} modal>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white shadow-2xl border-2 border-red-200 data-[state=open]:bg-white">
         <DialogHeader className="border-b border-gray-200 pb-4">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 bg-clip-text text-transparent">
             {category.name} - Deep Dive

@@ -4,7 +4,7 @@
  * Comprehensive expense tracking and cost optimization insights
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
@@ -36,6 +36,16 @@ export default function ExpenseAnalytics() {
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryMetrics | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Generate stable particle positions
+  const particles = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 3 + Math.random() * 4,
+      delay: Math.random() * 2,
+    }));
+  }, []);
 
   const { metrics, kpis, insights, chartData, isLoading, error } = useExpenseAnalytics(
     selectedFilter,
@@ -133,30 +143,19 @@ export default function ExpenseAnalytics() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-orange-500 to-amber-600 p-8 shadow-2xl">
         {/* Animated mesh/dot pattern background */}
         <div className="absolute inset-0 opacity-20">
-          <div 
-            className="absolute inset-0" 
-            style={{
-              backgroundImage: `
-                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.5) 0%, transparent 40%),
-                radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
-                radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.3) 0%, transparent 40%),
-                radial-gradient(circle at 90% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 40%)
-              `,
-              animation: 'pulse 6s ease-in-out infinite'
-            }} 
-          />
+          <div className="absolute inset-0 expense-header-pattern" />
         </div>
 
         {/* Floating particles effect */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(6)].map((_, i) => (
+          {particles.map((particle, i) => (
             <div
               key={i}
               className="absolute w-2 h-2 bg-white rounded-full opacity-30"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animation: `float ${3 + Math.random() * 4}s ease-in-out infinite ${Math.random() * 2}s`,
+                left: particle.left,
+                top: particle.top,
+                animation: `float ${particle.duration}s ease-in-out infinite ${particle.delay}s`,
               }}
             />
           ))}
