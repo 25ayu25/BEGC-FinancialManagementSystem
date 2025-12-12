@@ -33,6 +33,9 @@ import ClaimReconciliation from "@/pages/claim-reconciliation";
 // --- NEW: Insurance Lab Page ---
 import InsuranceLabPage from "@/pages/insurance-lab";
 
+// Insurance Overview page
+import InsuranceOverview from "@/pages/insurance-overview";
+
 // Department Analytics page
 import DepartmentAnalytics from "@/pages/department-analytics";
 
@@ -103,6 +106,9 @@ function Router() {
                     <Route path="/patient-volume" component={PatientVolume} />
                     <Route path="/department-analytics" component={DepartmentAnalytics} />
                     <Route path="/insurance" component={Insurance} />
+                    
+                    {/* --- NEW ROUTE for Insurance Overview --- */}
+                    <Route path="/insurance/overview" component={InsuranceOverview} />
                     
                     {/* --- NEW ROUTE for Lab Finance --- */}
                     <Route path="/insurance/lab" component={InsuranceLabPage} />
