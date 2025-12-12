@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Award } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatUSD, formatPercentage, getProviderColor, type ProviderMetrics } from "../utils/calculations";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 
 interface ProviderRankingCardsProps {
   metrics: ProviderMetrics[];
@@ -192,17 +192,28 @@ export function ProviderRankingCards({ metrics, onProviderClick }: ProviderRanki
 
                 {/* Enhanced Sparkline chart with gradient */}
                 {provider.monthlyTrend.length > 0 && (
-                  <div className="h-14 mt-2 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <div className="h-16 mt-4 opacity-70 group-hover:opacity-100 transition-opacity">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={provider.monthlyTrend}>
-                        <Line 
+                      <AreaChart data={provider.monthlyTrend.map(m => ({ 
+                        month: m.month, 
+                        value: m.revenue 
+                      }))}>
+                        <defs>
+                          <linearGradient id={`sparkline-${provider.id}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={providerColor} stopOpacity={0.5} />
+                            <stop offset="100%" stopColor={providerColor} stopOpacity={0.1} />
+                          </linearGradient>
+                        </defs>
+                        <Area 
                           type="monotone" 
-                          dataKey="revenue" 
-                          stroke={provider.growth >= 0 ? "#10b981" : "#ef4444"}
-                          strokeWidth={3}
+                          dataKey="value" 
+                          stroke={providerColor}
+                          strokeWidth={2.5}
+                          fill={`url(#sparkline-${provider.id})`}
                           dot={false}
+                          animationDuration={800}
                         />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 )}

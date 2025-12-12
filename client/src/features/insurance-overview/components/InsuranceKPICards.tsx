@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatUSD, formatPercentage, formatCompactNumber } from "../utils/calculations";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 
 interface KPICardsProps {
   kpis: {
@@ -18,6 +18,7 @@ interface KPICardsProps {
     growth: number;
     totalClaims: number;
     prevTotalClaimsValue: number;
+    monthlyTotals?: Array<{ month: string; total: number }>;
   };
 }
 
@@ -183,17 +184,25 @@ function KPICard({ card, index }: { card: any; index: number }) {
 
             {/* Mini Sparkline */}
             {card.change !== 0 && (
-              <div className="h-8 mt-2 opacity-60 group-hover:opacity-100 transition-opacity">
+              <div className="h-12 mt-3 opacity-60 group-hover:opacity-100 transition-opacity">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line 
+                  <AreaChart data={sparklineData}>
+                    <defs>
+                      <linearGradient id={`sparklineGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={card.change >= 0 ? "#10B981" : "#ef4444"} stopOpacity={0.6} />
+                        <stop offset="100%" stopColor={card.change >= 0 ? "#10B981" : "#ef4444"} stopOpacity={0.1} />
+                      </linearGradient>
+                    </defs>
+                    <Area 
                       type="monotone" 
                       dataKey="value" 
-                      stroke={card.change >= 0 ? "#10b981" : "#ef4444"}
-                      strokeWidth={2}
+                      stroke={card.change >= 0 ? "#10B981" : "#ef4444"}
+                      strokeWidth={3}
+                      fill={`url(#sparklineGradient-${index})`}
                       dot={false}
+                      animationDuration={1000}
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}

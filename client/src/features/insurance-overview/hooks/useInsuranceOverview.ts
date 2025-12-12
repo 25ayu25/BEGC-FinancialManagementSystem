@@ -208,6 +208,12 @@ export function useInsuranceOverview(
     const topProvider = metrics[0];
     const topProviderRevenue = topProvider ? topProvider.revenue : 0;
 
+    // Extract monthly totals for sparklines
+    const monthlyTotals = currentTrendData.map(month => ({
+      month: month.month,
+      total: month.revenueUSD || 0
+    }));
+
     return {
       totalClaimsValue,
       activeProviders,
@@ -216,8 +222,9 @@ export function useInsuranceOverview(
       growth,
       totalClaims,
       prevTotalClaimsValue,
+      monthlyTotals,
     };
-  }, [metrics, currentTransactions, prevTransactions]);
+  }, [metrics, currentTransactions, prevTransactions, currentTrendData]);
 
   const isLoading = loadingProviders || loadingCurrentTrend || loadingPrevTrend || loadingCurrent || loadingPrev;
   const error = currentError;
