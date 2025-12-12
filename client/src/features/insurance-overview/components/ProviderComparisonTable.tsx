@@ -44,6 +44,9 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
   const filteredAndSortedData = useMemo(() => {
     let data = [...metrics];
 
+    // Filter out providers with zero revenue
+    data = data.filter(m => m.revenue > 0);
+
     // Filter by search term
     if (searchTerm) {
       data = data.filter(m => 
@@ -134,8 +137,18 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
+        {filteredAndSortedData.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">
+              {searchTerm 
+                ? "No providers found matching your search."
+                : "No active providers with revenue in the selected period."}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
@@ -197,25 +210,25 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
                 const getMedalBadge = (rank: number) => {
                   if (rank === 1) {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-lg font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 text-white text-xl font-bold shadow-xl transform hover:scale-110 transition-transform">
                         🥇
                       </div>
                     );
                   } else if (rank === 2) {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-gray-300 to-gray-500 text-white text-lg font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 text-white text-xl font-bold shadow-xl transform hover:scale-110 transition-transform">
                         🥈
                       </div>
                     );
                   } else if (rank === 3) {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-amber-600 to-amber-800 text-white text-lg font-bold shadow-lg">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-amber-600 via-amber-700 to-amber-800 text-white text-xl font-bold shadow-xl transform hover:scale-110 transition-transform">
                         🥉
                       </div>
                     );
                   } else {
                     return (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-bold shadow-md">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-purple-600 text-white text-sm font-bold shadow-xl transform hover:scale-110 transition-transform">
                         {rank}
                       </div>
                     );
@@ -286,6 +299,8 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
               </Button>
             </div>
           </div>
+        )}
+        </>
         )}
       </CardContent>
     </Card>

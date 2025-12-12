@@ -118,6 +118,11 @@ function KPICard({ card, index }: { card: any; index: number }) {
       variants={cardVariants}
     >
       <Card className="relative overflow-hidden group hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/80 dark:bg-gray-900/80">
+        {/* Animated gradient border on hover - using pseudo-element for gradient border effect */}
+        <div className={`absolute inset-0 rounded-lg bg-gradient-to-r ${card.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-0.5`}>
+          <div className="absolute inset-0.5 rounded-lg bg-white dark:bg-gray-900" />
+        </div>
+        
         {/* Glassmorphism overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent dark:from-gray-800/50 dark:to-transparent pointer-events-none" />
         

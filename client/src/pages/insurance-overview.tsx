@@ -21,7 +21,6 @@ import { RevenueTrendChart } from "@/features/insurance-overview/components/Reve
 import { ClaimsDistributionChart } from "@/features/insurance-overview/components/ClaimsDistributionChart";
 import { ProviderDeepDiveModal } from "@/features/insurance-overview/components/ProviderDeepDiveModal";
 import { PerformanceInsights } from "@/features/insurance-overview/components/PerformanceInsights";
-import { MonthlyHeatmap } from "@/features/insurance-overview/components/MonthlyHeatmap";
 import {
   KPICardsLoadingSkeleton,
   RankingCardsLoadingSkeleton,
@@ -322,11 +321,6 @@ export default function InsuranceOverview() {
           )}
         </div>
       </div>
-
-      {/* Monthly Heatmap */}
-      {!isLoading && metrics.length > 0 && (
-        <MonthlyHeatmap metrics={metrics} />
-      )}
 
       {/* Deep Dive Modal */}
       <ProviderDeepDiveModal
