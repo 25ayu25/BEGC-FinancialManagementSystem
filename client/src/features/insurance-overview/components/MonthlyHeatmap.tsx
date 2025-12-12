@@ -4,7 +4,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatSSP, type ProviderMetrics } from "../utils/calculations";
-import { Tooltip } from "@/components/ui/tooltip";
 
 interface MonthlyHeatmapProps {
   metrics: ProviderMetrics[];
