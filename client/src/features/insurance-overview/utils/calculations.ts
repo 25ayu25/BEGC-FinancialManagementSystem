@@ -166,8 +166,10 @@ export function calculateProviderMetrics(
     t => t.insuranceProviderId && t.currency === 'USD'
   );
 
-  // Calculate total revenue from trend data (aggregated USD insurance revenue)
-  const totalRevenue = currentTrendData.reduce((sum, month) => sum + (month.revenueUSD || 0), 0);
+  // Calculate total revenue from transactions (not trend data)
+  // We use transaction-based revenue for accurate provider-level calculations
+  // since trend data's revenueUSD is aggregated across all providers
+  const totalRevenue = usdInsuranceTxs.reduce((sum, t) => sum + Number(t.amount), 0);
 
   // Group by provider
   const providerData = new Map<string, {

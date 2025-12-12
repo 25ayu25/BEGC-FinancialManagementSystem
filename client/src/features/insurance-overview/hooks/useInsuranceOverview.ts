@@ -91,7 +91,7 @@ export function useInsuranceOverview(
       const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
       
       // Transform response to match expected format
-      return (response.data || []).map((item: any) => ({
+      return (response.data || []).map((item: MonthlyTrendData): MonthlyTrendData => ({
         month: item.month,
         fullMonth: item.fullMonth,
         year: item.year,
@@ -115,7 +115,7 @@ export function useInsuranceOverview(
       const response = await api.get(`/api/trends/monthly-revenue?startDate=${startStr}&endDate=${endStr}`);
       
       // Transform response to match expected format
-      return (response.data || []).map((item: any) => ({
+      return (response.data || []).map((item: MonthlyTrendData): MonthlyTrendData => ({
         month: item.month,
         fullMonth: item.fullMonth,
         year: item.year,
