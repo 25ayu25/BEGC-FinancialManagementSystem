@@ -113,43 +113,64 @@ export default function InsuranceOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Premium Header with Enhanced Animated Gradient */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-700 p-8 shadow-2xl">
-        {/* Animated gradient mesh background */}
-        <div className="absolute inset-0 opacity-30">
+      {/* Premium Multi-Layer Header with Enhanced Design */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-700 via-purple-600 to-indigo-700 p-8 shadow-2xl">
+        {/* Animated mesh/dot pattern background */}
+        <div className="absolute inset-0 opacity-20">
           <div 
-            className="absolute inset-0 animate-pulse" 
+            className="absolute inset-0" 
             style={{
-              backgroundImage: `radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
-                               radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
-                               radial-gradient(circle at 40% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 50%)`,
-              animation: 'pulse 4s ease-in-out infinite'
+              backgroundImage: `
+                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.5) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
+                radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.3) 0%, transparent 40%),
+                radial-gradient(circle at 90% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 40%)
+              `,
+              animation: 'pulse 6s ease-in-out infinite'
             }} 
           />
         </div>
 
-        {/* Glassmorphism overlay */}
-        <div className="absolute inset-0 backdrop-blur-sm bg-white/5" />
+        {/* Floating particles effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-white rounded-full opacity-30"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animation: `float ${3 + Math.random() * 4}s ease-in-out infinite ${Math.random() * 2}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Glass layer with backdrop blur */}
+        <div className="absolute inset-0 backdrop-blur-[2px] bg-white/5" />
+        
+        {/* Animated gradient accent line at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 animate-pulse" />
 
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            {/* Left: Title and Subtitle with glow effect */}
+            {/* Left: Title and Subtitle with enhanced glow effect */}
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-lg">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-2xl">
                 Insurance Overview
               </h1>
-              <p className="mt-1 text-sm sm:text-base text-violet-100 drop-shadow-md">
+              <p className="mt-1 text-sm sm:text-base text-violet-100 drop-shadow-lg">
                 Comprehensive insurance provider analytics and performance tracking
               </p>
             </div>
 
-            {/* Right: Controls with enhanced styling */}
+            {/* Right: Controls with enhanced glassmorphism */}
             <div className="flex-shrink-0 flex items-center gap-2">
               <div className="flex flex-wrap gap-3">
-                {/* Date filter with enhanced glassmorphism */}
+                {/* Date filter with premium glassmorphism */}
                 <Select value={selectedFilter} onValueChange={handleFilterChange}>
-                  <SelectTrigger className="w-[180px] bg-white/95 backdrop-blur-md border-white/30 hover:bg-white transition-all hover:shadow-lg">
+                  <SelectTrigger className="w-[180px] bg-white/95 backdrop-blur-md border-white/30 hover:bg-white transition-all hover:shadow-xl hover:scale-105">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
@@ -168,7 +189,7 @@ export default function InsuranceOverview() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-[240px] justify-start text-left font-normal bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-lg transition-all",
+                          "w-[240px] justify-start text-left font-normal bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl hover:scale-105 transition-all",
                           !customDateRange.start && "text-muted-foreground"
                         )}
                       >
@@ -211,18 +232,27 @@ export default function InsuranceOverview() {
                   icon={<Download className="w-4 h-4" />}
                   label="Export CSV"
                   onClick={handleExportCSV}
-                  className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-lg text-violet-700 transition-all hover:scale-105"
+                  className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl text-violet-700 transition-all hover:scale-105"
                 />
                 <HeaderAction
                   icon={<FileText className="w-4 h-4" />}
                   label="Export PDF"
                   onClick={handleExportPDF}
-                  className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-lg text-violet-700 transition-all hover:scale-105"
+                  className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl text-violet-700 transition-all hover:scale-105"
                 />
               </div>
             </div>
           </div>
         </div>
+
+        <style jsx>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            25% { transform: translateY(-20px) translateX(10px); }
+            50% { transform: translateY(-10px) translateX(-10px); }
+            75% { transform: translateY(-30px) translateX(5px); }
+          }
+        `}</style>
       </div>
 
       {/* Error state */}

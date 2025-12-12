@@ -21,7 +21,7 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { LineChartIcon, AreaChartIcon, BarChart3, Eye, EyeOff } from "lucide-react";
-import { formatUSD, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, getProviderColor, sortMonthsChronologically, type ProviderMetrics } from "../utils/calculations";
 
 interface RevenueTrendChartProps {
   metrics: ProviderMetrics[];
@@ -29,33 +29,24 @@ interface RevenueTrendChartProps {
 
 type ChartType = 'line' | 'area' | 'bar' | 'stacked-bar' | 'stacked-area';
 
-const COLORS = [
-  '#8b5cf6', // violet
-  '#a855f7', // purple
-  '#d946ef', // fuchsia
-  '#ec4899', // pink
-  '#f43f5e', // rose
-  '#3b82f6', // blue
-  '#06b6d4', // cyan
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-];
-
 export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
   const [chartType, setChartType] = useState<ChartType>('area');
   const [visibleProviders, setVisibleProviders] = useState<Set<string>>(
     new Set(metrics.slice(0, 5).map(m => m.id))
   );
 
-  // Prepare chart data
+  // Prepare chart data with sorted months
   const chartData = (() => {
     // Get all unique months across all providers
     const monthsSet = new Set<string>();
     metrics.forEach(m => {
       m.monthlyTrend.forEach(t => monthsSet.add(t.month));
     });
-    const months = Array.from(monthsSet).sort();
+    
+    // Sort months chronologically
+    const months = sortMonthsChronologically(
+      Array.from(monthsSet).map(month => ({ month }))
+    ).map(item => item.month);
 
     // Build data array
     return months.map(month => {
@@ -106,7 +97,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
                 key={provider.id}
                 type="monotone"
                 dataKey={provider.name}
-                stroke={COLORS[index % COLORS.length]}
+                stroke={getProviderColor(provider.name, index)}
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
@@ -121,8 +112,8 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <defs>
               {visibleMetrics.map((provider, index) => (
                 <linearGradient key={provider.id} id={`gradient-${provider.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.1}/>
+                  <stop offset="5%" stopColor={getProviderColor(provider.name, index)} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={getProviderColor(provider.name, index)} stopOpacity={0.1}/>
                 </linearGradient>
               ))}
             </defs>
@@ -147,7 +138,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
                 key={provider.id}
                 type="monotone"
                 dataKey={provider.name}
-                stroke={COLORS[index % COLORS.length]}
+                stroke={getProviderColor(provider.name, index)}
                 strokeWidth={2}
                 fill={`url(#gradient-${provider.id})`}
                 animationDuration={1000}
@@ -175,7 +166,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
               <Bar
                 key={provider.id}
                 dataKey={provider.name}
-                fill={COLORS[index % COLORS.length]}
+                fill={getProviderColor(provider.name, index)}
               />
             ))}
           </BarChart>
@@ -201,7 +192,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
                 key={provider.id}
                 dataKey={provider.name}
                 stackId="a"
-                fill={COLORS[index % COLORS.length]}
+                fill={getProviderColor(provider.name, index)}
               />
             ))}
           </BarChart>
@@ -213,8 +204,8 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
             <defs>
               {visibleMetrics.map((provider, index) => (
                 <linearGradient key={provider.id} id={`gradient-stacked-${provider.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.9}/>
-                  <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.6}/>
+                  <stop offset="5%" stopColor={getProviderColor(provider.name, index)} stopOpacity={0.9}/>
+                  <stop offset="95%" stopColor={getProviderColor(provider.name, index)} stopOpacity={0.6}/>
                 </linearGradient>
               ))}
             </defs>
@@ -240,7 +231,7 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
                 type="monotone"
                 dataKey={provider.name}
                 stackId="1"
-                stroke={COLORS[index % COLORS.length]}
+                stroke={getProviderColor(provider.name, index)}
                 strokeWidth={2}
                 fill={`url(#gradient-stacked-${provider.id})`}
                 animationDuration={1000}
@@ -311,7 +302,10 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
               className="cursor-pointer hover:opacity-80 transition-opacity"
               style={{
                 backgroundColor: visibleProviders.has(provider.id) 
-                  ? COLORS[index % COLORS.length] 
+                  ? getProviderColor(provider.name, index) 
+                  : undefined,
+                borderColor: !visibleProviders.has(provider.id) 
+                  ? getProviderColor(provider.name, index) 
                   : undefined
               }}
               onClick={() => toggleProvider(provider.id)}

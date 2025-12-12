@@ -16,50 +16,46 @@ import {
   YAxis,
   CartesianGrid
 } from "recharts";
-import { formatUSD, formatPercentage, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, formatPercentage, getProviderColor, type ProviderMetrics } from "../utils/calculations";
 
 interface ClaimsDistributionChartProps {
   metrics: ProviderMetrics[];
 }
-
-const COLORS = [
-  '#8b5cf6', // violet
-  '#a855f7', // purple
-  '#d946ef', // fuchsia
-  '#ec4899', // pink
-  '#f43f5e', // rose
-  '#3b82f6', // blue
-  '#06b6d4', // cyan
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-];
 
 export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProps) {
   // Prepare pie chart data (top 8 providers + others)
   const topProviders = metrics.slice(0, 8);
   const others = metrics.slice(8);
   
-  const pieData = topProviders.map(m => ({
+  const pieData = topProviders.map((m, index) => ({
     name: m.name,
     value: m.revenue,
+    color: getProviderColor(m.name, index),
   }));
 
   if (others.length > 0) {
     const othersRevenue = others.reduce((sum, m) => sum + m.revenue, 0);
-    pieData.push({
-      name: 'Others',
-      value: othersRevenue,
-    });
+    if (othersRevenue > 0) {
+      pieData.push({
+        name: 'Others',
+        value: othersRevenue,
+        color: '#9CA3AF', // gray for others
+      });
+    }
   }
 
-  // Prepare bar chart data (sorted by revenue)
+  // Filter out 0% segments
+  const filteredPieData = pieData.filter(item => item.value > 0);
+
+  // Prepare bar chart data (sorted by revenue, with diverse colors)
   const barData = [...metrics]
+    .filter(m => m.revenue > 0)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10)
-    .map(m => ({
+    .map((m, index) => ({
       name: m.name,
       revenue: m.revenue,
+      color: getProviderColor(m.name, index),
     }));
 
   const totalRevenue = metrics.reduce((sum, m) => sum + m.revenue, 0);
@@ -67,7 +63,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Donut Chart */}
-      <Card className="border-violet-200 dark:border-violet-800">
+      <Card className="border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
         <CardHeader>
           <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
             Revenue Distribution
@@ -78,20 +74,23 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={pieData}
+                  data={filteredPieData}
                   cx="50%"
                   cy="50%"
                   innerRadius={80}
                   outerRadius={140}
                   paddingAngle={2}
                   dataKey="value"
-                  label={(entry) => `${entry.name}: ${formatPercentage((entry.value / totalRevenue) * 100, 0)}`}
-                  labelLine={false}
+                  label={(entry) => {
+                    const percent = (entry.value / totalRevenue) * 100;
+                    return percent > 3 ? `${entry.name}: ${formatPercentage(percent, 0)}` : '';
+                  }}
+                  labelLine={true}
                 >
-                  {pieData.map((entry, index) => (
+                  {filteredPieData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={COLORS[index % COLORS.length]}
+                      fill={entry.color}
                     />
                   ))}
                 </Pie>
@@ -108,7 +107,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
             
             {/* Center label */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
+              <div className="text-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg px-4 py-2">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
                 <p className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
                   {formatUSD(totalRevenue)}
@@ -120,7 +119,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
       </Card>
 
       {/* Horizontal Bar Chart */}
-      <Card className="border-violet-200 dark:border-violet-800">
+      <Card className="border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
         <CardHeader>
           <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
             Top Providers by Revenue
@@ -138,7 +137,7 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
                 <XAxis 
                   type="number" 
                   stroke="#6b7280"
-                  tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                 />
                 <YAxis 
                   type="category" 
@@ -156,15 +155,12 @@ export function ClaimsDistributionChart({ metrics }: ClaimsDistributionChartProp
                 />
                 <Bar 
                   dataKey="revenue" 
-                  fill="url(#colorGradient)"
                   radius={[0, 8, 8, 0]}
-                />
-                <defs>
-                  <linearGradient id="colorGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#a855f7" />
-                  </linearGradient>
-                </defs>
+                >
+                  {barData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

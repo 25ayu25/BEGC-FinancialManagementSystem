@@ -3,16 +3,25 @@
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUSD, type ProviderMetrics } from "../utils/calculations";
+import { formatUSD, sortMonthsChronologically, type ProviderMetrics } from "../utils/calculations";
 
 interface MonthlyHeatmapProps {
   metrics: ProviderMetrics[];
 }
 
 export function MonthlyHeatmap({ metrics }: MonthlyHeatmapProps) {
+  // All 12 months in order
+  const ALL_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
   // Prepare heatmap data - aggregate all providers by month
   const monthlyData = new Map<string, number>();
   
+  // Initialize all months with 0
+  ALL_MONTHS.forEach(month => {
+    monthlyData.set(month, 0);
+  });
+  
+  // Add actual data
   metrics.forEach(provider => {
     provider.monthlyTrend.forEach(({ month, revenue }) => {
       monthlyData.set(month, (monthlyData.get(month) || 0) + revenue);
@@ -20,40 +29,39 @@ export function MonthlyHeatmap({ metrics }: MonthlyHeatmapProps) {
   });
 
   // Get min and max for color scaling
-  const values = Array.from(monthlyData.values());
-  const minValue = Math.min(...values, 0);
-  const maxValue = Math.max(...values, 0);
+  const values = Array.from(monthlyData.values()).filter(v => v > 0);
+  const minValue = values.length > 0 ? Math.min(...values) : 0;
+  const maxValue = values.length > 0 ? Math.max(...values) : 0;
 
-  // Convert to array and sort
-  const months = Array.from(monthlyData.entries())
-    .map(([month, value]) => ({ month, value }))
-    .sort((a, b) => {
-      // Simple month name sorting
-      const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
-    });
+  // Convert to array (already in correct order from ALL_MONTHS)
+  const months = ALL_MONTHS.map(month => ({ 
+    month, 
+    value: monthlyData.get(month) || 0 
+  }));
 
-  // Get color intensity based on value
+  // Get color intensity based on value - multi-color gradient
   const getColorIntensity = (value: number): string => {
-    if (maxValue === minValue) return 'bg-violet-400';
+    if (value === 0) return 'bg-gray-200 dark:bg-gray-700';
+    if (maxValue === minValue) return 'bg-emerald-500';
     
     const normalized = (value - minValue) / (maxValue - minValue);
     
-    if (normalized >= 0.8) return 'bg-violet-700';
-    if (normalized >= 0.6) return 'bg-violet-600';
-    if (normalized >= 0.4) return 'bg-violet-500';
-    if (normalized >= 0.2) return 'bg-violet-400';
-    return 'bg-violet-300';
+    // Multi-color gradient: Light gray → Green → Amber → Orange → Red
+    if (normalized >= 0.8) return 'bg-red-600';      // Very high
+    if (normalized >= 0.6) return 'bg-orange-500';   // High
+    if (normalized >= 0.4) return 'bg-amber-500';    // Medium-high
+    if (normalized >= 0.2) return 'bg-green-500';    // Medium
+    return 'bg-emerald-400';                          // Low
   };
 
   return (
-    <Card className="border-violet-200 dark:border-violet-800">
+    <Card className="border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
           Monthly Performance Heatmap
         </CardTitle>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Visual representation of revenue intensity by month
+          Visual representation of revenue intensity by month (all months shown)
         </p>
       </CardHeader>
       <CardContent>
@@ -70,9 +78,10 @@ export function MonthlyHeatmap({ metrics }: MonthlyHeatmapProps) {
                   transition-all duration-200
                   hover:scale-110 hover:shadow-lg
                   cursor-pointer
+                  ${value === 0 ? 'opacity-50' : ''}
                 `}
               >
-                <span className="text-xs font-medium text-white">
+                <span className="text-xs font-medium text-white drop-shadow-md">
                   {month}
                 </span>
               </div>
@@ -87,7 +96,7 @@ export function MonthlyHeatmap({ metrics }: MonthlyHeatmapProps) {
               ">
                 <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg whitespace-nowrap">
                   <p className="font-semibold">{month}</p>
-                  <p>{formatUSD(value)}</p>
+                  <p>{value > 0 ? formatUSD(value) : 'No data'}</p>
                 </div>
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                   <div className="border-4 border-transparent border-t-gray-900"></div>
@@ -99,13 +108,17 @@ export function MonthlyHeatmap({ metrics }: MonthlyHeatmapProps) {
 
         {/* Legend */}
         <div className="mt-6 flex items-center justify-center gap-2">
-          <span className="text-xs text-gray-600 dark:text-gray-400">Low</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">No data</span>
           <div className="flex gap-1">
-            <div className="w-6 h-6 rounded bg-violet-300"></div>
-            <div className="w-6 h-6 rounded bg-violet-400"></div>
-            <div className="w-6 h-6 rounded bg-violet-500"></div>
-            <div className="w-6 h-6 rounded bg-violet-600"></div>
-            <div className="w-6 h-6 rounded bg-violet-700"></div>
+            <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-700"></div>
+          </div>
+          <span className="text-xs text-gray-600 dark:text-gray-400 ml-2">Low</span>
+          <div className="flex gap-1">
+            <div className="w-6 h-6 rounded bg-emerald-400"></div>
+            <div className="w-6 h-6 rounded bg-green-500"></div>
+            <div className="w-6 h-6 rounded bg-amber-500"></div>
+            <div className="w-6 h-6 rounded bg-orange-500"></div>
+            <div className="w-6 h-6 rounded bg-red-600"></div>
           </div>
           <span className="text-xs text-gray-600 dark:text-gray-400">High</span>
         </div>

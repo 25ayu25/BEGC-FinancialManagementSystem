@@ -150,7 +150,6 @@ export function useInsuranceOverview(
 
     const activeProviders = metrics.filter(m => m.revenue > 0).length;
     const totalClaims = currentInsuranceTxs.length;
-    const avgClaimValue = totalClaims > 0 ? totalClaimsValue / totalClaims : 0;
     
     const growth = prevTotalClaimsValue > 0 
       ? ((totalClaimsValue - prevTotalClaimsValue) / prevTotalClaimsValue) * 100 
@@ -159,14 +158,9 @@ export function useInsuranceOverview(
     const topProvider = metrics[0];
     const topProviderRevenue = topProvider ? topProvider.revenue : 0;
 
-    // Collection rate (simplified - assuming all claims are collected)
-    const collectionRate = 87; // This should be calculated from actual data if available
-
     return {
       totalClaimsValue,
       activeProviders,
-      collectionRate,
-      avgClaimValue,
       topProviderRevenue,
       topProviderName: topProvider?.name || 'N/A',
       growth,

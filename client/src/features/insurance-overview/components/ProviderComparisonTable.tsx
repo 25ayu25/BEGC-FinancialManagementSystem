@@ -30,7 +30,7 @@ interface ProviderComparisonTableProps {
   onProviderClick: (providerId: string) => void;
 }
 
-type SortField = 'name' | 'revenue' | 'share' | 'growth' | 'claims' | 'avgClaim';
+type SortField = 'name' | 'revenue' | 'share' | 'growth' | 'claims';
 type SortDirection = 'asc' | 'desc';
 
 export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderComparisonTableProps) {
@@ -113,7 +113,7 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
   };
 
   return (
-    <Card className="border-violet-200 dark:border-violet-800">
+    <Card className="border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
@@ -182,16 +182,6 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
                 <TableHead>
                   <Button 
                     variant="ghost" 
-                    onClick={() => handleSort('avgClaim')}
-                    className="hover:bg-violet-50 dark:hover:bg-violet-900/20"
-                  >
-                    Avg Claim
-                    <SortIcon field="avgClaim" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
                     onClick={() => handleSort('growth')}
                     className="hover:bg-violet-50 dark:hover:bg-violet-900/20"
                   >
@@ -203,43 +193,70 @@ export function ProviderComparisonTable({ metrics, onProviderClick }: ProviderCo
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedData.map((provider) => (
-                <TableRow
-                  key={provider.id}
-                  className="cursor-pointer hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-                  onClick={() => onProviderClick(provider.id)}
-                >
-                  <TableCell className="font-medium">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-bold">
-                      {provider.rank}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-semibold">{provider.name}</TableCell>
-                  <TableCell>{provider.claimsCount.toLocaleString()}</TableCell>
-                  <TableCell className="font-semibold">{formatUSD(provider.revenue)}</TableCell>
-                  <TableCell>{formatPercentage(provider.share)}</TableCell>
-                  <TableCell>{formatUSD(provider.avgClaim)}</TableCell>
-                  <TableCell>
-                    <div className={`flex items-center gap-1 font-semibold ${
-                      provider.growth >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {provider.growth >= 0 ? (
-                        <TrendingUp className="w-4 h-4" />
-                      ) : (
-                        <TrendingDown className="w-4 h-4" />
-                      )}
-                      {formatPercentage(Math.abs(provider.growth))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusBadgeVariant(provider.status)} className="text-xs">
-                      {provider.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {paginatedData.map((provider, index) => {
+                const getMedalBadge = (rank: number) => {
+                  if (rank === 1) {
+                    return (
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-lg font-bold shadow-lg">
+                        🥇
+                      </div>
+                    );
+                  } else if (rank === 2) {
+                    return (
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-gray-300 to-gray-500 text-white text-lg font-bold shadow-lg">
+                        🥈
+                      </div>
+                    );
+                  } else if (rank === 3) {
+                    return (
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-amber-600 to-amber-800 text-white text-lg font-bold shadow-lg">
+                        🥉
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-bold shadow-md">
+                        {rank}
+                      </div>
+                    );
+                  }
+                };
+
+                return (
+                  <TableRow
+                    key={provider.id}
+                    className="cursor-pointer hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+                    onClick={() => onProviderClick(provider.id)}
+                  >
+                    <TableCell className="font-medium">
+                      {getMedalBadge(provider.rank)}
+                    </TableCell>
+                    <TableCell className="font-semibold">{provider.name}</TableCell>
+                    <TableCell>{provider.claimsCount.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">{formatUSD(provider.revenue)}</TableCell>
+                    <TableCell>{formatPercentage(provider.share)}</TableCell>
+                    <TableCell>
+                      <div className={`flex items-center gap-1 font-semibold ${
+                        provider.growth >= 0 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {provider.growth >= 0 ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                        {formatPercentage(Math.abs(provider.growth))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(provider.status)} className="text-xs">
+                        {provider.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

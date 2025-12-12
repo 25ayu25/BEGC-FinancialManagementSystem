@@ -63,9 +63,8 @@ export function PerformanceInsights({ insights }: PerformanceInsightsProps) {
 
   return (
     <Card className="relative overflow-hidden border-violet-200/50 dark:border-violet-800/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 shadow-lg">
-      {/* Gradient border effect */}
-      <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 opacity-20 blur-xl" />
-      <div className="absolute inset-[2px] bg-white dark:bg-gray-900 rounded-lg" />
+      {/* Premium gradient border effect */}
+      <div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-violet-500 via-purple-500 to-pink-500" />
       
       <CardHeader className="relative z-10">
         <CardTitle className="text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
@@ -110,9 +109,9 @@ export function PerformanceInsights({ insights }: PerformanceInsightsProps) {
               initial="hidden"
               animate="visible"
               variants={insightVariants}
-              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              whileHover={{ scale: 1.02, x: 5, transition: { duration: 0.2 } }}
             >
-              <Alert className={`${getBgColor(insight.type)} shadow-md hover:shadow-lg transition-shadow`}>
+              <Alert className={`${getBgColor(insight.type)} shadow-md hover:shadow-lg transition-all border-l-4`}>
                 <div className="flex items-start gap-3">
                   <motion.div 
                     className="mt-0.5"
