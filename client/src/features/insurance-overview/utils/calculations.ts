@@ -139,11 +139,13 @@ export function sortMonthsChronologically<T extends { month: string }>(items: T[
 }
 
 /**
- * Calculate provider metrics from transaction data
+ * Calculate provider metrics from monthly trend data and transaction data
  */
 export function calculateProviderMetrics(
   providers: InsuranceProvider[],
-  transactions: Array<{
+  currentTrendData: MonthlyTrendData[], // Monthly trend data from API
+  prevTrendData: MonthlyTrendData[],
+  currentTransactions: Array<{
     insuranceProviderId: string | null;
     amount: number;
     currency: string;
@@ -155,8 +157,8 @@ export function calculateProviderMetrics(
     currency: string;
   }>
 ): ProviderMetrics[] {
-  // Filter USD insurance transactions
-  const usdInsuranceTxs = transactions.filter(
+  // Filter USD insurance transactions for claim counts
+  const usdInsuranceTxs = currentTransactions.filter(
     t => t.insuranceProviderId && t.currency === 'USD'
   );
   
@@ -164,7 +166,9 @@ export function calculateProviderMetrics(
     t => t.insuranceProviderId && t.currency === 'USD'
   );
 
-  // Calculate total revenue for share calculation
+  // Calculate total revenue from transactions (not trend data)
+  // We use transaction-based revenue for accurate provider-level calculations
+  // since trend data's revenueUSD is aggregated across all providers
   const totalRevenue = usdInsuranceTxs.reduce((sum, t) => sum + Number(t.amount), 0);
 
   // Group by provider
@@ -172,20 +176,31 @@ export function calculateProviderMetrics(
     revenue: number;
     claimsCount: number;
     prevRevenue: number;
-    monthlyData: Map<string, number>;
+    monthlyData: Map<string, { month: string; revenue: number }>;
   }>();
 
-  // Initialize for all active providers
+  // Initialize all months from trend data for each provider
   providers.filter(p => p.isActive).forEach(p => {
+    const monthlyData = new Map<string, { month: string; revenue: number }>();
+    
+    // Initialize all months from current trend data with $0
+    currentTrendData.forEach(trendMonth => {
+      const monthKey = `${trendMonth.year}-${String(trendMonth.monthNum).padStart(2, '0')}`;
+      monthlyData.set(monthKey, {
+        month: trendMonth.month,
+        revenue: 0
+      });
+    });
+    
     providerData.set(p.id, {
       revenue: 0,
       claimsCount: 0,
       prevRevenue: 0,
-      monthlyData: new Map(),
+      monthlyData,
     });
   });
 
-  // Process current period transactions
+  // Process current period transactions for claim counts and monthly revenue per provider
   usdInsuranceTxs.forEach(t => {
     if (!t.insuranceProviderId) return;
     
@@ -196,13 +211,16 @@ export function calculateProviderMetrics(
     data.revenue += amount;
     data.claimsCount += 1;
 
-    // Track monthly revenue
+    // Track monthly revenue per provider
     const txDate = new Date(t.date);
     const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
-    data.monthlyData.set(monthKey, (data.monthlyData.get(monthKey) || 0) + amount);
+    const monthData = data.monthlyData.get(monthKey);
+    if (monthData) {
+      monthData.revenue += amount;
+    }
   });
 
-  // Process previous period transactions
+  // Process previous period transactions for revenue comparison
   prevUsdInsuranceTxs.forEach(t => {
     if (!t.insuranceProviderId) return;
     
@@ -229,9 +247,9 @@ export function calculateProviderMetrics(
     let bestMonth: { month: string; fullMonth: string; revenue: number } | null = null;
     let maxRevenue = 0;
     
-    data.monthlyData.forEach((revenue, monthKey) => {
-      if (revenue > maxRevenue) {
-        maxRevenue = revenue;
+    data.monthlyData.forEach((monthData, monthKey) => {
+      if (monthData.revenue > maxRevenue) {
+        maxRevenue = monthData.revenue;
         const [year, month] = monthKey.split('-');
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const fullMonthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -239,23 +257,15 @@ export function calculateProviderMetrics(
         bestMonth = {
           month: monthNames[monthNum],
           fullMonth: `${fullMonthNames[monthNum]} ${year}`,
-          revenue,
+          revenue: monthData.revenue,
         };
       }
     });
 
-    // Build monthly trend (last 6 months or available)
+    // Build monthly trend from all months (sorted chronologically)
     const monthlyTrend = Array.from(data.monthlyData.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([monthKey, revenue]) => {
-        const [, month] = monthKey.split('-');
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return {
-          month: monthNames[parseInt(month) - 1],
-          revenue,
-        };
-      })
-      .slice(-6); // Last 6 months
+      .map(([, monthData]) => monthData);
 
     // Determine status
     let status: ProviderMetrics['status'] = 'STABLE';

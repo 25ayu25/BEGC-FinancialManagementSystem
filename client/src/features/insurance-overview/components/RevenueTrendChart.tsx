@@ -37,7 +37,8 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
 
   // Prepare chart data with sorted months
   const chartData = (() => {
-    // Get all unique months across all providers
+    // Get all unique months across all providers - these come from the API
+    // and already include all months in the selected date range
     const monthsSet = new Set<string>();
     metrics.forEach(m => {
       m.monthlyTrend.forEach(t => monthsSet.add(t.month));
@@ -48,29 +49,8 @@ export function RevenueTrendChart({ metrics }: RevenueTrendChartProps) {
       Array.from(monthsSet).map(month => ({ month }))
     ).map(item => item.month);
 
-    // Determine if we should show all 12 months
-    // Show all months when we have data spanning multiple months in what appears to be a year view
-    // This typically happens when "This Year" filter is selected
-    const allMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    // Logic: If we have 4+ months but not all 12, and the span is wide (first to last > 3 months apart)
-    // then we're likely viewing a year range and should show all months
-    const shouldShowAllMonths = months.length >= 4 && months.length < 12 && (() => {
-      const firstMonthIndex = allMonths.indexOf(months[0]);
-      const lastMonthIndex = allMonths.indexOf(months[months.length - 1]);
-      if (firstMonthIndex === -1 || lastMonthIndex === -1) return false;
-      
-      // Check if months span at least 4 positions (indicating a wide date range)
-      const span = lastMonthIndex >= firstMonthIndex 
-        ? lastMonthIndex - firstMonthIndex 
-        : (12 - firstMonthIndex) + lastMonthIndex;
-      return span >= 4;
-    })();
-    
-    const finalMonths = shouldShowAllMonths ? allMonths : months;
-
-    // Build data array
-    return finalMonths.map(month => {
+    // Build data array - all months already present from API
+    return months.map(month => {
       const dataPoint: any = { month };
       metrics.forEach(provider => {
         if (visibleProviders.has(provider.id)) {
