@@ -28,6 +28,9 @@ import type { CategoryMetrics } from "../utils/calculations";
 import { generateSafeCSSId } from "../utils/calculations";
 import { cn } from "@/lib/utils";
 
+// Regex pattern for YYYY-MM format validation
+const YYYY_MM_REGEX = /^\d{4}-\d{2}$/;
+
 interface ExpenseTrendChartProps {
   chartData: Array<Record<string, any>>;
   metrics: CategoryMetrics[];
@@ -86,7 +89,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     // Get the date range
     const allMonths = validatedChartData
       .map(d => d.month)
-      .filter(m => m && typeof m === 'string' && m.match(/^\d{4}-\d{2}$/)) // Only valid YYYY-MM formats
+      .filter(m => m && typeof m === 'string' && YYYY_MM_REGEX.test(m)) // Only valid YYYY-MM formats
       .sort();
       
     if (allMonths.length === 0) return validatedChartData;

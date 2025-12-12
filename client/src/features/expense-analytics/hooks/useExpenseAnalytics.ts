@@ -21,6 +21,9 @@ import {
   type RangeKey
 } from "@/lib/dateRanges";
 
+// Regex pattern for YYYY-MM format validation
+const YYYY_MM_REGEX = /^\d{4}-\d{2}$/;
+
 export type FilterPreset = RangeKey | 'custom';
 
 interface DateRange {
@@ -127,7 +130,7 @@ export function useExpenseAnalytics(
         // Ensure month is in YYYY-MM format for consistent parsing
         // Handle legacy format (short month names) by attempting to preserve them
         let monthKey = month.month;
-        if (monthKey && !monthKey.match(/^\d{4}-\d{2}$/)) {
+        if (monthKey && !YYYY_MM_REGEX.test(monthKey)) {
           // If not in YYYY-MM format, try to construct it from year/monthNum if available
           if (month.year && month.monthNum) {
             monthKey = `${month.year}-${String(month.monthNum).padStart(2, '0')}`;
@@ -137,7 +140,7 @@ export function useExpenseAnalytics(
         return {
           month: monthKey,
           fullMonth: month.fullMonth || monthKey,
-          total: typeof month.totalExpenses === 'number' ? month.totalExpenses : 0,
+          total: Number.isFinite(month.totalExpenses) ? month.totalExpenses : 0,
           ...breakdown,
         };
       });
