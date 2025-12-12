@@ -15,6 +15,7 @@ import {
   FlaskConical,  // <--- NEW ICON for Lab Finance
   TrendingUp,    // Trends & Comparisons
   PieChart,      // Insurance Overview
+  Receipt,       // Expense Analytics
 } from "lucide-react";
 import { UserProfileMenu } from "@/components/ui/user-profile-menu";
 import { useEffect, useState } from "react";
@@ -45,6 +46,7 @@ const navigationAfter: NavItem[] = [
   { name: "Monthly Reports", href: "/reports", icon: FileText },
   { name: "Patient Volume", href: "/patient-volume", icon: Activity },
   { name: "Department Analytics", href: "/department-analytics", icon: Building2 },
+  { name: "Expense Analytics", href: "/expense-analytics", icon: Receipt },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
