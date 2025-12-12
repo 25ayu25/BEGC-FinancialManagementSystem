@@ -129,104 +129,153 @@ export default function ExpenseAnalytics() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Gradient */}
-      <div className="bg-gradient-to-r from-red-500 via-red-600 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Receipt className="w-8 h-8" />
-              Expense Analytics
-            </h1>
-            <p className="text-red-100 mt-1">
-              Comprehensive expense tracking and cost optimization insights
-            </p>
-          </div>
+      {/* Premium Multi-Layer Header with Enhanced Design */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-orange-500 to-amber-600 p-8 shadow-2xl">
+        {/* Animated mesh/dot pattern background */}
+        <div className="absolute inset-0 opacity-20">
+          <div 
+            className="absolute inset-0" 
+            style={{
+              backgroundImage: `
+                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.5) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
+                radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.3) 0%, transparent 40%),
+                radial-gradient(circle at 90% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 40%)
+              `,
+              animation: 'pulse 6s ease-in-out infinite'
+            }} 
+          />
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Time Period Filter */}
-            <Select value={selectedFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger className="w-[180px] bg-white text-gray-900">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {filterOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Floating particles effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-white rounded-full opacity-30"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animation: `float ${3 + Math.random() * 4}s ease-in-out infinite ${Math.random() * 2}s`,
+              }}
+            />
+          ))}
+        </div>
 
-            {/* Custom Date Range Picker */}
-            {selectedFilter === 'custom' && (
-              <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="bg-white text-gray-900">
-                    <CalendarIcon className="w-4 h-4 mr-2" />
-                    {customDateRange.start && customDateRange.end
-                      ? `${format(customDateRange.start, 'MMM d')} - ${format(customDateRange.end, 'MMM d, yyyy')}`
-                      : 'Select dates'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <div className="p-3 space-y-3">
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">Start Date</label>
-                      <Calendar
-                        mode="single"
-                        selected={customDateRange.start}
-                        onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
-                        disabled={(date) => date > new Date()}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">End Date</label>
-                      <Calendar
-                        mode="single"
-                        selected={customDateRange.end}
-                        onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
-                        disabled={(date) => 
-                          date > new Date() || 
-                          (customDateRange.start ? date < customDateRange.start : false)
-                        }
-                      />
-                    </div>
-                    <Button 
-                      className="w-full" 
-                      onClick={() => setShowCustomDatePicker(false)}
-                      disabled={!customDateRange.start || !customDateRange.end}
-                    >
-                      Apply
+        {/* Glass layer with backdrop blur */}
+        <div className="absolute inset-0 backdrop-blur-[2px] bg-white/5" />
+        
+        {/* Animated gradient accent line at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 animate-pulse" />
+
+        {/* Content */}
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-3 text-white drop-shadow-2xl">
+                <Receipt className="w-8 h-8" />
+                Expense Analytics
+              </h1>
+              <p className="text-orange-100 mt-1 drop-shadow-lg">
+                Comprehensive expense tracking and cost optimization insights
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Time Period Filter */}
+              <Select value={selectedFilter} onValueChange={handleFilterChange}>
+                <SelectTrigger className="w-[180px] bg-white/95 backdrop-blur-md border-white/30 hover:bg-white transition-all hover:shadow-xl hover:scale-105">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {filterOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Custom Date Range Picker */}
+              {selectedFilter === 'custom' && (
+                <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl transition-all hover:scale-105">
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {customDateRange.start && customDateRange.end
+                        ? `${format(customDateRange.start, 'MMM d')} - ${format(customDateRange.end, 'MMM d, yyyy')}`
+                        : 'Select dates'}
                     </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">Start Date</label>
+                        <Calendar
+                          mode="single"
+                          selected={customDateRange.start}
+                          onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date }))}
+                          disabled={(date) => date > new Date()}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">End Date</label>
+                        <Calendar
+                          mode="single"
+                          selected={customDateRange.end}
+                          onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date }))}
+                          disabled={(date) => 
+                            date > new Date() || 
+                            (customDateRange.start ? date < customDateRange.start : false)
+                          }
+                        />
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => setShowCustomDatePicker(false)}
+                        disabled={!customDateRange.start || !customDateRange.end}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
 
-            {/* Export Buttons */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-white text-gray-900 hover:bg-gray-100"
-              onClick={handleExportCSV}
-              disabled={isLoading || metrics.length === 0}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              CSV
-            </Button>
+              {/* Export Buttons */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl text-orange-700 transition-all hover:scale-105"
+                onClick={handleExportCSV}
+                disabled={isLoading || metrics.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                CSV
+              </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-white text-gray-900 hover:bg-gray-100"
-              onClick={handleExportPDF}
-              disabled={isLoading || metrics.length === 0}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              PDF
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/95 backdrop-blur-md border-white/30 hover:bg-white hover:shadow-xl text-orange-700 transition-all hover:scale-105"
+                onClick={handleExportPDF}
+                disabled={isLoading || metrics.length === 0}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                PDF
+              </Button>
+            </div>
           </div>
         </div>
+
+        <style jsx>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            25% { transform: translateY(-20px) translateX(10px); }
+            50% { transform: translateY(-10px) translateX(-10px); }
+            75% { transform: translateY(-30px) translateX(5px); }
+          }
+        `}</style>
       </div>
 
       {/* KPI Cards */}
