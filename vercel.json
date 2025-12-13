@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://site--financial-management--2rbpdlgj47wb.code.run/api/$1"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
