@@ -55,6 +55,11 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return metrics.slice(0, 8);
   }, [metrics]);
 
+  // Helper function to validate numeric values
+  const isValidNumber = (value: any): value is number => {
+    return typeof value === 'number' && Number.isFinite(value);
+  };
+
   // Sanitize data to prevent NaN values in chart rendering
   const filledChartData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
@@ -65,14 +70,14 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
       const sanitizedPoint: Record<string, any> = {
         month: point.month,
         fullMonth: point.fullMonth,
-        total: typeof point.total === 'number' && Number.isFinite(point.total) ? point.total : 0,
+        total: isValidNumber(point.total) ? point.total : 0,
       };
       
       // For each top category, ensure the value exists and is a valid finite number
       // Categories that don't have data in this month will default to 0
       topCategories.forEach(cat => {
         const value = point[cat.name];
-        sanitizedPoint[cat.name] = (typeof value === 'number' && Number.isFinite(value)) ? value : 0;
+        sanitizedPoint[cat.name] = isValidNumber(value) ? value : 0;
       });
       
       return sanitizedPoint;
