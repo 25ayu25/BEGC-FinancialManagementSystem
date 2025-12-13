@@ -21,9 +21,6 @@ import {
   type RangeKey
 } from "@/lib/dateRanges";
 
-// Regex pattern for YYYY-MM format validation
-const YYYY_MM_REGEX = /^\d{4}-\d{2}$/;
-
 export type FilterPreset = RangeKey | 'custom';
 
 interface DateRange {
@@ -120,44 +117,23 @@ export function useExpenseAnalytics(
     return generateInsights(metrics, kpis, trendData, prevTrendData);
   }, [metrics, kpis, trendData, prevTrendData]);
 
-  // Prepare chart data with robust validation
+  // Prepare chart data - simple passthrough with minimal transformation
   const chartData = useMemo(() => {
+    if (!trendData || trendData.length === 0) return [];
+    
     return trendData
       .filter(month => month && month.month) // Filter out any null/undefined entries
       .map(month => {
         const breakdown = normalizeBreakdown(month.expenseBreakdown);
         
-        // Ensure month is in YYYY-MM format for consistent parsing
-        // Handle legacy format (short month names) by attempting to preserve them
-        let monthKey = month.month;
-        if (monthKey && !YYYY_MM_REGEX.test(monthKey)) {
-          // If not in YYYY-MM format, try to construct it from year/monthNum if available
-          if (month.year && month.monthNum) {
-            monthKey = `${month.year}-${String(month.monthNum).padStart(2, '0')}`;
-          }
-        }
-        
         return {
-          month: monthKey,
-          fullMonth: month.fullMonth || monthKey,
-          total: Number.isFinite(month.totalExpenses) ? month.totalExpenses : 0,
+          month: month.month || month.fullMonth || '', // Use month as-is from API
+          fullMonth: month.fullMonth || month.month || '',
+          total: month.totalExpenses || 0,
           ...breakdown,
         };
       });
   }, [trendData]);
-
-  // Debug logging to identify data structure issues (development only)
-  useEffect(() => {
-    if (import.meta.env.DEV && chartData.length > 0 && metrics.length > 0) {
-      console.log('🔍 Chart Data Debug:', {
-        trendDataSample: trendData[0],
-        chartDataSample: chartData[0],
-        metricsCategories: metrics.map(m => m.name),
-        chartDataKeys: chartData[0] ? Object.keys(chartData[0]) : [],
-        categoryKeysMatch: metrics.slice(0, 8).every(m => chartData[0] && m.name in chartData[0])
-      });
-    }
-  }, [chartData, metrics, trendData]);
 
   const isLoading = loadingTrend || loadingPrevTrend;
   const error = trendError;
