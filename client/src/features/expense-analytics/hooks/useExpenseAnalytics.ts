@@ -104,7 +104,14 @@ export function useExpenseAnalytics(
 
   // Process data into metrics
   const metrics = useMemo(() => {
-    return calculateCategoryMetrics(trendData, prevTrendData);
+    const result = calculateCategoryMetrics(trendData, prevTrendData);
+    
+    // DEBUG: Log metrics to see category names
+    if (result.length > 0) {
+      console.log('Category metrics:', result.map(m => ({ name: m.name, total: m.total })));
+    }
+    
+    return result;
   }, [trendData, prevTrendData]);
 
   // Calculate KPIs
@@ -121,7 +128,7 @@ export function useExpenseAnalytics(
   const chartData = useMemo(() => {
     if (!trendData || trendData.length === 0) return [];
     
-    return trendData
+    const result = trendData
       .filter(month => month && month.month) // Filter out any null/undefined entries
       .map(month => {
         const breakdown = normalizeBreakdown(month.expenseBreakdown);
@@ -133,6 +140,15 @@ export function useExpenseAnalytics(
           ...breakdown,
         };
       });
+    
+    // DEBUG: Log first data point to see structure
+    if (result.length > 0) {
+      console.log('=== EXPENSE ANALYTICS DEBUG ===');
+      console.log('First chartData point:', result[0]);
+      console.log('Keys:', Object.keys(result[0]));
+    }
+    
+    return result;
   }, [trendData]);
 
   const isLoading = loadingTrend || loadingPrevTrend;

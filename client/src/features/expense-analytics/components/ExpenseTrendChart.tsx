@@ -55,15 +55,37 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return metrics.slice(0, 8);
   }, [metrics]);
 
-  // Simple validation: just use the data as-is
+  // Simple validation: sanitize data to prevent NaN values
   // If chart data is empty or has issues, the empty state will handle it
   const filledChartData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
     
-    // Simply return the chart data without complex transformations
-    // The data should already be properly formatted from the hook
-    return chartData;
-  }, [chartData]);
+    // DEBUG: Log to verify data structure before rendering
+    console.log('=== CHART RENDER DEBUG ===');
+    console.log('filledChartData[0]:', chartData[0]);
+    console.log('topCategories:', topCategories.map(c => c.name));
+    
+    // Sanitize data: ensure all category values are valid numbers
+    const sanitized = chartData.map(point => {
+      const sanitizedPoint: Record<string, any> = {
+        month: point.month,
+        fullMonth: point.fullMonth,
+        total: typeof point.total === 'number' && Number.isFinite(point.total) ? point.total : 0,
+      };
+      
+      // For each category, ensure the value is a valid number
+      topCategories.forEach(cat => {
+        const value = point[cat.name];
+        sanitizedPoint[cat.name] = (typeof value === 'number' && Number.isFinite(value)) ? value : 0;
+      });
+      
+      return sanitizedPoint;
+    });
+    
+    console.log('sanitized[0]:', sanitized[0]);
+    
+    return sanitized;
+  }, [chartData, topCategories]);
 
   const toggleCategory = (categoryName: string) => {
     setHiddenCategories(prev => {
