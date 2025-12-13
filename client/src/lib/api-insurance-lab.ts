@@ -1,12 +1,27 @@
-import { API_BASE_URL } from "@/lib/constants";
+// client/src/lib/api-insurance-lab.ts
+import { API_BASE_URL, USE_API_PROXY } from "@/lib/constants";
 
-const base = (path: string) =>
-  new URL(`/api/insurance${path}`, API_BASE_URL).toString();
+/**
+ * Build an API URL for insurance/lab routes.
+ * - When USE_API_PROXY is true (Vercel), call same-origin:
+ *     /api/insurance/...
+ *   so auth works cleanly through Vercel rewrites.
+ * - Otherwise, call the absolute backend:
+ *     https://<backend>/api/insurance/...
+ */
+const base = (path: string) => {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  if (USE_API_PROXY) return `/api/insurance${p}`;
+  return new URL(`/api/insurance${p}`, API_BASE_URL).toString();
+};
 
 const headers = (): HeadersInit => {
   const h: HeadersInit = { "Content-Type": "application/json" };
-  const tok = localStorage.getItem("user_session_backup"); // you used BACKUP_KEY before
-  if (tok) h["x-session-token"] = tok;
+
+  // Keep using the same localStorage key as queryClient.ts BACKUP_KEY
+  const tok = localStorage.getItem("user_session_backup");
+  if (tok) (h as any)["x-session-token"] = tok;
+
   return h;
 };
 
@@ -15,10 +30,10 @@ const headers = (): HeadersInit => {
 /* ---------------------------------------------------------------------- */
 
 export async function getLabSummary(year: number, month: number) {
-  const res = await fetch(
-    base(`/lab-summary?year=${year}&month=${month}`),
-    { credentials: "include", headers: headers() }
-  );
+  const res = await fetch(base(`/lab-summary?year=${year}&month=${month}`), {
+    credentials: "include",
+    headers: headers(),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -58,10 +73,10 @@ export async function addLabPayment(input: {
 }
 
 export async function getLabPayments(year: number, month: number) {
-  const res = await fetch(
-    base(`/lab-payments?year=${year}&month=${month}`),
-    { credentials: "include", headers: headers() }
-  );
+  const res = await fetch(base(`/lab-payments?year=${year}&month=${month}`), {
+    credentials: "include",
+    headers: headers(),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -79,13 +94,6 @@ export type LabPaymentInput = {
   note?: string;
 };
 
-/**
- * Update an existing lab payment.
- *
- * Assumes backend route:
- *   PUT /api/insurance/lab-payment/:id
- * Adjust the path if your API uses a different pattern.
- */
 export async function updateLabPayment(
   id: string | number,
   input: LabPaymentInput
@@ -100,13 +108,6 @@ export async function updateLabPayment(
   return res.json();
 }
 
-/**
- * Delete an existing lab payment.
- *
- * Assumes backend route:
- *   DELETE /api/insurance/lab-payment/:id
- * Adjust the path if your API uses a different pattern.
- */
 export async function deleteLabPayment(id: string | number) {
   const res = await fetch(base(`/lab-payment/${String(id)}`), {
     method: "DELETE",
