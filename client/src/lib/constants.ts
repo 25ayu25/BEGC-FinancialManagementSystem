@@ -69,9 +69,20 @@ export const REPORT_STATUS = {
 /* ---------------- API base URL (updated) ---------------- */
 
 /**
- * Where the frontend will send API requests.
- * - Uses VITE_API_URL if provided at build time (Netlify env).
- * - Falls back to localhost:5000 for local dev, or the Northflank URL in prod.
+ * Proxy mode:
+ * - When VITE_USE_API_PROXY === "true", the app should call the API via same-origin paths like:
+ *   /api/dashboard, /api/transactions, /api/insurance/...
+ * - We will use this flag in queryClient.ts and api-insurance-lab.ts to avoid cross-site auth issues on Vercel.
+ */
+export const USE_API_PROXY: boolean =
+  String((import.meta as any)?.env?.VITE_USE_API_PROXY ?? "").toLowerCase() ===
+  "true";
+
+/**
+ * Where the frontend will send API requests (when NOT using proxy mode).
+ * - Uses VITE_API_URL if provided at build time (Netlify/Vercel env).
+ * - Back-compat: also reads VITE_API_BASE_URL.
+ * - Falls back to localhost:5000 for local dev, or the code.run URL in prod.
  */
 const FALLBACK_PROD_API =
   "https://site--financial-management--2rbpdlgj47wb.code.run";
@@ -83,8 +94,6 @@ function normalizeBaseUrl(url?: string) {
 }
 
 export const API_BASE_URL: string = (() => {
-  // Primary: VITE_API_URL
-  // Back-compat: also read VITE_API_BASE_URL if present
   const fromEnv =
     (import.meta as any)?.env?.VITE_API_URL ??
     (import.meta as any)?.env?.VITE_API_BASE_URL;
@@ -107,6 +116,8 @@ export const API_BASE_URL: string = (() => {
 
 // Helpful at boot to confirm where requests go
 if (typeof window !== "undefined") {
+  // eslint-disable-next-line no-console
+  console.log("[CFG] USE_API_PROXY =", USE_API_PROXY);
   // eslint-disable-next-line no-console
   console.log("[CFG] API base URL =", API_BASE_URL);
 }
