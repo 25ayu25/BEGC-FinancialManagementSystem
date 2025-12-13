@@ -1,12 +1,23 @@
 // client/src/lib/queryClient.ts
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import axios from "axios";
-import { API_BASE_URL } from "./constants";
+import { API_BASE_URL, USE_API_PROXY } from "./constants";
 
 /* ---------------- Base URL & axios instance ---------------- */
 
-const baseURL = API_BASE_URL;
-console.info("[CFG] API base URL =", baseURL);
+/**
+ * When USE_API_PROXY is enabled (Vercel), we want SAME-ORIGIN requests:
+ *   /api/...
+ * so cookies/localStorage backup work without cross-site issues.
+ *
+ * Axios behavior:
+ * - baseURL = ""  => api.get("/api/dashboard") stays "/api/dashboard" (same origin)
+ * - baseURL = "https://backend" => api.get("/api/dashboard") becomes cross-origin
+ */
+const baseURL = USE_API_PROXY ? "" : API_BASE_URL;
+
+console.info("[CFG] USE_API_PROXY =", USE_API_PROXY);
+console.info("[CFG] API base URL =", baseURL || "(same-origin)");
 
 export const api = axios.create({
   baseURL,
@@ -50,7 +61,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => {
     const url = response.config?.url || "";
-    if (response.status >= 200 && response.status < 300 && url.includes("/api/auth/login")) {
+    if (
+      response.status >= 200 &&
+      response.status < 300 &&
+      url.includes("/api/auth/login")
+    ) {
       // Server returns the session payload; keep a JSON backup client-side.
       writeBackup(response.data);
     }
@@ -83,7 +98,9 @@ export async function apiRequest(
     } as Response;
   } catch (error: any) {
     throw new Error(
-      `${error.response?.status || 500}: ${error.response?.data?.error || error.message}`
+      `${error.response?.status || 500}: ${
+        error.response?.data?.error || error.message
+      }`
     );
   }
 }
@@ -102,13 +119,18 @@ export const getQueryFn: <T>(options: {
       const response = await api.get(path.startsWith("/") ? path : `/${path}`);
       return response.data;
     } catch (error: any) {
-      if (unauthorizedBehavior === "returnNull" && error.response?.status === 401) {
+      if (
+        unauthorizedBehavior === "returnNull" &&
+        error.response?.status === 401
+      ) {
         // make sure we don't keep sending a stale header
         clearBackup();
         return null as T;
       }
       throw new Error(
-        `${error.response?.status || 500}: ${error.response?.data?.error || error.message}`
+        `${error.response?.status || 500}: ${
+          error.response?.data?.error || error.message
+        }`
       );
     }
   };
