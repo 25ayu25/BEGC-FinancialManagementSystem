@@ -70,13 +70,28 @@ export const REPORT_STATUS = {
 
 /**
  * Proxy mode:
- * - When VITE_USE_API_PROXY === "true", the app should call the API via same-origin paths like:
+ * - When enabled, the app should call the API via same-origin paths like:
  *   /api/dashboard, /api/transactions, /api/insurance/...
- * - We will use this flag in queryClient.ts and api-insurance-lab.ts to avoid cross-site auth issues on Vercel.
+ * - This avoids cross-site auth/CORS issues when the frontend is on Vercel.
  */
-export const USE_API_PROXY: boolean =
-  String((import.meta as any)?.env?.VITE_USE_API_PROXY ?? "").toLowerCase() ===
-  "true";
+export const USE_API_PROXY: boolean = (() => {
+  const raw = String(
+    (import.meta as any)?.env?.VITE_USE_API_PROXY ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+  // Primary control via env var
+  if (raw === "true") return true;
+
+  // Fallback: auto-enable on Vercel preview/prod domains
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.endsWith(".vercel.app")) return true;
+  }
+
+  return false;
+})();
 
 /**
  * Where the frontend will send API requests (when NOT using proxy mode).
