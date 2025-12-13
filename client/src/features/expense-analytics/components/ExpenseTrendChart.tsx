@@ -22,14 +22,10 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { format } from "date-fns";
 import { AreaChartIcon, LineChartIcon, BarChart3 } from "lucide-react";
 import type { CategoryMetrics } from "../utils/calculations";
 import { generateSafeCSSId } from "../utils/calculations";
 import { cn } from "@/lib/utils";
-
-// Regex pattern for YYYY-MM format validation
-const YYYY_MM_REGEX = /^\d{4}-\d{2}$/;
 
 interface ExpenseTrendChartProps {
   chartData: Array<Record<string, any>>;
@@ -59,98 +55,15 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return metrics.slice(0, 8);
   }, [metrics]);
 
-  // Validate chart data to ensure all category values are numeric
-  const validatedChartData = useMemo(() => {
-    return chartData.map(dataPoint => {
-      const validated = { ...dataPoint };
-      
-      // Ensure all categories have valid numeric values
-      topCategories.forEach(category => {
-        const value = validated[category.name];
-        // Convert any non-numeric or NaN values to 0
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-          validated[category.name] = 0;
-        }
-      });
-      
-      // Also validate total
-      if (typeof validated.total !== 'number' || !Number.isFinite(validated.total)) {
-        validated.total = 0;
-      }
-      
-      return validated;
-    });
-  }, [chartData, topCategories]);
-
-  // Fill in missing months to prevent gaps
+  // Simple validation: just use the data as-is
+  // If chart data is empty or has issues, the empty state will handle it
   const filledChartData = useMemo(() => {
-    if (validatedChartData.length === 0) return [];
+    if (!chartData || chartData.length === 0) return [];
     
-    // Get the date range
-    const allMonths = validatedChartData
-      .map(d => d.month)
-      .filter(m => m && typeof m === 'string' && YYYY_MM_REGEX.test(m)) // Only valid YYYY-MM formats
-      .sort();
-      
-    if (allMonths.length === 0) return validatedChartData;
-    
-    const firstMonth = allMonths[0];
-    const lastMonth = allMonths[allMonths.length - 1];
-    
-    // Parse dates safely
-    const parseMonth = (monthStr: string): [number, number] | null => {
-      const parts = monthStr.split('-');
-      if (parts.length !== 2) return null;
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10);
-      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) return null;
-      return [year, month];
-    };
-    
-    const firstParsed = parseMonth(firstMonth);
-    const lastParsed = parseMonth(lastMonth);
-    
-    if (!firstParsed || !lastParsed) return validatedChartData;
-    
-    const [startYear, startMonth] = firstParsed;
-    const [endYear, endMonth] = lastParsed;
-    
-    // Generate all months in range
-    const filled: Array<Record<string, any>> = [];
-    let currentYear = startYear;
-    let currentMonth = startMonth;
-    
-    while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
-      const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-      const existingData = validatedChartData.find(d => d.month === monthKey);
-      
-      if (existingData) {
-        filled.push(existingData);
-      } else {
-        // Create empty data point for missing month
-        const emptyData: Record<string, any> = { 
-          month: monthKey,
-          fullMonth: format(new Date(currentYear, currentMonth - 1, 1), 'MMM yyyy'),
-          total: 0,
-        };
-        
-        // Add zero values for all categories
-        topCategories.forEach(cat => {
-          emptyData[cat.name] = 0;
-        });
-        
-        filled.push(emptyData);
-      }
-      
-      currentMonth++;
-      if (currentMonth > 12) {
-        currentMonth = 1;
-        currentYear++;
-      }
-    }
-    
-    return filled;
-  }, [validatedChartData, topCategories]);
+    // Simply return the chart data without complex transformations
+    // The data should already be properly formatted from the hook
+    return chartData;
+  }, [chartData]);
 
   const toggleCategory = (categoryName: string) => {
     setHiddenCategories(prev => {
@@ -179,16 +92,9 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
   };
 
   const formatXAxis = (value: string) => {
-    try {
-      const parts = value.split('-');
-      if (parts.length >= 2) {
-        const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-        return format(date, 'MMM yy');
-      }
-      return value;
-    } catch {
-      return value;
-    }
+    // Simply return the value as provided by the API
+    // The API should provide properly formatted month labels
+    return value || '';
   };
 
   // Helper function to add opacity to hex colors
