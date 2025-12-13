@@ -22,7 +22,7 @@ function log(message: string, source = "express") {
 
 const app = express();
 
-// trust proxy (Render/Netlify)
+// trust proxy (Render/Netlify/Vercel/Northflank)
 app.set("trust proxy", 1);
 
 // Allowed web origins for CORS (comma-separated). Example:
@@ -30,42 +30,86 @@ app.set("trust proxy", 1);
 // Also supports ALLOWED_ORIGINS for backward compatibility
 const RAW_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.WEB_ORIGINS || "")
   .split(",")
-  .map(s => s.trim())
+  .map((s) => s.trim())
   .filter(Boolean);
+
+const ORIGIN_SET = new Set(RAW_ORIGINS);
 const isProd = app.get("env") === "production";
 
 /* --------------------------------- CORS --------------------------------- */
 /**
  * Configure CORS to allow credentials (cookies) and the fallback X-Session-Token header.
- * In production, only allow origins listed in ALLOWED_ORIGINS or WEB_ORIGINS environment variable.
+ * In production, allow:
+ *  - any exact origins listed in WEB_ORIGINS / ALLOWED_ORIGINS
+ *  - *.bahrelghazalclinic.com (custom domain + subdomains)
+ *  - *.netlify.app (deploy previews)
+ *  - begc-financial-management-system*.vercel.app (Vercel prod + previews for this project)
+ *
  * In development, allow any origin for local testing.
  */
+function isAllowedOrigin(origin?: string) {
+  // Allow requests with no origin (curl, server-to-server, mobile apps)
+  if (!origin) return true;
+
+  // In development, allow any origin
+  if (!isProd) return true;
+
+  // Exact allowlist via env vars
+  if (ORIGIN_SET.size > 0 && ORIGIN_SET.has(origin)) return true;
+
+  // Pattern-based allow (safe-ish)
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== "https:" && protocol !== "http:") return false;
+
+    // Allow your custom domain + subdomains
+    if (hostname === "bahrelghazalclinic.com" || hostname.endsWith(".bahrelghazalclinic.com")) {
+      return true;
+    }
+
+    // Allow Netlify deploy previews
+    if (hostname.endsWith(".netlify.app")) return true;
+
+    // Allow ONLY this Vercel project (prod + preview URLs)
+    // Examples:
+    // - begc-financial-management-system.vercel.app
+    // - begc-financial-management-system-abc123.vercel.app
+    // - begc-financial-management-system-git-branch-xyz.vercel.app
+    if (/^begc-financial-management-system([-.].+)?\.vercel\.app$/i.test(hostname)) {
+      return true;
+    }
+  } catch {
+    // invalid origin string
+    return false;
+  }
+
+  return false;
+}
+
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    if (!isProd) {
-      // In development, allow any origin
-      return callback(null, true);
-    }
-    
-    // In production, check against allowed origins
-    if (RAW_ORIGINS.length > 0 && RAW_ORIGINS.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // Reject other origins in production
-    callback(new Error("Not allowed by CORS"));
+    const allowed = isAllowedOrigin(origin);
+
+    if (allowed) return callback(null, true);
+
+    const err: any = new Error("Not allowed by CORS");
+    err.status = 403;
+    return callback(err, false);
   },
   credentials: true,
-  allowedHeaders: ["Content-Type", "X-Session-Token", "Authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Session-Token",
+    "x-session-token",
+  ],
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS", "PUT"],
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
+
+// Make sure preflight is handled
+app.options("*", cors(corsOptions));
 
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -86,8 +130,8 @@ app.use((req, res, next) => {
 /**
  * Legacy middleware: If a client sends X-Session-Token header,
  * make it available as req.cookies.session for backward compatibility.
- * Note: The global auth middleware below handles both user_session cookie 
- * and x-session-token header directly, so this bridge is primarily for 
+ * Note: The global auth middleware below handles both user_session cookie
+ * and x-session-token header directly, so this bridge is primarily for
  * any legacy code that still reads req.cookies.session.
  */
 app.use((req, _res, next) => {
@@ -103,35 +147,26 @@ app.use((req, _res, next) => {
 });
 
 /* -------------------- Global authentication middleware -------------------- */
-/**
- * Attempt to populate req.user from session cookie or X-Session-Token header.
- * This middleware runs for all requests but doesn't fail if there's no session.
- * Individual routes can use requireAuth to enforce authentication.
- * 
- * Note: This logic is similar to the requireAuth middleware in routes.ts.
- * The duplication is intentional - this middleware is non-blocking (doesn't fail
- * requests without auth), while requireAuth in routes.ts blocks unauthorized requests.
- */
 app.use(async (req, _res, next) => {
   try {
     let userSession: any = null;
 
     const sessionCookie = (req as any).cookies?.user_session;
     if (sessionCookie) {
-      try { 
-        userSession = JSON.parse(sessionCookie); 
-      } catch (e) {
-        // Ignore invalid JSON in session cookie
+      try {
+        userSession = JSON.parse(sessionCookie);
+      } catch {
+        // ignore
       }
     }
 
     if (!userSession) {
       const header = req.headers["x-session-token"];
       if (header) {
-        try { 
-          userSession = JSON.parse(header as string); 
-        } catch (e) {
-          // Ignore invalid JSON in X-Session-Token header
+        try {
+          userSession = JSON.parse(header as string);
+        } catch {
+          // ignore
         }
       }
     }
@@ -150,9 +185,9 @@ app.use(async (req, _res, next) => {
     }
   } catch (err) {
     console.error("Error populating req.user:", err);
-    // Don't fail the request, just continue without user
+    // don't block
   }
-  
+
   next();
 });
 
@@ -176,7 +211,7 @@ app.use((req, res, next) => {
         try {
           logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
         } catch {
-          // ignore stringify failures
+          // ignore
         }
       }
       if (logLine.length > 120) logLine = logLine.slice(0, 119) + "…";
@@ -197,8 +232,10 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    // still log the stack to server logs
+
+    // include both keys so frontend can read .error reliably
+    res.status(status).json({ error: message, message });
+
     if (err?.stack) console.error(err.stack);
   });
 
