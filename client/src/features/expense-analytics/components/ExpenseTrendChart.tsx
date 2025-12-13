@@ -22,7 +22,6 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { format } from "date-fns";
 import { AreaChartIcon, LineChartIcon, BarChart3 } from "lucide-react";
 import type { CategoryMetrics } from "../utils/calculations";
 import { generateSafeCSSId } from "../utils/calculations";
@@ -93,13 +92,9 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
   };
 
   const formatXAxis = (value: string) => {
-    // If value is already formatted or unrecognized, return as-is
-    if (!value) return '';
-    
-    // Simple format - just show the value if it's already a short month format
-    if (value.length <= 10) return value;
-    
-    return value;
+    // Simply return the value as provided by the API
+    // The API should provide properly formatted month labels
+    return value || '';
   };
 
   // Helper function to add opacity to hex colors
