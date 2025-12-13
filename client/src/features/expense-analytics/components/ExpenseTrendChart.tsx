@@ -55,25 +55,21 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return metrics.slice(0, 8);
   }, [metrics]);
 
-  // Simple validation: sanitize data to prevent NaN values
-  // If chart data is empty or has issues, the empty state will handle it
+  // Sanitize data to prevent NaN values in chart rendering
   const filledChartData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
     
-    // DEBUG: Log to verify data structure before rendering
-    console.log('=== CHART RENDER DEBUG ===');
-    console.log('filledChartData[0]:', chartData[0]);
-    console.log('topCategories:', topCategories.map(c => c.name));
-    
-    // Sanitize data: ensure all category values are valid numbers
-    const sanitized = chartData.map(point => {
+    // Ensure all category values are valid numbers for Recharts
+    // Recharts will throw NaN errors if it receives undefined/null values
+    return chartData.map(point => {
       const sanitizedPoint: Record<string, any> = {
         month: point.month,
         fullMonth: point.fullMonth,
         total: typeof point.total === 'number' && Number.isFinite(point.total) ? point.total : 0,
       };
       
-      // For each category, ensure the value is a valid number
+      // For each top category, ensure the value exists and is a valid finite number
+      // Categories that don't have data in this month will default to 0
       topCategories.forEach(cat => {
         const value = point[cat.name];
         sanitizedPoint[cat.name] = (typeof value === 'number' && Number.isFinite(value)) ? value : 0;
@@ -81,10 +77,6 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
       
       return sanitizedPoint;
     });
-    
-    console.log('sanitized[0]:', sanitized[0]);
-    
-    return sanitized;
   }, [chartData, topCategories]);
 
   const toggleCategory = (categoryName: string) => {
