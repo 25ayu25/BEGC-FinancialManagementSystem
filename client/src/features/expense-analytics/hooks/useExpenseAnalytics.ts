@@ -21,6 +21,9 @@ import {
   type RangeKey
 } from "@/lib/dateRanges";
 
+// Regex pattern for YYYY-MM format validation
+const YYYY_MM_REGEX = /^\d{4}-\d{2}$/;
+
 export type FilterPreset = RangeKey | 'custom';
 
 interface DateRange {
@@ -117,18 +120,30 @@ export function useExpenseAnalytics(
     return generateInsights(metrics, kpis, trendData, prevTrendData);
   }, [metrics, kpis, trendData, prevTrendData]);
 
-  // Prepare chart data
+  // Prepare chart data with robust validation
   const chartData = useMemo(() => {
-    return trendData.map(month => {
-      const breakdown = normalizeBreakdown(month.expenseBreakdown);
-      
-      return {
-        month: month.month,
-        fullMonth: month.fullMonth,
-        total: month.totalExpenses,
-        ...breakdown,
-      };
-    });
+    return trendData
+      .filter(month => month && month.month) // Filter out any null/undefined entries
+      .map(month => {
+        const breakdown = normalizeBreakdown(month.expenseBreakdown);
+        
+        // Ensure month is in YYYY-MM format for consistent parsing
+        // Handle legacy format (short month names) by attempting to preserve them
+        let monthKey = month.month;
+        if (monthKey && !YYYY_MM_REGEX.test(monthKey)) {
+          // If not in YYYY-MM format, try to construct it from year/monthNum if available
+          if (month.year && month.monthNum) {
+            monthKey = `${month.year}-${String(month.monthNum).padStart(2, '0')}`;
+          }
+        }
+        
+        return {
+          month: monthKey,
+          fullMonth: month.fullMonth || monthKey,
+          total: Number.isFinite(month.totalExpenses) ? month.totalExpenses : 0,
+          ...breakdown,
+        };
+      });
   }, [trendData]);
 
   // Debug logging to identify data structure issues (development only)

@@ -364,8 +364,8 @@ export interface IStorage {
     startDate: Date;
     endDate: Date;
   }): Promise<Array<{
-    month: string;           // Short month label (e.g., "Nov")
-    fullMonth: string;       // Full month label (e.g., "November 2025")
+    month: string;           // Month key in YYYY-MM format (e.g., "2025-01")
+    fullMonth: string;       // Full month label (e.g., "January 2025")
     year: number;
     monthNum: number;        // 1-12
     revenue: number;         // SSP income

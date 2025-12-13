@@ -28,6 +28,9 @@ import type { CategoryMetrics } from "../utils/calculations";
 import { generateSafeCSSId } from "../utils/calculations";
 import { cn } from "@/lib/utils";
 
+// Regex pattern for YYYY-MM format validation
+const YYYY_MM_REGEX = /^\d{4}-\d{2}$/;
+
 interface ExpenseTrendChartProps {
   chartData: Array<Record<string, any>>;
   metrics: CategoryMetrics[];
@@ -64,10 +67,16 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
       // Ensure all categories have valid numeric values
       topCategories.forEach(category => {
         const value = validated[category.name];
-        if (typeof value !== 'number' || isNaN(value)) {
+        // Convert any non-numeric or NaN values to 0
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
           validated[category.name] = 0;
         }
       });
+      
+      // Also validate total
+      if (typeof validated.total !== 'number' || !Number.isFinite(validated.total)) {
+        validated.total = 0;
+      }
       
       return validated;
     });
@@ -78,15 +87,33 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     if (validatedChartData.length === 0) return [];
     
     // Get the date range
-    const allMonths = validatedChartData.map(d => d.month).sort();
+    const allMonths = validatedChartData
+      .map(d => d.month)
+      .filter(m => m && typeof m === 'string' && YYYY_MM_REGEX.test(m)) // Only valid YYYY-MM formats
+      .sort();
+      
     if (allMonths.length === 0) return validatedChartData;
     
     const firstMonth = allMonths[0];
     const lastMonth = allMonths[allMonths.length - 1];
     
-    // Parse dates
-    const [startYear, startMonth] = firstMonth.split('-').map(Number);
-    const [endYear, endMonth] = lastMonth.split('-').map(Number);
+    // Parse dates safely
+    const parseMonth = (monthStr: string): [number, number] | null => {
+      const parts = monthStr.split('-');
+      if (parts.length !== 2) return null;
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) return null;
+      return [year, month];
+    };
+    
+    const firstParsed = parseMonth(firstMonth);
+    const lastParsed = parseMonth(lastMonth);
+    
+    if (!firstParsed || !lastParsed) return validatedChartData;
+    
+    const [startYear, startMonth] = firstParsed;
+    const [endYear, endMonth] = lastParsed;
     
     // Generate all months in range
     const filled: Array<Record<string, any>> = [];
