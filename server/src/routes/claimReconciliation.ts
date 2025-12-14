@@ -26,6 +26,11 @@ import {
 
 const router = Router();
 
+// Utility function for period formatting
+function formatPeriod(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
 // Auth middleware - same as before
 const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || !req.user.id) {
@@ -190,7 +195,7 @@ router.post(
       res.json({
         success: true,
         provider: providerName,
-        period: `${periodYear}-${String(periodMonth).padStart(2, '0')}`,
+        period: formatPeriod(parseInt(periodYear, 10), parseInt(periodMonth, 10)),
         claimsStored: inserted.length,
         message: `${inserted.length} claims stored and awaiting remittance`,
       });
@@ -269,7 +274,7 @@ router.post(
         res.json({
           success: true,
           provider: providerName,
-          period: `${periodYear}-${String(month).padStart(2, '0')}`,
+          period: formatPeriod(year, month),
           remittancesStored: inserted.length,
           reconciliation: {
             totalClaims: reconciliationResult.summary.totalClaims,
@@ -326,7 +331,7 @@ router.get(
 
       res.json({
         provider: providerName,
-        period: `${year}-${String(month).padStart(2, '0')}`,
+        period: formatPeriod(periodYear, periodMonth),
         claims: {
           total: claims.length,
           awaitingRemittance: claimsAwaiting,

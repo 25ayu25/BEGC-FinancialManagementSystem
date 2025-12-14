@@ -611,17 +611,10 @@ export async function runClaimReconciliation(
 
     // Update claims with match results
     for (const match of matches) {
-      let status = match.status;
-      
-      // Map "submitted" to "unpaid" for claims that have no remittance
-      if (status === "submitted" && match.remittanceId === null) {
-        status = "unpaid" as any;
-      }
-
       await tx
         .update(claimReconClaims)
         .set({
-          status,
+          status: match.status,
           amountPaid: match.amountPaid.toString(),
           remittanceLineId: match.remittanceId,
         })
@@ -668,7 +661,7 @@ export async function runClaimReconciliation(
     return {
       summary,
       orphanRemittances: orphanRemittances.length,
-      unpaidClaims: matches.filter((m) => m.status === "submitted" && m.remittanceId === null).length,
+      unpaidClaims: matches.filter((m) => m.status === "unpaid" && m.remittanceId === null).length,
     };
   });
 }

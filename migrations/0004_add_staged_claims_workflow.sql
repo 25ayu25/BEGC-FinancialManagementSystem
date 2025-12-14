@@ -7,7 +7,7 @@ ALTER TABLE claim_recon_claims
   ADD COLUMN IF NOT EXISTS provider_name VARCHAR(128),
   ADD COLUMN IF NOT EXISTS period_year INTEGER,
   ADD COLUMN IF NOT EXISTS period_month INTEGER,
-  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 -- Make runId nullable to support standalone claims
 ALTER TABLE claim_recon_claims
@@ -38,7 +38,7 @@ ALTER TABLE claim_recon_remittances
   ADD COLUMN IF NOT EXISTS period_year INTEGER,
   ADD COLUMN IF NOT EXISTS period_month INTEGER,
   ADD COLUMN IF NOT EXISTS status VARCHAR(32),
-  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 -- Make runId nullable to support standalone remittances
 ALTER TABLE claim_recon_remittances
