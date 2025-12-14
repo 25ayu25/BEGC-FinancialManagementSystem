@@ -120,16 +120,16 @@ export function matchClaimsToRemittances(
       const paidAmount = normalizeAmount(rem.data.paidAmount);
 
       // Determine match status based on amounts
-      let status: "submitted" | "paid" | "partially_paid" | "manual_review";
+      let status: "awaiting_remittance" | "matched" | "paid" | "partially_paid" | "unpaid" | "manual_review";
       let matchType: "exact" | "partial" | "none";
 
       if (paidAmount === claimAmount) {
         // Exact match
-        status = "paid";
+        status = "matched";
         matchType = "exact";
       } else if (paidAmount >= claimAmount) {
         // Overpaid (still considered paid)
-        status = "paid";
+        status = "matched";
         matchType = "partial";
       } else if (paidAmount > 0 && paidAmount < claimAmount) {
         // Partially paid
@@ -151,7 +151,7 @@ export function matchClaimsToRemittances(
     }
   }
 
-  // Add unmatched claims
+  // Add unmatched claims (these remain in their current status, or "unpaid" if they were awaiting)
   for (const claim of claims) {
     if (!matchedClaims.has(claim.id)) {
       results.push({
@@ -159,7 +159,7 @@ export function matchClaimsToRemittances(
         remittanceId: null,
         matchType: "none",
         amountPaid: 0,
-        status: "submitted",
+        status: "unpaid", // Mark unmatched claims as unpaid
       });
     }
   }
