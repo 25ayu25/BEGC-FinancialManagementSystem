@@ -1008,7 +1008,13 @@ export default function ClaimReconciliation() {
               </div>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Upload one Claims Submitted file and one Remittance file.
+                  <strong>Upload claims only:</strong> Store claims before remittance arrives (status: "Awaiting remittance").
+                </li>
+                <li>
+                  <strong>Upload remittance & reconcile:</strong> Upload remittance file to automatically reconcile against stored claims.
+                </li>
+                <li>
+                  <strong>Upload both:</strong> Upload claims and remittance together for immediate reconciliation.
                 </li>
                 <li>
                   Only Excel files are supported (<code>.xlsx</code> or{" "}
@@ -1019,12 +1025,7 @@ export default function ClaimReconciliation() {
                   files.
                 </li>
                 <li>
-                  Re-uploading for the same period will create a new run; older
-                  runs stay available for audit.
-                </li>
-                <li>
-                  Use the history table below to open a run, review unmatched
-                  items, or delete test runs.
+                  Use the status filter to view runs awaiting remittance or already reconciled.
                 </li>
               </ul>
             </CardContent>
@@ -1040,8 +1041,8 @@ export default function ClaimReconciliation() {
               Upload reconciliation files
             </CardTitle>
             <CardDescription>
-              Choose the period and upload the Claims Submitted and Remittance
-              Advice Excel exports.
+              Choose the period and upload Claims, Remittance, or both files. 
+              You can upload claims first and reconcile later when remittance arrives.
             </CardDescription>
           </div>
         </CardHeader>
