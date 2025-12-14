@@ -200,7 +200,12 @@ export const claimReconRuns = pgTable("claim_recon_runs", {
 // 2) Raw "Claims Submitted" rows
 export const claimReconClaims = pgTable("claim_recon_claims", {
   id: serial("id").primaryKey(),
-  runId: integer("run_id").notNull().references(() => claimReconRuns.id, { onDelete: "cascade" }),
+  runId: integer("run_id").references(() => claimReconRuns.id, { onDelete: "cascade" }),
+
+  // Provider and period tracking for staged workflow
+  providerName: varchar("provider_name", { length: 128 }).notNull(),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month").notNull(),
 
   memberNumber: varchar("member_number", { length: 64 }).notNull(),
   patientName: varchar("patient_name", { length: 256 }),
@@ -214,19 +219,26 @@ export const claimReconClaims = pgTable("claim_recon_claims", {
   currency: varchar("currency", { length: 3 }).notNull().default("SSP"),
 
   // reconciliation fields
-  status: varchar("status", { length: 32 }).notNull().default("submitted"),
+  // Status values: "awaiting_remittance", "matched", "partially_paid", "unpaid", "manual_review"
+  status: varchar("status", { length: 32 }).notNull().default("awaiting_remittance"),
   amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).notNull().default("0"),
   remittanceLineId: integer("remittance_line_id"),
 
   compositeKey: varchar("composite_key", { length: 128 }).notNull(),
 
   rawRow: jsonb("raw_row"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // 3) Raw remittance lines
 export const claimReconRemittances = pgTable("claim_recon_remittances", {
   id: serial("id").primaryKey(),
-  runId: integer("run_id").notNull().references(() => claimReconRuns.id, { onDelete: "cascade" }),
+  runId: integer("run_id").references(() => claimReconRuns.id, { onDelete: "cascade" }),
+
+  // Provider and period tracking for staged workflow
+  providerName: varchar("provider_name", { length: 128 }).notNull(),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month").notNull(),
 
   employerName: varchar("employer_name", { length: 256 }),
   patientName: varchar("patient_name", { length: 256 }),
@@ -243,7 +255,10 @@ export const claimReconRemittances = pgTable("claim_recon_remittances", {
 
   matchedClaimId: integer("matched_claim_id"),
   matchType: varchar("match_type", { length: 32 }),
+  // Status for orphan remittances: "orphan_remittance" means no matching claim found
+  status: varchar("status", { length: 32 }),
   rawRow: jsonb("raw_row"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 

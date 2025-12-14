@@ -30,7 +30,7 @@ export interface MatchResult {
   remittanceId: number | null;
   matchType: "exact" | "partial" | "none";
   amountPaid: number;
-  status: "submitted" | "paid" | "partially_paid" | "manual_review";
+  status: "awaiting_remittance" | "matched" | "paid" | "partially_paid" | "unpaid" | "manual_review";
 }
 
 export interface ReconciliationSummary {

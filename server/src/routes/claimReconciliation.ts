@@ -16,6 +16,12 @@ import {
   getRemittancesForRun,
   getIssueClaimsForRun,
   deleteReconRun,
+  // New staged workflow functions
+  upsertClaimsForPeriod,
+  upsertRemittanceForPeriod,
+  getClaimsForPeriod,
+  getRemittanceForPeriod,
+  runClaimReconciliation,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -129,6 +135,221 @@ const uploadHandler = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * POST /api/claim-reconciliation/upload-claims
+ * Upload claims only (without remittance) for a specific provider and period
+ * Stores claims with status "awaiting_remittance"
+ */
+router.post(
+  "/upload-claims",
+  requireAuth,
+  upload.single("claimsFile"),
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName, periodYear, periodMonth } = req.body;
+      const userId = req.user?.id;
+
+      // Validate required fields
+      if (!providerName || !periodYear || !periodMonth) {
+        return res.status(400).json({
+          error: "Missing required fields: providerName, periodYear, periodMonth",
+        });
+      }
+
+      if (!userId) {
+        return res.status(401).json({
+          error: "User authentication required",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          error: "claimsFile is required",
+        });
+      }
+
+      // Parse claims file
+      const claimsBuffer = req.file.buffer;
+      const claims = parseClaimsFile(claimsBuffer);
+
+      if (claims.length === 0) {
+        return res.status(400).json({
+          error: "No valid claims found in the uploaded file",
+        });
+      }
+
+      // Upsert claims for this provider+period
+      const inserted = await upsertClaimsForPeriod(
+        providerName,
+        parseInt(periodYear, 10),
+        parseInt(periodMonth, 10),
+        claims
+      );
+
+      res.json({
+        success: true,
+        provider: providerName,
+        period: `${periodYear}-${String(periodMonth).padStart(2, '0')}`,
+        claimsStored: inserted.length,
+        message: `${inserted.length} claims stored and awaiting remittance`,
+      });
+    } catch (error: any) {
+      console.error("Error uploading claims:", error);
+      res.status(500).json({
+        error: error.message || "Failed to upload claims",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/claim-reconciliation/upload-remittance
+ * Upload remittance only (requires existing claims) for a specific provider and period
+ * Runs reconciliation automatically after upload
+ */
+router.post(
+  "/upload-remittance",
+  requireAuth,
+  upload.single("remittanceFile"),
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName, periodYear, periodMonth } = req.body;
+      const userId = req.user?.id;
+
+      // Validate required fields
+      if (!providerName || !periodYear || !periodMonth) {
+        return res.status(400).json({
+          error: "Missing required fields: providerName, periodYear, periodMonth",
+        });
+      }
+
+      if (!userId) {
+        return res.status(401).json({
+          error: "User authentication required",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          error: "remittanceFile is required",
+        });
+      }
+
+      // Parse remittance file
+      const remittanceBuffer = req.file.buffer;
+      const remittances = parseRemittanceFile(remittanceBuffer);
+
+      if (remittances.length === 0) {
+        return res.status(400).json({
+          error: "No valid remittances found in the uploaded file",
+        });
+      }
+
+      const year = parseInt(periodYear, 10);
+      const month = parseInt(periodMonth, 10);
+
+      // Upsert remittances for this provider+period
+      // This will fail with 400 if no claims exist
+      try {
+        const inserted = await upsertRemittanceForPeriod(
+          providerName,
+          year,
+          month,
+          remittances
+        );
+
+        // Run reconciliation automatically
+        const reconciliationResult = await runClaimReconciliation(
+          providerName,
+          year,
+          month
+        );
+
+        res.json({
+          success: true,
+          provider: providerName,
+          period: `${periodYear}-${String(month).padStart(2, '0')}`,
+          remittancesStored: inserted.length,
+          reconciliation: {
+            totalClaims: reconciliationResult.summary.totalClaims,
+            totalRemittances: reconciliationResult.summary.totalRemittances,
+            autoMatched: reconciliationResult.summary.autoMatched,
+            partialMatched: reconciliationResult.summary.partialMatched,
+            manualReview: reconciliationResult.summary.manualReview,
+            unpaidClaims: reconciliationResult.unpaidClaims,
+            orphanRemittances: reconciliationResult.orphanRemittances,
+          },
+          message: "Remittances uploaded and reconciliation completed",
+        });
+      } catch (error: any) {
+        // Check if it's the "no claims found" error
+        if (error.message && error.message.includes("No claims found")) {
+          return res.status(400).json({
+            error: error.message,
+            suggestion: "Please upload claims for this provider and period first",
+          });
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      console.error("Error uploading remittance:", error);
+      res.status(500).json({
+        error: error.message || "Failed to upload remittance",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/claim-reconciliation/period/:providerName/:year/:month
+ * Get reconciliation status for a specific provider and period
+ */
+router.get(
+  "/period/:providerName/:year/:month",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName, year, month } = req.params;
+      const periodYear = parseInt(year, 10);
+      const periodMonth = parseInt(month, 10);
+
+      const claims = await getClaimsForPeriod(providerName, periodYear, periodMonth);
+      const remittances = await getRemittanceForPeriod(providerName, periodYear, periodMonth);
+
+      // Calculate summary statistics
+      const claimsAwaiting = claims.filter((c) => c.status === "awaiting_remittance").length;
+      const claimsMatched = claims.filter((c) => c.status === "matched" || c.status === "paid").length;
+      const claimsPartial = claims.filter((c) => c.status === "partially_paid").length;
+      const claimsUnpaid = claims.filter((c) => c.status === "unpaid").length;
+      const orphanRemittances = remittances.filter((r) => r.status === "orphan_remittance").length;
+
+      res.json({
+        provider: providerName,
+        period: `${year}-${String(month).padStart(2, '0')}`,
+        claims: {
+          total: claims.length,
+          awaitingRemittance: claimsAwaiting,
+          matched: claimsMatched,
+          partiallyPaid: claimsPartial,
+          unpaid: claimsUnpaid,
+        },
+        remittances: {
+          total: remittances.length,
+          orphans: orphanRemittances,
+        },
+        hasClaimsOnly: claims.length > 0 && remittances.length === 0,
+        hasRemittances: remittances.length > 0,
+        isReconciled: remittances.length > 0 && claimsAwaiting === 0,
+      });
+    } catch (error: any) {
+      console.error("Error fetching period status:", error);
+      res.status(500).json({
+        error: error.message || "Failed to fetch period status",
+      });
+    }
+  }
+);
 
 /**
  * POST /api/claim-reconciliation/upload
