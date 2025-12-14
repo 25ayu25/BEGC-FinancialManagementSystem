@@ -691,6 +691,6 @@ router.get(
       });
     }
   }
-});
+);
 
 export { router as claimReconciliationRouter };
