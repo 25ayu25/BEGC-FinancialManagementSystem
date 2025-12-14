@@ -130,6 +130,34 @@ function findColumnIndex(
   return undefined;
 }
 
+/**
+ * Check if a row contains a member number/ID column header
+ */
+function hasMemberHeader(texts: string[]): boolean {
+  return texts.some((t) => 
+    (t.includes("member") && (t.includes("number") || t.includes("no") || t.includes("id"))) ||
+    t.includes("membernumber") ||
+    t.includes("membershipno") ||
+    t.includes("membership_no")
+  );
+}
+
+/**
+ * Check if a row contains either patient name OR amount column header
+ */
+function hasPatientOrAmountHeader(texts: string[]): boolean {
+  return texts.some((t) => 
+    (t.includes("patient") && t.includes("name")) || 
+    t.includes("patientname") || 
+    t.includes("patient_name")
+  ) || 
+  texts.some((t) => 
+    t.includes("amount") || 
+    t.includes("billed") || 
+    t.includes("claim")
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Claims Submitted (Smart Billing Utility Report)                     */
 /* ------------------------------------------------------------------ */
@@ -154,23 +182,7 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
   // - Require member number/id/no AND
   // - Either patient name OR amount (to handle both formats)
   const headerIdx = findHeaderRowIndex(rows, [
-    (texts) =>
-      texts.some((t) => 
-        (t.includes("member") && (t.includes("number") || t.includes("no") || t.includes("id"))) ||
-        t.includes("membernumber") ||
-        t.includes("membershipno") ||
-        t.includes("membership_no")
-      ) &&
-      (texts.some((t) => 
-        (t.includes("patient") && t.includes("name")) || 
-        t.includes("patientname") || 
-        t.includes("patient_name")
-      ) || 
-      texts.some((t) => 
-        t.includes("amount") || 
-        t.includes("billed") || 
-        t.includes("claim")
-      )),
+    (texts) => hasMemberHeader(texts) && hasPatientOrAmountHeader(texts),
   ]);
 
   if (headerIdx === -1) {

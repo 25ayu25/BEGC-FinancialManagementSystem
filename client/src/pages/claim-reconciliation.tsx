@@ -1769,7 +1769,7 @@ export default function ClaimReconciliation() {
                             {claim.currency || "SSP"} {parseFloat(claim.billedAmount).toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            {claim.currency || "SSP"} {parseFloat(claim.amountPaid).toFixed(2)}
+                            {claim.currency || "SSP"} {parseFloat(claim.amountPaid || "0").toFixed(2)}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(claim.status)}
