@@ -485,7 +485,8 @@ export default function ClaimReconciliation() {
     },
     onSuccess: (data) => {
       const reconciliation = data.reconciliation;
-      const summary = `${reconciliation.totalClaims} claims, ${reconciliation.autoMatched} matched, ${reconciliation.partialMatched} partial, ${reconciliation.manualReview + reconciliation.unpaidClaims} unpaid`;
+      const unpaidCount = (reconciliation.manualReview || 0) + (reconciliation.unpaidClaims || 0);
+      const summary = `${reconciliation.totalClaims} claims, ${reconciliation.autoMatched} matched, ${reconciliation.partialMatched} partial, ${unpaidCount} unpaid`;
       
       toast({
         title: "Reconciliation complete",
