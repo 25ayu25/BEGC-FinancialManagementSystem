@@ -271,10 +271,15 @@ function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-6 mx-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
-          <h4 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <h4 id="modal-title" className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <Maximize2 className="h-5 w-5 text-teal-500" />
             {title}
           </h4>
@@ -307,6 +312,32 @@ function Modal({
 
 /* ----------------------- Chart Type State ----------------------- */
 type ChartType = "area" | "line" | "bar";
+
+/* ----------------------- Animation Constants ----------------------- */
+const CHART_ANIMATION_DURATION = 800;
+const CHART_ANIMATION_EASING = "ease-out";
+
+/* ----------------------- Helper: Average Reference Line ----------------------- */
+function renderAverageReferenceLine(
+  avgValue: number,
+  color: string,
+  label: string
+) {
+  if (avgValue <= 0) return null;
+  return (
+    <ReferenceLine
+      y={avgValue}
+      stroke={color}
+      strokeWidth={2}
+      strokeDasharray="4 4"
+      label={{
+        value: label,
+        position: "insideTopRight",
+        style: { fontSize: 11, fill: color, fontWeight: 600 },
+      }}
+    />
+  );
+}
 
 /* ----------------------- Drilldown helpers ----------------------- */
 
@@ -398,6 +429,9 @@ export default function RevenueAnalyticsDaily({
 }: Props) {
   const year = selectedYear;
   const month = selectedMonth;
+
+  // Generate unique IDs for gradients to avoid conflicts when multiple instances exist
+  const componentId = useMemo(() => `rev-${Math.random().toString(36).substr(2, 9)}`, []);
 
   const { start, end } = computeWindow(
     timeRange,
@@ -932,7 +966,7 @@ export default function RevenueAnalyticsDaily({
                       barCategoryGap="26%"
                     >
                       <defs>
-                        <linearGradient id="barGradientSSP" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id={`barGradientSSP-${componentId}`} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.9} />
                           <stop offset="100%" stopColor="#0d9488" stopOpacity={0.7} />
                         </linearGradient>
@@ -995,22 +1029,14 @@ export default function RevenueAnalyticsDaily({
                           />
                         )}
                       />
-                      {!wide && showAvgLine && avgDaySSP > 0 && (
-                        <ReferenceLine
-                          y={avgDaySSP}
-                          stroke="#14b8a6"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                          label={{
-                            value: `Avg ${compact.format(avgDaySSP)}`,
-                            position: "insideTopRight",
-                            style: { fontSize: 11, fill: "#14b8a6", fontWeight: 600 },
-                          }}
-                        />
+                      {!wide && showAvgLine && renderAverageReferenceLine(
+                        avgDaySSP,
+                        "#14b8a6",
+                        `Avg ${compact.format(avgDaySSP)}`
                       )}
                       <Bar
                         dataKey="value"
-                        fill="url(#barGradientSSP)"
+                        fill="url(#barGradientSSP-${componentId})"
                         radius={[6, 6, 0, 0]}
                         maxBarSize={28}
                         onClick={(p: any) =>
@@ -1019,8 +1045,8 @@ export default function RevenueAnalyticsDaily({
                             : onClickDailySSP(p?.payload)
                         }
                         style={{ cursor: "pointer" }}
-                        animationDuration={800}
-                        animationEasing="ease-out"
+                        animationDuration={CHART_ANIMATION_DURATION}
+                        animationEasing={CHART_ANIMATION_EASING}
                       >
                         {showBarLabels && (
                           <LabelList dataKey="value" content={renderSSPLabel} />
@@ -1090,18 +1116,10 @@ export default function RevenueAnalyticsDaily({
                           />
                         )}
                       />
-                      {!wide && showAvgLine && avgDaySSP > 0 && (
-                        <ReferenceLine
-                          y={avgDaySSP}
-                          stroke="#14b8a6"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                          label={{
-                            value: `Avg ${compact.format(avgDaySSP)}`,
-                            position: "insideTopRight",
-                            style: { fontSize: 11, fill: "#14b8a6", fontWeight: 600 },
-                          }}
-                        />
+                      {!wide && showAvgLine && renderAverageReferenceLine(
+                        avgDaySSP,
+                        "#14b8a6",
+                        `Avg ${compact.format(avgDaySSP)}`
                       )}
                       <Line
                         type="monotone"
@@ -1110,8 +1128,8 @@ export default function RevenueAnalyticsDaily({
                         strokeWidth={3}
                         dot={{ r: 4, fill: "#14b8a6", strokeWidth: 2, stroke: "#fff" }}
                         activeDot={{ r: 6, fill: "#0d9488" }}
-                        animationDuration={800}
-                        animationEasing="ease-out"
+                        animationDuration={CHART_ANIMATION_DURATION}
+                        animationEasing={CHART_ANIMATION_EASING}
                       />
                     </LineChart>
                   ) : (
@@ -1120,7 +1138,7 @@ export default function RevenueAnalyticsDaily({
                       margin={{ top: 20, right: 12, left: 12, bottom: 18 }}
                     >
                       <defs>
-                        <linearGradient id="areaGradientSSP" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id={`areaGradientSSP-${componentId}`} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8} />
                           <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.1} />
                         </linearGradient>
@@ -1183,27 +1201,19 @@ export default function RevenueAnalyticsDaily({
                           />
                         )}
                       />
-                      {!wide && showAvgLine && avgDaySSP > 0 && (
-                        <ReferenceLine
-                          y={avgDaySSP}
-                          stroke="#14b8a6"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                          label={{
-                            value: `Avg ${compact.format(avgDaySSP)}`,
-                            position: "insideTopRight",
-                            style: { fontSize: 11, fill: "#14b8a6", fontWeight: 600 },
-                          }}
-                        />
+                      {!wide && showAvgLine && renderAverageReferenceLine(
+                        avgDaySSP,
+                        "#14b8a6",
+                        `Avg ${compact.format(avgDaySSP)}`
                       )}
                       <Area
                         type="monotone"
                         dataKey="value"
                         stroke="#14b8a6"
                         strokeWidth={2}
-                        fill="url(#areaGradientSSP)"
-                        animationDuration={800}
-                        animationEasing="ease-out"
+                        fill="url(#areaGradientSSP-${componentId})"
+                        animationDuration={CHART_ANIMATION_DURATION}
+                        animationEasing={CHART_ANIMATION_EASING}
                       />
                     </AreaChart>
                   )}
@@ -1239,7 +1249,7 @@ export default function RevenueAnalyticsDaily({
                       barCategoryGap="26%"
                     >
                       <defs>
-                        <linearGradient id="barGradientUSD" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id={`barGradientUSD-${componentId}`} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.9} />
                           <stop offset="100%" stopColor="#0284c7" stopOpacity={0.7} />
                         </linearGradient>
@@ -1302,22 +1312,14 @@ export default function RevenueAnalyticsDaily({
                           />
                         )}
                       />
-                      {!wide && showAvgLine && avgDayUSD > 0 && (
-                        <ReferenceLine
-                          y={avgDayUSD}
-                          stroke="#0ea5e9"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                          label={{
-                            value: `Avg ${nf0.format(avgDayUSD)}`,
-                            position: "insideTopRight",
-                            style: { fontSize: 11, fill: "#0ea5e9", fontWeight: 600 },
-                          }}
-                        />
+                      {!wide && showAvgLine && renderAverageReferenceLine(
+                        avgDayUSD,
+                        "#0ea5e9",
+                        `Avg ${nf0.format(avgDayUSD)}`
                       )}
                       <Bar
                         dataKey="value"
-                        fill="url(#barGradientUSD)"
+                        fill="url(#barGradientUSD-${componentId})"
                         radius={[6, 6, 0, 0]}
                         maxBarSize={28}
                         onClick={(p: any) =>
@@ -1326,8 +1328,8 @@ export default function RevenueAnalyticsDaily({
                             : onClickDailyUSD(p?.payload)
                         }
                         style={{ cursor: "pointer" }}
-                        animationDuration={800}
-                        animationEasing="ease-out"
+                        animationDuration={CHART_ANIMATION_DURATION}
+                        animationEasing={CHART_ANIMATION_EASING}
                       >
                         {showBarLabels && (
                           <LabelList dataKey="value" content={renderUSDLabel} />
@@ -1397,18 +1399,10 @@ export default function RevenueAnalyticsDaily({
                           />
                         )}
                       />
-                      {!wide && showAvgLine && avgDayUSD > 0 && (
-                        <ReferenceLine
-                          y={avgDayUSD}
-                          stroke="#0ea5e9"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                          label={{
-                            value: `Avg ${nf0.format(avgDayUSD)}`,
-                            position: "insideTopRight",
-                            style: { fontSize: 11, fill: "#0ea5e9", fontWeight: 600 },
-                          }}
-                        />
+                      {!wide && showAvgLine && renderAverageReferenceLine(
+                        avgDayUSD,
+                        "#0ea5e9",
+                        `Avg ${nf0.format(avgDayUSD)}`
                       )}
                       <Line
                         type="monotone"
@@ -1417,8 +1411,8 @@ export default function RevenueAnalyticsDaily({
                         strokeWidth={3}
                         dot={{ r: 4, fill: "#0ea5e9", strokeWidth: 2, stroke: "#fff" }}
                         activeDot={{ r: 6, fill: "#0284c7" }}
-                        animationDuration={800}
-                        animationEasing="ease-out"
+                        animationDuration={CHART_ANIMATION_DURATION}
+                        animationEasing={CHART_ANIMATION_EASING}
                       />
                     </LineChart>
                   ) : (
@@ -1427,7 +1421,7 @@ export default function RevenueAnalyticsDaily({
                       margin={{ top: 20, right: 12, left: 12, bottom: 18 }}
                     >
                       <defs>
-                        <linearGradient id="areaGradientUSD" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id={`areaGradientUSD-${componentId}`} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8} />
                           <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.1} />
                         </linearGradient>
@@ -1490,27 +1484,19 @@ export default function RevenueAnalyticsDaily({
                           />
                         )}
                       />
-                      {!wide && showAvgLine && avgDayUSD > 0 && (
-                        <ReferenceLine
-                          y={avgDayUSD}
-                          stroke="#0ea5e9"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                          label={{
-                            value: `Avg ${nf0.format(avgDayUSD)}`,
-                            position: "insideTopRight",
-                            style: { fontSize: 11, fill: "#0ea5e9", fontWeight: 600 },
-                          }}
-                        />
+                      {!wide && showAvgLine && renderAverageReferenceLine(
+                        avgDayUSD,
+                        "#0ea5e9",
+                        `Avg ${nf0.format(avgDayUSD)}`
                       )}
                       <Area
                         type="monotone"
                         dataKey="value"
                         stroke="#0ea5e9"
                         strokeWidth={2}
-                        fill="url(#areaGradientUSD)"
-                        animationDuration={800}
-                        animationEasing="ease-out"
+                        fill="url(#areaGradientUSD-${componentId})"
+                        animationDuration={CHART_ANIMATION_DURATION}
+                        animationEasing={CHART_ANIMATION_EASING}
                       />
                     </AreaChart>
                   )}
