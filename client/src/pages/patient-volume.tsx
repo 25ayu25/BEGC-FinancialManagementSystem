@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   format,
@@ -88,6 +88,10 @@ type PatientVolume = {
   notes?: string | null;
 };
 
+type WeekdayDistributionRow = { day: string; count: number; percentage: number };
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
 /** ---------- SAFETY HELPERS (prevents Recharts reduce() crash) ---------- */
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -113,8 +117,8 @@ export default function PatientVolumePage() {
     if (viewParam === "monthly" && yearParam && monthParam) {
       return new Date(Number(yearParam), Number(monthParam) - 1, 1, 12);
     }
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1, 12);
+    const now0 = new Date();
+    return new Date(now0.getFullYear(), now0.getMonth(), 1, 12);
   }, [viewParam, yearParam, monthParam]);
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(initialMonthDate);
@@ -142,6 +146,28 @@ export default function PatientVolumePage() {
   });
 
   const queryClient = useQueryClient();
+
+  /**
+   * ✅ IMPORTANT FIX:
+   * When navigating to this page via SPA (no refresh) with query params,
+   * state does NOT reinitialize. Refresh makes it work, navigation can break.
+   * This sync makes navigation behave like refresh.
+   */
+  useEffect(() => {
+    if (viewParam === "monthly" && yearParam && monthParam) {
+      const y = Number(yearParam);
+      const m = Number(monthParam);
+
+      if (Number.isFinite(y) && Number.isFinite(m) && m >= 1 && m <= 12) {
+        const monthStart = startOfMonth(new Date(y, m - 1, 1, 12));
+        const monthEnd = endOfMonth(monthStart);
+
+        setSelectedMonth(monthStart);
+        setTimePeriod("custom");
+        setCustomDateRange({ start: monthStart, end: monthEnd });
+      }
+    }
+  }, [viewParam, yearParam, monthParam]);
 
   // --- Helper functions for date range calculation ---
   const getDateRangeForPeriod = (
@@ -252,46 +278,58 @@ export default function PatientVolumePage() {
     return { months, range: "multi-month" as const };
   }, [dateRange]);
 
+  const queryReady = useMemo(() => {
+    if (!apiQueryParams) return false;
+
+    if (apiQueryParams.range === "current-month") {
+      return (
+        Number.isFinite(apiQueryParams.year) &&
+        Number.isFinite(apiQueryParams.month) &&
+        apiQueryParams.month >= 1 &&
+        apiQueryParams.month <= 12
+      );
+    }
+
+    return Array.isArray(apiQueryParams.months) && apiQueryParams.months.length > 0;
+  }, [apiQueryParams]);
+
   const {
     data: rawVolumes = [],
     isLoading,
+    isError,
     error,
   } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/period", apiQueryParams],
     queryFn: async () => {
-      try {
-        if (!apiQueryParams) return [];
+      if (!apiQueryParams) return [];
 
-        if (apiQueryParams.range === "current-month") {
-          const resp = await api.get(`/api/patient-volume/period/${apiQueryParams.year}/${apiQueryParams.month}`);
-          const data = resp.data;
-          if (!Array.isArray(data)) {
-            console.error("API returned non-array data:", data);
-            return [];
-          }
-          return data;
+      if (apiQueryParams.range === "current-month") {
+        const resp = await api.get(`/api/patient-volume/period/${apiQueryParams.year}/${apiQueryParams.month}`);
+        if (!Array.isArray(resp.data)) {
+          // If the backend ever returns an object/string/html, don't let it hit charts
+          throw new Error("Patient volume API returned non-array for current-month");
         }
-
-        // multi-month
-        const allData: PatientVolume[] = [];
-        const months = apiQueryParams.months || [];
-        for (const { year: y, month: m } of months) {
-          try {
-            const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
-            if (Array.isArray(resp.data)) allData.push(...resp.data);
-          } catch (monthError) {
-            console.error(`Failed to fetch month ${y}-${m}:`, monthError);
-          }
-        }
-        return allData;
-      } catch (e) {
-        console.error("Failed to fetch patient volume data:", e);
-        return [];
+        return resp.data;
       }
+
+      // multi-month (best effort)
+      const allData: PatientVolume[] = [];
+      const months = Array.isArray(apiQueryParams.months) ? apiQueryParams.months : [];
+      for (const { year: y, month: m } of months) {
+        try {
+          const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
+          if (Array.isArray(resp.data)) allData.push(...resp.data);
+        } catch (monthError) {
+          console.error(`Failed to fetch month ${y}-${m}:`, monthError);
+        }
+      }
+      return allData;
     },
-    enabled: !!apiQueryParams,
+    enabled: queryReady,
     retry: 2,
     staleTime: 1 * 60 * 1000,
+    // extra guard: even if queryFn changes later, cached "data" is always an array
+    select: (data) => (Array.isArray(data) ? data : []),
   });
 
   // --- Comparison Period Data ---
@@ -336,34 +374,30 @@ export default function PatientVolumePage() {
   const { data: rawComparisonVolumes = [], isLoading: isLoadingComparison } = useQuery<PatientVolume[]>({
     queryKey: ["/api/patient-volume/comparison", comparisonApiQueryParams],
     queryFn: async () => {
-      try {
-        if (!comparisonApiQueryParams) return [];
+      if (!comparisonApiQueryParams) return [];
 
-        if (comparisonApiQueryParams.range === "current-month") {
-          const resp = await api.get(
-            `/api/patient-volume/period/${comparisonApiQueryParams.year}/${comparisonApiQueryParams.month}`
-          );
-          return Array.isArray(resp.data) ? resp.data : [];
-        }
-
-        const allData: PatientVolume[] = [];
-        const months = comparisonApiQueryParams.months || [];
-        for (const { year: y, month: m } of months) {
-          try {
-            const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
-            if (Array.isArray(resp.data)) allData.push(...resp.data);
-          } catch {
-            // keep going
-          }
-        }
-        return allData;
-      } catch (e) {
-        console.error("Failed to fetch comparison data:", e);
-        return [];
+      if (comparisonApiQueryParams.range === "current-month") {
+        const resp = await api.get(
+          `/api/patient-volume/period/${comparisonApiQueryParams.year}/${comparisonApiQueryParams.month}`
+        );
+        return Array.isArray(resp.data) ? resp.data : [];
       }
+
+      const allData: PatientVolume[] = [];
+      const months = comparisonApiQueryParams.months || [];
+      for (const { year: y, month: m } of months) {
+        try {
+          const resp = await api.get(`/api/patient-volume/period/${y}/${m}`);
+          if (Array.isArray(resp.data)) allData.push(...resp.data);
+        } catch {
+          // keep going
+        }
+      }
+      return allData;
     },
     enabled: !!comparisonApiQueryParams && showComparison,
     retry: 1,
+    select: (data) => (Array.isArray(data) ? data : []),
   });
 
   // Filter comparison volumes to only include those in the comparison date range
@@ -413,7 +447,14 @@ export default function PatientVolumePage() {
       const peakIdx = peak > 0 ? buckets.findIndex((n) => n === peak) : null;
       const peakLbl = peakIdx !== null ? format(addDays(dateRange.start, peakIdx), "EEE, MMM d, yyyy") : "—";
 
-      return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
+      return {
+        chartData: data,
+        xTicks: ticks,
+        totalPatients: total,
+        activeDays: active,
+        peakCount: peak,
+        peakLabel: peakLbl,
+      };
     }
 
     if (aggregationLevel === "weekly") {
@@ -442,7 +483,14 @@ export default function PatientVolumePage() {
       const peakIdx = peak > 0 ? buckets.findIndex((b) => b.count === peak) : null;
       const peakLbl = peakIdx !== null ? `Week of ${format(buckets[peakIdx].weekStart, "MMM d, yyyy")}` : "—";
 
-      return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
+      return {
+        chartData: data,
+        xTicks: ticks,
+        totalPatients: total,
+        activeDays: active,
+        peakCount: peak,
+        peakLabel: peakLbl,
+      };
     }
 
     // monthly
@@ -471,7 +519,14 @@ export default function PatientVolumePage() {
     const peakIdx = peak > 0 ? buckets.findIndex((b) => b.count === peak) : null;
     const peakLbl = peakIdx !== null ? format(buckets[peakIdx].monthStart, "MMMM yyyy") : "—";
 
-    return { chartData: data, xTicks: ticks, totalPatients: total, activeDays: active, peakCount: peak, peakLabel: peakLbl };
+    return {
+      chartData: data,
+      xTicks: ticks,
+      totalPatients: total,
+      activeDays: active,
+      peakCount: peak,
+      peakLabel: peakLbl,
+    };
   }, [filteredVolumes, aggregationLevel, dateRange]);
 
   // Aggregate comparison data based on aggregation level
@@ -593,7 +648,11 @@ export default function PatientVolumePage() {
   const avgPerActiveDay = activeDays ? totalPatients / activeDays : 0;
 
   // --- Additional Analytics Metrics ---
-  const sortedCounts = chartData.filter((d) => d.count > 0).map((d) => d.count).sort((a, b) => a - b);
+  const sortedCounts = chartData
+    .filter((d: any) => toFiniteNumber(d.count) > 0)
+    .map((d: any) => toFiniteNumber(d.count))
+    .sort((a, b) => a - b);
+
   const medianPatients =
     sortedCounts.length > 0
       ? sortedCounts.length % 2 === 0
@@ -618,12 +677,13 @@ export default function PatientVolumePage() {
     queryKey: ["/api/patient-volume/prevWeek", year, monthNumber],
     queryFn: async () => {
       const weekStart = startOfWeek(selectedMonth);
-      const prevWeekStart = subWeeks(weekStart, 1);
-      const prevYear = prevWeekStart.getFullYear();
-      const prevMonth = prevWeekStart.getMonth() + 1;
-      const resp = await api.get(`/api/patient-volume/period/${prevYear}/${prevMonth}`);
+      const prevWeekStart0 = subWeeks(weekStart, 1);
+      const prevYear = prevWeekStart0.getFullYear();
+      const prevMonth0 = prevWeekStart0.getMonth() + 1;
+      const resp = await api.get(`/api/patient-volume/period/${prevYear}/${prevMonth0}`);
       return Array.isArray(resp.data) ? resp.data : [];
     },
+    select: (data) => (Array.isArray(data) ? data : []),
   });
 
   const currentWeekTotal = dayBuckets.slice(-7).reduce((s, n) => s + n, 0);
@@ -635,6 +695,7 @@ export default function PatientVolumePage() {
       return d.getTime() >= prevWeekStart.getTime() && d.getTime() <= prevWeekEnd.getTime();
     })
     .reduce((s, v) => s + Number(v.patientCount || 0), 0);
+
   const weekOverWeekGrowth = prevWeekTotal > 0 ? ((currentWeekTotal - prevWeekTotal) / prevWeekTotal) * 100 : 0;
 
   // Month-over-Month Trend
@@ -645,14 +706,14 @@ export default function PatientVolumePage() {
       const resp = await api.get(`/api/patient-volume/period/${prevMonth.getFullYear()}/${prevMonth.getMonth() + 1}`);
       return Array.isArray(resp.data) ? resp.data : [];
     },
+    select: (data) => (Array.isArray(data) ? data : []),
   });
 
   const prevMonthTotal = prevMonthVolumes.reduce((s, v) => s + Number(v.patientCount || 0), 0);
   const monthOverMonthGrowth = prevMonthTotal > 0 ? ((totalPatients - prevMonthTotal) / prevMonthTotal) * 100 : 0;
 
-  // Weekday distribution
-  const weekdayDistribution = useMemo(() => {
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  // Weekday distribution (✅ always array)
+  const weekdayDistribution = useMemo<WeekdayDistributionRow[]>(() => {
     const counts = Array(7).fill(0);
 
     filteredVolumes.forEach((v) => {
@@ -662,12 +723,18 @@ export default function PatientVolumePage() {
     });
 
     const total = counts.reduce((s, n) => s + n, 0);
-    return days.map((day, i) => ({
+    return WEEKDAYS.map((day, i) => ({
       day,
       count: counts[i],
       percentage: total > 0 ? (counts[i] / total) * 100 : 0,
     }));
   }, [filteredVolumes]);
+
+  // ✅ Pie safety: always pass an array to <Pie data={...}>
+  const weekdayPieData = useMemo(
+    () => asArray<WeekdayDistributionRow>(weekdayDistribution).filter((d) => toFiniteNumber(d.count) > 0),
+    [weekdayDistribution]
+  );
 
   // Heatmap data for calendar view
   const heatmapData = useMemo(() => {
@@ -707,9 +774,9 @@ export default function PatientVolumePage() {
   // --- Export Functions ---
   const exportToCSV = () => {
     const headers = ["Period", "Patient Count"];
-    const rows = chartData.map((d) => [d.label, d.count]);
+    const rows = chartData.map((d: any) => [d.label, d.count]);
 
-    const csv = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const csv = [headers.join(","), ...rows.map((row: any) => row.join(","))].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -797,7 +864,7 @@ export default function PatientVolumePage() {
                 <tr><th>Period</th><th>Patient Count</th></tr>
               </thead>
               <tbody>
-                ${chartData.map((d) => `<tr><td>${d.label}</td><td>${d.count}</td></tr>`).join("")}
+                ${chartData.map((d: any) => `<tr><td>${d.label}</td><td>${d.count}</td></tr>`).join("")}
               </tbody>
             </table>
           </body>
@@ -860,7 +927,11 @@ export default function PatientVolumePage() {
     const newDate = newEntry.date;
     const alreadyExistsForDay = rawVolumes.some((v) => {
       const d = parseISO(v.date);
-      return d.getFullYear() === newDate.getFullYear() && d.getMonth() === newDate.getMonth() && d.getDate() === newDate.getDate();
+      return (
+        d.getFullYear() === newDate.getFullYear() &&
+        d.getMonth() === newDate.getMonth() &&
+        d.getDate() === newDate.getDate()
+      );
     });
 
     if (alreadyExistsForDay) {
@@ -931,7 +1002,7 @@ export default function PatientVolumePage() {
   }
 
   // Error state
-  if (error) {
+  if (isError) {
     return (
       <div className="min-h-screen bg-slate-50">
         <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
@@ -990,7 +1061,9 @@ export default function PatientVolumePage() {
               <div className="text-xs text-slate-600">
                 Average / Active {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}
               </div>
-              <div className="text-2xl font-semibold">{activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}</div>
+              <div className="text-2xl font-semibold">
+                {activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}
+              </div>
               <div className="text-xs text-slate-500">
                 {activeDays} active {aggregationLevel === "daily" ? "days" : aggregationLevel === "weekly" ? "weeks" : "months"}
               </div>
@@ -999,7 +1072,9 @@ export default function PatientVolumePage() {
 
           <Card>
             <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Peak {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}</div>
+              <div className="text-xs text-slate-600">
+                Peak {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}
+              </div>
               <div className="text-2xl font-semibold">{peakCount}</div>
               <div className="text-xs text-slate-500">{peakLabel}</div>
             </CardContent>
@@ -1015,7 +1090,10 @@ export default function PatientVolumePage() {
                 Week-over-Week
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <div className="text-2xl font-semibold">{weekOverWeekGrowth > 0 ? "+" : ""}{weekOverWeekGrowth.toFixed(1)}%</div>
+                <div className="text-2xl font-semibold">
+                  {weekOverWeekGrowth > 0 ? "+" : ""}
+                  {weekOverWeekGrowth.toFixed(1)}%
+                </div>
                 {weekOverWeekGrowth > 0 ? (
                   <TrendingUp className="w-5 h-5 text-green-600" />
                 ) : weekOverWeekGrowth < 0 ? (
@@ -1033,7 +1111,10 @@ export default function PatientVolumePage() {
                 Month-over-Month
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <div className="text-2xl font-semibold">{monthOverMonthGrowth > 0 ? "+" : ""}{monthOverMonthGrowth.toFixed(1)}%</div>
+                <div className="text-2xl font-semibold">
+                  {monthOverMonthGrowth > 0 ? "+" : ""}
+                  {monthOverMonthGrowth.toFixed(1)}%
+                </div>
                 {monthOverMonthGrowth > 0 ? (
                   <TrendingUp className="w-5 h-5 text-green-600" />
                 ) : monthOverMonthGrowth < 0 ? (
@@ -1246,7 +1327,11 @@ export default function PatientVolumePage() {
                       value={targetValue || ""}
                       onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : null)}
                     />
-                    <Button size="sm" className="w-full bg-teal-600 hover:bg-teal-700" onClick={() => toast({ title: "Target updated" })}>
+                    <Button
+                      size="sm"
+                      className="w-full bg-teal-600 hover:bg-teal-700"
+                      onClick={() => toast({ title: "Target updated" })}
+                    >
                       Apply
                     </Button>
                   </div>
@@ -1380,7 +1465,13 @@ export default function PatientVolumePage() {
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
-                            label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
+                            label={{
+                              value: "Patients",
+                              angle: -90,
+                              position: "insideLeft",
+                              offset: 8,
+                              style: { fill: "#64748b", fontSize: 11 },
+                            }}
                           />
                           <Tooltip content={<TooltipBox />} />
                           <Legend />
@@ -1392,40 +1483,44 @@ export default function PatientVolumePage() {
                               label={{ value: `Target: ${targetValue}`, position: "insideTopRight", fill: "#f59e0b", fontSize: 11 }}
                             />
                           )}
-                          {showTrendLine && safeCombinedChartData.length > 1 && (() => {
-                            const nonZeroData = safeCombinedChartData.filter((d) => toFiniteNumber(d.count) > 0);
-                            if (nonZeroData.length < 2) return null;
+                          {showTrendLine &&
+                            safeCombinedChartData.length > 1 &&
+                            (() => {
+                              const nonZeroData = safeCombinedChartData.filter((d) => toFiniteNumber(d.count) > 0);
+                              if (nonZeroData.length < 2) return null;
 
-                            const dataWithIndex = nonZeroData.map((d, i) => ({ ...d, index: i }));
-                            const n = dataWithIndex.length;
-                            const sumX = dataWithIndex.reduce((s, d) => s + d.index, 0);
-                            const sumY = dataWithIndex.reduce((s, d) => s + toFiniteNumber(d.count), 0);
-                            const sumXY = dataWithIndex.reduce((s, d) => s + d.index * toFiniteNumber(d.count), 0);
-                            const sumX2 = dataWithIndex.reduce((s, d) => s + d.index * d.index, 0);
+                              const dataWithIndex = nonZeroData.map((d, i) => ({ ...d, index: i }));
+                              const n = dataWithIndex.length;
+                              const sumX = dataWithIndex.reduce((s, d) => s + d.index, 0);
+                              const sumY = dataWithIndex.reduce((s, d) => s + toFiniteNumber(d.count), 0);
+                              const sumXY = dataWithIndex.reduce((s, d) => s + d.index * toFiniteNumber(d.count), 0);
+                              const sumX2 = dataWithIndex.reduce((s, d) => s + d.index * d.index, 0);
 
-                            const denom = (n * sumX2 - sumX * sumX);
-                            if (denom === 0) return null;
+                              const denom = n * sumX2 - sumX * sumX;
+                              if (denom === 0) return null;
 
-                            const slope = (n * sumXY - sumX * sumY) / denom;
-                            const intercept = (sumY - slope * sumX) / n;
+                              const slope = (n * sumXY - sumX * sumY) / denom;
+                              const intercept = (sumY - slope * sumX) / n;
 
-                            const y1 = slope * 0 + intercept;
-                            const y2 = slope * (safeCombinedChartData.length - 1) + intercept;
+                              const y1 = slope * 0 + intercept;
+                              const y2 = slope * (safeCombinedChartData.length - 1) + intercept;
 
-                            return (
-                              <ReferenceLine
-                                segment={[
-                                  { x: safeCombinedChartData[0].label, y: Math.max(0, y1) },
-                                  { x: safeCombinedChartData[safeCombinedChartData.length - 1].label, y: Math.max(0, y2) },
-                                ]}
-                                stroke="#3b82f6"
-                                strokeDasharray="5 5"
-                                strokeWidth={2}
-                              />
-                            );
-                          })()}
+                              return (
+                                <ReferenceLine
+                                  segment={[
+                                    { x: safeCombinedChartData[0].label, y: Math.max(0, y1) },
+                                    { x: safeCombinedChartData[safeCombinedChartData.length - 1].label, y: Math.max(0, y2) },
+                                  ]}
+                                  stroke="#3b82f6"
+                                  strokeDasharray="5 5"
+                                  strokeWidth={2}
+                                />
+                              );
+                            })()}
                           <Bar dataKey="count" name="Current Period" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
-                          {showComparison && <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26} />}
+                          {showComparison && (
+                            <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26} />
+                          )}
                         </BarChart>
                       ) : chartType === "line" ? (
                         <RechartsLineChart data={safeCombinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
@@ -1444,7 +1539,13 @@ export default function PatientVolumePage() {
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
-                            label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
+                            label={{
+                              value: "Patients",
+                              angle: -90,
+                              position: "insideLeft",
+                              offset: 8,
+                              style: { fill: "#64748b", fontSize: 11 },
+                            }}
                           />
                           <Tooltip content={<TooltipBox />} />
                           <Legend />
@@ -1505,7 +1606,13 @@ export default function PatientVolumePage() {
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
-                            label={{ value: "Patients", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#64748b", fontSize: 11 } }}
+                            label={{
+                              value: "Patients",
+                              angle: -90,
+                              position: "insideLeft",
+                              offset: 8,
+                              style: { fill: "#64748b", fontSize: 11 },
+                            }}
                           />
                           <Tooltip content={<TooltipBox />} />
                           <Legend />
@@ -1549,7 +1656,11 @@ export default function PatientVolumePage() {
                       const idToDelete =
                         rawVolumes.find((v) => {
                           const vd = parseISO(v.date);
-                          return vd.getFullYear() === dayDate.getFullYear() && vd.getMonth() === dayDate.getMonth() && vd.getDate() === dayDate.getDate();
+                          return (
+                            vd.getFullYear() === dayDate.getFullYear() &&
+                            vd.getMonth() === dayDate.getMonth() &&
+                            vd.getDate() === dayDate.getDate()
+                          );
                         })?.id ?? null;
 
                       return (
@@ -1590,18 +1701,21 @@ export default function PatientVolumePage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={weekdayDistribution.filter((d) => d.count > 0)}
+                      data={weekdayPieData}
                       dataKey="count"
                       nameKey="day"
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ day, percentage }) => (percentage > 0 ? `${day.slice(0, 3)}: ${percentage.toFixed(1)}%` : "")}
+                      label={({ day, percentage }: any) =>
+                        Number(percentage) > 0 ? `${String(day).slice(0, 3)}: ${Number(percentage).toFixed(1)}%` : ""
+                      }
                       labelLine={true}
                     >
-                      {weekdayDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={WEEKDAY_COLORS[index]} />
-                      ))}
+                      {weekdayPieData.map((entry) => {
+                        const idx = WEEKDAYS.indexOf(entry.day as any);
+                        return <Cell key={entry.day} fill={WEEKDAY_COLORS[idx >= 0 ? idx : 0]} />;
+                      })}
                     </Pie>
                     <Tooltip
                       formatter={(value: any, name: any) => [
@@ -1655,7 +1769,7 @@ export default function PatientVolumePage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
                 <h3 className="text-base font-semibold text-slate-900">Add Patient Volume</h3>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAddOpen(false)}>
-                  <X className="h-4 h-4" />
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
 
