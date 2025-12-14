@@ -1530,7 +1530,10 @@ export default function RevenueAnalyticsDaily({
             <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between text-sm text-slate-600">
               <span>Total: {detail.items.length} transaction{detail.items.length !== 1 ? "s" : ""}</span>
               <span className="font-mono font-semibold">
-                Total Amount: {detail.currency} {nf0.format(detail.items.reduce((sum, t) => sum + (t.amount ?? 0), 0))}
+                Total Amount: {detail.currency} {nf0.format(detail.items.reduce((sum, t) => {
+                  const amount = Number(t.amount) || 0;
+                  return sum + amount;
+                }, 0))}
               </span>
             </div>
           </div>
