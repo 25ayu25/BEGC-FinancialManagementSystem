@@ -1,12 +1,11 @@
 /**
  * Expense Trend Chart Component
- * 
+ *
  * Displays expense trends over time with category breakdown
  */
 
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveContainer,
@@ -20,7 +19,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
 } from "recharts";
 import { AreaChartIcon, LineChartIcon, BarChart3 } from "lucide-react";
 import type { CategoryMetrics } from "../utils/calculations";
@@ -33,11 +31,11 @@ interface ExpenseTrendChartProps {
   isLoading?: boolean;
 }
 
-type ChartType = 'area' | 'line' | 'bar';
+type ChartType = "area" | "line" | "bar";
 
 // More muted colors (reduced saturation by ~20%)
 const CHART_COLORS = [
-  "#dc2626", // red-600 (more muted)
+  "#dc2626", // red-600
   "#ea580c", // orange-600
   "#d97706", // amber-600
   "#0d9488", // teal-600
@@ -47,96 +45,104 @@ const CHART_COLORS = [
   "#059669", // green-600
 ];
 
+// Empty state component (kept outside to avoid recreating each render)
+function EmptyState() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Expense Trends</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-80 flex flex-col items-center justify-center text-gray-500">
+          <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
+          <p className="font-medium">No expense data available</p>
+          <p className="text-sm">Data will appear once expenses are recorded for this period</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTrendChartProps) {
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
-  const [chartType, setChartType] = useState<ChartType>('line'); // Default to Line chart
+  const [chartType, setChartType] = useState<ChartType>("line"); // Default to Line chart
 
-  const topCategories = useMemo(() => {
-    return metrics.slice(0, 8);
-  }, [metrics]);
+  const topCategories = useMemo(() => metrics.slice(0, 8), [metrics]);
 
   // Helper function to validate numeric values
-  const isValidNumber = (value: any): value is number => {
-    return typeof value === 'number' && Number.isFinite(value);
-  };
+  const isValidNumber = (value: any): value is number =>
+    typeof value === "number" && Number.isFinite(value);
 
   // Sanitize data to prevent NaN values in chart rendering
   const filledChartData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
-    
-    // Ensure all category values are valid numbers for Recharts
-    // Recharts will throw NaN errors if it receives undefined/null values
-    return chartData.map(point => {
+
+    return chartData.map((point) => {
       const sanitizedPoint: Record<string, any> = {
-        month: point.month,
-        fullMonth: point.fullMonth,
+        // ensure these are always strings (recharts X scale stability)
+        month: typeof point.month === "string" ? point.month : String(point.month ?? ""),
+        fullMonth: typeof point.fullMonth === "string" ? point.fullMonth : String(point.fullMonth ?? ""),
         total: isValidNumber(point.total) ? point.total : 0,
       };
-      
-      // For each top category, ensure the value exists and is a valid finite number
-      // Categories that don't have data in this month will default to 0
-      topCategories.forEach(cat => {
-        const value = point[cat.name];
-        sanitizedPoint[cat.name] = isValidNumber(value) ? value : 0;
+
+      // For each top category, ensure value exists and is a finite number
+      topCategories.forEach((cat) => {
+        const v = point?.[cat.name];
+        sanitizedPoint[cat.name] = isValidNumber(v) ? v : 0;
       });
-      
+
       return sanitizedPoint;
     });
   }, [chartData, topCategories]);
 
+  // IMPORTANT: Do NOT use hooks after conditional returns.
+  // Compute this as a normal boolean (cheap) to avoid React #310.
+  const hasActualData =
+    filledChartData.length > 0 &&
+    topCategories.length > 0 &&
+    filledChartData.some((dataPoint) =>
+      topCategories.some((cat) => {
+        const v = dataPoint[cat.name];
+        return typeof v === "number" && Number.isFinite(v) && v > 0;
+      })
+    );
+
   const toggleCategory = (categoryName: string) => {
-    setHiddenCategories(prev => {
+    setHiddenCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryName)) {
-        next.delete(categoryName);
-      } else {
-        next.add(categoryName);
-      }
+      if (next.has(categoryName)) next.delete(categoryName);
+      else next.add(categoryName);
       return next;
     });
   };
 
   const formatCurrency = (value: number) => {
-    const abs = Math.abs(value);
-    if (abs >= 1_000_000_000) {
-      return `${(value / 1_000_000_000).toFixed(1)}B`;
-    }
-    if (abs >= 1_000_000) {
-      return `${(value / 1_000_000).toFixed(1)}M`;
-    }
-    if (abs >= 1_000) {
-      return `${(value / 1_000).toFixed(0)}k`;
-    }
-    return value.toFixed(0);
+    const num = typeof value === "number" && Number.isFinite(value) ? value : 0;
+    const abs = Math.abs(num);
+    if (abs >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+    if (abs >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${(num / 1_000).toFixed(0)}k`;
+    return num.toFixed(0);
   };
 
-  const formatXAxis = (value: string) => {
-    // Simply return the value as provided by the API
-    // The API should provide properly formatted month labels
-    return value || '';
-  };
+  const formatXAxis = (value: string) => value || "";
 
   // Helper function to add opacity to hex colors
   const addOpacityToHex = (hex: string, opacity: number): string => {
-    // Remove # if present
-    const cleanHex = hex.replace('#', '');
-    // Validate hex format (must be 6 characters)
-    if (cleanHex.length !== 6) {
-      console.warn(`Invalid hex color: ${hex}`);
-      return hex; // Return original if invalid
-    }
-    // Convert opacity (0-1) to hex (00-FF)
-    const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
+    const cleanHex = hex.replace("#", "");
+    if (cleanHex.length !== 6) return hex;
+    const alpha = Math.round(opacity * 255)
+      .toString(16)
+      .padStart(2, "0");
     return `#${cleanHex}${alpha}`;
   };
 
-  // Helper function for chart button styling
-  const getChartButtonClass = (type: ChartType) => {
-    return cn(
+  const getChartButtonClass = (type: ChartType) =>
+    cn(
       "transition-all duration-200",
-      chartType === type && "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
+      chartType === type &&
+        "bg-gradient-to-r from-red-500 to-orange-500 text-white hover:from-red-600 hover:to-orange-600"
     );
-  };
 
   if (isLoading) {
     return (
@@ -153,72 +159,42 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     );
   }
 
-  // Empty state component
-  const EmptyState = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Expense Trends</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-80 flex flex-col items-center justify-center text-gray-500">
-          <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
-          <p className="font-medium">No expense data available</p>
-          <p className="text-sm">Data will appear once expenses are recorded for this period</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  if (chartData.length === 0) {
-    return <EmptyState />;
-  }
-
-  // Check if there's actual numeric data to display
-  const hasActualData = useMemo(() => {
-    return filledChartData.some(dataPoint => 
-      topCategories.some(cat => 
-        dataPoint[cat.name] && dataPoint[cat.name] > 0
-      )
-    );
-  }, [filledChartData, topCategories]);
-
-  if (!hasActualData) {
+  // If there is no data (or only zeros), show EmptyState
+  if (!chartData || chartData.length === 0 || !hasActualData) {
     return <EmptyState />;
   }
 
   const renderChart = () => {
-    const commonProps = {
-      data: filledChartData,
-    };
+    const commonProps = { data: filledChartData };
 
     const commonAxisProps = {
       xAxis: {
         dataKey: "month",
         tickFormatter: formatXAxis,
         stroke: "#6b7280",
-        style: { fontSize: '12px' },
+        style: { fontSize: "12px" },
       },
       yAxis: {
         tickFormatter: formatCurrency,
         stroke: "#6b7280",
-        style: { fontSize: '12px' },
+        style: { fontSize: "12px" },
       },
       tooltip: {
         formatter: (value: number, name: string) => [
-          `SSP ${value.toLocaleString()}`,
+          `SSP ${Number.isFinite(value) ? value.toLocaleString() : "0"}`,
           name,
         ],
         contentStyle: {
-          backgroundColor: 'white',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          fontSize: '12px',
-          padding: '8px 12px',
+          backgroundColor: "white",
+          border: "1px solid #e5e7eb",
+          borderRadius: "8px",
+          fontSize: "12px",
+          padding: "8px 12px",
         },
       },
     };
 
-    if (chartType === 'line') {
+    if (chartType === "line") {
       return (
         <LineChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -242,7 +218,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
       );
     }
 
-    if (chartType === 'bar') {
+    if (chartType === "bar") {
       return (
         <BarChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -271,14 +247,7 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
           {topCategories.map((category, index) => {
             const safeId = generateSafeCSSId(category.name);
             return (
-              <linearGradient
-                key={category.name}
-                id={`color-${safeId}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
+              <linearGradient key={category.name} id={`color-${safeId}`} x1="0" y1="0" x2="0" y2="1">
                 <stop
                   offset="5%"
                   stopColor={CHART_COLORS[index % CHART_COLORS.length]}
@@ -321,42 +290,42 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <CardTitle className="text-gray-900">Expense Trends</CardTitle>
-          
+
           {/* Chart Type Toggle */}
           <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
             <Button
-              variant={chartType === 'line' ? 'default' : 'ghost'}
+              variant={chartType === "line" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setChartType('line')}
-              className={getChartButtonClass('line')}
+              onClick={() => setChartType("line")}
+              className={getChartButtonClass("line")}
             >
               <LineChartIcon className="w-4 h-4 mr-1" />
               Line
             </Button>
             <Button
-              variant={chartType === 'area' ? 'default' : 'ghost'}
+              variant={chartType === "area" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setChartType('area')}
-              className={getChartButtonClass('area')}
+              onClick={() => setChartType("area")}
+              className={getChartButtonClass("area")}
             >
               <AreaChartIcon className="w-4 h-4 mr-1" />
               Area
             </Button>
             <Button
-              variant={chartType === 'bar' ? 'default' : 'ghost'}
+              variant={chartType === "bar" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setChartType('bar')}
-              className={getChartButtonClass('bar')}
+              onClick={() => setChartType("bar")}
+              className={getChartButtonClass("bar")}
             >
               <BarChart3 className="w-4 h-4 mr-1" />
               Bar
             </Button>
           </div>
         </div>
-        <p className="text-sm text-gray-500 mt-1">
-          Click legend items to show/hide categories
-        </p>
+
+        <p className="text-sm text-gray-500 mt-1">Click legend items to show/hide categories</p>
       </CardHeader>
+
       <CardContent>
         {/* Legend */}
         <div className="flex flex-wrap gap-2 mb-6">
@@ -373,9 +342,9 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
                   isHidden ? "opacity-50 scale-95 grayscale" : "opacity-100 scale-100 hover:scale-105"
                 )}
                 style={{
-                  backgroundColor: isHidden ? 'transparent' : addOpacityToHex(color, 0.1),
+                  backgroundColor: isHidden ? "transparent" : addOpacityToHex(color, 0.1),
                   borderColor: addOpacityToHex(color, 0.5),
-                  color: color,
+                  color,
                 }}
               >
                 {category.name}
