@@ -427,6 +427,17 @@ body {
       radial-gradient(circle at 90% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 40%);
     animation: pulse 6s ease-in-out infinite;
   }
+
+  /* Reconciliation Header Pattern - Orange/Amber theme */
+  .reconciliation-header-pattern {
+    background-image: 
+      radial-gradient(circle at 25% 35%, rgba(255, 255, 255, 0.5) 0%, transparent 35%),
+      radial-gradient(circle at 75% 65%, rgba(255, 255, 255, 0.4) 0%, transparent 35%),
+      radial-gradient(circle at 50% 85%, rgba(255, 255, 255, 0.3) 0%, transparent 35%),
+      radial-gradient(circle at 85% 25%, rgba(255, 255, 255, 0.4) 0%, transparent 35%),
+      radial-gradient(circle at 15% 75%, rgba(255, 255, 255, 0.3) 0%, transparent 35%);
+    animation: pulse 6s ease-in-out infinite;
+  }
 }
 
 /* =========================

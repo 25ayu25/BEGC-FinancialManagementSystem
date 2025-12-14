@@ -61,6 +61,9 @@ import {
   X,
   Info,
   Download,
+  CheckCircle,
+  FileStack,
+  AlertTriangle,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -192,11 +195,13 @@ function FileDropzone({
       <div
         {...getRootProps()}
         className={cn(
-          "flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white/60 hover:bg-slate-50 transition-colors",
+          "flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white/60 hover:bg-slate-50 transition-all relative group",
           isDragActive && "border-primary bg-primary/10",
           disabled && "cursor-not-allowed opacity-60"
         )}
       >
+        {/* Gradient border effect on hover */}
+        <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 -z-10 blur-sm" />
         <input {...getInputProps()} id={label} />
         {isDragActive ? (
           <p className="text-sm font-medium text-primary">
@@ -241,6 +246,16 @@ export default function ClaimReconciliation() {
   const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">(
     "issues"
   );
+
+  // Generate stable particle positions for header
+  const particles = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 3 + Math.random() * 4,
+      delay: Math.random() * 2,
+    }));
+  }, []);
 
   /* ------------------------------------------------------------------------ */
   /* Data loading */
@@ -572,28 +587,33 @@ export default function ClaimReconciliation() {
     switch (status) {
       case "paid":
         return (
-          <Badge className="bg-green-500 text-white">
+          <Badge className="bg-green-500 text-white hover:bg-green-600">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Paid
           </Badge>
         );
       case "partially_paid":
         return (
-          <Badge className="bg-yellow-500 text-black">
+          <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">
             <Clock className="w-3 h-3 mr-1" />
             Partial
           </Badge>
         );
       case "manual_review":
         return (
-          <Badge className="bg-orange-500 text-white">
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600">
             <AlertCircle className="w-3 h-3 mr-1" />
             Review
           </Badge>
         );
       case "submitted":
       default:
-        return <Badge variant="secondary">Submitted</Badge>;
+        return (
+          <Badge className="bg-slate-500 text-white hover:bg-slate-600">
+            <FileSpreadsheet className="w-3 h-3 mr-1" />
+            Submitted
+          </Badge>
+        );
     }
   };
 
@@ -622,78 +642,139 @@ export default function ClaimReconciliation() {
 
   return (
     <>
-      <PageHeader
-        variant="claimReconciliation"
-        title="Claim Reconciliation"
-        subtitle="Upload claim and remittance files, then review matches, underpayments, and outstanding balances"
-      >
-        <HeaderAction
-          variant="dark"
-          icon={<Info className="w-4 h-4" />}
-          onClick={() => setShowHelp((v) => !v)}
-        >
-          <span className="hidden sm:inline">
-            {showHelp ? "Hide help" : "Show help"}
-          </span>
-        </HeaderAction>
-      </PageHeader>
+      {/* Premium Gradient Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-600 via-amber-500 to-orange-400 p-8 shadow-2xl">
+        {/* Animated mesh/dot pattern background */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0 reconciliation-header-pattern" />
+        </div>
+
+        {/* Floating particles effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {particles.map((particle, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-white rounded-full opacity-30"
+              style={{
+                left: particle.left,
+                top: particle.top,
+                animation: `float ${particle.duration}s ease-in-out infinite ${particle.delay}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Glass layer with backdrop blur */}
+        <div className="absolute inset-0 backdrop-blur-[2px] bg-white/5" />
+        
+        {/* Animated gradient accent line at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 animate-pulse" />
+
+        {/* Content */}
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-white drop-shadow-2xl">
+                Claim Reconciliation
+              </h1>
+              <p className="text-orange-100 mt-1 drop-shadow-lg">
+                Upload claim and remittance files, then review matches, underpayments, and outstanding balances
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowHelp((v) => !v)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-md border-white/30 hover:bg-white transition-all hover:shadow-xl hover:scale-105 rounded-lg text-orange-700 font-medium text-sm"
+            >
+              <Info className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {showHelp ? "Hide help" : "Show help"}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
         <section className="space-y-4">
 
-        {/* KPI strip */}
-        <div className="grid gap-3 md:grid-cols-3">
+        {/* Enhanced KPI Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
           {/* Reconciliations done */}
-          <div className="rounded-xl border bg-white px-4 py-3">
-            <div className="text-xs font-medium text-slate-500">
-              Reconciliations done
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-semibold">
-                {stats.totalRuns}
-              </span>
-              <span className="text-[11px] uppercase tracking-wide text-slate-500">
-                periods checked
-              </span>
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              Latest period: {stats.lastPeriodLabel}
+          <div className="relative overflow-hidden rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 hover:border-emerald-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-400/20 to-teal-500/20 rounded-full blur-2xl group-hover:scale-110 transition-transform" />
+            <div className="relative flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  </div>
+                  Reconciliations done
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-gray-900">
+                    {stats.totalRuns}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                    periods checked
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Latest period: {stats.lastPeriodLabel}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Claims processed */}
-          <div className="rounded-xl border bg-white px-4 py-3">
-            <div className="text-xs font-medium text-slate-500">
-              Claims processed
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-semibold">
-                {stats.totalClaims.toLocaleString()}
-              </span>
-              <span className="text-[11px] uppercase tracking-wide text-slate-500">
-                rows in total
-              </span>
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              Across all uploads.
+          <div className="relative overflow-hidden rounded-xl border-2 border-blue-200 bg-white px-4 py-3 hover:border-blue-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-cyan-500/20 rounded-full blur-2xl group-hover:scale-110 transition-transform" />
+            <div className="relative flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-md">
+                    <FileStack className="w-4 h-4 text-white" />
+                  </div>
+                  Claims processed
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-gray-900">
+                    {stats.totalClaims.toLocaleString()}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                    rows in total
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Across all uploads.
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Claims to follow up */}
-          <div className="rounded-xl border bg-white px-4 py-3">
-            <div className="text-xs font-medium text-slate-500">
-              Claims to follow up
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-semibold text-orange-500">
-                {stats.problemClaims}
-              </span>
-              <span className="text-[11px] uppercase tracking-wide text-orange-500">
-                not fully paid
-              </span>
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              Partial or unpaid claims to discuss with CIC.
+          {/* Claims to follow up - Warning Style */}
+          <div className="relative overflow-hidden rounded-xl border-2 border-orange-200 bg-white px-4 py-3 hover:border-orange-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/20 to-red-500/20 rounded-full blur-2xl group-hover:scale-110 transition-transform" />
+            <div className="relative flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-md">
+                    <AlertTriangle className="w-4 h-4 text-white" />
+                  </div>
+                  Claims to follow up
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-orange-600">
+                    {stats.problemClaims}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wide text-orange-500">
+                    not fully paid
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Partial or unpaid claims to discuss with CIC.
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -732,8 +813,8 @@ export default function ClaimReconciliation() {
       </section>
 
       {/* Upload Form */}
-      <Card className="border border-slate-200/80 shadow-sm">
-        <CardHeader className="space-y-1 pb-4">
+      <Card className="border-2 border-slate-200/80 shadow-lg hover:shadow-xl transition-shadow">
+        <CardHeader className="space-y-1 pb-4 bg-gradient-to-r from-slate-50 to-white">
           <div>
             <CardTitle className="text-lg md:text-xl">
               Upload reconciliation files
@@ -843,7 +924,7 @@ export default function ClaimReconciliation() {
                         type="submit"
                         size="lg"
                         disabled={isSubmitDisabled}
-                        className="w-full md:w-auto font-semibold shadow-md gap-2 px-6"
+                        className="w-full md:w-auto font-semibold shadow-lg gap-2 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border-0"
                       >
                         {isUploading ? (
                           <>
@@ -877,8 +958,8 @@ export default function ClaimReconciliation() {
       </Card>
 
       {/* Reconciliation Runs List */}
-      <Card className="border border-slate-200/80 shadow-sm">
-        <CardHeader className="pb-3">
+      <Card className="border-2 border-slate-200/80 shadow-lg">
+        <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle className="text-lg">Reconciliation history</CardTitle>
@@ -934,9 +1015,9 @@ export default function ClaimReconciliation() {
                       <TableRow
                         key={run.id}
                         className={cn(
-                          "odd:bg-slate-50/40 hover:bg-slate-100 transition-colors",
+                          "odd:bg-slate-50/40 hover:bg-emerald-50/60 transition-colors cursor-pointer",
                           selectedRunId === run.id &&
-                            "border-l-2 border-l-emerald-500 bg-emerald-50/60"
+                            "border-l-4 border-l-emerald-500 bg-emerald-50/80 hover:bg-emerald-50/90"
                         )}
                       >
                         <TableCell className="font-medium">
@@ -946,7 +1027,7 @@ export default function ClaimReconciliation() {
                           <div className="flex items-center gap-2">
                             <span>{periodLabel}</span>
                             {isLatest && (
-                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                              <span className="rounded-full border-2 border-emerald-400 bg-gradient-to-r from-emerald-50 to-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 shadow-sm">
                                 Latest
                               </span>
                             )}
@@ -957,18 +1038,21 @@ export default function ClaimReconciliation() {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className="text-xs font-semibold"
+                            className="text-xs font-semibold border-green-300 bg-green-50 text-green-700"
                           >
+                            <CheckCircle className="w-3 h-3 mr-1" />
                             {run.autoMatched} Matched
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
+                            <Clock className="w-3 h-3 mr-1" />
                             {run.partialMatched} Partial
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
+                            <AlertCircle className="w-3 h-3 mr-1" />
                             {run.manualReview} Review
                           </Badge>
                         </TableCell>
@@ -1033,11 +1117,12 @@ export default function ClaimReconciliation() {
 
       {/* Claims Details */}
       {selectedRunId && (
-        <Card className="border border-slate-200/80 shadow-sm">
-          <CardHeader className="pb-3">
+        <Card className="border-2 border-slate-200/80 shadow-lg border-l-4 border-l-orange-400">
+          <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-amber-50">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                   Claims details &mdash; Run #{selectedRunId}
                 </CardTitle>
                 <CardDescription>
@@ -1078,14 +1163,14 @@ export default function ClaimReconciliation() {
               <>
                 {/* Filter + Export row */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 py-3">
-                  <div className="inline-flex items-center rounded-full bg-slate-100 p-1 text-xs">
+                  <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200">
                     <button
                       type="button"
                       className={cn(
-                        "px-3 py-1 rounded-full",
+                        "px-4 py-2 rounded-full transition-all font-medium",
                         attentionFilter === "all"
-                          ? "bg-white shadow-sm"
-                          : "text-slate-600"
+                          ? "bg-white shadow-md text-slate-900"
+                          : "text-slate-600 hover:text-slate-900"
                       )}
                       onClick={() => setAttentionFilter("all")}
                     >
@@ -1094,13 +1179,14 @@ export default function ClaimReconciliation() {
                     <button
                       type="button"
                       className={cn(
-                        "px-3 py-1 rounded-full",
+                        "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
                         attentionFilter === "issues"
-                          ? "bg-white shadow-sm"
-                          : "text-slate-600"
+                          ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-md text-white"
+                          : "text-slate-600 hover:text-slate-900"
                       )}
                       onClick={() => setAttentionFilter("issues")}
                     >
+                      <AlertTriangle className="w-3 h-3" />
                       Needs attention ({issuesCountForSelected})
                     </button>
                   </div>
@@ -1151,7 +1237,7 @@ export default function ClaimReconciliation() {
                         {filteredClaims.map((claim) => (
                           <TableRow
                             key={claim.id}
-                            className="odd:bg-slate-50/40"
+                            className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors"
                           >
                             <TableCell className="font-mono">
                               {claim.memberNumber}
