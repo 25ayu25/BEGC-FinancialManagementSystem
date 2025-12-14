@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
@@ -136,6 +136,22 @@ function readSessionBackup(): string | null {
   } catch {
     return null;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Utility helpers */
+/* -------------------------------------------------------------------------- */
+
+function formatPeriodLabel(year: number, month: number): string {
+  return new Date(year, month - 1).toLocaleString("default", { 
+    month: "long", 
+    year: "numeric" 
+  });
+}
+
+function pluralize(count: number, singular: string, plural?: string): string {
+  if (count === 1) return singular;
+  return plural || `${singular}s`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -358,7 +374,7 @@ export default function ClaimReconciliation() {
 
       return response.json();
     },
-    // Debounce by refetching only when inputs stabilize
+    // Keep data fresh for 2 seconds to avoid excessive API calls when changing dropdowns
     staleTime: 2000,
     enabled: !!(providerName && periodYear && periodMonth),
   });
@@ -397,10 +413,7 @@ export default function ClaimReconciliation() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
     const latest = sortedRuns[0];
-    const lastPeriodLabel = new Date(
-      latest.periodYear,
-      latest.periodMonth - 1
-    ).toLocaleString("default", { month: "short", year: "numeric" });
+    const lastPeriodLabel = formatPeriodLabel(latest.periodYear, latest.periodMonth);
 
     return {
       totalRuns,
@@ -920,10 +933,7 @@ export default function ClaimReconciliation() {
   const handleDeleteRun = (runId: number) => {
     const run = runs.find((r) => r.id === runId);
     const label = run
-      ? `${run.providerName} – ${new Date(
-          run.periodYear,
-          run.periodMonth - 1
-        ).toLocaleString("default", { month: "short", year: "numeric" })}`
+      ? `${run.providerName} – ${formatPeriodLabel(run.periodYear, run.periodMonth)}`
       : `Run #${runId}`;
 
     const ok = window.confirm(
@@ -1360,7 +1370,7 @@ export default function ClaimReconciliation() {
                             {periodStatus.claims.total === 0
                               ? "🔵 No data for this period"
                               : periodStatus.hasClaimsOnly
-                              ? `🟡 ${periodStatus.claims.total} claim${periodStatus.claims.total !== 1 ? 's' : ''} awaiting remittance`
+                              ? `🟡 ${periodStatus.claims.total} ${pluralize(periodStatus.claims.total, 'claim')} awaiting remittance`
                               : periodStatus.isReconciled
                               ? `🟢 Reconciled (${periodStatus.claims.matched} matched, ${periodStatus.claims.partiallyPaid} partial, ${periodStatus.claims.unpaid} unpaid)`
                               : "Period has data"}
@@ -1410,7 +1420,7 @@ export default function ClaimReconciliation() {
                       <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <div className="font-semibold text-sm text-orange-800 mb-1">
-                          No claims found for {providerName} - {new Date(parseInt(periodYear), parseInt(periodMonth) - 1).toLocaleString("default", { month: "long", year: "numeric" })}
+                          No claims found for {providerName} - {formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth))}
                         </div>
                         <div className="text-xs text-orange-700">
                           Please upload claims first or select a different period.
