@@ -64,6 +64,8 @@ import {
   CheckCircle,
   FileStack,
   AlertTriangle,
+  DollarSign,
+  FileText,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -103,6 +105,25 @@ interface ClaimDetail {
   currency?: string;
 }
 
+interface PeriodStatus {
+  provider: string;
+  period: string;
+  claims: {
+    total: number;
+    awaitingRemittance: number;
+    matched: number;
+    partiallyPaid: number;
+    unpaid: number;
+  };
+  remittances: {
+    total: number;
+    orphans: number;
+  };
+  hasClaimsOnly: boolean;
+  hasRemittances: boolean;
+  isReconciled: boolean;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Session backup helper */
 /* -------------------------------------------------------------------------- */
@@ -118,6 +139,22 @@ function readSessionBackup(): string | null {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Utility helpers */
+/* -------------------------------------------------------------------------- */
+
+function formatPeriodLabel(year: number, month: number): string {
+  return new Date(year, month - 1).toLocaleString("default", { 
+    month: "long", 
+    year: "numeric" 
+  });
+}
+
+function pluralize(count: number, singular: string, plural?: string): string {
+  if (count === 1) return singular;
+  return plural || `${singular}s`;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Re-usable FileDropzone Component */
 /* -------------------------------------------------------------------------- */
 interface FileDropzoneProps {
@@ -126,6 +163,8 @@ interface FileDropzoneProps {
   label: string;
   description: string;
   disabled?: boolean;
+  tintColor?: "blue" | "green";
+  icon?: React.ReactNode;
 }
 
 function FileDropzone({
@@ -134,6 +173,8 @@ function FileDropzone({
   label,
   description,
   disabled,
+  tintColor = "blue",
+  icon,
 }: FileDropzoneProps) {
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -157,13 +198,25 @@ function FileDropzone({
     disabled,
   });
 
+  const tintClasses = tintColor === "blue" 
+    ? "border-blue-200 bg-blue-50/40 hover:border-blue-300 hover:bg-blue-50/60" 
+    : "border-green-200 bg-green-50/40 hover:border-green-300 hover:bg-green-50/60";
+    
+  const iconColor = tintColor === "blue" ? "text-blue-500" : "text-green-500";
+
   // State 1: File is selected
   if (file) {
     return (
       <div className="space-y-2">
-        <Label>{label}</Label>
-        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white/60 p-3">
-          <FileSpreadsheet className="w-5 h-5 text-emerald-500 shrink-0" />
+        <Label className="flex items-center gap-2">
+          {icon && <span className={iconColor}>{icon}</span>}
+          {label}
+        </Label>
+        <div className={cn(
+          "flex items-center gap-2 rounded-md border-2 p-3 transition-all",
+          tintClasses
+        )}>
+          <FileSpreadsheet className={cn("w-5 h-5 shrink-0", iconColor)} />
           <span
             className="text-sm font-medium text-slate-800 truncate"
             title={file.name}
@@ -192,11 +245,15 @@ function FileDropzone({
   // State 2: Empty / Dragging
   return (
     <div className="space-y-2">
-      <Label htmlFor={label}>{label}</Label>
+      <Label htmlFor={label} className="flex items-center gap-2">
+        {icon && <span className={iconColor}>{icon}</span>}
+        {label}
+      </Label>
       <div
         {...getRootProps()}
         className={cn(
-          "flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white/60 hover:bg-slate-50 transition-all relative group",
+          "flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-all relative group",
+          tintClasses,
           isDragActive && "border-primary bg-primary/10",
           disabled && "cursor-not-allowed opacity-60"
         )}
@@ -279,6 +336,50 @@ export default function ClaimReconciliation() {
   });
 
   /* ------------------------------------------------------------------------ */
+  /* Period status query - fetches current state for selected period */
+  /* ------------------------------------------------------------------------ */
+  
+  const { 
+    data: periodStatus, 
+    isLoading: periodStatusLoading,
+    isFetching: periodStatusFetching 
+  } = useQuery<PeriodStatus>({
+    queryKey: [
+      "/api/claim-reconciliation/period",
+      providerName,
+      periodYear,
+      periodMonth,
+    ],
+    queryFn: async () => {
+      const url = new URL(
+        `/api/claim-reconciliation/period/${providerName}/${periodYear}/${periodMonth}`,
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch period status");
+      }
+
+      return response.json();
+    },
+    // Keep data fresh for 2 seconds to avoid excessive API calls when changing dropdowns
+    staleTime: 2000,
+    enabled: !!(providerName && periodYear && periodMonth),
+  });
+
+  /* ------------------------------------------------------------------------ */
   /* Simple derived stats for summary strip */
   /* ------------------------------------------------------------------------ */
 
@@ -312,10 +413,7 @@ export default function ClaimReconciliation() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
     const latest = sortedRuns[0];
-    const lastPeriodLabel = new Date(
-      latest.periodYear,
-      latest.periodMonth - 1
-    ).toLocaleString("default", { month: "short", year: "numeric" });
+    const lastPeriodLabel = formatPeriodLabel(latest.periodYear, latest.periodMonth);
 
     return {
       totalRuns,
@@ -374,6 +472,10 @@ export default function ClaimReconciliation() {
 
       queryClient.invalidateQueries({
         queryKey: ["/api/claim-reconciliation/runs"],
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/period"],
       });
 
       setSelectedRunId(data.runId);
@@ -435,6 +537,10 @@ export default function ClaimReconciliation() {
       queryClient.invalidateQueries({
         queryKey: ["/api/claim-reconciliation/runs"],
       });
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/period"],
+      });
 
       setClaimsFile(null);
     },
@@ -495,6 +601,10 @@ export default function ClaimReconciliation() {
 
       queryClient.invalidateQueries({
         queryKey: ["/api/claim-reconciliation/runs"],
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/period"],
       });
 
       setRemittanceFile(null);
@@ -647,10 +757,114 @@ export default function ClaimReconciliation() {
   const isUploading = uploadMutation.isPending || uploadClaimsMutation.isPending || uploadRemittanceMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const isExporting = exportIssuesMutation.isPending;
+  
+  /* ------------------------------------------------------------------------ */
+  /* Smart button logic - determines action based on uploaded files */
+  /* ------------------------------------------------------------------------ */
+  
+  const uploadAction = useMemo(() => {
+    const hasClaims = !!claimsFile;
+    const hasRemittance = !!remittanceFile;
+    
+    if (!hasClaims && !hasRemittance) {
+      return {
+        type: "disabled" as const,
+        label: "Select files to continue",
+        color: "gray",
+        disabled: true,
+      };
+    }
+    
+    if (hasClaims && !hasRemittance) {
+      return {
+        type: "claims-only" as const,
+        label: "Store Claims (Awaiting Remittance)",
+        color: "blue",
+        disabled: false,
+      };
+    }
+    
+    if (!hasClaims && hasRemittance) {
+      return {
+        type: "remittance-only" as const,
+        label: "Reconcile Against Stored Claims",
+        color: "green",
+        disabled: false,
+      };
+    }
+    
+    // Both files
+    return {
+      type: "both" as const,
+      label: "Upload & Reconcile",
+      color: "orange",
+      disabled: false,
+    };
+  }, [claimsFile, remittanceFile]);
+  
+  /* ------------------------------------------------------------------------ */
+  /* Inline validation - warn when remittance without claims */
+  /* ------------------------------------------------------------------------ */
+  
+  const showRemittanceWarning = useMemo(() => {
+    // Only show warning when remittance file is selected but no claims file,
+    // AND period status shows no claims exist for this period
+    if (!remittanceFile || claimsFile) return false;
+    if (!periodStatus) return false;
+    
+    return periodStatus.claims.total === 0;
+  }, [remittanceFile, claimsFile, periodStatus]);
+  
+  /* ------------------------------------------------------------------------ */
+  /* Contextual help text */
+  /* ------------------------------------------------------------------------ */
+  
+  const helpText = useMemo(() => {
+    const hasClaims = !!claimsFile;
+    const hasRemittance = !!remittanceFile;
+    const periodHasClaims = periodStatus && periodStatus.claims.total > 0;
+    
+    if (!hasClaims && !hasRemittance) {
+      if (periodHasClaims) {
+        return "Claims are ready! Upload the remittance file to reconcile.";
+      }
+      return "Upload your claims file to store them while waiting for remittance, or upload both files to reconcile immediately.";
+    }
+    
+    if (hasClaims && !hasRemittance) {
+      return "Upload your claims file to store them while waiting for remittance.";
+    }
+    
+    if (!hasClaims && hasRemittance) {
+      if (periodHasClaims) {
+        return "Upload remittance to reconcile against stored claims for this period.";
+      }
+      return "⚠️ No claims found for this period. Please upload claims first or select a different period.";
+    }
+    
+    // Both files
+    return "Both files ready - click to upload and reconcile immediately.";
+  }, [claimsFile, remittanceFile, periodStatus]);
 
   /* ------------------------------------------------------------------------ */
   /* Handlers */
   /* ------------------------------------------------------------------------ */
+  
+  const handleSmartSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (uploadAction.type === "disabled") {
+      return;
+    }
+    
+    if (uploadAction.type === "claims-only") {
+      handleUploadClaims(e);
+    } else if (uploadAction.type === "remittance-only") {
+      handleUploadRemittance(e);
+    } else if (uploadAction.type === "both") {
+      handleSubmit(e);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -719,10 +933,7 @@ export default function ClaimReconciliation() {
   const handleDeleteRun = (runId: number) => {
     const run = runs.find((r) => r.id === runId);
     const label = run
-      ? `${run.providerName} – ${new Date(
-          run.periodYear,
-          run.periodMonth - 1
-        ).toLocaleString("default", { month: "short", year: "numeric" })}`
+      ? `${run.providerName} – ${formatPeriodLabel(run.periodYear, run.periodMonth)}`
       : `Run #${runId}`;
 
     const ok = window.confirm(
@@ -1050,7 +1261,7 @@ export default function ClaimReconciliation() {
 
         <CardContent className="space-y-6 pt-0">
           <TooltipProvider delayDuration={100}>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSmartSubmit} className="space-y-6">
               {/* 6-column grid for form fields */}
               <div className="grid grid-cols-1 md:grid-cols-6 gap-x-6 gap-y-6">
                 {/* Row 1: Settings */}
@@ -1114,6 +1325,68 @@ export default function ClaimReconciliation() {
                     </SelectContent>
                   </Select>
                 </div>
+                
+                {/* Period Status Indicator */}
+                <div className="md:col-span-6">
+                  {periodStatusLoading || periodStatusFetching ? (
+                    <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                      <span className="text-sm text-slate-600">Loading period status...</span>
+                    </div>
+                  ) : periodStatus ? (
+                    <div className={cn(
+                      "px-4 py-3 border-2 rounded-lg transition-all",
+                      periodStatus.claims.total === 0 
+                        ? "bg-blue-50/50 border-blue-200" 
+                        : periodStatus.hasClaimsOnly
+                        ? "bg-yellow-50/50 border-yellow-300"
+                        : periodStatus.isReconciled
+                        ? "bg-green-50/50 border-green-300"
+                        : "bg-slate-50 border-slate-200"
+                    )}>
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                          periodStatus.claims.total === 0
+                            ? "bg-blue-500"
+                            : periodStatus.hasClaimsOnly
+                            ? "bg-yellow-500"
+                            : periodStatus.isReconciled
+                            ? "bg-green-500"
+                            : "bg-slate-500"
+                        )}>
+                          {periodStatus.claims.total === 0 ? (
+                            <Info className="w-4 h-4 text-white" />
+                          ) : periodStatus.hasClaimsOnly ? (
+                            <Clock className="w-4 h-4 text-white" />
+                          ) : periodStatus.isReconciled ? (
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm text-slate-800 mb-1">
+                            {periodStatus.claims.total === 0
+                              ? "🔵 No data for this period"
+                              : periodStatus.hasClaimsOnly
+                              ? `🟡 ${periodStatus.claims.total} ${pluralize(periodStatus.claims.total, 'claim')} awaiting remittance`
+                              : periodStatus.isReconciled
+                              ? `🟢 Reconciled (${periodStatus.claims.matched} matched, ${periodStatus.claims.partiallyPaid} partial, ${periodStatus.claims.unpaid} unpaid)`
+                              : "Period has data"}
+                          </div>
+                          <div className="text-xs text-slate-600">
+                            {periodStatus.claims.total === 0
+                              ? "No claims have been uploaded for this provider and period yet."
+                              : periodStatus.hasClaimsOnly
+                              ? "Claims have been stored. Upload the remittance file to reconcile."
+                              : `This period has ${periodStatus.claims.total} claims and ${periodStatus.remittances.total} remittances.`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
 
                 {/* Row 2: Files */}
                 <div className="md:col-span-3">
@@ -1123,6 +1396,8 @@ export default function ClaimReconciliation() {
                     file={claimsFile}
                     onFileChange={setClaimsFile}
                     disabled={isFormDisabled}
+                    tintColor="blue"
+                    icon={<FileText className="w-4 h-4" />}
                   />
                 </div>
 
@@ -1133,117 +1408,61 @@ export default function ClaimReconciliation() {
                     file={remittanceFile}
                     onFileChange={setRemittanceFile}
                     disabled={isFormDisabled}
+                    tintColor="green"
+                    icon={<DollarSign className="w-4 h-4" />}
                   />
                 </div>
+                
+                {/* Inline warning when remittance selected without claims */}
+                {showRemittanceWarning && (
+                  <div className="md:col-span-6">
+                    <div className="flex items-start gap-3 px-4 py-3 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                      <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-orange-800 mb-1">
+                          No claims found for {providerName} - {formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth))}
+                        </div>
+                        <div className="text-xs text-orange-700">
+                          Please upload claims first or select a different period.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Action buttons */}
+              {/* Smart Single Action Button */}
               <div className="flex flex-col gap-3 pt-1">
-                <div className="flex flex-col md:flex-row gap-3">
-                  <TooltipProvider delayDuration={100}>
-                    {/* Upload Claims Only */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex-1">
-                          <Button
-                            type="button"
-                            size="lg"
-                            disabled={!claimsFile || isUploading}
-                            onClick={handleUploadClaims}
-                            variant="outline"
-                            className="w-full font-semibold shadow-md gap-2 px-6 border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400"
-                          >
-                            {uploadClaimsMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Uploading…
-                              </>
-                            ) : (
-                              <>
-                                <FileSpreadsheet className="w-4 h-4" />
-                                Upload claims only
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </TooltipTrigger>
-                      {!claimsFile && !isUploading && (
-                        <TooltipContent>
-                          <p>Select a claims file to enable this option</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={uploadAction.disabled || isUploading}
+                  className={cn(
+                    "w-full font-semibold shadow-lg gap-2 px-6 transition-all",
+                    uploadAction.color === "blue" && "bg-blue-500 hover:bg-blue-600 text-white border-0",
+                    uploadAction.color === "green" && "bg-green-500 hover:bg-green-600 text-white border-0",
+                    uploadAction.color === "orange" && "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border-0",
+                    uploadAction.color === "gray" && "bg-slate-300 text-slate-600 cursor-not-allowed border-0"
+                  )}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Processing…
+                    </>
+                  ) : (
+                    <>
+                      {uploadAction.type === "claims-only" && <FileText className="w-4 h-4" />}
+                      {uploadAction.type === "remittance-only" && <CheckCircle2 className="w-4 h-4" />}
+                      {uploadAction.type === "both" && <Upload className="w-4 h-4" />}
+                      {uploadAction.type === "disabled" && <Upload className="w-4 h-4" />}
+                      {uploadAction.label}
+                    </>
+                  )}
+                </Button>
 
-                    {/* Upload Remittance & Reconcile */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex-1">
-                          <Button
-                            type="button"
-                            size="lg"
-                            disabled={!remittanceFile || isUploading}
-                            onClick={handleUploadRemittance}
-                            variant="outline"
-                            className="w-full font-semibold shadow-md gap-2 px-6 border-2 border-emerald-300 hover:bg-emerald-50 hover:border-emerald-400"
-                          >
-                            {uploadRemittanceMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Processing…
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="w-4 h-4" />
-                                Upload remittance &amp; reconcile
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </TooltipTrigger>
-                      {!remittanceFile && !isUploading && (
-                        <TooltipContent>
-                          <p>Select a remittance file to enable this option</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-
-                    {/* Upload Both & Reconcile */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex-1">
-                          <Button
-                            type="submit"
-                            size="lg"
-                            disabled={isSubmitDisabled}
-                            className="w-full font-semibold shadow-lg gap-2 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border-0"
-                          >
-                            {uploadMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Processing…
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-4 h-4" />
-                                Upload both &amp; reconcile
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </TooltipTrigger>
-                      {isSubmitDisabled && !isUploading && (
-                        <TooltipContent>
-                          <p>Please select both claims and remittance files</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-
-                <p className="text-xs text-muted-foreground max-w-full">
-                  <strong>Upload claims only</strong> to store claims awaiting remittance. 
-                  <strong> Upload remittance</strong> to reconcile against existing claims. 
-                  <strong> Upload both</strong> to do everything at once.
+                <p className="text-xs text-muted-foreground text-center max-w-full">
+                  {helpText}
                 </p>
               </div>
             </form>
