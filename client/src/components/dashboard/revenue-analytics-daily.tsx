@@ -760,10 +760,6 @@ export default function RevenueAnalyticsDaily({
   // Check if there's no data to display
   const hasNoData = totalSSP === 0 && totalUSD === 0;
 
-  // Calculate growth percentages (placeholder - would need previous period data)
-  const sspGrowth = 0; // This would be calculated from previous period data
-  const usdGrowth = 0; // This would be calculated from previous period data
-
   return (
     <Card className="border border-slate-100 shadow-md bg-white hover:shadow-lg transition-all duration-300">
       {/* HEADER WITH INTEGRATED METRICS */}
@@ -816,95 +812,43 @@ export default function RevenueAnalyticsDaily({
           </div>
         </div>
 
-        {/* Period Label and Sparkline/Trend */}
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-sm text-slate-500">{headerLabel}</span>
+        {/* Period Label and Inline Stats */}
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">{headerLabel}</span>
+            {!hasNoData && (
+              <div className="flex items-center gap-1 text-xs text-slate-500">
+                <TrendingUp className="h-3 w-3 text-teal-500" />
+                <span>Trending</span>
+              </div>
+            )}
+          </div>
+
+          {/* Inline Stats Badges */}
           {!hasNoData && (
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <TrendingUp className="h-3 w-3 text-teal-500" />
-              <span>Trending</span>
-            </div>
-          )}
-        </div>
-
-        {/* Enhanced Stats Display */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Total SSP */}
-          <div className="rounded-lg bg-gradient-to-br from-teal-50 to-emerald-50 p-3 border border-teal-100">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-teal-700 uppercase tracking-wide">
-                Total SSP
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 font-semibold border border-teal-100">
+                TOTAL SSP {nf0.format(Math.round(totalSSP))}
               </span>
-              {sspGrowth !== 0 && (
-                <span className={cn(
-                  "flex items-center gap-0.5 text-xs font-semibold",
-                  sspGrowth > 0 ? "text-emerald-600" : "text-red-600"
-                )}>
-                  {sspGrowth > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  {Math.abs(sspGrowth).toFixed(1)}%
-                </span>
-              )}
-            </div>
-            <div className="font-mono text-lg font-bold text-teal-900">
-              {nf0.format(Math.round(totalSSP))}
-            </div>
-          </div>
-
-          {/* Total USD */}
-          <div className="rounded-lg bg-gradient-to-br from-sky-50 to-blue-50 p-3 border border-sky-100">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-sky-700 uppercase tracking-wide">
-                Total USD
+              <span className="text-slate-300">|</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-semibold border border-sky-100">
+                TOTAL USD {nf0.format(Math.round(totalUSD))}
               </span>
-              {usdGrowth !== 0 && (
-                <span className={cn(
-                  "flex items-center gap-0.5 text-xs font-semibold",
-                  usdGrowth > 0 ? "text-emerald-600" : "text-red-600"
-                )}>
-                  {usdGrowth > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  {Math.abs(usdGrowth).toFixed(1)}%
-                </span>
+              {!wide && avgDaySSP > 0 && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
+                    AVG SSP / DAY {nf0.format(avgDaySSP)} ({activeDaysSSP} active days)
+                  </span>
+                </>
               )}
-            </div>
-            <div className="font-mono text-lg font-bold text-sky-900">
-              {nf0.format(Math.round(totalUSD))}
-            </div>
-          </div>
-
-          {/* Avg SSP/Day */}
-          {!wide && (
-            <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-green-50 p-3 border border-emerald-100">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-emerald-700 uppercase tracking-wide">
-                  Avg SSP/Day
-                </span>
-              </div>
-              <div className="font-mono text-lg font-bold text-emerald-900">
-                {avgDaySSP > 0 ? nf0.format(avgDaySSP) : "—"}
-              </div>
-              {activeDaysSSP > 0 && (
-                <div className="text-xs text-emerald-600 mt-0.5">
-                  {activeDaysSSP} active days
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Avg USD/Day */}
-          {!wide && (
-            <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-3 border border-blue-100">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
-                  Avg USD/Day
-                </span>
-              </div>
-              <div className="font-mono text-lg font-bold text-blue-900">
-                {avgDayUSD > 0 ? nf0.format(avgDayUSD) : "—"}
-              </div>
-              {activeDaysUSD > 0 && (
-                <div className="text-xs text-blue-600 mt-0.5">
-                  {activeDaysUSD} active days
-                </div>
+              {!wide && avgDayUSD > 0 && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                    AVG USD / DAY {nf0.format(avgDayUSD)} ({activeDaysUSD} active days)
+                  </span>
+                </>
               )}
             </div>
           )}
@@ -1036,7 +980,7 @@ export default function RevenueAnalyticsDaily({
                       )}
                       <Bar
                         dataKey="value"
-                        fill="url(#barGradientSSP-${componentId})"
+                        fill={`url(#barGradientSSP-${componentId})`}
                         radius={[6, 6, 0, 0]}
                         maxBarSize={28}
                         onClick={(p: any) =>
@@ -1211,7 +1155,7 @@ export default function RevenueAnalyticsDaily({
                         dataKey="value"
                         stroke="#14b8a6"
                         strokeWidth={2}
-                        fill="url(#areaGradientSSP-${componentId})"
+                        fill={`url(#areaGradientSSP-${componentId})`}
                         animationDuration={CHART_ANIMATION_DURATION}
                         animationEasing={CHART_ANIMATION_EASING}
                       />
@@ -1319,7 +1263,7 @@ export default function RevenueAnalyticsDaily({
                       )}
                       <Bar
                         dataKey="value"
-                        fill="url(#barGradientUSD-${componentId})"
+                        fill={`url(#barGradientUSD-${componentId})`}
                         radius={[6, 6, 0, 0]}
                         maxBarSize={28}
                         onClick={(p: any) =>
@@ -1494,7 +1438,7 @@ export default function RevenueAnalyticsDaily({
                         dataKey="value"
                         stroke="#0ea5e9"
                         strokeWidth={2}
-                        fill="url(#areaGradientUSD-${componentId})"
+                        fill={`url(#areaGradientUSD-${componentId})`}
                         animationDuration={CHART_ANIMATION_DURATION}
                         animationEasing={CHART_ANIMATION_EASING}
                       />
