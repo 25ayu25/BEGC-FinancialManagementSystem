@@ -124,6 +124,35 @@ interface PeriodStatus {
   isReconciled: boolean;
 }
 
+interface ClaimsInventoryItem extends ClaimDetail {
+  periodYear: number;
+  periodMonth: number;
+  providerName: string;
+}
+
+interface ClaimsInventoryResponse {
+  claims: ClaimsInventoryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+interface PeriodSummary {
+  providerName: string;
+  periodYear: number;
+  periodMonth: number;
+  totalClaims: number;
+  awaitingRemittance: number;
+  matched: number;
+  partiallyPaid: number;
+  unpaid: number;
+  totalBilled: string;
+  totalPaid: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Session backup helper */
 /* -------------------------------------------------------------------------- */
@@ -305,6 +334,11 @@ export default function ClaimReconciliation() {
     "issues"
   );
   const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
+  
+  // Claims Inventory state
+  const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid">("all");
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [showInventory, setShowInventory] = useState(false);
 
   // Generate stable particle positions for header
   const particles = useMemo(() => {
@@ -377,6 +411,89 @@ export default function ClaimReconciliation() {
     // Keep data fresh for 2 seconds to avoid excessive API calls when changing dropdowns
     staleTime: 2000,
     enabled: !!(providerName && periodYear && periodMonth),
+  });
+
+  /* ------------------------------------------------------------------------ */
+  /* Claims Inventory queries */
+  /* ------------------------------------------------------------------------ */
+
+  const { 
+    data: claimsInventory, 
+    isLoading: inventoryLoading 
+  } = useQuery<ClaimsInventoryResponse>({
+    queryKey: [
+      "/api/claim-reconciliation/claims",
+      providerName,
+      inventoryStatusFilter === "all" ? undefined : inventoryStatusFilter,
+      inventoryPage,
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        providerName,
+        page: inventoryPage.toString(),
+        limit: "50",
+      });
+      
+      if (inventoryStatusFilter !== "all") {
+        params.append("status", inventoryStatusFilter);
+      }
+
+      const url = new URL(
+        `/api/claim-reconciliation/claims?${params.toString()}`,
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch claims inventory");
+      }
+
+      return response.json();
+    },
+    enabled: showInventory,
+  });
+
+  const { 
+    data: periodsSummary = [], 
+    isLoading: summaryLoading 
+  } = useQuery<PeriodSummary[]>({
+    queryKey: ["/api/claim-reconciliation/periods-summary", providerName],
+    queryFn: async () => {
+      const params = new URLSearchParams({ providerName });
+      const url = new URL(
+        `/api/claim-reconciliation/periods-summary?${params.toString()}`,
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch periods summary");
+      }
+
+      return response.json();
+    },
   });
 
   /* ------------------------------------------------------------------------ */
@@ -1468,6 +1585,233 @@ export default function ClaimReconciliation() {
             </form>
           </TooltipProvider>
         </CardContent>
+      </Card>
+
+      {/* Claims Inventory Section */}
+      <Card className="border-2 border-slate-200/80 shadow-lg">
+        <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg">Claims Inventory</CardTitle>
+              <CardDescription>
+                All claims submitted to {providerName} across all periods
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInventory(!showInventory)}
+              className="gap-2"
+            >
+              <FileStack className="w-4 h-4" />
+              {showInventory ? "Hide" : "View All Claims"}
+            </Button>
+          </div>
+        </CardHeader>
+
+        {showInventory && (
+          <CardContent className="pt-0">
+            {/* Filter Pills */}
+            <div className="py-3 mb-2">
+              <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200 flex-wrap">
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium",
+                    inventoryStatusFilter === "all"
+                      ? "bg-white shadow-md text-slate-900"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => {
+                    setInventoryStatusFilter("all");
+                    setInventoryPage(1);
+                  }}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium",
+                    inventoryStatusFilter === "awaiting_remittance"
+                      ? "bg-blue-500 shadow-md text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => {
+                    setInventoryStatusFilter("awaiting_remittance");
+                    setInventoryPage(1);
+                  }}
+                >
+                  Awaiting Remittance
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium",
+                    inventoryStatusFilter === "matched"
+                      ? "bg-green-500 shadow-md text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => {
+                    setInventoryStatusFilter("matched");
+                    setInventoryPage(1);
+                  }}
+                >
+                  Matched
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium",
+                    inventoryStatusFilter === "partially_paid"
+                      ? "bg-yellow-500 shadow-md text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => {
+                    setInventoryStatusFilter("partially_paid");
+                    setInventoryPage(1);
+                  }}
+                >
+                  Partially Paid
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium",
+                    inventoryStatusFilter === "unpaid"
+                      ? "bg-red-500 shadow-md text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => {
+                    setInventoryStatusFilter("unpaid");
+                    setInventoryPage(1);
+                  }}
+                >
+                  Unpaid
+                </button>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            {!summaryLoading && periodsSummary.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">Total Claims</div>
+                  <div className="text-xl font-bold text-slate-900">
+                    {periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">Awaiting Remittance</div>
+                  <div className="text-xl font-bold text-blue-600">
+                    {periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">Matched</div>
+                  <div className="text-xl font-bold text-green-600">
+                    {periodsSummary.reduce((sum, p) => sum + p.matched, 0)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">Unpaid</div>
+                  <div className="text-xl font-bold text-red-600">
+                    {periodsSummary.reduce((sum, p) => sum + p.unpaid, 0)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Claims Table */}
+            {inventoryLoading ? (
+              <p className="text-muted-foreground py-6 text-sm">
+                Loading claims inventory…
+              </p>
+            ) : !claimsInventory || claimsInventory.claims.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-muted-foreground text-sm">
+                  No claims found{inventoryStatusFilter !== "all" ? ` with status "${inventoryStatusFilter}"` : ""}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50/50">
+                        <TableHead>Member #</TableHead>
+                        <TableHead>Patient Name</TableHead>
+                        <TableHead>Service Date</TableHead>
+                        <TableHead>Period</TableHead>
+                        <TableHead>Billed Amount</TableHead>
+                        <TableHead>Amount Paid</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {claimsInventory.claims.map((claim) => (
+                        <TableRow
+                          key={claim.id}
+                          className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors"
+                        >
+                          <TableCell className="font-mono text-sm">
+                            {claim.memberNumber}
+                          </TableCell>
+                          <TableCell>{claim.patientName || "N/A"}</TableCell>
+                          <TableCell>
+                            {new Date(claim.serviceDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatPeriodLabel(claim.periodYear, claim.periodMonth)}
+                          </TableCell>
+                          <TableCell>
+                            {claim.currency || "SSP"} {parseFloat(claim.billedAmount).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            {claim.currency || "SSP"} {parseFloat(claim.amountPaid).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(claim.status)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination */}
+                {claimsInventory.pagination.totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                    <div className="text-sm text-slate-600">
+                      Showing {((claimsInventory.pagination.page - 1) * claimsInventory.pagination.limit) + 1} to{" "}
+                      {Math.min(claimsInventory.pagination.page * claimsInventory.pagination.limit, claimsInventory.pagination.total)} of{" "}
+                      {claimsInventory.pagination.total} claims
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInventoryPage(p => Math.max(1, p - 1))}
+                        disabled={inventoryPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInventoryPage(p => p + 1)}
+                        disabled={inventoryPage >= claimsInventory.pagination.totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Reconciliation Runs List */}
