@@ -22,6 +22,11 @@ import {
   getClaimsForPeriod,
   getRemittanceForPeriod,
   runClaimReconciliation,
+  // Claims inventory functions
+  getAllClaims,
+  deleteClaim,
+  deleteClaimsForPeriod,
+  getPeriodsSummary,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -264,7 +269,7 @@ router.post(
           remittances
         );
 
-        // Run reconciliation automatically
+        // Run reconciliation automatically (now cross-period)
         const reconciliationResult = await runClaimReconciliation(
           providerName,
           year,
@@ -277,7 +282,8 @@ router.post(
           period: formatPeriod(year, month),
           remittancesStored: inserted.length,
           reconciliation: {
-            totalClaims: reconciliationResult.summary.totalClaims,
+            totalClaimsSearched: reconciliationResult.totalClaimsSearched,
+            claimsMatched: reconciliationResult.claimsMatched,
             totalRemittances: reconciliationResult.summary.totalRemittances,
             autoMatched: reconciliationResult.summary.autoMatched,
             partialMatched: reconciliationResult.summary.partialMatched,
@@ -285,14 +291,15 @@ router.post(
             unpaidClaims: reconciliationResult.unpaidClaims,
             orphanRemittances: reconciliationResult.orphanRemittances,
           },
-          message: "Remittances uploaded and reconciliation completed",
+          message: "Remittances uploaded and cross-period reconciliation completed",
+          info: `Matched against ${reconciliationResult.totalClaimsSearched} unpaid claims across all periods`,
         });
       } catch (error: any) {
         // Check if it's the "no claims found" error
         if (error.message && error.message.includes("No claims found")) {
           return res.status(400).json({
             error: error.message,
-            suggestion: "Please upload claims for this provider and period first",
+            suggestion: "Please upload claims for this provider first",
           });
         }
         throw error;
@@ -587,6 +594,102 @@ router.delete("/runs/:runId", requireAuth, async (req, res) => {
     res.status(500).json({
       error: error.message || "Failed to delete reconciliation run",
     });
+  }
+});
+
+/**
+ * GET /api/claim-reconciliation/claims
+ * Get all claims with optional filtering and pagination
+ */
+router.get("/claims", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const {
+      providerName,
+      status,
+      periodYear,
+      periodMonth,
+      page,
+      limit,
+    } = req.query;
+
+    const options = {
+      providerName: providerName as string | undefined,
+      status: status as string | undefined,
+      periodYear: periodYear ? parseInt(periodYear as string, 10) : undefined,
+      periodMonth: periodMonth ? parseInt(periodMonth as string, 10) : undefined,
+      page: page ? parseInt(page as string, 10) : undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+    };
+
+    const result = await getAllClaims(options);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching claims:", error);
+    res.status(500).json({
+      error: error.message || "Failed to fetch claims",
+    });
+  }
+});
+
+/**
+ * DELETE /api/claim-reconciliation/claims/:id
+ * Delete a single claim by ID
+ */
+router.delete("/claims/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const claimId = parseInt(req.params.id, 10);
+    await deleteClaim(claimId);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting claim:", error);
+    res.status(500).json({
+      error: error.message || "Failed to delete claim",
+    });
+  }
+});
+
+/**
+ * DELETE /api/claim-reconciliation/claims/period/:providerName/:year/:month
+ * Delete all claims for a specific period
+ */
+router.delete(
+  "/claims/period/:providerName/:year/:month",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName, year, month } = req.params;
+      const periodYear = parseInt(year, 10);
+      const periodMonth = parseInt(month, 10);
+
+      await deleteClaimsForPeriod(providerName, periodYear, periodMonth);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting claims for period:", error);
+      res.status(500).json({
+        error: error.message || "Failed to delete claims for period",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/claim-reconciliation/periods-summary
+ * Get summary of all periods that have claims
+ */
+router.get(
+  "/periods-summary",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName } = req.query;
+      const summaries = await getPeriodsSummary(providerName as string | undefined);
+      res.json(summaries);
+    } catch (error: any) {
+      console.error("Error fetching periods summary:", error);
+      res.status(500).json({
+        error: error.message || "Failed to fetch periods summary",
+      });
+    }
   }
 });
 
