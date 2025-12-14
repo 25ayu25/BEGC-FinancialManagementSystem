@@ -45,6 +45,8 @@ const CHART_COLORS = [
   "#059669", // green-600
 ];
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 // Empty state component (kept outside to avoid recreating each render)
 function EmptyState() {
   return (
@@ -95,6 +97,16 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     });
   }, [chartData, topCategories]);
 
+  // Determine if the chart spans multiple years (only then include year in X tick)
+  const spansMultipleYears = useMemo(() => {
+    const years = new Set<string>();
+    for (const p of filledChartData) {
+      const m = String(p.month ?? "").match(/^(\d{4})-(\d{2})/);
+      if (m?.[1]) years.add(m[1]);
+    }
+    return years.size > 1;
+  }, [filledChartData]);
+
   // IMPORTANT: Do NOT use hooks after conditional returns.
   // Compute this as a normal boolean (cheap) to avoid React #310.
   const hasActualData =
@@ -125,7 +137,20 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
     return num.toFixed(0);
   };
 
-  const formatXAxis = (value: string) => value || "";
+  // X axis: show Jan, Feb ... (and only include year if multiple years are shown)
+  const formatXAxis = (value: string) => {
+    if (!value) return "";
+
+    const m = value.match(/^(\d{4})-(\d{2})/);
+    if (m) {
+      const year = m[1];
+      const idx = parseInt(m[2], 10) - 1;
+      const mon = idx >= 0 && idx < 12 ? MONTHS[idx] : value;
+      return spansMultipleYears ? `${mon} '${year.slice(2)}` : mon;
+    }
+
+    return value;
+  };
 
   // Helper function to add opacity to hex colors
   const addOpacityToHex = (hex: string, opacity: number): string => {
@@ -184,6 +209,9 @@ export function ExpenseTrendChart({ chartData, metrics, isLoading }: ExpenseTren
           `SSP ${Number.isFinite(value) ? value.toLocaleString() : "0"}`,
           name,
         ],
+        // Show full month name (from API) on hover
+        labelFormatter: (_label: any, payload: any[]) =>
+          payload?.[0]?.payload?.fullMonth ?? String(_label ?? ""),
         contentStyle: {
           backgroundColor: "white",
           border: "1px solid #e5e7eb",
