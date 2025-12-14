@@ -89,6 +89,7 @@ interface ReconRun {
   autoMatched: number;
   partialMatched: number;
   manualReview: number;
+  status?: "awaiting_remittance" | "reconciled" | "pending_review";
 }
 
 interface ClaimDetail {
@@ -246,6 +247,7 @@ export default function ClaimReconciliation() {
   const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">(
     "issues"
   );
+  const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
 
   // Generate stable particle positions for header
   const particles = useMemo(() => {
@@ -378,6 +380,123 @@ export default function ClaimReconciliation() {
       setClaimsFile(null);
       setRemittanceFile(null);
       setAttentionFilter("issues");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Upload claims only
+  const uploadClaimsMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const uploadUrl = new URL(
+        "/api/claim-reconciliation/upload-claims",
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        } else {
+          const text = await response.text();
+          throw new Error(
+            `Upload failed (${response.status}): ${text.substring(0, 120)}`
+          );
+        }
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Claims uploaded",
+        description: `${data.claimsStored} claims uploaded – awaiting remittance`,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/runs"],
+      });
+
+      setClaimsFile(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Upload remittance only
+  const uploadRemittanceMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const uploadUrl = new URL(
+        "/api/claim-reconciliation/upload-remittance",
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        } else {
+          const text = await response.text();
+          throw new Error(
+            `Upload failed (${response.status}): ${text.substring(0, 120)}`
+          );
+        }
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const reconciliation = data.reconciliation;
+      const summary = `${reconciliation.totalClaims} claims, ${reconciliation.autoMatched} matched, ${reconciliation.partialMatched} partial, ${reconciliation.manualReview + reconciliation.unpaidClaims} unpaid`;
+      
+      toast({
+        title: "Reconciliation complete",
+        description: summary,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/runs"],
+      });
+
+      setRemittanceFile(null);
     },
     onError: (error: Error) => {
       toast({
@@ -524,7 +643,7 @@ export default function ClaimReconciliation() {
     },
   });
 
-  const isUploading = uploadMutation.isPending;
+  const isUploading = uploadMutation.isPending || uploadClaimsMutation.isPending || uploadRemittanceMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const isExporting = exportIssuesMutation.isPending;
 
@@ -552,6 +671,48 @@ export default function ClaimReconciliation() {
     formData.append("periodMonth", periodMonth);
 
     uploadMutation.mutate(formData);
+  };
+
+  const handleUploadClaims = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!claimsFile) {
+      toast({
+        title: "Missing file",
+        description: "Please select a claims file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("claimsFile", claimsFile);
+    formData.append("providerName", providerName);
+    formData.append("periodYear", periodYear);
+    formData.append("periodMonth", periodMonth);
+
+    uploadClaimsMutation.mutate(formData);
+  };
+
+  const handleUploadRemittance = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!remittanceFile) {
+      toast({
+        title: "Missing file",
+        description: "Please select a remittance file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("remittanceFile", remittanceFile);
+    formData.append("providerName", providerName);
+    formData.append("periodYear", periodYear);
+    formData.append("periodMonth", periodMonth);
+
+    uploadRemittanceMutation.mutate(formData);
   };
 
   const handleDeleteRun = (runId: number) => {
@@ -617,6 +778,34 @@ export default function ClaimReconciliation() {
     }
   };
 
+  const getRunStatusBadge = (run: ReconRun) => {
+    const status = getRunStatus(run);
+    
+    switch (status) {
+      case "awaiting_remittance":
+        return (
+          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+            <Clock className="w-3 h-3 mr-1" />
+            Awaiting remittance
+          </Badge>
+        );
+      case "pending_review":
+        return (
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Reconciled – pending review
+          </Badge>
+        );
+      case "reconciled":
+        return (
+          <Badge className="bg-green-500 text-white hover:bg-green-600">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Reconciled
+          </Badge>
+        );
+    }
+  };
+
   /* ------------------------------------------------------------------------ */
   /* Derived data for current run                                             */
   /* ------------------------------------------------------------------------ */
@@ -635,6 +824,37 @@ export default function ClaimReconciliation() {
     if (attentionFilter === "all") return claims;
     return claims.filter((c) => c.status !== "paid");
   }, [claims, attentionFilter]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Helper functions for run status */
+  /* ------------------------------------------------------------------------ */
+
+  const getRunStatus = (run: ReconRun): "awaiting_remittance" | "reconciled" | "pending_review" => {
+    // If no remittances uploaded (totalRemittanceRows = 0), status is awaiting
+    if (run.totalRemittanceRows === 0) {
+      return "awaiting_remittance";
+    }
+    
+    // If there are items needing review (partial or manual review), status is pending review
+    if (run.partialMatched > 0 || run.manualReview > 0) {
+      return "pending_review";
+    }
+    
+    // Otherwise, it's reconciled
+    return "reconciled";
+  };
+
+  const filteredRuns = useMemo(() => {
+    if (statusFilter === "all") return runs;
+    return runs.filter((run) => {
+      const status = getRunStatus(run);
+      if (statusFilter === "awaiting_remittance") {
+        return status === "awaiting_remittance";
+      }
+      // "reconciled" filter includes both reconciled and pending_review
+      return status === "reconciled" || status === "pending_review";
+    });
+  }, [runs, statusFilter]);
 
   /* ------------------------------------------------------------------------ */
   /* Render */
@@ -915,41 +1135,113 @@ export default function ClaimReconciliation() {
                 </div>
               </div>
 
-              {/* Primary action */}
+              {/* Action buttons */}
               <div className="flex flex-col gap-3 pt-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="inline-block">
-                      <Button
-                        type="submit"
-                        size="lg"
-                        disabled={isSubmitDisabled}
-                        className="w-full md:w-auto font-semibold shadow-lg gap-2 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border-0"
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Processing…
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4" />
-                            Upload &amp; Reconcile
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
-                  {isSubmitDisabled && !isUploading && (
-                    <TooltipContent>
-                      <p>Please upload both a Claims and Remittance file.</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <TooltipProvider delayDuration={100}>
+                    {/* Upload Claims Only */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex-1">
+                          <Button
+                            type="button"
+                            size="lg"
+                            disabled={!claimsFile || isUploading}
+                            onClick={handleUploadClaims}
+                            variant="outline"
+                            className="w-full font-semibold shadow-md gap-2 px-6 border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400"
+                          >
+                            {uploadClaimsMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Uploading…
+                              </>
+                            ) : (
+                              <>
+                                <FileSpreadsheet className="w-4 h-4" />
+                                Upload claims only
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      {!claimsFile && !isUploading && (
+                        <TooltipContent>
+                          <p>Select a claims file to enable this option</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
 
-                <p className="text-xs text-muted-foreground max-w-md">
-                  Uploading again for the same period will create a new run.
-                  All runs are kept so you can compare and audit over time.
+                    {/* Upload Remittance & Reconcile */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex-1">
+                          <Button
+                            type="button"
+                            size="lg"
+                            disabled={!remittanceFile || isUploading}
+                            onClick={handleUploadRemittance}
+                            variant="outline"
+                            className="w-full font-semibold shadow-md gap-2 px-6 border-2 border-emerald-300 hover:bg-emerald-50 hover:border-emerald-400"
+                          >
+                            {uploadRemittanceMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Processing…
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                Upload remittance &amp; reconcile
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      {!remittanceFile && !isUploading && (
+                        <TooltipContent>
+                          <p>Select a remittance file to enable this option</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+
+                    {/* Upload Both & Reconcile */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex-1">
+                          <Button
+                            type="submit"
+                            size="lg"
+                            disabled={isSubmitDisabled}
+                            className="w-full font-semibold shadow-lg gap-2 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border-0"
+                          >
+                            {uploadMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Processing…
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4" />
+                                Upload both &amp; reconcile
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      {isSubmitDisabled && !isUploading && (
+                        <TooltipContent>
+                          <p>Please select both claims and remittance files</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+
+                <p className="text-xs text-muted-foreground max-w-full">
+                  <strong>Upload claims only</strong> to store claims awaiting remittance. 
+                  <strong> Upload remittance</strong> to reconcile against existing claims. 
+                  <strong> Upload both</strong> to do everything at once.
                 </p>
               </div>
             </form>
@@ -975,6 +1267,55 @@ export default function ClaimReconciliation() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
+          {/* Status Filter Pills */}
+          {runs.length > 0 && (
+            <div className="py-3 mb-2">
+              <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200">
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium",
+                    statusFilter === "all"
+                      ? "bg-white shadow-md text-slate-900"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => setStatusFilter("all")}
+                >
+                  All ({runs.length})
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
+                    statusFilter === "awaiting_remittance"
+                      ? "bg-blue-500 shadow-md text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => setStatusFilter("awaiting_remittance")}
+                >
+                  <Clock className="w-3 h-3" />
+                  Awaiting remittance ({runs.filter((r) => getRunStatus(r) === "awaiting_remittance").length})
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
+                    statusFilter === "reconciled"
+                      ? "bg-green-500 shadow-md text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                  onClick={() => setStatusFilter("reconciled")}
+                >
+                  <CheckCircle2 className="w-3 h-3" />
+                  Reconciled ({runs.filter((r) => {
+                    const status = getRunStatus(r);
+                    return status === "reconciled" || status === "pending_review";
+                  }).length})
+                </button>
+              </div>
+            </div>
+          )}
+
           {runsLoading ? (
             <p className="text-muted-foreground py-6 text-sm">
               Loading reconciliation runs…
@@ -984,6 +1325,10 @@ export default function ClaimReconciliation() {
               No reconciliation runs yet. Upload your first pair of files
               above.
             </p>
+          ) : filteredRuns.length === 0 ? (
+            <p className="text-muted-foreground py-6 text-sm">
+              No runs match the selected status filter.
+            </p>
           ) : (
             <div className="w-full overflow-x-auto">
               <Table>
@@ -991,6 +1336,7 @@ export default function ClaimReconciliation() {
                   <TableRow>
                     <TableHead>Provider</TableHead>
                     <TableHead>Period</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Claims</TableHead>
                     <TableHead>Remittances</TableHead>
                     <TableHead>Auto matched</TableHead>
@@ -1001,7 +1347,7 @@ export default function ClaimReconciliation() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runs.map((run) => {
+                  {filteredRuns.map((run) => {
                     const periodLabel = new Date(
                       run.periodYear,
                       run.periodMonth - 1
@@ -1032,6 +1378,9 @@ export default function ClaimReconciliation() {
                               </span>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {getRunStatusBadge(run)}
                         </TableCell>
                         <TableCell>{run.totalClaimRows}</TableCell>
                         <TableCell>{run.totalRemittanceRows}</TableCell>
