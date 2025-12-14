@@ -130,6 +130,34 @@ function findColumnIndex(
   return undefined;
 }
 
+/**
+ * Check if a row contains a member number/ID column header
+ */
+function hasMemberHeader(texts: string[]): boolean {
+  return texts.some((t) => 
+    (t.includes("member") && (t.includes("number") || t.includes("no") || t.includes("id"))) ||
+    t.includes("membernumber") ||
+    t.includes("membershipno") ||
+    t.includes("membership_no")
+  );
+}
+
+/**
+ * Check if a row contains either patient name OR amount column header
+ */
+function hasPatientOrAmountHeader(texts: string[]): boolean {
+  return texts.some((t) => 
+    (t.includes("patient") && t.includes("name")) || 
+    t.includes("patientname") || 
+    t.includes("patient_name")
+  ) || 
+  texts.some((t) => 
+    t.includes("amount") || 
+    t.includes("billed") || 
+    t.includes("claim")
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Claims Submitted (Smart Billing Utility Report)                     */
 /* ------------------------------------------------------------------ */
@@ -150,12 +178,11 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
   const rows = readRows(sheet);
   if (rows.length === 0) return [];
 
-  // Detect the header row: we expect "member number" / "patient name" / "invoice"
+  // Detect the header row with more lenient criteria:
+  // - Require member number/id/no AND
+  // - Either patient name OR amount (to handle both formats)
   const headerIdx = findHeaderRowIndex(rows, [
-    (texts) =>
-      texts.some((t) => t.includes("member number")) &&
-      texts.some((t) => t.includes("patient name")) &&
-      texts.some((t) => t.includes("invoice")),
+    (texts) => hasMemberHeader(texts) && hasPatientOrAmountHeader(texts),
   ]);
 
   if (headerIdx === -1) {
@@ -167,34 +194,62 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
 
   const headerRow = rows[headerIdx];
 
-  // Map the important columns
+  // Map the important columns with more variations
   const colMemberNumber = findColumnIndex(headerRow, [
     "member number",
     "membership no",
     "member no",
+    "membernumber",
+    "membershipno",
+    "membership_no",
+    "member_number",
+    "member id",
+    "memberid",
   ]);
-  const colPatientName = findColumnIndex(headerRow, ["patient name"]);
+  const colPatientName = findColumnIndex(headerRow, [
+    "patient name",
+    "patientname",
+    "patient_name",
+    "patient",
+    "name",
+  ]);
   const colServiceDate = findColumnIndex(headerRow, [
     "service date",
     "billing date",
     "bill date",
+    "billingdate",
+    "billing_date",
+    "servicedate",
+    "service_date",
+    "date",
   ]);
   const colInvoiceNumber = findColumnIndex(headerRow, [
     "invoice no",
     "invoice number",
     "bill no",
+    "invoiceno",
+    "invoice_no",
+    "invoice_number",
   ]);
-  const colClaimType = findColumnIndex(headerRow, ["claim type", "type"]);
-  const colSchemeName = findColumnIndex(headerRow, ["scheme name"]);
+  const colClaimType = findColumnIndex(headerRow, ["claim type", "type", "claimtype", "claim_type"]);
+  const colSchemeName = findColumnIndex(headerRow, ["scheme name", "schemename", "scheme_name", "scheme"]);
   const colBenefitDesc = findColumnIndex(headerRow, [
     "benefit description",
     "benefit desc",
     "benefit",
+    "benefitdescription",
+    "benefit_description",
+    "benefitdesc",
+    "benefit_desc",
   ]);
   const colAmount = findColumnIndex(headerRow, [
     "amount",
     "billed amount",
     "claim amount",
+    "billedamount",
+    "billed_amount",
+    "claimamount",
+    "claim_amount",
   ]);
   const colCurrency = findColumnIndex(headerRow, ["currency"]);
 

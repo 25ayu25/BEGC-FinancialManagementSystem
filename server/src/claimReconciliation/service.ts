@@ -399,8 +399,8 @@ export async function upsertClaimsForPeriod(
 
 /**
  * Upsert remittances for a specific provider and period.
- * Replaces existing remittances for that provider+period.
- * Validates that claims exist before proceeding.
+ * Now supports CROSS-PERIOD matching: matches against ALL unpaid claims in the system.
+ * Does NOT require claims to exist for the specific period anymore.
  */
 export async function upsertRemittanceForPeriod(
   providerName: string,
@@ -409,22 +409,16 @@ export async function upsertRemittanceForPeriod(
   remittances: RemittanceRow[]
 ) {
   return await db.transaction(async (tx) => {
-    // Check if claims exist for this provider+period
+    // Check if ANY claims exist for this provider (across all periods)
     const existingClaims = await tx
       .select()
       .from(claimReconClaims)
-      .where(
-        and(
-          eq(claimReconClaims.providerName, providerName),
-          eq(claimReconClaims.periodYear, periodYear),
-          eq(claimReconClaims.periodMonth, periodMonth)
-        )
-      )
+      .where(eq(claimReconClaims.providerName, providerName))
       .limit(1);
 
     if (existingClaims.length === 0) {
       throw new Error(
-        `No claims found for ${providerName} for ${periodYear}-${String(periodMonth).padStart(2, '0')}. Please upload claims first.`
+        `No claims found for ${providerName}. Please upload claims first.`
       );
     }
 
@@ -523,7 +517,8 @@ export async function getRemittanceForPeriod(
 
 /**
  * Run claim reconciliation for a specific provider and period.
- * Uses persisted claims and remittances (not raw files).
+ * Now supports CROSS-PERIOD matching: matches remittances against ALL unpaid claims
+ * for the provider, not just the specific period.
  * Updates claim and remittance statuses based on matching results.
  * Returns a summary of the reconciliation.
  */
@@ -533,15 +528,14 @@ export async function runClaimReconciliation(
   periodMonth: number
 ) {
   return await db.transaction(async (tx) => {
-    // Fetch claims for this provider+period
+    // Fetch ALL claims with status "awaiting_remittance" for this provider (across all periods)
     const claims = await tx
       .select()
       .from(claimReconClaims)
       .where(
         and(
           eq(claimReconClaims.providerName, providerName),
-          eq(claimReconClaims.periodYear, periodYear),
-          eq(claimReconClaims.periodMonth, periodMonth)
+          eq(claimReconClaims.status, "awaiting_remittance")
         )
       );
 
@@ -559,7 +553,7 @@ export async function runClaimReconciliation(
 
     if (claims.length === 0) {
       throw new Error(
-        `No claims found for ${providerName} for ${periodYear}-${String(periodMonth).padStart(2, '0')}`
+        `No claims awaiting remittance found for ${providerName}`
       );
     }
 
@@ -649,12 +643,14 @@ export async function runClaimReconciliation(
         .where(eq(claimReconRemittances.id, orphan.id));
     }
 
-    // Calculate summary
+    // Calculate summary (claims matched in THIS reconciliation run)
+    const claimsMatchedInThisRun = matches.filter((m) => m.remittanceId !== null).length;
+    
     const summary: ReconciliationSummary = {
-      totalClaims: claims.length,
+      totalClaims: claimsMatchedInThisRun,
       totalRemittances: remittances.length,
-      autoMatched: matches.filter((m) => m.matchType === "exact").length,
-      partialMatched: matches.filter((m) => m.matchType === "partial").length,
+      autoMatched: matches.filter((m) => m.matchType === "exact" && m.remittanceId !== null).length,
+      partialMatched: matches.filter((m) => m.matchType === "partial" && m.remittanceId !== null).length,
       manualReview: matches.filter((m) => m.status === "manual_review").length,
     };
 
@@ -662,6 +658,190 @@ export async function runClaimReconciliation(
       summary,
       orphanRemittances: orphanRemittances.length,
       unpaidClaims: matches.filter((m) => m.status === "unpaid" && m.remittanceId === null).length,
+      totalClaimsSearched: claims.length,
+      claimsMatched: claimsMatchedInThisRun,
     };
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Claims Inventory Management Functions                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Get all claims with optional filtering and pagination
+ */
+export async function getAllClaims(options?: {
+  providerName?: string;
+  status?: string;
+  periodYear?: number;
+  periodMonth?: number;
+  page?: number;
+  limit?: number;
+}) {
+  const {
+    providerName,
+    status,
+    periodYear,
+    periodMonth,
+    page = 1,
+    limit = 50,
+  } = options || {};
+
+  let query = db.select().from(claimReconClaims);
+
+  // Build filters
+  const filters = [];
+  if (providerName) {
+    filters.push(eq(claimReconClaims.providerName, providerName));
+  }
+  if (status) {
+    filters.push(eq(claimReconClaims.status, status));
+  }
+  if (periodYear !== undefined) {
+    filters.push(eq(claimReconClaims.periodYear, periodYear));
+  }
+  if (periodMonth !== undefined) {
+    filters.push(eq(claimReconClaims.periodMonth, periodMonth));
+  }
+
+  if (filters.length > 0) {
+    query = query.where(and(...filters)) as any;
+  }
+
+  // Apply pagination
+  const offset = (page - 1) * limit;
+  const claims = await query.limit(limit).offset(offset);
+
+  // Get total count
+  let countQuery = db.select().from(claimReconClaims);
+  if (filters.length > 0) {
+    countQuery = countQuery.where(and(...filters)) as any;
+  }
+  const allClaims = await countQuery;
+  const total = allClaims.length;
+
+  return {
+    claims,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+/**
+ * Delete a single claim by ID
+ */
+export async function deleteClaim(claimId: number) {
+  await db.delete(claimReconClaims).where(eq(claimReconClaims.id, claimId));
+  return { success: true };
+}
+
+/**
+ * Delete all claims for a specific period
+ */
+export async function deleteClaimsForPeriod(
+  providerName: string,
+  periodYear: number,
+  periodMonth: number
+) {
+  await db
+    .delete(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, providerName),
+        eq(claimReconClaims.periodYear, periodYear),
+        eq(claimReconClaims.periodMonth, periodMonth)
+      )
+    );
+  return { success: true };
+}
+
+/**
+ * Get summary of all periods that have claims
+ */
+export async function getPeriodsSummary(providerName?: string) {
+  const filters = providerName
+    ? [eq(claimReconClaims.providerName, providerName)]
+    : [];
+  
+  let query = db.select().from(claimReconClaims);
+  if (filters.length > 0) {
+    query = query.where(and(...filters)) as any;
+  }
+  
+  const allClaims = await query;
+
+  // Group claims by period
+  const periodMap = new Map<
+    string,
+    {
+      periodYear: number;
+      periodMonth: number;
+      providerName: string;
+      claims: typeof allClaims;
+    }
+  >();
+
+  for (const claim of allClaims) {
+    const key = `${claim.providerName}-${claim.periodYear}-${claim.periodMonth}`;
+    if (!periodMap.has(key)) {
+      periodMap.set(key, {
+        periodYear: claim.periodYear,
+        periodMonth: claim.periodMonth,
+        providerName: claim.providerName,
+        claims: [],
+      });
+    }
+    periodMap.get(key)!.claims.push(claim);
+  }
+
+  // Calculate summary for each period
+  const summaries = Array.from(periodMap.values()).map((period) => {
+    const awaitingRemittance = period.claims.filter(
+      (c) => c.status === "awaiting_remittance"
+    ).length;
+    const matched = period.claims.filter(
+      (c) => c.status === "matched" || c.status === "paid"
+    ).length;
+    const partiallyPaid = period.claims.filter(
+      (c) => c.status === "partially_paid"
+    ).length;
+    const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
+
+    const totalBilled = period.claims.reduce(
+      (sum, c) => sum + parseFloat(c.billedAmount),
+      0
+    );
+    const totalPaid = period.claims.reduce(
+      (sum, c) => sum + parseFloat(c.amountPaid || "0"),
+      0
+    );
+
+    return {
+      providerName: period.providerName,
+      periodYear: period.periodYear,
+      periodMonth: period.periodMonth,
+      totalClaims: period.claims.length,
+      awaitingRemittance,
+      matched,
+      partiallyPaid,
+      unpaid,
+      totalBilled: totalBilled.toFixed(2),
+      totalPaid: totalPaid.toFixed(2),
+    };
+  });
+
+  // Sort by period (most recent first)
+  summaries.sort((a, b) => {
+    if (a.periodYear !== b.periodYear) {
+      return b.periodYear - a.periodYear;
+    }
+    return b.periodMonth - a.periodMonth;
+  });
+
+  return summaries;
 }
