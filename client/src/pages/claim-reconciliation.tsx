@@ -989,7 +989,7 @@ export default function ClaimReconciliation() {
     const hasClaims = periodStatus.claims.total > 0;
     const hasRemittance = periodStatus.remittances.total > 0;
     const isReconciled = periodStatus.isReconciled;
-    const hasExceptions = periodStatus.claims.partiallyPaid > 0 || periodStatus.claims.unpaid > 0;
+    const exceptionsCount = periodStatus.claims.partiallyPaid + periodStatus.claims.unpaid;
 
     // Step 1: Claims uploaded
     const step1 = { 
@@ -1011,8 +1011,8 @@ export default function ClaimReconciliation() {
 
     // Step 4: Review exceptions
     const step4 = { 
-      completed: isReconciled && !hasExceptions,
-      details: hasExceptions ? `${hasExceptions} issues` : isReconciled ? "No issues" : undefined
+      completed: isReconciled && exceptionsCount === 0,
+      details: exceptionsCount > 0 ? `${exceptionsCount} issues` : isReconciled ? "No issues" : undefined
     };
 
     // Determine current step and primary action
@@ -1034,7 +1034,7 @@ export default function ClaimReconciliation() {
       primaryDisabled = false;
     } else {
       currentStep = 4;
-      primaryAction = hasExceptions ? "🔍 Review Exceptions" : "✅ All Complete";
+      primaryAction = exceptionsCount > 0 ? "🔍 Review Exceptions" : "✅ All Complete";
       primaryDisabled = false;
     }
 
