@@ -762,6 +762,8 @@ export async function deleteClaimsForPeriod(
 
 /**
  * Delete all remittances for a specific period
+ * Note: This is a period-level operation intended for staff to clear and re-upload data.
+ * It does not cascade to reconciliation runs to preserve audit trail.
  */
 export async function deleteRemittancesForPeriod(
   providerName: string,

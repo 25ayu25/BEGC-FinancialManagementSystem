@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
@@ -196,6 +196,24 @@ function getCurrencyForDisplay(providerName: string, currency?: string): string 
   return currency || "USD";
 }
 
+/**
+ * Get workflow description explaining cross-period matching for providers
+ */
+function getWorkflowDescription(providerName: string, periodLabel: string): string {
+  return `Working on: ${providerName} – ${periodLabel} (claims for this month). Remittance uploads will be matched against all outstanding ${providerName} claims across all months.`;
+}
+
+/**
+ * Get remittance file upload description
+ * CIC has special cross-period behavior
+ */
+function getRemittanceUploadDescription(providerName: string): string {
+  if (providerName === "CIC") {
+    return "This remittance will be matched against all CIC claims that are still awaiting remittance, not just this month";
+  }
+  return "Upload remittance advice from insurance";
+}
+
 /* -------------------------------------------------------------------------- */
 /* Re-usable FileDropzone Component */
 /* -------------------------------------------------------------------------- */
@@ -336,7 +354,7 @@ export default function ClaimReconciliation() {
   // and all related UI (form fields, filters) sync to it
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
   
-  // Year filter for period cards
+  // Year filter for period cards - initialized to most recent year
   const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
   
   // Form state - derived from selectedPeriodKey when available
@@ -357,6 +375,7 @@ export default function ClaimReconciliation() {
   const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
   
   // Claims Inventory state
+  // Default to "unpaid" to show the most important claims first (per requirement F)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid">("unpaid");
   const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null); // Format: "2025-1" for Jan 2025
   const [inventoryPage, setInventoryPage] = useState(1);
@@ -548,7 +567,7 @@ export default function ClaimReconciliation() {
   }, [periodsSummary]);
   
   // Set default year filter to current year if not set
-  useMemo(() => {
+  useEffect(() => {
     if (periodYearFilter === null && availableYears.length > 0) {
       setPeriodYearFilter(availableYears[0]);
     }
@@ -1910,7 +1929,7 @@ export default function ClaimReconciliation() {
                                 <MoreHorizontal className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2063,7 +2082,7 @@ export default function ClaimReconciliation() {
               </CardTitle>
               <CardDescription>
                 {selectedPeriodKey 
-                  ? `Working on: ${providerName} – ${formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth))} (claims for this month). Remittance uploads will be matched against all outstanding ${providerName} claims across all months.`
+                  ? getWorkflowDescription(providerName, formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth)))
                   : "Select a period above to begin"}
               </CardDescription>
             </div>
@@ -2104,9 +2123,7 @@ export default function ClaimReconciliation() {
                   {/* Remittance File Upload */}
                   <FileDropzone
                     label="Remittance File"
-                    description={providerName === "CIC" 
-                      ? "This remittance will be matched against all CIC claims that are still awaiting remittance, not just this month"
-                      : "Upload remittance advice from insurance"}
+                    description={getRemittanceUploadDescription(providerName)}
                     file={remittanceFile}
                     onFileChange={setRemittanceFile}
                     disabled={isUploading}
