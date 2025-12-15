@@ -321,6 +321,8 @@ export default function ClaimReconciliation() {
   const queryClient = useQueryClient();
 
   // Single source of truth for selected period
+  // When a period card is clicked, this key (format: "YYYY-M") becomes the active period
+  // and all related UI (form fields, filters) sync to it
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
   
   // Form state - derived from selectedPeriodKey when available
@@ -1174,7 +1176,13 @@ export default function ClaimReconciliation() {
         });
         return;
       }
-      handleUploadClaims(new Event("submit") as any);
+      // Call upload handler directly without synthetic event
+      const formData = new FormData();
+      formData.append("claimsFile", claimsFile);
+      formData.append("providerName", providerName);
+      formData.append("periodYear", periodYear);
+      formData.append("periodMonth", periodMonth);
+      uploadClaimsMutation.mutate(formData);
     } else if (!hasRemittance) {
       // Step 2: Upload remittance
       if (!remittanceFile) {
@@ -1185,7 +1193,13 @@ export default function ClaimReconciliation() {
         });
         return;
       }
-      handleUploadRemittance(new Event("submit") as any);
+      // Call upload handler directly without synthetic event
+      const formData = new FormData();
+      formData.append("remittanceFile", remittanceFile);
+      formData.append("providerName", providerName);
+      formData.append("periodYear", periodYear);
+      formData.append("periodMonth", periodMonth);
+      uploadRemittanceMutation.mutate(formData);
     } else if (!isReconciled) {
       // Step 3: Run reconciliation (not needed - happens automatically)
       toast({
@@ -1202,7 +1216,7 @@ export default function ClaimReconciliation() {
         setInventoryStatusFilter("unpaid");
       }
     }
-  }, [periodStatus, claimsFile, remittanceFile, toast]);
+  }, [periodStatus, claimsFile, remittanceFile, providerName, periodYear, periodMonth, toast, uploadClaimsMutation, uploadRemittanceMutation]);
   
   const handleSmartSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1607,14 +1621,14 @@ export default function ClaimReconciliation() {
           <Card className="border border-dashed border-slate-300 bg-slate-50/80">
             <CardContent className="pt-4 text-sm text-slate-700 space-y-2">
               <div className="font-medium text-slate-800">
-                How the new reconciliation workflow works
+                How the reconciliation workflow works
               </div>
               <ul className="list-disc list-inside space-y-1">
                 <li>
                   <strong>Select a period:</strong> Click on any period card above to select it and view its reconciliation status.
                 </li>
                 <li>
-                  <strong>Follow the stepper:</strong> The workflow stepper shows 4 steps and guides you through the process with one clear action at a time.
+                  <strong>Follow the stepper:</strong> The workflow stepper guides you through the process with one clear action at a time.
                 </li>
                 <li>
                   <strong>Upload claims first:</strong> Start by uploading your claims file. Claims will be stored with "awaiting remittance" status.
