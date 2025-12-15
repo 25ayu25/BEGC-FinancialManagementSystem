@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Upload, FileSpreadsheet, PlayCircle, Eye } from "lucide-react";
+import { CheckCircle2, Clock, Upload, FileSpreadsheet, PlayCircle, Eye, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { Card, CardContent } from "./card";
@@ -141,7 +141,7 @@ export function ReconciliationStepper({
             >
               {primaryActionLoading ? (
                 <>
-                  <Clock className="w-5 h-5 mr-2 animate-spin" />
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   Processing...
                 </>
               ) : (

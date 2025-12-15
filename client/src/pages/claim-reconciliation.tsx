@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
@@ -1201,10 +1201,11 @@ export default function ClaimReconciliation() {
       formData.append("periodMonth", periodMonth);
       uploadRemittanceMutation.mutate(formData);
     } else if (!isReconciled) {
-      // Step 3: Run reconciliation (not needed - happens automatically)
+      // Step 3: Reconciliation runs automatically when remittance is uploaded
+      // This state shouldn't normally be reachable, but handle it gracefully
       toast({
-        title: "Reconciliation complete",
-        description: "Reconciliation was completed when remittance was uploaded.",
+        title: "Reconciliation Pending",
+        description: "Reconciliation will run automatically when you upload the remittance file.",
       });
     } else {
       // Step 4: Review exceptions - scroll to exceptions
@@ -1212,6 +1213,7 @@ export default function ClaimReconciliation() {
       if (exceptionsSection) {
         exceptionsSection.scrollIntoView({ behavior: "smooth" });
       } else {
+        // Fallback: open inventory and filter to unpaid
         setShowInventory(true);
         setInventoryStatusFilter("unpaid");
       }
