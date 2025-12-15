@@ -67,7 +67,7 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
     schemeName: claim.schemeName || null,
     benefitDesc: claim.benefitDesc || null,
     billedAmount: claim.billedAmount.toString(),
-    currency: claim.currency || "SSP",
+    currency: claim.currency || "USD",
     status: "submitted" as const,
     amountPaid: "0",
     compositeKey: buildClaimCompositeKey(
@@ -377,7 +377,7 @@ export async function upsertClaimsForPeriod(
       schemeName: claim.schemeName || null,
       benefitDesc: claim.benefitDesc || null,
       billedAmount: claim.billedAmount.toString(),
-      currency: claim.currency || "SSP",
+      currency: claim.currency || "USD",
       status: "awaiting_remittance" as const,
       amountPaid: "0",
       compositeKey: buildClaimCompositeKey(
