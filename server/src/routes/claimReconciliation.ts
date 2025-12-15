@@ -34,7 +34,90 @@ const router = Router();
 
 // Utility function for period formatting
 function formatPeriod(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, '0')}`;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+/**
+ * Convert an Excel serial date (1900 system) into a JS Date.
+ * This is a best-effort helper for cases where parsers return numeric dates.
+ */
+function excelSerialToDate(serial: number): Date | null {
+  if (!Number.isFinite(serial)) return null;
+  // Excel serial date: days since 1899-12-30 (Excel's 1900 system)
+  const ms = Math.round((serial - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Best-effort parse of a receivedDate from body (string) into Date.
+ */
+function parseReceivedDate(input: any): Date | null {
+  if (!input) return null;
+
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+
+  if (typeof input === "number") {
+    // Could be Excel serial
+    const d = excelSerialToDate(input);
+    return d;
+  }
+
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+
+    // Try ISO first; fallback to Date parser
+    const d = new Date(trimmed);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
+/**
+ * Try to infer a statement date from parsed remittance rows.
+ * We look for common fields that might carry cheque/EFT date.
+ */
+function inferStatementDateFromRemittances(remittances: any[]): Date | null {
+  if (!Array.isArray(remittances) || remittances.length === 0) return null;
+
+  const candidateKeys = [
+    "chequeEftDate",
+    "chequeDate",
+    "eftDate",
+    "paymentDate",
+    "paidDate",
+    "datePaid",
+    "statementDate",
+    "remittanceDate",
+    "cheque_eft_date",
+    "cheque_date",
+    "eft_date",
+  ];
+
+  // Scan first N rows to find a usable date
+  const N = Math.min(remittances.length, 50);
+  for (let i = 0; i < N; i++) {
+    const r = remittances[i];
+    if (!r || typeof r !== "object") continue;
+
+    for (const k of candidateKeys) {
+      if (r[k] === undefined || r[k] === null) continue;
+      const d = parseReceivedDate(r[k]);
+      if (d) return d;
+    }
+
+    // As a fallback, scan any value that looks like a date
+    for (const v of Object.values(r)) {
+      const d = parseReceivedDate(v);
+      if (d) return d;
+    }
+  }
+
+  return null;
 }
 
 // Auth middleware - same as before
@@ -67,9 +150,7 @@ const upload = multer({
     ) {
       cb(null, true);
     } else {
-      cb(
-        new Error("Invalid file type. Only Excel files (.xlsx, .xls) are allowed.")
-      );
+      cb(new Error("Invalid file type. Only Excel files (.xlsx, .xls) are allowed."));
     }
   },
 });
@@ -215,9 +296,123 @@ router.post(
 );
 
 /**
- * POST /api/claim-reconciliation/upload-remittance
- * Upload remittance only (requires existing claims) for a specific provider and period
- * Runs reconciliation automatically after upload
+ * NEW: POST /api/claim-reconciliation/upload-remittance-statement
+ * Upload remittance at PROVIDER level (no period selection required).
+ *
+ * CIC remittances are mixed across months/years. We still store the remittance rows under a
+ * "filing period" derived from receivedDate (or inferred from the file, else today's date),
+ * but matching is cross-period across ALL outstanding claims.
+ *
+ * Required: providerName, remittanceFile
+ * Optional: receivedDate (ISO date string recommended)
+ */
+router.post(
+  "/upload-remittance-statement",
+  requireAuth,
+  upload.single("remittanceFile"),
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName, receivedDate } = req.body;
+      const userId = req.user?.id;
+
+      if (!providerName) {
+        return res.status(400).json({
+          error: "Missing required field: providerName",
+        });
+      }
+
+      if (!userId) {
+        return res.status(401).json({
+          error: "User authentication required",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          error: "remittanceFile is required",
+        });
+      }
+
+      // Parse remittance file
+      const remittanceBuffer = req.file.buffer;
+      const remittances = parseRemittanceFile(remittanceBuffer);
+
+      if (remittances.length === 0) {
+        return res.status(400).json({
+          error: "No valid remittances found in the uploaded file",
+        });
+      }
+
+      // Determine a filing date (for organizing statements only)
+      const received = parseReceivedDate(receivedDate);
+      const inferred = inferStatementDateFromRemittances(remittances);
+      const filingDate = received ?? inferred ?? new Date();
+
+      const year = filingDate.getFullYear();
+      const month = filingDate.getMonth() + 1;
+
+      try {
+        const inserted = await upsertRemittanceForPeriod(
+          providerName,
+          year,
+          month,
+          remittances
+        );
+
+        // Cross-period reconciliation
+        const reconciliationResult = await runClaimReconciliation(
+          providerName,
+          year,
+          month
+        );
+
+        res.json({
+          success: true,
+          provider: providerName,
+          filingPeriod: formatPeriod(year, month),
+          filingDate: filingDate.toISOString().slice(0, 10),
+          remittancesStored: inserted.length,
+          reconciliation: {
+            totalClaimsSearched: reconciliationResult.totalClaimsSearched,
+            claimsMatched: reconciliationResult.claimsMatched,
+            totalRemittances: reconciliationResult.summary.totalRemittances,
+            autoMatched: reconciliationResult.summary.autoMatched,
+            partialMatched: reconciliationResult.summary.partialMatched,
+            manualReview: reconciliationResult.summary.manualReview,
+            unpaidClaims: reconciliationResult.unpaidClaims,
+            orphanRemittances: reconciliationResult.orphanRemittances,
+          },
+          message:
+            "Remittance statement uploaded. Matching ran across ALL outstanding claims (all periods).",
+          info: `Stored under filing period ${formatPeriod(
+            year,
+            month
+          )} for organization only. Matched against ${reconciliationResult.totalClaimsSearched} unpaid claims across all periods.`,
+        });
+      } catch (error: any) {
+        // If you still enforce "claims must exist first"
+        if (error.message && error.message.includes("No claims found")) {
+          return res.status(400).json({
+            error: error.message,
+            suggestion:
+              "Upload claims for this provider first (claims can be across any months/years). Then re-upload this remittance statement.",
+          });
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      console.error("Error uploading remittance statement:", error);
+      res.status(500).json({
+        error: error.message || "Failed to upload remittance statement",
+      });
+    }
+  }
+);
+
+/**
+ * LEGACY: POST /api/claim-reconciliation/upload-remittance
+ * Upload remittance only for a specific provider and period (kept for compatibility).
+ * Runs reconciliation automatically after upload.
  */
 router.post(
   "/upload-remittance",
@@ -314,10 +509,8 @@ router.post(
   }
 );
 
-/**
- * GET /api/claim-reconciliation/period/:providerName/:year/:month
- * Get reconciliation status for a specific provider and period
- */
+// ...everything below stays the same (period status, upload/run, runs, export, claims inventory, deletes, periods-summary)
+
 router.get(
   "/period/:providerName/:year/:month",
   requireAuth,
@@ -364,10 +557,6 @@ router.get(
   }
 );
 
-/**
- * POST /api/claim-reconciliation/upload
- * Upload and process claim reconciliation files
- */
 router.post(
   "/upload",
   requireAuth,
@@ -378,10 +567,6 @@ router.post(
   uploadHandler
 );
 
-/**
- * POST /api/claim-reconciliation/run
- * Alias for /upload endpoint
- */
 router.post(
   "/run",
   requireAuth,
@@ -392,10 +577,6 @@ router.post(
   uploadHandler
 );
 
-/**
- * GET /api/claim-reconciliation/runs
- * Get all reconciliation runs
- */
 router.get("/runs", requireAuth, async (_req, res) => {
   try {
     const runs = await getAllReconRuns();
@@ -408,10 +589,6 @@ router.get("/runs", requireAuth, async (_req, res) => {
   }
 });
 
-/**
- * GET /api/claim-reconciliation/runs/:runId
- * Get a specific reconciliation run
- */
 router.get("/runs/:runId", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
@@ -430,10 +607,6 @@ router.get("/runs/:runId", requireAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/claim-reconciliation/runs/:runId/claims
- * Get claims for a specific run
- */
 router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
@@ -447,10 +620,6 @@ router.get("/runs/:runId/claims", requireAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/claim-reconciliation/runs/:runId/remittances
- * Get remittances for a specific run
- */
 router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
@@ -464,10 +633,6 @@ router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/claim-reconciliation/runs/:runId/issues/export
- * Export problem claims (partial / unpaid / review) as an Excel file
- */
 router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
@@ -479,13 +644,10 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
 
     const issueClaims = await getIssueClaimsForRun(runId);
 
-    // Basic stats for the summary sheet
     const totalClaims = run.totalClaimRows ?? issueClaims.length;
     const totalRemits = run.totalRemittanceRows ?? 0;
 
-    const unpaidCount = issueClaims.filter(
-      (c) => parseFloat(c.amountPaid || "0") === 0
-    ).length;
+    const unpaidCount = issueClaims.filter((c) => parseFloat(c.amountPaid || "0") === 0).length;
 
     const partialCount = issueClaims.filter(
       (c) =>
@@ -496,12 +658,11 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
     const problemCount = issueClaims.length;
     const fullyPaid = Math.max(totalClaims - problemCount, 0);
 
-    const periodLabel = new Date(run.periodYear, run.periodMonth - 1).toLocaleString(
-      "default",
-      { month: "short", year: "numeric" }
-    );
+    const periodLabel = new Date(run.periodYear, run.periodMonth - 1).toLocaleString("default", {
+      month: "short",
+      year: "numeric",
+    });
 
-    // Build worksheet: summary + detail table
     const rows: any[][] = [];
 
     rows.push(["Provider", run.providerName]);
@@ -560,10 +721,7 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
 
     const filename = `CIC-issues-${run.periodYear}-${run.periodMonth}.xlsx`;
 
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(buffer);
   } catch (error: any) {
@@ -574,10 +732,6 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
   }
 });
 
-/**
- * DELETE /api/claim-reconciliation/runs/:runId
- * Delete a reconciliation run and all its data (for test runs)
- */
 router.delete("/runs/:runId", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
@@ -598,20 +752,9 @@ router.delete("/runs/:runId", requireAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/claim-reconciliation/claims
- * Get all claims with optional filtering and pagination
- */
 router.get("/claims", requireAuth, async (req: Request, res: Response) => {
   try {
-    const {
-      providerName,
-      status,
-      periodYear,
-      periodMonth,
-      page,
-      limit,
-    } = req.query;
+    const { providerName, status, periodYear, periodMonth, page, limit } = req.query;
 
     const options = {
       providerName: providerName as string | undefined,
@@ -632,10 +775,6 @@ router.get("/claims", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * DELETE /api/claim-reconciliation/claims/:id
- * Delete a single claim by ID
- */
 router.delete("/claims/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const claimId = parseInt(req.params.id, 10);
@@ -649,10 +788,6 @@ router.delete("/claims/:id", requireAuth, async (req: Request, res: Response) =>
   }
 });
 
-/**
- * DELETE /api/claim-reconciliation/claims/period/:providerName/:year/:month
- * Delete all claims for a specific period
- */
 router.delete(
   "/claims/period/:providerName/:year/:month",
   requireAuth,
@@ -673,10 +808,6 @@ router.delete(
   }
 );
 
-/**
- * DELETE /api/claim-reconciliation/remittances/period/:providerName/:year/:month
- * Delete all remittances for a specific period
- */
 router.delete(
   "/remittances/period/:providerName/:year/:month",
   requireAuth,
@@ -697,25 +828,17 @@ router.delete(
   }
 );
 
-/**
- * GET /api/claim-reconciliation/periods-summary
- * Get summary of all periods that have claims
- */
-router.get(
-  "/periods-summary",
-  requireAuth,
-  async (req: Request, res: Response) => {
-    try {
-      const { providerName } = req.query;
-      const summaries = await getPeriodsSummary(providerName as string | undefined);
-      res.json(summaries);
-    } catch (error: any) {
-      console.error("Error fetching periods summary:", error);
-      res.status(500).json({
-        error: error.message || "Failed to fetch periods summary",
-      });
-    }
+router.get("/periods-summary", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { providerName } = req.query;
+    const summaries = await getPeriodsSummary(providerName as string | undefined);
+    res.json(summaries);
+  } catch (error: any) {
+    console.error("Error fetching periods summary:", error);
+    res.status(500).json({
+      error: error.message || "Failed to fetch periods summary",
+    });
   }
-);
+});
 
 export { router as claimReconciliationRouter };
