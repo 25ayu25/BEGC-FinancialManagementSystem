@@ -7,16 +7,18 @@ import {
   claimReconRemittances,
 } from "@shared/schema";
 import { eq, and, or, isNull } from "drizzle-orm";
-import type {
-  ClaimRow,
-  RemittanceRow,
-  ReconciliationSummary,
-} from "./types";
+import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
 import {
-  buildClaimCompositeKey,
-  buildRemittanceKeyVariants,
+  buildClaimCompositeKeyFromRow,
+  buildRemittanceKeyVariantsFromRow,
   matchClaimsToRemittances,
 } from "./matching";
+
+function normalizeCurrencyForProvider(providerName: string, currency?: string | null) {
+  const p = (providerName || "").toUpperCase();
+  if (p === "CIC") return "USD";
+  return currency || "USD";
+}
 
 /**
  * Create a new reconciliation run
@@ -67,14 +69,15 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
     schemeName: claim.schemeName || null,
     benefitDesc: claim.benefitDesc || null,
     billedAmount: claim.billedAmount.toString(),
-    currency: claim.currency || "USD",
+    currency: normalizeCurrencyForProvider(run.providerName, claim.currency),
     status: "submitted" as const,
     amountPaid: "0",
-    compositeKey: buildClaimCompositeKey(
-      claim.memberNumber,
-      claim.serviceDate,
-      claim.billedAmount
-    ),
+    compositeKey: buildClaimCompositeKeyFromRow({
+      memberNumber: claim.memberNumber,
+      invoiceNumber: claim.invoiceNumber,
+      serviceDate: claim.serviceDate,
+      billedAmount: claim.billedAmount,
+    } as any),
     rawRow: claim as any,
   }));
 
@@ -89,10 +92,7 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
 /**
  * Insert parsed remittances (legacy - for backward compatibility)
  */
-export async function insertRemittances(
-  runId: number,
-  remittances: RemittanceRow[]
-) {
+export async function insertRemittances(runId: number, remittances: RemittanceRow[]) {
   // Get provider and period from the run
   const [run] = await db
     .select()
@@ -104,13 +104,13 @@ export async function insertRemittances(
   }
 
   const remittancesToInsert = remittances.map((rem) => {
-    // For remittances, we store the first variant as the composite key
-    // The matching algorithm will generate all variants during matching
-    const keyVariants = buildRemittanceKeyVariants(
-      rem.memberNumber,
-      rem.serviceDate,
-      rem.claimAmount
-    );
+    const keyVariants = buildRemittanceKeyVariantsFromRow({
+      memberNumber: rem.memberNumber,
+      // For CIC, bill/invoice often lives here
+      claimNumber: rem.claimNumber,
+      serviceDate: rem.serviceDate,
+      claimAmount: rem.claimAmount,
+    } as any);
 
     return {
       runId,
@@ -127,7 +127,7 @@ export async function insertRemittances(
       paidAmount: rem.paidAmount.toString(),
       paymentNo: rem.paymentNo || null,
       paymentMode: rem.paymentMode || null,
-      compositeKey: keyVariants[0], // Store the base key (no delta)
+      compositeKey: keyVariants[0],
       rawRow: rem as any,
     };
   });
@@ -141,25 +141,29 @@ export async function insertRemittances(
 }
 
 /**
- * Perform matching and update claims/remittances
+ * Perform matching and update claims/remittances (legacy run-based)
  */
 export async function performMatching(runId: number) {
-  // Fetch all claims for this run
   const claims = await db
     .select()
     .from(claimReconClaims)
     .where(eq(claimReconClaims.runId, runId));
 
-  // Fetch all remittances for this run
   const remittances = await db
     .select()
     .from(claimReconRemittances)
     .where(eq(claimReconRemittances.runId, runId));
 
-  // Convert to matching format
+  // IMPORTANT: compute compositeKey at runtime (supports old stored keys)
   const claimData = claims.map((c) => ({
     id: c.id,
-    compositeKey: c.compositeKey,
+    compositeKey: buildClaimCompositeKeyFromRow({
+      memberNumber: c.memberNumber,
+      invoiceNumber: c.invoiceNumber,
+      serviceDate: new Date(c.serviceDate),
+      billedAmount: parseFloat(c.billedAmount),
+      status: c.status,
+    } as any),
     data: {
       memberNumber: c.memberNumber,
       patientName: c.patientName || undefined,
@@ -170,12 +174,18 @@ export async function performMatching(runId: number) {
       benefitDesc: c.benefitDesc || undefined,
       billedAmount: parseFloat(c.billedAmount),
       currency: c.currency,
-    },
+      status: c.status as any,
+    } as any,
   }));
 
   const remitData = remittances.map((r) => ({
     id: r.id,
-    compositeKey: r.compositeKey,
+    compositeKey: buildRemittanceKeyVariantsFromRow({
+      memberNumber: r.memberNumber,
+      claimNumber: r.claimNumber,
+      serviceDate: new Date(r.serviceDate),
+      claimAmount: parseFloat(r.claimAmount),
+    } as any)[0],
     data: {
       employerName: r.employerName || undefined,
       patientName: r.patientName || undefined,
@@ -187,13 +197,11 @@ export async function performMatching(runId: number) {
       paidAmount: parseFloat(r.paidAmount),
       paymentNo: r.paymentNo || undefined,
       paymentMode: r.paymentMode || undefined,
-    },
+    } as any,
   }));
 
-  // Perform matching
   const matches = matchClaimsToRemittances(claimData, remitData);
 
-  // Update claims with match results
   for (const match of matches) {
     await db
       .update(claimReconClaims)
@@ -204,7 +212,6 @@ export async function performMatching(runId: number) {
       })
       .where(eq(claimReconClaims.id, match.claimId));
 
-    // Update remittance if matched
     if (match.remittanceId) {
       await db
         .update(claimReconRemittances)
@@ -216,7 +223,6 @@ export async function performMatching(runId: number) {
     }
   }
 
-  // Calculate summary
   const summary: ReconciliationSummary = {
     totalClaims: claims.length,
     totalRemittances: remittances.length,
@@ -225,7 +231,6 @@ export async function performMatching(runId: number) {
     manualReview: matches.filter((m) => m.status === "manual_review").length,
   };
 
-  // Update run with summary
   await db
     .update(claimReconRuns)
     .set({
@@ -240,9 +245,6 @@ export async function performMatching(runId: number) {
   return summary;
 }
 
-/**
- * Get reconciliation run details
- */
 export async function getReconRun(runId: number) {
   const [run] = await db
     .select()
@@ -252,32 +254,16 @@ export async function getReconRun(runId: number) {
   return run;
 }
 
-/**
- * Get all reconciliation runs
- */
 export async function getAllReconRuns() {
-  const runs = await db
-    .select()
-    .from(claimReconRuns)
-    .orderBy(claimReconRuns.createdAt);
+  const runs = await db.select().from(claimReconRuns).orderBy(claimReconRuns.createdAt);
   return runs;
 }
 
-/**
- * Get claims for a run
- */
 export async function getClaimsForRun(runId: number) {
-  const claims = await db
-    .select()
-    .from(claimReconClaims)
-    .where(eq(claimReconClaims.runId, runId));
-
+  const claims = await db.select().from(claimReconClaims).where(eq(claimReconClaims.runId, runId));
   return claims;
 }
 
-/**
- * Get remittances for a run
- */
 export async function getRemittancesForRun(runId: number) {
   const remittances = await db
     .select()
@@ -291,12 +277,6 @@ export async function getRemittancesForRun(runId: number) {
 /* Extra helpers: issue claims + delete run                                   */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Get "issue" claims for a run:
- * - partially paid
- * - marked for manual review
- * - still submitted with amountPaid = 0 (no remittance / unpaid)
- */
 export async function getIssueClaimsForRun(runId: number) {
   const claims = await db
     .select()
@@ -315,20 +295,10 @@ export async function getIssueClaimsForRun(runId: number) {
   return claims;
 }
 
-/**
- * Delete a reconciliation run and all its child rows.
- * Useful for removing test runs.
- */
 export async function deleteReconRun(runId: number) {
   await db.transaction(async (tx) => {
-    await tx
-      .delete(claimReconClaims)
-      .where(eq(claimReconClaims.runId, runId));
-
-    await tx
-      .delete(claimReconRemittances)
-      .where(eq(claimReconRemittances.runId, runId));
-
+    await tx.delete(claimReconClaims).where(eq(claimReconClaims.runId, runId));
+    await tx.delete(claimReconRemittances).where(eq(claimReconRemittances.runId, runId));
     await tx.delete(claimReconRuns).where(eq(claimReconRuns.id, runId));
   });
 
@@ -339,11 +309,6 @@ export async function deleteReconRun(runId: number) {
 /* Staged Workflow Functions (Claims-only, Remittance-only)                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Upsert claims for a specific provider and period.
- * Replaces existing claims for that provider+period and resets their status to awaiting_remittance.
- * Does NOT create a run or perform reconciliation.
- */
 export async function upsertClaimsForPeriod(
   providerName: string,
   periodYear: number,
@@ -351,7 +316,6 @@ export async function upsertClaimsForPeriod(
   claims: ClaimRow[]
 ) {
   return await db.transaction(async (tx) => {
-    // Delete existing claims for this provider+period (only standalone claims without runId)
     await tx
       .delete(claimReconClaims)
       .where(
@@ -359,11 +323,10 @@ export async function upsertClaimsForPeriod(
           eq(claimReconClaims.providerName, providerName),
           eq(claimReconClaims.periodYear, periodYear),
           eq(claimReconClaims.periodMonth, periodMonth),
-          isNull(claimReconClaims.runId) // Only delete standalone claims to preserve audit trail
+          isNull(claimReconClaims.runId)
         )
       );
 
-    // Insert new claims with awaiting_remittance status
     const claimsToInsert = claims.map((claim) => ({
       runId: null,
       providerName,
@@ -377,31 +340,24 @@ export async function upsertClaimsForPeriod(
       schemeName: claim.schemeName || null,
       benefitDesc: claim.benefitDesc || null,
       billedAmount: claim.billedAmount.toString(),
-      currency: claim.currency || "USD",
+      currency: normalizeCurrencyForProvider(providerName, claim.currency),
       status: "awaiting_remittance" as const,
       amountPaid: "0",
-      compositeKey: buildClaimCompositeKey(
-        claim.memberNumber,
-        claim.serviceDate,
-        claim.billedAmount
-      ),
+      compositeKey: buildClaimCompositeKeyFromRow({
+        memberNumber: claim.memberNumber,
+        invoiceNumber: claim.invoiceNumber,
+        serviceDate: claim.serviceDate,
+        billedAmount: claim.billedAmount,
+        status: "awaiting_remittance",
+      } as any),
       rawRow: claim as any,
     }));
 
-    const inserted = await tx
-      .insert(claimReconClaims)
-      .values(claimsToInsert)
-      .returning();
-
+    const inserted = await tx.insert(claimReconClaims).values(claimsToInsert).returning();
     return inserted;
   });
 }
 
-/**
- * Upsert remittances for a specific provider and period.
- * Now supports CROSS-PERIOD matching: matches against ALL unpaid claims in the system.
- * Does NOT require claims to exist for the specific period anymore.
- */
 export async function upsertRemittanceForPeriod(
   providerName: string,
   periodYear: number,
@@ -409,7 +365,6 @@ export async function upsertRemittanceForPeriod(
   remittances: RemittanceRow[]
 ) {
   return await db.transaction(async (tx) => {
-    // Check if ANY claims exist for this provider (across all periods)
     const existingClaims = await tx
       .select()
       .from(claimReconClaims)
@@ -417,12 +372,9 @@ export async function upsertRemittanceForPeriod(
       .limit(1);
 
     if (existingClaims.length === 0) {
-      throw new Error(
-        `No claims found for ${providerName}. Please upload claims first.`
-      );
+      throw new Error(`No claims found for ${providerName}. Please upload claims first.`);
     }
 
-    // Delete existing remittances for this provider+period (standalone only)
     await tx
       .delete(claimReconRemittances)
       .where(
@@ -434,13 +386,13 @@ export async function upsertRemittanceForPeriod(
         )
       );
 
-    // Insert new remittances
     const remittancesToInsert = remittances.map((rem) => {
-      const keyVariants = buildRemittanceKeyVariants(
-        rem.memberNumber,
-        rem.serviceDate,
-        rem.claimAmount
-      );
+      const keyVariants = buildRemittanceKeyVariantsFromRow({
+        memberNumber: rem.memberNumber,
+        claimNumber: rem.claimNumber,
+        serviceDate: rem.serviceDate,
+        claimAmount: rem.claimAmount,
+      } as any);
 
       return {
         runId: null,
@@ -462,23 +414,12 @@ export async function upsertRemittanceForPeriod(
       };
     });
 
-    const inserted = await tx
-      .insert(claimReconRemittances)
-      .values(remittancesToInsert)
-      .returning();
-
+    const inserted = await tx.insert(claimReconRemittances).values(remittancesToInsert).returning();
     return inserted;
   });
 }
 
-/**
- * Get claims for a specific provider and period
- */
-export async function getClaimsForPeriod(
-  providerName: string,
-  periodYear: number,
-  periodMonth: number
-) {
+export async function getClaimsForPeriod(providerName: string, periodYear: number, periodMonth: number) {
   const claims = await db
     .select()
     .from(claimReconClaims)
@@ -493,14 +434,7 @@ export async function getClaimsForPeriod(
   return claims;
 }
 
-/**
- * Get remittances for a specific provider and period
- */
-export async function getRemittanceForPeriod(
-  providerName: string,
-  periodYear: number,
-  periodMonth: number
-) {
+export async function getRemittanceForPeriod(providerName: string, periodYear: number, periodMonth: number) {
   const remittances = await db
     .select()
     .from(claimReconRemittances)
@@ -515,31 +449,14 @@ export async function getRemittanceForPeriod(
   return remittances;
 }
 
-/**
- * Run claim reconciliation for a specific provider and period.
- * Now supports CROSS-PERIOD matching: matches remittances against ALL unpaid claims
- * for the provider, not just the specific period.
- * Updates claim and remittance statuses based on matching results.
- * Returns a summary of the reconciliation.
- */
-export async function runClaimReconciliation(
-  providerName: string,
-  periodYear: number,
-  periodMonth: number
-) {
+export async function runClaimReconciliation(providerName: string, periodYear: number, periodMonth: number) {
   return await db.transaction(async (tx) => {
-    // Fetch ALL claims with status "awaiting_remittance" for this provider (across all periods)
     const claims = await tx
       .select()
       .from(claimReconClaims)
-      .where(
-        and(
-          eq(claimReconClaims.providerName, providerName),
-          eq(claimReconClaims.status, "awaiting_remittance")
-        )
-      );
+      .where(and(eq(claimReconClaims.providerName, providerName), eq(claimReconClaims.status, "awaiting_remittance")));
 
-    // Fetch remittances for this provider+period
+    // ✅ only reconcile NEW/UNMATCHED remittance lines for that filing period
     const remittances = await tx
       .select()
       .from(claimReconRemittances)
@@ -547,26 +464,30 @@ export async function runClaimReconciliation(
         and(
           eq(claimReconRemittances.providerName, providerName),
           eq(claimReconRemittances.periodYear, periodYear),
-          eq(claimReconRemittances.periodMonth, periodMonth)
+          eq(claimReconRemittances.periodMonth, periodMonth),
+          isNull(claimReconRemittances.matchedClaimId)
         )
       );
 
     if (claims.length === 0) {
-      throw new Error(
-        `No claims awaiting remittance found for ${providerName}`
-      );
+      throw new Error(`No claims awaiting remittance found for ${providerName}`);
     }
 
     if (remittances.length === 0) {
       throw new Error(
-        `No remittances found for ${providerName} for ${periodYear}-${String(periodMonth).padStart(2, '0')}`
+        `No NEW remittance lines found for ${providerName} for ${periodYear}-${String(periodMonth).padStart(2, "0")}`
       );
     }
 
-    // Convert to matching format
     const claimData = claims.map((c) => ({
       id: c.id,
-      compositeKey: c.compositeKey,
+      compositeKey: buildClaimCompositeKeyFromRow({
+        memberNumber: c.memberNumber,
+        invoiceNumber: c.invoiceNumber,
+        serviceDate: new Date(c.serviceDate),
+        billedAmount: parseFloat(c.billedAmount),
+        status: c.status,
+      } as any),
       data: {
         memberNumber: c.memberNumber,
         patientName: c.patientName || undefined,
@@ -577,12 +498,18 @@ export async function runClaimReconciliation(
         benefitDesc: c.benefitDesc || undefined,
         billedAmount: parseFloat(c.billedAmount),
         currency: c.currency,
-      },
+        status: c.status as any,
+      } as any,
     }));
 
     const remitData = remittances.map((r) => ({
       id: r.id,
-      compositeKey: r.compositeKey,
+      compositeKey: buildRemittanceKeyVariantsFromRow({
+        memberNumber: r.memberNumber,
+        claimNumber: r.claimNumber,
+        serviceDate: new Date(r.serviceDate),
+        claimAmount: parseFloat(r.claimAmount),
+      } as any)[0],
       data: {
         employerName: r.employerName || undefined,
         patientName: r.patientName || undefined,
@@ -594,16 +521,13 @@ export async function runClaimReconciliation(
         paidAmount: parseFloat(r.paidAmount),
         paymentNo: r.paymentNo || undefined,
         paymentMode: r.paymentMode || undefined,
-      },
+      } as any,
     }));
 
-    // Perform matching
     const matches = matchClaimsToRemittances(claimData, remitData);
 
-    // Track which remittances were matched
     const matchedRemittanceIds = new Set<number>();
 
-    // Update claims with match results
     for (const match of matches) {
       await tx
         .update(claimReconClaims)
@@ -614,7 +538,6 @@ export async function runClaimReconciliation(
         })
         .where(eq(claimReconClaims.id, match.claimId));
 
-      // Update remittance if matched
       if (match.remittanceId) {
         matchedRemittanceIds.add(match.remittanceId);
         await tx
@@ -622,16 +545,13 @@ export async function runClaimReconciliation(
           .set({
             matchedClaimId: match.claimId,
             matchType: match.matchType,
-            status: null, // Clear orphan status if previously set
+            status: null,
           })
           .where(eq(claimReconRemittances.id, match.remittanceId));
       }
     }
 
-    // Mark unmatched remittances as orphans
-    const orphanRemittances = remittances.filter(
-      (r) => !matchedRemittanceIds.has(r.id)
-    );
+    const orphanRemittances = remittances.filter((r) => !matchedRemittanceIds.has(r.id));
     for (const orphan of orphanRemittances) {
       await tx
         .update(claimReconRemittances)
@@ -643,9 +563,8 @@ export async function runClaimReconciliation(
         .where(eq(claimReconRemittances.id, orphan.id));
     }
 
-    // Calculate summary (claims matched in THIS reconciliation run)
     const claimsMatchedInThisRun = matches.filter((m) => m.remittanceId !== null).length;
-    
+
     const summary: ReconciliationSummary = {
       totalClaims: claimsMatchedInThisRun,
       totalRemittances: remittances.length,
@@ -668,9 +587,6 @@ export async function runClaimReconciliation(
 /* Claims Inventory Management Functions                                      */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Get all claims with optional filtering and pagination
- */
 export async function getAllClaims(options?: {
   providerName?: string;
   status?: string;
@@ -679,41 +595,23 @@ export async function getAllClaims(options?: {
   page?: number;
   limit?: number;
 }) {
-  const {
-    providerName,
-    status,
-    periodYear,
-    periodMonth,
-    page = 1,
-    limit = 50,
-  } = options || {};
+  const { providerName, status, periodYear, periodMonth, page = 1, limit = 50 } = options || {};
 
   let query = db.select().from(claimReconClaims);
 
-  // Build filters
   const filters = [];
-  if (providerName) {
-    filters.push(eq(claimReconClaims.providerName, providerName));
-  }
-  if (status) {
-    filters.push(eq(claimReconClaims.status, status));
-  }
-  if (periodYear !== undefined) {
-    filters.push(eq(claimReconClaims.periodYear, periodYear));
-  }
-  if (periodMonth !== undefined) {
-    filters.push(eq(claimReconClaims.periodMonth, periodMonth));
-  }
+  if (providerName) filters.push(eq(claimReconClaims.providerName, providerName));
+  if (status) filters.push(eq(claimReconClaims.status, status));
+  if (periodYear !== undefined) filters.push(eq(claimReconClaims.periodYear, periodYear));
+  if (periodMonth !== undefined) filters.push(eq(claimReconClaims.periodMonth, periodMonth));
 
   if (filters.length > 0) {
     query = query.where(and(...filters)) as any;
   }
 
-  // Apply pagination
   const offset = (page - 1) * limit;
   const claims = await query.limit(limit).offset(offset);
 
-  // Get total count
   let countQuery = db.select().from(claimReconClaims);
   if (filters.length > 0) {
     countQuery = countQuery.where(and(...filters)) as any;
@@ -732,22 +630,12 @@ export async function getAllClaims(options?: {
   };
 }
 
-/**
- * Delete a single claim by ID
- */
 export async function deleteClaim(claimId: number) {
   await db.delete(claimReconClaims).where(eq(claimReconClaims.id, claimId));
   return { success: true };
 }
 
-/**
- * Delete all claims for a specific period
- */
-export async function deleteClaimsForPeriod(
-  providerName: string,
-  periodYear: number,
-  periodMonth: number
-) {
+export async function deleteClaimsForPeriod(providerName: string, periodYear: number, periodMonth: number) {
   await db
     .delete(claimReconClaims)
     .where(
@@ -760,16 +648,7 @@ export async function deleteClaimsForPeriod(
   return { success: true };
 }
 
-/**
- * Delete all remittances for a specific period
- * Note: This is a period-level operation intended for staff to clear and re-upload data.
- * It does not cascade to reconciliation runs to preserve audit trail.
- */
-export async function deleteRemittancesForPeriod(
-  providerName: string,
-  periodYear: number,
-  periodMonth: number
-) {
+export async function deleteRemittancesForPeriod(providerName: string, periodYear: number, periodMonth: number) {
   await db
     .delete(claimReconRemittances)
     .where(
@@ -782,22 +661,16 @@ export async function deleteRemittancesForPeriod(
   return { success: true };
 }
 
-/**
- * Get summary of all periods that have claims
- */
 export async function getPeriodsSummary(providerName?: string) {
-  const filters = providerName
-    ? [eq(claimReconClaims.providerName, providerName)]
-    : [];
-  
+  const filters = providerName ? [eq(claimReconClaims.providerName, providerName)] : [];
+
   let query = db.select().from(claimReconClaims);
   if (filters.length > 0) {
     query = query.where(and(...filters)) as any;
   }
-  
+
   const allClaims = await query;
 
-  // Group claims by period
   const periodMap = new Map<
     string,
     {
@@ -821,53 +694,36 @@ export async function getPeriodsSummary(providerName?: string) {
     periodMap.get(key)!.claims.push(claim);
   }
 
-  // Calculate summary for each period
   const summaries = Array.from(periodMap.values())
-    .filter((period) => period.claims.length > 0) // Safety check: only include periods with claims
+    .filter((period) => period.claims.length > 0)
     .map((period) => {
-    const awaitingRemittance = period.claims.filter(
-      (c) => c.status === "awaiting_remittance"
-    ).length;
-    const matched = period.claims.filter(
-      (c) => c.status === "matched" || c.status === "paid"
-    ).length;
-    const partiallyPaid = period.claims.filter(
-      (c) => c.status === "partially_paid"
-    ).length;
-    const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
+      const awaitingRemittance = period.claims.filter((c) => c.status === "awaiting_remittance").length;
+      const matched = period.claims.filter((c) => c.status === "matched" || c.status === "paid").length;
+      const partiallyPaid = period.claims.filter((c) => c.status === "partially_paid").length;
+      const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
 
-    const totalBilled = period.claims.reduce(
-      (sum, c) => sum + parseFloat(c.billedAmount),
-      0
-    );
-    const totalPaid = period.claims.reduce(
-      (sum, c) => sum + parseFloat(c.amountPaid || "0"),
-      0
-    );
-    
-    // Get currency from first claim (all claims in a period should have same currency)
-    const currency = period.claims[0]?.currency || "USD";
+      const totalBilled = period.claims.reduce((sum, c) => sum + parseFloat(c.billedAmount), 0);
+      const totalPaid = period.claims.reduce((sum, c) => sum + parseFloat(c.amountPaid || "0"), 0);
 
-    return {
-      providerName: period.providerName,
-      periodYear: period.periodYear,
-      periodMonth: period.periodMonth,
-      totalClaims: period.claims.length,
-      awaitingRemittance,
-      matched,
-      partiallyPaid,
-      unpaid,
-      totalBilled: totalBilled.toFixed(2),
-      totalPaid: totalPaid.toFixed(2),
-      currency,
-    };
-  });
+      const currency = period.claims[0]?.currency || "USD";
 
-  // Sort by period (most recent first)
+      return {
+        providerName: period.providerName,
+        periodYear: period.periodYear,
+        periodMonth: period.periodMonth,
+        totalClaims: period.claims.length,
+        awaitingRemittance,
+        matched,
+        partiallyPaid,
+        unpaid,
+        totalBilled: totalBilled.toFixed(2),
+        totalPaid: totalPaid.toFixed(2),
+        currency,
+      };
+    });
+
   summaries.sort((a, b) => {
-    if (a.periodYear !== b.periodYear) {
-      return b.periodYear - a.periodYear;
-    }
+    if (a.periodYear !== b.periodYear) return b.periodYear - a.periodYear;
     return b.periodMonth - a.periodMonth;
   });
 
