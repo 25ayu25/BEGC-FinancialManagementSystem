@@ -446,9 +446,15 @@ export default function ClaimReconciliation() {
         const parts = inventoryPeriodFilter.split("-");
         // Validate format: should be "YYYY-M" or "YYYY-MM"
         if (parts.length === 2 && parts[0] && parts[1]) {
-          const [year, month] = parts;
-          params.append("periodYear", year);
-          params.append("periodMonth", month);
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10);
+          // Validate year and month are valid numbers
+          if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
+            params.append("periodYear", year.toString());
+            params.append("periodMonth", month.toString());
+          } else {
+            console.warn("Invalid period filter values:", inventoryPeriodFilter);
+          }
         } else {
           console.warn("Invalid period filter format:", inventoryPeriodFilter);
         }
@@ -1478,7 +1484,7 @@ export default function ClaimReconciliation() {
                         ) : hasAwaitingClaims ? (
                           <Badge className="bg-blue-500 text-white hover:bg-blue-600">
                             <Clock className="w-3 h-3 mr-1" />
-                            Awaiting remittance
+                            Awaiting Remittance
                           </Badge>
                         ) : (
                           <Badge className="bg-slate-500 text-white hover:bg-slate-600">
