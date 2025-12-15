@@ -820,6 +820,9 @@ export async function getPeriodsSummary(providerName?: string) {
       (sum, c) => sum + parseFloat(c.amountPaid || "0"),
       0
     );
+    
+    // Get currency from first claim (all claims in a period should have same currency)
+    const currency = period.claims[0]?.currency || "USD";
 
     return {
       providerName: period.providerName,
@@ -832,6 +835,7 @@ export async function getPeriodsSummary(providerName?: string) {
       unpaid,
       totalBilled: totalBilled.toFixed(2),
       totalPaid: totalPaid.toFixed(2),
+      currency,
     };
   });
 
