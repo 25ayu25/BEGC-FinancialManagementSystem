@@ -179,6 +179,10 @@ function detectCurrency(rows: RowArray[]): string {
       if (cellText.includes("usd")) {
         return "USD";
       }
+      // Look for explicit "SSP" in any cell
+      if (cellText.includes("ssp")) {
+        return "SSP";
+      }
     }
   }
   

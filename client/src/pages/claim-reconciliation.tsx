@@ -897,8 +897,70 @@ export default function ClaimReconciliation() {
     },
   });
 
+  // Delete period claims
+  const deletePeriodMutation = useMutation({
+    mutationFn: async ({ providerName, year, month }: { providerName: string; year: number; month: number }) => {
+      const url = new URL(
+        `/api/claim-reconciliation/claims/period/${providerName}/${year}/${month}`,
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to delete claims");
+        } else {
+          const text = await response.text();
+          throw new Error(
+            `Failed to delete claims (${response.status}): ${text.substring(0, 120)}`
+          );
+        }
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Claims deleted",
+        description: "All claims for the period were removed.",
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/periods-summary"],
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/period"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/claims"],
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const isUploading = uploadMutation.isPending || uploadClaimsMutation.isPending || uploadRemittanceMutation.isPending;
-  const isDeleting = deleteMutation.isPending;
+  const isDeleting = deleteMutation.isPending || deletePeriodMutation.isPending;
   const isExporting = exportIssuesMutation.isPending;
   
   /* ------------------------------------------------------------------------ */
@@ -1097,6 +1159,22 @@ export default function ClaimReconciliation() {
       return;
     }
     exportIssuesMutation.mutate(selectedRunId);
+  };
+
+  const handleDeletePeriod = (period: PeriodSummary) => {
+    const periodLabel = formatPeriodLabel(period.periodYear, period.periodMonth);
+    const claimCount = period.totalClaims;
+    
+    const ok = window.confirm(
+      `Delete all ${claimCount} ${pluralize(claimCount, 'claim')} for ${periodLabel}?\n\nThis cannot be undone.`
+    );
+    if (!ok) return;
+
+    deletePeriodMutation.mutate({
+      providerName: period.providerName,
+      year: period.periodYear,
+      month: period.periodMonth,
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -1426,15 +1504,10 @@ export default function ClaimReconciliation() {
                 const hasAwaitingClaims = period.awaitingRemittance > 0;
                 
                 return (
-                  <button
+                  <div
                     key={periodKey}
-                    onClick={() => {
-                      setInventoryPeriodFilter(periodKey);
-                      setInventoryPage(1);
-                      setShowInventory(true);
-                    }}
                     className={cn(
-                      "relative overflow-hidden rounded-xl border-2 p-4 text-left transition-all hover:shadow-lg hover:-translate-y-1 group",
+                      "relative overflow-hidden rounded-xl border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-1 group",
                       inventoryPeriodFilter === periodKey
                         ? "border-orange-400 bg-orange-50/50 shadow-md"
                         : "border-slate-200 bg-white hover:border-slate-300"
@@ -1452,27 +1525,68 @@ export default function ClaimReconciliation() {
                     )} />
                     
                     <div className="relative space-y-3">
-                      {/* Period Label */}
+                      {/* Period Label with Delete Button */}
                       <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-lg text-slate-800">
-                          {formatPeriodLabel(period.periodYear, period.periodMonth)}
-                        </h3>
-                        {isReconciled ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        ) : hasAwaitingClaims ? (
-                          <Clock className="w-5 h-5 text-blue-600" />
-                        ) : null}
+                        <button
+                          onClick={() => {
+                            setInventoryPeriodFilter(periodKey);
+                            setInventoryPage(1);
+                            setShowInventory(true);
+                          }}
+                          className="flex-1 text-left"
+                        >
+                          <h3 className="font-bold text-lg text-slate-800 hover:text-orange-600 transition-colors">
+                            {formatPeriodLabel(period.periodYear, period.periodMonth)}
+                          </h3>
+                        </button>
+                        <div className="flex items-center gap-2">
+                          {isReconciled ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          ) : hasAwaitingClaims ? (
+                            <>
+                              <Clock className="w-5 h-5 text-blue-600" />
+                              {/* Delete button - only show for awaiting remittance */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-7 h-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period);
+                                }}
+                                disabled={deletePeriodMutation.isPending}
+                                title="Delete all claims for this period"
+                              >
+                                {deletePeriodMutation.isPending &&
+                                deletePeriodMutation.variables?.providerName === period.providerName &&
+                                deletePeriodMutation.variables?.year === period.periodYear &&
+                                deletePeriodMutation.variables?.month === period.periodMonth ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                       
                       {/* Claim Count */}
-                      <div>
+                      <button
+                        onClick={() => {
+                          setInventoryPeriodFilter(periodKey);
+                          setInventoryPage(1);
+                          setShowInventory(true);
+                        }}
+                        className="w-full text-left"
+                      >
                         <div className="text-2xl font-bold text-slate-900">
                           {period.totalClaims} {pluralize(period.totalClaims, 'claim')}
                         </div>
                         <div className="text-sm text-slate-600">
                           {period.currency} {parseFloat(period.totalBilled).toLocaleString()} billed
                         </div>
-                      </div>
+                      </button>
                       
                       {/* Status */}
                       <div className="flex items-center gap-2">
@@ -1511,7 +1625,7 @@ export default function ClaimReconciliation() {
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1970,10 +2084,10 @@ export default function ClaimReconciliation() {
                             {formatPeriodLabel(claim.periodYear, claim.periodMonth)}
                           </TableCell>
                           <TableCell>
-                            {claim.currency || "SSP"} {parseFloat(claim.billedAmount).toFixed(2)}
+                            {claim.currency || "USD"} {parseFloat(claim.billedAmount).toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            {claim.currency || "SSP"} {parseFloat(claim.amountPaid || "0").toFixed(2)}
+                            {claim.currency || "USD"} {parseFloat(claim.amountPaid || "0").toFixed(2)}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(claim.status)}
@@ -2369,11 +2483,11 @@ export default function ClaimReconciliation() {
                               ).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
-                              {/* Currency fallback to SSP if not available */}
-                              {claim.currency || "SSP"} {parseFloat(claim.billedAmount).toFixed(2)}
+                              {/* Currency fallback to USD if not available */}
+                              {claim.currency || "USD"} {parseFloat(claim.billedAmount).toFixed(2)}
                             </TableCell>
                             <TableCell>
-                              {claim.currency || "SSP"} {parseFloat(claim.amountPaid).toFixed(2)}
+                              {claim.currency || "USD"} {parseFloat(claim.amountPaid).toFixed(2)}
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(claim.status)}
