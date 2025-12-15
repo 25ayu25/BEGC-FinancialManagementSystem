@@ -443,9 +443,15 @@ export default function ClaimReconciliation() {
       
       // Add period filter if selected
       if (inventoryPeriodFilter) {
-        const [year, month] = inventoryPeriodFilter.split("-");
-        params.append("periodYear", year);
-        params.append("periodMonth", month);
+        const parts = inventoryPeriodFilter.split("-");
+        // Validate format: should be "YYYY-M" or "YYYY-MM"
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          const [year, month] = parts;
+          params.append("periodYear", year);
+          params.append("periodMonth", month);
+        } else {
+          console.warn("Invalid period filter format:", inventoryPeriodFilter);
+        }
       }
 
       const url = new URL(

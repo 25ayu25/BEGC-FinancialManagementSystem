@@ -175,16 +175,8 @@ function detectCurrency(rows: RowArray[]): string {
     
     for (const cell of row) {
       const cellText = norm(cell);
-      // Look for explicit "USD" or "usd" in any cell
+      // Look for explicit "USD" in any cell
       if (cellText.includes("usd")) {
-        return "USD";
-      }
-      // Look for clinic name patterns like "BAHR EL GHAZAL CLINIC - USD"
-      if (cellText.includes("clinic") && cellText.includes("usd")) {
-        return "USD";
-      }
-      // Check for CIC-specific patterns
-      if (cellText.includes("cic") && cellText.includes("usd")) {
         return "USD";
       }
     }
