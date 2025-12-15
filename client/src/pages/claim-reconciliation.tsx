@@ -336,6 +336,9 @@ export default function ClaimReconciliation() {
   // and all related UI (form fields, filters) sync to it
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
   
+  // Year filter for period cards
+  const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
+  
   // Form state - derived from selectedPeriodKey when available
   const [providerName, setProviderName] = useState("CIC");
   const [periodYear, setPeriodYear] = useState(
@@ -534,6 +537,34 @@ export default function ClaimReconciliation() {
       return response.json();
     },
   });
+
+  /* ------------------------------------------------------------------------ */
+  /* Filter and limit visible periods */
+  /* ------------------------------------------------------------------------ */
+  
+  const availableYears = useMemo(() => {
+    const years = new Set(periodsSummary.map(p => p.periodYear));
+    return Array.from(years).sort((a, b) => b - a); // Most recent first
+  }, [periodsSummary]);
+  
+  // Set default year filter to current year if not set
+  useMemo(() => {
+    if (periodYearFilter === null && availableYears.length > 0) {
+      setPeriodYearFilter(availableYears[0]);
+    }
+  }, [availableYears, periodYearFilter]);
+  
+  const filteredPeriods = useMemo(() => {
+    let filtered = periodsSummary;
+    
+    // Apply year filter
+    if (periodYearFilter !== null) {
+      filtered = filtered.filter(p => p.periodYear === periodYearFilter);
+    }
+    
+    // Limit to latest 12 periods
+    return filtered.slice(0, 12);
+  }, [periodsSummary, periodYearFilter]);
 
   /* ------------------------------------------------------------------------ */
   /* Simple derived stats for summary strip */
@@ -1787,19 +1818,45 @@ export default function ClaimReconciliation() {
                   Click on a period to select it and view its reconciliation workflow
                 </CardDescription>
               </div>
-              {selectedPeriodKey && (
-                <Badge className="bg-orange-500 text-white">
-                  Selected: {formatPeriodLabel(
-                    parseInt(periodYear),
-                    parseInt(periodMonth)
-                  )}
-                </Badge>
-              )}
+              <div className="flex items-center gap-3">
+                {/* Year filter */}
+                {availableYears.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium text-slate-700">Year:</Label>
+                    <Select
+                      value={periodYearFilter?.toString() || "all"}
+                      onValueChange={(value) => {
+                        setPeriodYearFilter(value === "all" ? null : parseInt(value, 10));
+                      }}
+                    >
+                      <SelectTrigger className="w-[140px] bg-white">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All years</SelectItem>
+                        {availableYears.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {selectedPeriodKey && (
+                  <Badge className="bg-orange-500 text-white">
+                    Selected: {formatPeriodLabel(
+                      parseInt(periodYear),
+                      parseInt(periodMonth)
+                    )}
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {periodsSummary.map((period) => {
+              {filteredPeriods.map((period) => {
                 const periodKey = `${period.periodYear}-${period.periodMonth}`;
                 const isReconciled = period.awaitingRemittance === 0 && period.totalClaims > 0;
                 const hasAwaitingClaims = period.awaitingRemittance > 0;
@@ -1956,6 +2013,24 @@ export default function ClaimReconciliation() {
               })}
             </div>
             
+            {/* View all periods link */}
+            {periodsSummary.length > filteredPeriods.length && (
+              <div className="mt-6 text-center">
+                <Button
+                  variant="link"
+                  className="text-orange-600 hover:text-orange-700"
+                  onClick={() => {
+                    const historySection = document.getElementById("reconciliation-history");
+                    if (historySection) {
+                      historySection.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                >
+                  View all {periodsSummary.length} periods in history →
+                </Button>
+              </div>
+            )}
+            
             {/* Clear filter button when filter is active */}
             {inventoryPeriodFilter && (
               <div className="mt-4 flex items-center justify-center">
@@ -1978,7 +2053,7 @@ export default function ClaimReconciliation() {
       )}
 
       {/* Reconciliation Workflow Section */}
-      <Card className="border-2 border-slate-200/80 shadow-lg">
+      <Card id="workflow-section" className="border-2 border-slate-200/80 shadow-lg">
         <CardHeader className="pb-4 bg-gradient-to-r from-orange-50 to-amber-50">
           <div className="flex items-center justify-between">
             <div>
@@ -2327,7 +2402,7 @@ export default function ClaimReconciliation() {
       </Card>
 
       {/* Reconciliation Runs List */}
-      <Card className="border-2 border-slate-200/80 shadow-lg">
+      <Card id="reconciliation-history" className="border-2 border-slate-200/80 shadow-lg">
         <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -2437,6 +2512,14 @@ export default function ClaimReconciliation() {
                     return (
                       <TableRow
                         key={run.id}
+                        onClick={() => {
+                          // Select this period and scroll to workflow
+                          handleSelectPeriod(run.periodYear, run.periodMonth);
+                          const workflowSection = document.getElementById("workflow-section");
+                          if (workflowSection) {
+                            workflowSection.scrollIntoView({ behavior: "smooth" });
+                          }
+                        }}
                         className={cn(
                           "odd:bg-slate-50/40 hover:bg-emerald-50/60 transition-colors cursor-pointer",
                           selectedRunId === run.id &&
