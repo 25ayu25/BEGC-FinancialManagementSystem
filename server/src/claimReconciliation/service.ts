@@ -800,7 +800,9 @@ export async function getPeriodsSummary(providerName?: string) {
   }
 
   // Calculate summary for each period
-  const summaries = Array.from(periodMap.values()).map((period) => {
+  const summaries = Array.from(periodMap.values())
+    .filter((period) => period.claims.length > 0) // Safety check: only include periods with claims
+    .map((period) => {
     const awaitingRemittance = period.claims.filter(
       (c) => c.status === "awaiting_remittance"
     ).length;
@@ -820,6 +822,9 @@ export async function getPeriodsSummary(providerName?: string) {
       (sum, c) => sum + parseFloat(c.amountPaid || "0"),
       0
     );
+    
+    // Get currency from first claim (all claims in a period should have same currency)
+    const currency = period.claims[0]?.currency || "USD";
 
     return {
       providerName: period.providerName,
@@ -832,6 +837,7 @@ export async function getPeriodsSummary(providerName?: string) {
       unpaid,
       totalBilled: totalBilled.toFixed(2),
       totalPaid: totalPaid.toFixed(2),
+      currency,
     };
   });
 

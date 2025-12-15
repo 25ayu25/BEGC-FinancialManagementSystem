@@ -163,6 +163,30 @@ function hasPatientOrAmountHeader(texts: string[]): boolean {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Detect currency from file content.
+ * Looks for "USD" in header rows (clinic name, title, etc.)
+ * Defaults to USD for CIC provider.
+ */
+function detectCurrency(rows: RowArray[]): string {
+  // Check first 10 rows for currency indicators
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const row = rows[i];
+    if (!Array.isArray(row)) continue;
+    
+    for (const cell of row) {
+      const cellText = norm(cell);
+      // Look for explicit "USD" in any cell
+      if (cellText.includes("usd")) {
+        return "USD";
+      }
+    }
+  }
+  
+  // Default to USD for CIC (based on problem statement)
+  return "USD";
+}
+
+/**
  * Parse Claims Submitted Excel file (CIC Smart Billing report).
  *
  * Screenshot columns:
@@ -177,6 +201,9 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
 
   const rows = readRows(sheet);
   if (rows.length === 0) return [];
+
+  // Detect currency from file content (defaults to USD for CIC)
+  const detectedCurrency = detectCurrency(rows);
 
   // Detect the header row with more lenient criteria:
   // - Require member number/id/no AND
@@ -287,10 +314,15 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
       colSchemeName != null ? String(row[colSchemeName] ?? "").trim() : "";
     const benefitDesc =
       colBenefitDesc != null ? String(row[colBenefitDesc] ?? "").trim() : "";
-    const currency =
-      colCurrency != null
-        ? String(row[colCurrency] ?? "").trim() || "SSP"
-        : "SSP";
+    
+    // Use currency column if available, otherwise use detected currency from file
+    let currency = detectedCurrency;
+    if (colCurrency != null) {
+      const cellCurrency = String(row[colCurrency] ?? "").trim();
+      if (cellCurrency) {
+        currency = cellCurrency.toUpperCase();
+      }
+    }
 
     results.push({
       memberNumber,

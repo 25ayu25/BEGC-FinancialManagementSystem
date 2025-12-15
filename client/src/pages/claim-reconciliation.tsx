@@ -151,6 +151,7 @@ interface PeriodSummary {
   unpaid: number;
   totalBilled: string;
   totalPaid: string;
+  currency: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -337,6 +338,7 @@ export default function ClaimReconciliation() {
   
   // Claims Inventory state
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid">("all");
+  const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null); // Format: "2025-1" for Jan 2025
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);
 
@@ -425,6 +427,7 @@ export default function ClaimReconciliation() {
       "/api/claim-reconciliation/claims",
       providerName,
       inventoryStatusFilter === "all" ? undefined : inventoryStatusFilter,
+      inventoryPeriodFilter,
       inventoryPage,
     ],
     queryFn: async () => {
@@ -436,6 +439,25 @@ export default function ClaimReconciliation() {
       
       if (inventoryStatusFilter !== "all") {
         params.append("status", inventoryStatusFilter);
+      }
+      
+      // Add period filter if selected
+      if (inventoryPeriodFilter) {
+        const parts = inventoryPeriodFilter.split("-");
+        // Validate format: should be "YYYY-M" or "YYYY-MM"
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10);
+          // Validate year and month are valid numbers
+          if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
+            params.append("periodYear", year.toString());
+            params.append("periodMonth", month.toString());
+          } else {
+            console.warn("Invalid period filter values:", inventoryPeriodFilter);
+          }
+        } else {
+          console.warn("Invalid period filter format:", inventoryPeriodFilter);
+        }
       }
 
       const url = new URL(
@@ -501,9 +523,9 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
-    if (!runs.length) {
+    if (!periodsSummary || periodsSummary.length === 0) {
       return {
-        totalRuns: 0,
+        totalRuns: runs.length,
         totalClaims: 0,
         problemClaims: 0,
         lastPeriodLabel: "—",
@@ -512,16 +534,16 @@ export default function ClaimReconciliation() {
     }
 
     const totalRuns = runs.length;
-    const totalClaims = runs.reduce(
-      (sum, r) => sum + (r.totalClaimRows || 0),
+    
+    // Sum all claims across all periods (not just runs)
+    const totalClaims = periodsSummary.reduce(
+      (sum, p) => sum + p.totalClaims,
       0
     );
 
-    // "Problem" = not fully paid = totalClaims - fullyPaid (autoMatched)
-    const problemClaims = runs.reduce((sum, r) => {
-      const total = r.totalClaimRows || 0;
-      const fullyPaid = r.autoMatched || 0;
-      return sum + Math.max(total - fullyPaid, 0);
+    // "Problem" = awaiting remittance + unpaid + partially paid
+    const problemClaims = periodsSummary.reduce((sum, p) => {
+      return sum + p.awaitingRemittance + p.unpaid + p.partiallyPaid;
     }, 0);
 
     // Sort runs to get the latest one reliably
@@ -530,7 +552,11 @@ export default function ClaimReconciliation() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
     const latest = sortedRuns[0];
-    const lastPeriodLabel = formatPeriodLabel(latest.periodYear, latest.periodMonth);
+    const lastPeriodLabel = latest 
+      ? formatPeriodLabel(latest.periodYear, latest.periodMonth)
+      : periodsSummary.length > 0
+      ? formatPeriodLabel(periodsSummary[0].periodYear, periodsSummary[0].periodMonth)
+      : "—";
 
     return {
       totalRuns,
@@ -539,7 +565,7 @@ export default function ClaimReconciliation() {
       lastPeriodLabel,
       latestRunId: latest?.id ?? null,
     };
-  }, [runs]);
+  }, [runs, periodsSummary]);
 
   /* ------------------------------------------------------------------------ */
   /* Mutations */
@@ -1082,6 +1108,13 @@ export default function ClaimReconciliation() {
             Paid
           </Badge>
         );
+      case "matched":
+        return (
+          <Badge className="bg-green-500 text-white hover:bg-green-600">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Matched
+          </Badge>
+        );
       case "partially_paid":
         return (
           <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">
@@ -1096,12 +1129,26 @@ export default function ClaimReconciliation() {
             Review
           </Badge>
         );
+      case "unpaid":
+        return (
+          <Badge className="bg-red-500 text-white hover:bg-red-600">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Unpaid
+          </Badge>
+        );
+      case "awaiting_remittance":
+        return (
+          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+            <Clock className="w-3 h-3 mr-1" />
+            Awaiting Remittance
+          </Badge>
+        );
       case "submitted":
       default:
         return (
-          <Badge className="bg-slate-500 text-white hover:bg-slate-600">
-            <FileSpreadsheet className="w-3 h-3 mr-1" />
-            Submitted
+          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+            <Clock className="w-3 h-3 mr-1" />
+            Awaiting Remittance
           </Badge>
         );
     }
@@ -1361,6 +1408,134 @@ export default function ClaimReconciliation() {
           </Card>
         )}
       </section>
+
+      {/* Period Overview Cards */}
+      {periodsSummary.length > 0 && (
+        <Card className="border-2 border-slate-200/80 shadow-lg">
+          <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-white">
+            <CardTitle className="text-lg">Your Claim Periods</CardTitle>
+            <CardDescription>
+              Overview of all periods with claims for {providerName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {periodsSummary.map((period) => {
+                const periodKey = `${period.periodYear}-${period.periodMonth}`;
+                const isReconciled = period.awaitingRemittance === 0 && period.totalClaims > 0;
+                const hasAwaitingClaims = period.awaitingRemittance > 0;
+                
+                return (
+                  <button
+                    key={periodKey}
+                    onClick={() => {
+                      setInventoryPeriodFilter(periodKey);
+                      setInventoryPage(1);
+                      setShowInventory(true);
+                    }}
+                    className={cn(
+                      "relative overflow-hidden rounded-xl border-2 p-4 text-left transition-all hover:shadow-lg hover:-translate-y-1 group",
+                      inventoryPeriodFilter === periodKey
+                        ? "border-orange-400 bg-orange-50/50 shadow-md"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    )}
+                  >
+                    {/* Gradient accent */}
+                    <div className={cn(
+                      "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl transition-all",
+                      isReconciled 
+                        ? "bg-gradient-to-br from-green-400/20 to-emerald-500/20"
+                        : hasAwaitingClaims
+                        ? "bg-gradient-to-br from-blue-400/20 to-cyan-500/20"
+                        : "bg-gradient-to-br from-slate-400/10 to-slate-500/10",
+                      "group-hover:scale-110"
+                    )} />
+                    
+                    <div className="relative space-y-3">
+                      {/* Period Label */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-lg text-slate-800">
+                          {formatPeriodLabel(period.periodYear, period.periodMonth)}
+                        </h3>
+                        {isReconciled ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        ) : hasAwaitingClaims ? (
+                          <Clock className="w-5 h-5 text-blue-600" />
+                        ) : null}
+                      </div>
+                      
+                      {/* Claim Count */}
+                      <div>
+                        <div className="text-2xl font-bold text-slate-900">
+                          {period.totalClaims} {pluralize(period.totalClaims, 'claim')}
+                        </div>
+                        <div className="text-sm text-slate-600">
+                          {period.currency} {parseFloat(period.totalBilled).toLocaleString()} billed
+                        </div>
+                      </div>
+                      
+                      {/* Status */}
+                      <div className="flex items-center gap-2">
+                        {isReconciled ? (
+                          <Badge className="bg-green-500 text-white hover:bg-green-600">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Reconciled
+                          </Badge>
+                        ) : hasAwaitingClaims ? (
+                          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                            <Clock className="w-3 h-3 mr-1" />
+                            Awaiting Remittance
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-500 text-white hover:bg-slate-600">
+                            Processing
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {/* Breakdown */}
+                      {!isReconciled && (
+                        <div className="text-xs text-slate-500 space-y-1">
+                          {period.awaitingRemittance > 0 && (
+                            <div>• {period.awaitingRemittance} awaiting remittance</div>
+                          )}
+                          {period.matched > 0 && (
+                            <div>• {period.matched} matched</div>
+                          )}
+                          {period.partiallyPaid > 0 && (
+                            <div>• {period.partiallyPaid} partially paid</div>
+                          )}
+                          {period.unpaid > 0 && (
+                            <div>• {period.unpaid} unpaid</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* Clear filter button when filter is active */}
+            {inventoryPeriodFilter && (
+              <div className="mt-4 flex items-center justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setInventoryPeriodFilter(null);
+                    setInventoryPage(1);
+                  }}
+                  className="gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Clear period filter
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Upload Form */}
       <Card className="border-2 border-slate-200/80 shadow-lg hover:shadow-xl transition-shadow">
@@ -1691,6 +1866,35 @@ export default function ClaimReconciliation() {
                 </button>
               </div>
             </div>
+            
+            {/* Period Filter Dropdown */}
+            {periodsSummary.length > 0 && (
+              <div className="mb-4 flex items-center gap-2">
+                <Label className="text-sm font-medium text-slate-700">Period:</Label>
+                <Select
+                  value={inventoryPeriodFilter || "all"}
+                  onValueChange={(value) => {
+                    setInventoryPeriodFilter(value === "all" ? null : value);
+                    setInventoryPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[280px] bg-white">
+                    <SelectValue placeholder="All periods" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All periods</SelectItem>
+                    {periodsSummary.map((period) => {
+                      const periodKey = `${period.periodYear}-${period.periodMonth}`;
+                      return (
+                        <SelectItem key={periodKey} value={periodKey}>
+                          {formatPeriodLabel(period.periodYear, period.periodMonth)} ({period.totalClaims} {pluralize(period.totalClaims, 'claim')})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Summary Stats */}
             {!summaryLoading && periodsSummary.length > 0 && (
