@@ -75,6 +75,7 @@ import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 import PageHeader from "@/components/layout/PageHeader";
 import HeaderAction from "@/components/layout/HeaderAction";
+import { ReconciliationStepper } from "@/components/ui/reconciliation-stepper";
 
 /* -------------------------------------------------------------------------- */
 /* Types */
@@ -319,7 +320,12 @@ export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Form state
+  // Single source of truth for selected period
+  // When a period card is clicked, this key (format: "YYYY-M") becomes the active period
+  // and all related UI (form fields, filters) sync to it
+  const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
+  
+  // Form state - derived from selectedPeriodKey when available
   const [providerName, setProviderName] = useState("CIC");
   const [periodYear, setPeriodYear] = useState(
     new Date().getFullYear().toString()
@@ -340,7 +346,7 @@ export default function ClaimReconciliation() {
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid">("all");
   const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null); // Format: "2025-1" for Jan 2025
   const [inventoryPage, setInventoryPage] = useState(1);
-  const [showInventory, setShowInventory] = useState(false);
+  const [showInventory, setShowInventory] = useState(false); // Default collapsed
 
   // Generate stable particle positions for header
   const particles = useMemo(() => {
@@ -964,6 +970,90 @@ export default function ClaimReconciliation() {
   const isExporting = exportIssuesMutation.isPending;
   
   /* ------------------------------------------------------------------------ */
+  /* Stepper logic - determines workflow state for selected period */
+  /* ------------------------------------------------------------------------ */
+  
+  const stepperState = useMemo(() => {
+    if (!periodStatus) {
+      return {
+        steps: {
+          claimsUploaded: { completed: false },
+          remittanceUploaded: { completed: false },
+          reconciliationRun: { completed: false },
+          reviewExceptions: { completed: false },
+        },
+        currentStep: 1 as 1 | 2 | 3 | 4,
+        primaryAction: "Upload claims file to begin",
+        primaryDisabled: true,
+      };
+    }
+
+    const hasClaims = periodStatus.claims.total > 0;
+    const hasRemittance = periodStatus.remittances.total > 0;
+    const isReconciled = periodStatus.isReconciled;
+    const exceptionsCount = periodStatus.claims.partiallyPaid + periodStatus.claims.unpaid;
+
+    // Step 1: Claims uploaded
+    const step1 = { 
+      completed: hasClaims,
+      details: hasClaims ? `${periodStatus.claims.total} claims` : undefined
+    };
+
+    // Step 2: Remittance uploaded
+    const step2 = { 
+      completed: hasRemittance,
+      details: hasRemittance ? `${periodStatus.remittances.total} remittances` : undefined
+    };
+
+    // Step 3: Reconciliation run
+    const step3 = { 
+      completed: isReconciled,
+      details: isReconciled ? "Complete" : undefined
+    };
+
+    // Step 4: Review exceptions
+    const step4 = { 
+      completed: isReconciled && exceptionsCount === 0,
+      details: exceptionsCount > 0 ? `${exceptionsCount} issues` : isReconciled ? "No issues" : undefined
+    };
+
+    // Determine current step and primary action
+    let currentStep: 1 | 2 | 3 | 4 = 1;
+    let primaryAction = "";
+    let primaryDisabled = false;
+
+    if (!hasClaims) {
+      currentStep = 1;
+      primaryAction = "📄 Upload Claims File";
+      primaryDisabled = !claimsFile;
+    } else if (!hasRemittance) {
+      currentStep = 2;
+      primaryAction = "💰 Upload Remittance File";
+      primaryDisabled = !remittanceFile;
+    } else if (!isReconciled) {
+      currentStep = 3;
+      primaryAction = "▶️ Run Reconciliation";
+      primaryDisabled = false;
+    } else {
+      currentStep = 4;
+      primaryAction = exceptionsCount > 0 ? "🔍 Review Exceptions" : "✅ All Complete";
+      primaryDisabled = false;
+    }
+
+    return {
+      steps: {
+        claimsUploaded: step1,
+        remittanceUploaded: step2,
+        reconciliationRun: step3,
+        reviewExceptions: step4,
+      },
+      currentStep,
+      primaryAction,
+      primaryDisabled,
+    };
+  }, [periodStatus, claimsFile, remittanceFile]);
+  
+  /* ------------------------------------------------------------------------ */
   /* Smart button logic - determines action based on uploaded files */
   /* ------------------------------------------------------------------------ */
   
@@ -1054,6 +1144,81 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
   /* Handlers */
   /* ------------------------------------------------------------------------ */
+  
+  // Handler for selecting a period from the period cards
+  const handleSelectPeriod = useCallback((year: number, month: number) => {
+    const periodKey = `${year}-${month}`;
+    setSelectedPeriodKey(periodKey);
+    setPeriodYear(year.toString());
+    setPeriodMonth(month.toString());
+    setInventoryPeriodFilter(periodKey);
+    
+    // Clear any uploaded files when switching periods
+    setClaimsFile(null);
+    setRemittanceFile(null);
+  }, []);
+  
+  // Handler for stepper primary action
+  const handleStepperAction = useCallback(() => {
+    if (!periodStatus) return;
+
+    const hasClaims = periodStatus.claims.total > 0;
+    const hasRemittance = periodStatus.remittances.total > 0;
+    const isReconciled = periodStatus.isReconciled;
+
+    if (!hasClaims) {
+      // Step 1: Upload claims
+      if (!claimsFile) {
+        toast({
+          title: "No file selected",
+          description: "Please select a claims file to upload.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Call upload handler directly without synthetic event
+      const formData = new FormData();
+      formData.append("claimsFile", claimsFile);
+      formData.append("providerName", providerName);
+      formData.append("periodYear", periodYear);
+      formData.append("periodMonth", periodMonth);
+      uploadClaimsMutation.mutate(formData);
+    } else if (!hasRemittance) {
+      // Step 2: Upload remittance
+      if (!remittanceFile) {
+        toast({
+          title: "No file selected",
+          description: "Please select a remittance file to upload.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Call upload handler directly without synthetic event
+      const formData = new FormData();
+      formData.append("remittanceFile", remittanceFile);
+      formData.append("providerName", providerName);
+      formData.append("periodYear", periodYear);
+      formData.append("periodMonth", periodMonth);
+      uploadRemittanceMutation.mutate(formData);
+    } else if (!isReconciled) {
+      // Step 3: Reconciliation runs automatically when remittance is uploaded
+      // This state shouldn't normally be reachable, but handle it gracefully
+      toast({
+        title: "Reconciliation Pending",
+        description: "Reconciliation will run automatically when you upload the remittance file.",
+      });
+    } else {
+      // Step 4: Review exceptions - scroll to exceptions
+      const exceptionsSection = document.getElementById("exceptions-section");
+      if (exceptionsSection) {
+        exceptionsSection.scrollIntoView({ behavior: "smooth" });
+      } else {
+        // Fallback: open inventory and filter to unpaid
+        setShowInventory(true);
+        setInventoryStatusFilter("unpaid");
+      }
+    }
+  }, [periodStatus, claimsFile, remittanceFile, providerName, periodYear, periodMonth, toast, uploadClaimsMutation, uploadRemittanceMutation]);
   
   const handleSmartSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1458,28 +1623,27 @@ export default function ClaimReconciliation() {
           <Card className="border border-dashed border-slate-300 bg-slate-50/80">
             <CardContent className="pt-4 text-sm text-slate-700 space-y-2">
               <div className="font-medium text-slate-800">
-                How reconciliation works
+                How the reconciliation workflow works
               </div>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  <strong>Upload claims only:</strong> Store claims before remittance arrives (status: "Awaiting remittance").
+                  <strong>Select a period:</strong> Click on any period card above to select it and view its reconciliation status.
                 </li>
                 <li>
-                  <strong>Upload remittance & reconcile:</strong> Upload remittance file to automatically reconcile against stored claims.
+                  <strong>Follow the stepper:</strong> The workflow stepper guides you through the process with one clear action at a time.
                 </li>
                 <li>
-                  <strong>Upload both:</strong> Upload claims and remittance together for immediate reconciliation.
+                  <strong>Upload claims first:</strong> Start by uploading your claims file. Claims will be stored with "awaiting remittance" status.
+                </li>
+                <li>
+                  <strong>Upload remittance:</strong> Once remittance arrives, upload it. Reconciliation runs automatically.
+                </li>
+                <li>
+                  <strong>Review exceptions:</strong> After reconciliation, review any partially paid or unpaid claims.
                 </li>
                 <li>
                   Only Excel files are supported (<code>.xlsx</code> or{" "}
-                  <code>.xls</code>).
-                </li>
-                <li>
-                  Member numbers and service dates should match between the two
-                  files.
-                </li>
-                <li>
-                  Use the status filter to view runs awaiting remittance or already reconciled.
+                  <code>.xls</code>). Member numbers and service dates should match between files.
                 </li>
               </ul>
             </CardContent>
@@ -1491,10 +1655,22 @@ export default function ClaimReconciliation() {
       {periodsSummary.length > 0 && (
         <Card className="border-2 border-slate-200/80 shadow-lg">
           <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-white">
-            <CardTitle className="text-lg">Your Claim Periods</CardTitle>
-            <CardDescription>
-              Overview of all periods with claims for {providerName}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Your Claim Periods</CardTitle>
+                <CardDescription>
+                  Click on a period to select it and view its reconciliation workflow
+                </CardDescription>
+              </div>
+              {selectedPeriodKey && (
+                <Badge className="bg-orange-500 text-white">
+                  Selected: {formatPeriodLabel(
+                    parseInt(periodYear),
+                    parseInt(periodMonth)
+                  )}
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1506,10 +1682,11 @@ export default function ClaimReconciliation() {
                 return (
                   <div
                     key={periodKey}
+                    onClick={() => handleSelectPeriod(period.periodYear, period.periodMonth)}
                     className={cn(
-                      "relative overflow-hidden rounded-xl border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-1 group",
-                      inventoryPeriodFilter === periodKey
-                        ? "border-orange-400 bg-orange-50/50 shadow-md"
+                      "relative overflow-hidden rounded-xl border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-1 group cursor-pointer",
+                      selectedPeriodKey === periodKey
+                        ? "border-orange-400 bg-orange-50/50 shadow-md ring-2 ring-orange-300"
                         : "border-slate-200 bg-white hover:border-slate-300"
                     )}
                   >
@@ -1527,18 +1704,11 @@ export default function ClaimReconciliation() {
                     <div className="relative space-y-3">
                       {/* Period Label with Delete Button */}
                       <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => {
-                            setInventoryPeriodFilter(periodKey);
-                            setInventoryPage(1);
-                            setShowInventory(true);
-                          }}
-                          className="flex-1 text-left"
-                        >
-                          <h3 className="font-bold text-lg text-slate-800 hover:text-orange-600 transition-colors">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg text-slate-800 group-hover:text-orange-600 transition-colors">
                             {formatPeriodLabel(period.periodYear, period.periodMonth)}
                           </h3>
-                        </button>
+                        </div>
                         <div className="flex items-center gap-2">
                           {isReconciled ? (
                             <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -1572,21 +1742,14 @@ export default function ClaimReconciliation() {
                       </div>
                       
                       {/* Claim Count */}
-                      <button
-                        onClick={() => {
-                          setInventoryPeriodFilter(periodKey);
-                          setInventoryPage(1);
-                          setShowInventory(true);
-                        }}
-                        className="w-full text-left"
-                      >
+                      <div className="w-full text-left">
                         <div className="text-2xl font-bold text-slate-900">
                           {period.totalClaims} {pluralize(period.totalClaims, 'claim')}
                         </div>
                         <div className="text-sm text-slate-600">
                           {period.currency} {parseFloat(period.totalBilled).toLocaleString()} billed
                         </div>
-                      </button>
+                      </div>
                       
                       {/* Status */}
                       <div className="flex items-center gap-2">
@@ -1651,233 +1814,99 @@ export default function ClaimReconciliation() {
         </Card>
       )}
 
-      {/* Upload Form */}
-      <Card className="border-2 border-slate-200/80 shadow-lg hover:shadow-xl transition-shadow">
-        <CardHeader className="space-y-1 pb-4 bg-gradient-to-r from-slate-50 to-white">
-          <div>
-            <CardTitle className="text-lg md:text-xl">
-              Upload reconciliation files
-            </CardTitle>
-            <CardDescription>
-              Choose the period and upload Claims, Remittance, or both files. 
-              You can upload claims first and reconcile later when remittance arrives.
-            </CardDescription>
+      {/* Reconciliation Workflow Section */}
+      <Card className="border-2 border-slate-200/80 shadow-lg">
+        <CardHeader className="pb-4 bg-gradient-to-r from-orange-50 to-amber-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+                <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                Reconciliation Workflow
+              </CardTitle>
+              <CardDescription>
+                {selectedPeriodKey 
+                  ? `Working on: ${providerName} - ${formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth))}`
+                  : "Select a period above to begin"}
+              </CardDescription>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6 pt-0">
-          <TooltipProvider delayDuration={100}>
-            <form onSubmit={handleSmartSubmit} className="space-y-6">
-              {/* 6-column grid for form fields */}
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-x-6 gap-y-6">
-                {/* Row 1: Settings */}
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="provider">Insurance provider</Label>
-                  <Select
-                    value={providerName}
-                    onValueChange={setProviderName}
-                    disabled={isFormDisabled}
-                  >
-                    <SelectTrigger
-                      id="provider"
-                      className="bg-white/60 focus-visible:ring-slate-300"
-                    >
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CIC">CIC</SelectItem>
-                      <SelectItem value="UAP">UAP</SelectItem>
-                      <SelectItem value="CIGNA">CIGNA</SelectItem>
-                      <SelectItem value="OTHER">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+        <CardContent className="space-y-6 pt-4">
+          {selectedPeriodKey ? (
+            <>
+              {/* Stepper Component */}
+              <ReconciliationStepper
+                steps={stepperState.steps}
+                currentStep={stepperState.currentStep}
+                primaryActionLabel={stepperState.primaryAction}
+                primaryActionDisabled={stepperState.primaryDisabled}
+                primaryActionLoading={isUploading}
+                onPrimaryAction={handleStepperAction}
+              />
+
+              {/* File Upload Section - Collapsible */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700">File Upload</h3>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="year">Period year</Label>
-                  <Input
-                    id="year"
-                    type="number"
-                    value={periodYear}
-                    onChange={(e) => setPeriodYear(e.target.value)}
-                    min="2020"
-                    max="2099"
-                    disabled={isFormDisabled}
-                    className="bg-white/60 focus-visible:ring-slate-300"
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="month">Period month</Label>
-                  <Select
-                    value={periodMonth}
-                    onValueChange={setPeriodMonth}
-                    disabled={isFormDisabled}
-                  >
-                    <SelectTrigger
-                      id="month"
-                      className="bg-white/60 focus-visible:ring-slate-300"
-                    >
-                      <SelectValue placeholder="Select month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                        <SelectItem key={m} value={m.toString()}>
-                          {new Date(2000, m - 1).toLocaleString("default", {
-                            month: "long",
-                          })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Period Status Indicator */}
-                <div className="md:col-span-6">
-                  {periodStatusLoading || periodStatusFetching ? (
-                    <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg">
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
-                      <span className="text-sm text-slate-600">Loading period status...</span>
-                    </div>
-                  ) : periodStatus ? (
-                    <div className={cn(
-                      "px-4 py-3 border-2 rounded-lg transition-all",
-                      periodStatus.claims.total === 0 
-                        ? "bg-blue-50/50 border-blue-200" 
-                        : periodStatus.hasClaimsOnly
-                        ? "bg-yellow-50/50 border-yellow-300"
-                        : periodStatus.isReconciled
-                        ? "bg-green-50/50 border-green-300"
-                        : "bg-slate-50 border-slate-200"
-                    )}>
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                          periodStatus.claims.total === 0
-                            ? "bg-blue-500"
-                            : periodStatus.hasClaimsOnly
-                            ? "bg-yellow-500"
-                            : periodStatus.isReconciled
-                            ? "bg-green-500"
-                            : "bg-slate-500"
-                        )}>
-                          {periodStatus.claims.total === 0 ? (
-                            <Info className="w-4 h-4 text-white" />
-                          ) : periodStatus.hasClaimsOnly ? (
-                            <Clock className="w-4 h-4 text-white" />
-                          ) : periodStatus.isReconciled ? (
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 text-white" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-semibold text-sm text-slate-800 mb-1">
-                            {periodStatus.claims.total === 0
-                              ? "🔵 No data for this period"
-                              : periodStatus.hasClaimsOnly
-                              ? `🟡 ${periodStatus.claims.total} ${pluralize(periodStatus.claims.total, 'claim')} awaiting remittance`
-                              : periodStatus.isReconciled
-                              ? `🟢 Reconciled (${periodStatus.claims.matched} matched, ${periodStatus.claims.partiallyPaid} partial, ${periodStatus.claims.unpaid} unpaid)`
-                              : "Period has data"}
-                          </div>
-                          <div className="text-xs text-slate-600">
-                            {periodStatus.claims.total === 0
-                              ? "No claims have been uploaded for this provider and period yet."
-                              : periodStatus.hasClaimsOnly
-                              ? "Claims have been stored. Upload the remittance file to reconcile."
-                              : `This period has ${periodStatus.claims.total} claims and ${periodStatus.remittances.total} remittances.`}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Row 2: Files */}
-                <div className="md:col-span-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Claims File Upload */}
                   <FileDropzone
-                    label="Claims submitted file"
-                    description="The billing export you send to CIC (one row per claim)."
+                    label="Claims File"
+                    description="Upload claims submitted to insurance"
                     file={claimsFile}
                     onFileChange={setClaimsFile}
-                    disabled={isFormDisabled}
+                    disabled={isUploading}
                     tintColor="blue"
                     icon={<FileText className="w-4 h-4" />}
                   />
-                </div>
 
-                <div className="md:col-span-3">
+                  {/* Remittance File Upload */}
                   <FileDropzone
-                    label="Remittance advice file"
-                    description="The payment / remittance report you receive back from CIC."
+                    label="Remittance File"
+                    description="Upload remittance advice from insurance"
                     file={remittanceFile}
                     onFileChange={setRemittanceFile}
-                    disabled={isFormDisabled}
+                    disabled={isUploading}
                     tintColor="green"
                     icon={<DollarSign className="w-4 h-4" />}
                   />
                 </div>
-                
-                {/* Inline warning when remittance selected without claims */}
+
+                {/* Warning for remittance without claims */}
                 {showRemittanceWarning && (
-                  <div className="md:col-span-6">
-                    <div className="flex items-start gap-3 px-4 py-3 bg-orange-50 border-2 border-orange-300 rounded-lg">
-                      <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm text-orange-800 mb-1">
-                          No claims found for {providerName} - {formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth))}
-                        </div>
-                        <div className="text-xs text-orange-700">
-                          Please upload claims first or select a different period.
-                        </div>
+                  <div className="flex items-start gap-3 px-4 py-3 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm text-orange-800 mb-1">
+                        No claims found for this period
+                      </div>
+                      <div className="text-xs text-orange-700">
+                        Please upload claims first or select a different period.
                       </div>
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Smart Single Action Button */}
-              <div className="flex flex-col gap-3 pt-1">
-                <Button
-                  type="submit"
-                  size="lg"
-                  disabled={uploadAction.disabled || isUploading}
-                  className={cn(
-                    "w-full font-semibold shadow-lg gap-2 px-6 transition-all",
-                    uploadAction.color === "blue" && "bg-blue-500 hover:bg-blue-600 text-white border-0",
-                    uploadAction.color === "green" && "bg-green-500 hover:bg-green-600 text-white border-0",
-                    uploadAction.color === "orange" && "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border-0",
-                    uploadAction.color === "gray" && "bg-slate-300 text-slate-600 cursor-not-allowed border-0"
-                  )}
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Processing…
-                    </>
-                  ) : (
-                    <>
-                      {uploadAction.type === "claims-only" && <FileText className="w-4 h-4" />}
-                      {uploadAction.type === "remittance-only" && <CheckCircle2 className="w-4 h-4" />}
-                      {uploadAction.type === "both" && <Upload className="w-4 h-4" />}
-                      {uploadAction.type === "disabled" && <Upload className="w-4 h-4" />}
-                      {uploadAction.label}
-                    </>
-                  )}
-                </Button>
-
-                <p className="text-xs text-muted-foreground text-center max-w-full">
-                  {helpText}
-                </p>
-              </div>
-            </form>
-          </TooltipProvider>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-muted-foreground text-sm">
+                Click on a period card above to select it and begin the reconciliation workflow.
+              </p>
+              <p className="text-xs text-slate-500 mt-2">
+                Or create a new period by selecting provider, year, and month, then uploading files.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Claims Inventory Section */}
-      <Card className="border-2 border-slate-200/80 shadow-lg">
+      <Card id="exceptions-section" className="border-2 border-slate-200/80 shadow-lg">
         <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-between gap-2">
             <div>
