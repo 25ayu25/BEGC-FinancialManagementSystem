@@ -761,6 +761,26 @@ export async function deleteClaimsForPeriod(
 }
 
 /**
+ * Delete all remittances for a specific period
+ */
+export async function deleteRemittancesForPeriod(
+  providerName: string,
+  periodYear: number,
+  periodMonth: number
+) {
+  await db
+    .delete(claimReconRemittances)
+    .where(
+      and(
+        eq(claimReconRemittances.providerName, providerName),
+        eq(claimReconRemittances.periodYear, periodYear),
+        eq(claimReconRemittances.periodMonth, periodMonth)
+      )
+    );
+  return { success: true };
+}
+
+/**
  * Get summary of all periods that have claims
  */
 export async function getPeriodsSummary(providerName?: string) {
