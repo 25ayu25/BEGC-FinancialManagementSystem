@@ -1890,7 +1890,7 @@ export default function ClaimReconciliation() {
       </Card>
 
       {/* Claims Inventory Section */}
-      <Card className="border-2 border-slate-200/80 shadow-lg">
+      <Card id="exceptions-section" className="border-2 border-slate-200/80 shadow-lg">
         <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-between gap-2">
             <div>
