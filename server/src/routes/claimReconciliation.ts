@@ -26,6 +26,7 @@ import {
   getAllClaims,
   deleteClaim,
   deleteClaimsForPeriod,
+  deleteRemittancesForPeriod,
   getPeriodsSummary,
 } from "../claimReconciliation/service";
 
@@ -667,6 +668,30 @@ router.delete(
       console.error("Error deleting claims for period:", error);
       res.status(500).json({
         error: error.message || "Failed to delete claims for period",
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/claim-reconciliation/remittances/period/:providerName/:year/:month
+ * Delete all remittances for a specific period
+ */
+router.delete(
+  "/remittances/period/:providerName/:year/:month",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { providerName, year, month } = req.params;
+      const periodYear = parseInt(year, 10);
+      const periodMonth = parseInt(month, 10);
+
+      await deleteRemittancesForPeriod(providerName, periodYear, periodMonth);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting remittances for period:", error);
+      res.status(500).json({
+        error: error.message || "Failed to delete remittances for period",
       });
     }
   }

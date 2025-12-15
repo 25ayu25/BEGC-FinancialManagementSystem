@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
@@ -185,6 +185,35 @@ function pluralize(count: number, singular: string, plural?: string): string {
   return plural || `${singular}s`;
 }
 
+/**
+ * Get currency display for a provider/claim
+ * CIC should always display USD, even if stored as SSP
+ */
+function getCurrencyForDisplay(providerName: string, currency?: string): string {
+  if (providerName === "CIC") {
+    return "USD";
+  }
+  return currency || "USD";
+}
+
+/**
+ * Get workflow description explaining cross-period matching for providers
+ */
+function getWorkflowDescription(providerName: string, periodLabel: string): string {
+  return `Working on: ${providerName} – ${periodLabel} (claims for this month). Remittance uploads will be matched against all outstanding ${providerName} claims across all months.`;
+}
+
+/**
+ * Get remittance file upload description
+ * CIC has special cross-period behavior
+ */
+function getRemittanceUploadDescription(providerName: string): string {
+  if (providerName === "CIC") {
+    return "This remittance will be matched against all CIC claims that are still awaiting remittance, not just this month";
+  }
+  return "Upload remittance advice from insurance";
+}
+
 /* -------------------------------------------------------------------------- */
 /* Re-usable FileDropzone Component */
 /* -------------------------------------------------------------------------- */
@@ -325,6 +354,9 @@ export default function ClaimReconciliation() {
   // and all related UI (form fields, filters) sync to it
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
   
+  // Year filter for period cards - initialized to most recent year
+  const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
+  
   // Form state - derived from selectedPeriodKey when available
   const [providerName, setProviderName] = useState("CIC");
   const [periodYear, setPeriodYear] = useState(
@@ -343,7 +375,8 @@ export default function ClaimReconciliation() {
   const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
   
   // Claims Inventory state
-  const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid">("all");
+  // Default to "unpaid" to show the most important claims first (per requirement F)
+  const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid">("unpaid");
   const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null); // Format: "2025-1" for Jan 2025
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false); // Default collapsed
@@ -523,6 +556,34 @@ export default function ClaimReconciliation() {
       return response.json();
     },
   });
+
+  /* ------------------------------------------------------------------------ */
+  /* Filter and limit visible periods */
+  /* ------------------------------------------------------------------------ */
+  
+  const availableYears = useMemo(() => {
+    const years = new Set(periodsSummary.map(p => p.periodYear));
+    return Array.from(years).sort((a, b) => b - a); // Most recent first
+  }, [periodsSummary]);
+  
+  // Set default year filter to current year if not set
+  useEffect(() => {
+    if (periodYearFilter === null && availableYears.length > 0) {
+      setPeriodYearFilter(availableYears[0]);
+    }
+  }, [availableYears, periodYearFilter]);
+  
+  const filteredPeriods = useMemo(() => {
+    let filtered = periodsSummary;
+    
+    // Apply year filter
+    if (periodYearFilter !== null) {
+      filtered = filtered.filter(p => p.periodYear === periodYearFilter);
+    }
+    
+    // Limit to latest 12 periods
+    return filtered.slice(0, 12);
+  }, [periodsSummary, periodYearFilter]);
 
   /* ------------------------------------------------------------------------ */
   /* Simple derived stats for summary strip */
@@ -904,7 +965,7 @@ export default function ClaimReconciliation() {
   });
 
   // Delete period claims
-  const deletePeriodMutation = useMutation({
+  const deletePeriodClaimsMutation = useMutation({
     mutationFn: async ({ providerName, year, month }: { providerName: string; year: number; month: number }) => {
       const url = new URL(
         `/api/claim-reconciliation/claims/period/${providerName}/${year}/${month}`,
@@ -965,8 +1026,70 @@ export default function ClaimReconciliation() {
     },
   });
 
+  // Delete period remittances
+  const deletePeriodRemittancesMutation = useMutation({
+    mutationFn: async ({ providerName, year, month }: { providerName: string; year: number; month: number }) => {
+      const url = new URL(
+        `/api/claim-reconciliation/remittances/period/${providerName}/${year}/${month}`,
+        API_BASE_URL
+      ).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) {
+        headers["x-session-token"] = backup;
+      }
+
+      const response = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to delete remittances");
+        } else {
+          const text = await response.text();
+          throw new Error(
+            `Failed to delete remittances (${response.status}): ${text.substring(0, 120)}`
+          );
+        }
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Remittances deleted",
+        description: "All remittances for the period were removed.",
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/periods-summary"],
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/period"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/claim-reconciliation/claims"],
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const isUploading = uploadMutation.isPending || uploadClaimsMutation.isPending || uploadRemittanceMutation.isPending;
-  const isDeleting = deleteMutation.isPending || deletePeriodMutation.isPending;
+  const isDeleting = deleteMutation.isPending || deletePeriodClaimsMutation.isPending || deletePeriodRemittancesMutation.isPending;
   const isExporting = exportIssuesMutation.isPending;
   
   /* ------------------------------------------------------------------------ */
@@ -1326,20 +1449,72 @@ export default function ClaimReconciliation() {
     exportIssuesMutation.mutate(selectedRunId);
   };
 
-  const handleDeletePeriod = (period: PeriodSummary) => {
+  const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
     const periodLabel = formatPeriodLabel(period.periodYear, period.periodMonth);
-    const claimCount = period.totalClaims;
     
-    const ok = window.confirm(
-      `Delete all ${claimCount} ${pluralize(claimCount, 'claim')} for ${periodLabel}?\n\nThis cannot be undone.`
-    );
-    if (!ok) return;
+    if (type === "claims") {
+      const claimCount = period.totalClaims;
+      const ok = window.confirm(
+        `Delete all ${claimCount} ${pluralize(claimCount, 'claim')} for ${periodLabel}?\n\nThis cannot be undone.`
+      );
+      if (!ok) return;
 
-    deletePeriodMutation.mutate({
-      providerName: period.providerName,
-      year: period.periodYear,
-      month: period.periodMonth,
-    });
+      deletePeriodClaimsMutation.mutate({
+        providerName: period.providerName,
+        year: period.periodYear,
+        month: period.periodMonth,
+      });
+    } else {
+      const ok = window.confirm(
+        `Delete all remittances for ${periodLabel}?\n\nThis cannot be undone.`
+      );
+      if (!ok) return;
+
+      deletePeriodRemittancesMutation.mutate({
+        providerName: period.providerName,
+        year: period.periodYear,
+        month: period.periodMonth,
+      });
+    }
+  };
+
+  const handleReplacePeriodFile = (period: PeriodSummary, type: "claims" | "remittances") => {
+    // Set the period for upload
+    setPeriodYear(period.periodYear.toString());
+    setPeriodMonth(period.periodMonth.toString());
+    setProviderName(period.providerName);
+    setSelectedPeriodKey(`${period.periodYear}-${period.periodMonth}`);
+    
+    // Create a file input element
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,.xls";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      // Set the file based on type
+      if (type === "claims") {
+        setClaimsFile(file);
+        // Upload immediately
+        const formData = new FormData();
+        formData.append("claimsFile", file);
+        formData.append("providerName", period.providerName);
+        formData.append("periodYear", period.periodYear.toString());
+        formData.append("periodMonth", period.periodMonth.toString());
+        uploadClaimsMutation.mutate(formData);
+      } else {
+        setRemittanceFile(file);
+        // Upload immediately
+        const formData = new FormData();
+        formData.append("remittanceFile", file);
+        formData.append("providerName", period.providerName);
+        formData.append("periodYear", period.periodYear.toString());
+        formData.append("periodMonth", period.periodMonth.toString());
+        uploadRemittanceMutation.mutate(formData);
+      }
+    };
+    input.click();
   };
 
   const getStatusBadge = (status: string) => {
@@ -1662,19 +1837,45 @@ export default function ClaimReconciliation() {
                   Click on a period to select it and view its reconciliation workflow
                 </CardDescription>
               </div>
-              {selectedPeriodKey && (
-                <Badge className="bg-orange-500 text-white">
-                  Selected: {formatPeriodLabel(
-                    parseInt(periodYear),
-                    parseInt(periodMonth)
-                  )}
-                </Badge>
-              )}
+              <div className="flex items-center gap-3">
+                {/* Year filter */}
+                {availableYears.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium text-slate-700">Year:</Label>
+                    <Select
+                      value={periodYearFilter?.toString() || "all"}
+                      onValueChange={(value) => {
+                        setPeriodYearFilter(value === "all" ? null : parseInt(value, 10));
+                      }}
+                    >
+                      <SelectTrigger className="w-[140px] bg-white">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All years</SelectItem>
+                        {availableYears.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {selectedPeriodKey && (
+                  <Badge className="bg-orange-500 text-white">
+                    Selected: {formatPeriodLabel(
+                      parseInt(periodYear),
+                      parseInt(periodMonth)
+                    )}
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {periodsSummary.map((period) => {
+              {filteredPeriods.map((period) => {
                 const periodKey = `${period.periodYear}-${period.periodMonth}`;
                 const isReconciled = period.awaitingRemittance === 0 && period.totalClaims > 0;
                 const hasAwaitingClaims = period.awaitingRemittance > 0;
@@ -1702,7 +1903,7 @@ export default function ClaimReconciliation() {
                     )} />
                     
                     <div className="relative space-y-3">
-                      {/* Period Label with Delete Button */}
+                      {/* Period Label with Action Menu */}
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <h3 className="font-bold text-lg text-slate-800 group-hover:text-orange-600 transition-colors">
@@ -1713,31 +1914,69 @@ export default function ClaimReconciliation() {
                           {isReconciled ? (
                             <CheckCircle2 className="w-5 h-5 text-green-600" />
                           ) : hasAwaitingClaims ? (
-                            <>
-                              <Clock className="w-5 h-5 text-blue-600" />
-                              {/* Delete button - only show for awaiting remittance */}
+                            <Clock className="w-5 h-5 text-blue-600" />
+                          ) : null}
+                          {/* Action menu for period - stop propagation to prevent card click */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="w-7 h-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                className="w-7 h-7 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                                onClick={(e) => e.stopPropagation()}
+                                disabled={isDeleting || isUploading}
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeletePeriod(period);
+                                  handleReplacePeriodFile(period, "claims");
                                 }}
-                                disabled={deletePeriodMutation.isPending}
-                                title="Delete all claims for this period"
+                                disabled={isUploading}
+                                className="cursor-pointer"
                               >
-                                {deletePeriodMutation.isPending &&
-                                deletePeriodMutation.variables?.providerName === period.providerName &&
-                                deletePeriodMutation.variables?.year === period.periodYear &&
-                                deletePeriodMutation.variables?.month === period.periodMonth ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </>
-                          ) : null}
+                                <Upload className="w-3 h-3 mr-2" />
+                                Replace claims file
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period, "claims");
+                                }}
+                                disabled={isDeleting}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Clear all claims
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReplacePeriodFile(period, "remittances");
+                                }}
+                                disabled={isUploading}
+                                className="cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3 mr-2" />
+                                Replace remittance file
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period, "remittances");
+                                }}
+                                disabled={isDeleting}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Clear remittances
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                       
@@ -1747,7 +1986,7 @@ export default function ClaimReconciliation() {
                           {period.totalClaims} {pluralize(period.totalClaims, 'claim')}
                         </div>
                         <div className="text-sm text-slate-600">
-                          {period.currency} {parseFloat(period.totalBilled).toLocaleString()} billed
+                          {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()} billed
                         </div>
                       </div>
                       
@@ -1793,6 +2032,24 @@ export default function ClaimReconciliation() {
               })}
             </div>
             
+            {/* View all periods link */}
+            {periodsSummary.length > filteredPeriods.length && (
+              <div className="mt-6 text-center">
+                <Button
+                  variant="link"
+                  className="text-orange-600 hover:text-orange-700"
+                  onClick={() => {
+                    const historySection = document.getElementById("reconciliation-history");
+                    if (historySection) {
+                      historySection.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                >
+                  View all {periodsSummary.length} periods in history →
+                </Button>
+              </div>
+            )}
+            
             {/* Clear filter button when filter is active */}
             {inventoryPeriodFilter && (
               <div className="mt-4 flex items-center justify-center">
@@ -1815,7 +2072,7 @@ export default function ClaimReconciliation() {
       )}
 
       {/* Reconciliation Workflow Section */}
-      <Card className="border-2 border-slate-200/80 shadow-lg">
+      <Card id="workflow-section" className="border-2 border-slate-200/80 shadow-lg">
         <CardHeader className="pb-4 bg-gradient-to-r from-orange-50 to-amber-50">
           <div className="flex items-center justify-between">
             <div>
@@ -1825,7 +2082,7 @@ export default function ClaimReconciliation() {
               </CardTitle>
               <CardDescription>
                 {selectedPeriodKey 
-                  ? `Working on: ${providerName} - ${formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth))}`
+                  ? getWorkflowDescription(providerName, formatPeriodLabel(parseInt(periodYear), parseInt(periodMonth)))
                   : "Select a period above to begin"}
               </CardDescription>
             </div>
@@ -1866,7 +2123,7 @@ export default function ClaimReconciliation() {
                   {/* Remittance File Upload */}
                   <FileDropzone
                     label="Remittance File"
-                    description="Upload remittance advice from insurance"
+                    description={getRemittanceUploadDescription(providerName)}
                     file={remittanceFile}
                     onFileChange={setRemittanceFile}
                     disabled={isUploading}
@@ -2113,10 +2370,10 @@ export default function ClaimReconciliation() {
                             {formatPeriodLabel(claim.periodYear, claim.periodMonth)}
                           </TableCell>
                           <TableCell>
-                            {claim.currency || "USD"} {parseFloat(claim.billedAmount).toFixed(2)}
+                            {getCurrencyForDisplay(claim.providerName, claim.currency)} {parseFloat(claim.billedAmount).toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            {claim.currency || "USD"} {parseFloat(claim.amountPaid || "0").toFixed(2)}
+                            {getCurrencyForDisplay(claim.providerName, claim.currency)} {parseFloat(claim.amountPaid || "0").toFixed(2)}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(claim.status)}
@@ -2162,7 +2419,7 @@ export default function ClaimReconciliation() {
       </Card>
 
       {/* Reconciliation Runs List */}
-      <Card className="border-2 border-slate-200/80 shadow-lg">
+      <Card id="reconciliation-history" className="border-2 border-slate-200/80 shadow-lg">
         <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -2272,6 +2529,14 @@ export default function ClaimReconciliation() {
                     return (
                       <TableRow
                         key={run.id}
+                        onClick={() => {
+                          // Select this period and scroll to workflow
+                          handleSelectPeriod(run.periodYear, run.periodMonth);
+                          const workflowSection = document.getElementById("workflow-section");
+                          if (workflowSection) {
+                            workflowSection.scrollIntoView({ behavior: "smooth" });
+                          }
+                        }}
                         className={cn(
                           "odd:bg-slate-50/40 hover:bg-emerald-50/60 transition-colors cursor-pointer",
                           selectedRunId === run.id &&
@@ -2513,10 +2778,10 @@ export default function ClaimReconciliation() {
                             </TableCell>
                             <TableCell>
                               {/* Currency fallback to USD if not available */}
-                              {claim.currency || "USD"} {parseFloat(claim.billedAmount).toFixed(2)}
+                              {getCurrencyForDisplay(selectedRun.providerName, claim.currency)} {parseFloat(claim.billedAmount).toFixed(2)}
                             </TableCell>
                             <TableCell>
-                              {claim.currency || "USD"} {parseFloat(claim.amountPaid).toFixed(2)}
+                              {getCurrencyForDisplay(selectedRun.providerName, claim.currency)} {parseFloat(claim.amountPaid).toFixed(2)}
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(claim.status)}

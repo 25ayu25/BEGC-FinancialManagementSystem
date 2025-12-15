@@ -761,6 +761,28 @@ export async function deleteClaimsForPeriod(
 }
 
 /**
+ * Delete all remittances for a specific period
+ * Note: This is a period-level operation intended for staff to clear and re-upload data.
+ * It does not cascade to reconciliation runs to preserve audit trail.
+ */
+export async function deleteRemittancesForPeriod(
+  providerName: string,
+  periodYear: number,
+  periodMonth: number
+) {
+  await db
+    .delete(claimReconRemittances)
+    .where(
+      and(
+        eq(claimReconRemittances.providerName, providerName),
+        eq(claimReconRemittances.periodYear, periodYear),
+        eq(claimReconRemittances.periodMonth, periodMonth)
+      )
+    );
+  return { success: true };
+}
+
+/**
  * Get summary of all periods that have claims
  */
 export async function getPeriodsSummary(providerName?: string) {
