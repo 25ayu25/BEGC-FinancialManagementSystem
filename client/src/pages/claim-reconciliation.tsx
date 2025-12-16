@@ -747,6 +747,7 @@ export default function ClaimReconciliation() {
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
+      if (data?.runId) setSelectedRunId(data.runId);
 
       setClaimsFile(null);
     },
@@ -793,6 +794,7 @@ export default function ClaimReconciliation() {
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
+      if (data?.runId) setSelectedRunId(data.runId);
 
       setRemittanceFile(null);
     },
