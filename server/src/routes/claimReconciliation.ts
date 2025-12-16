@@ -276,25 +276,11 @@ router.post(
         claims
       );
 
-      // Create a run (history entry) and record metrics
-      const run = await createReconRun(
-        providerName,
-        parseInt(periodYear, 10),
-        parseInt(periodMonth, 10),
-        userId
-      );
-
-      await updateReconRunMetrics(run.id, {
-        totalClaimRows: inserted.length,
-        totalRemittanceRows: 0,
-        autoMatched: 0,
-        partialMatched: 0,
-        manualReview: 0,
-      });
-
+      // Claims-only uploads should NOT create a run record.
+      // Runs should only be created when remittances are uploaded and matching occurs.
+      
       res.json({
         success: true,
-        runId: run.id,
         provider: providerName,
         period: formatPeriod(parseInt(periodYear, 10), parseInt(periodMonth, 10)),
         claimsStored: inserted.length,
