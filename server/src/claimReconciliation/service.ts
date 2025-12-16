@@ -6,7 +6,8 @@ import {
   claimReconClaims,
   claimReconRemittances,
 } from "@shared/schema";
-import { eq, and, or, isNull } from "drizzle-orm";
+// INSTRUCTION A: Updated imports to include 'desc'
+import { eq, and, or, isNull, desc } from "drizzle-orm";
 import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
 import {
   buildClaimCompositeKeyFromRow,
@@ -40,6 +41,23 @@ export async function createReconRun(
     .returning();
 
   return run;
+}
+
+// INSTRUCTION B: Added helper near createReconRun
+export async function updateReconRunMetrics(
+  runId: number,
+  metrics: Partial<{
+    totalClaimRows: number;
+    totalRemittanceRows: number;
+    autoMatched: number;
+    partialMatched: number;
+    manualReview: number;
+  }>
+) {
+  await db
+    .update(claimReconRuns)
+    .set(metrics as any)
+    .where(eq(claimReconRuns.id, runId));
 }
 
 /**
@@ -254,31 +272,76 @@ export async function getReconRun(runId: number) {
   return run;
 }
 
+// INSTRUCTION C: Replace getAllReconRuns with newest-first
 export async function getAllReconRuns() {
-  const runs = await db.select().from(claimReconRuns).orderBy(claimReconRuns.createdAt);
+  const runs = await db
+    .select()
+    .from(claimReconRuns)
+    .orderBy(desc(claimReconRuns.createdAt));
   return runs;
 }
 
+// INSTRUCTION D: Replace getClaimsForRun with fallback logic
 export async function getClaimsForRun(runId: number) {
-  const claims = await db.select().from(claimReconClaims).where(eq(claimReconClaims.runId, runId));
-  return claims;
+  const runClaims = await db
+    .select()
+    .from(claimReconClaims)
+    .where(eq(claimReconClaims.runId, runId));
+
+  if (runClaims.length > 0) return runClaims;
+
+  // Fallback for staged runs (claims have runId = null)
+  const run = await getReconRun(runId);
+  if (!run) return [];
+
+  const periodClaims = await db
+    .select()
+    .from(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, run.providerName),
+        eq(claimReconClaims.periodYear, run.periodYear),
+        eq(claimReconClaims.periodMonth, run.periodMonth)
+      )
+    );
+
+  return periodClaims;
 }
 
+// INSTRUCTION D: Replace getRemittancesForRun with fallback logic
 export async function getRemittancesForRun(runId: number) {
-  const remittances = await db
+  const runRemits = await db
     .select()
     .from(claimReconRemittances)
     .where(eq(claimReconRemittances.runId, runId));
 
-  return remittances;
+  if (runRemits.length > 0) return runRemits;
+
+  // Fallback for staged runs (remittances have runId = null)
+  const run = await getReconRun(runId);
+  if (!run) return [];
+
+  const periodRemits = await db
+    .select()
+    .from(claimReconRemittances)
+    .where(
+      and(
+        eq(claimReconRemittances.providerName, run.providerName),
+        eq(claimReconRemittances.periodYear, run.periodYear),
+        eq(claimReconRemittances.periodMonth, run.periodMonth)
+      )
+    );
+
+  return periodRemits;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Extra helpers: issue claims + delete run                                   */
 /* -------------------------------------------------------------------------- */
 
+// INSTRUCTION D: Replace getIssueClaimsForRun with fallback logic
 export async function getIssueClaimsForRun(runId: number) {
-  const claims = await db
+  const runIssues = await db
     .select()
     .from(claimReconClaims)
     .where(
@@ -292,7 +355,31 @@ export async function getIssueClaimsForRun(runId: number) {
       )
     );
 
-  return claims;
+  if (runIssues.length > 0) return runIssues;
+
+  // Fallback for staged runs
+  const run = await getReconRun(runId);
+  if (!run) return [];
+
+  const periodIssues = await db
+    .select()
+    .from(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, run.providerName),
+        eq(claimReconClaims.periodYear, run.periodYear),
+        eq(claimReconClaims.periodMonth, run.periodMonth),
+        or(
+          eq(claimReconClaims.status, "awaiting_remittance"),
+          eq(claimReconClaims.status, "unpaid"),
+          eq(claimReconClaims.status, "partially_paid"),
+          eq(claimReconClaims.status, "manual_review"),
+          eq(claimReconClaims.status, "submitted")
+        )
+      )
+    );
+
+  return periodIssues;
 }
 
 export async function deleteReconRun(runId: number) {
