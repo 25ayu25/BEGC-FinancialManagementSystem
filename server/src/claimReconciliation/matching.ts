@@ -27,7 +27,7 @@ const normalizeInvoice = (v: unknown): string | null => {
  */
 const normalizeDate = (d: Date | string) => {
   const date = d instanceof Date ? d : new Date(d);
-  if (Number.isNaN(date.getTime())) return ""; // avoid throwing
+  if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
 };
 
@@ -42,7 +42,6 @@ const toCents = (amount: number) => {
 
 /**
  * Try to read an invoice-like field from a claim row.
- * Adjust these keys if your ClaimRow uses different property names.
  */
 function getClaimInvoice(row: any): string | null {
   return (
@@ -51,27 +50,32 @@ function getClaimInvoice(row: any): string | null {
     normalizeInvoice(row?.invoice) ??
     normalizeInvoice(row?.billNo) ??
     normalizeInvoice(row?.billNumber) ??
+    normalizeInvoice(row?.bill) ??
     null
   );
 }
 
 /**
  * Try to read a bill/invoice-like field from a remittance row.
- * Adjust these keys if your RemittanceRow uses different property names.
+ * IMPORTANT: CIC commonly stores the bill/invoice under claimNumber.
  */
 function getRemittanceBill(row: any): string | null {
   return (
+    normalizeInvoice(row?.claimNumber) ??   // ✅ ADDED
+    normalizeInvoice(row?.claimNo) ??       // ✅ ADDED
+    normalizeInvoice(row?.claim) ??         // ✅ ADDED
     normalizeInvoice(row?.billNo) ??
     normalizeInvoice(row?.billNumber) ??
     normalizeInvoice(row?.bill) ??
     normalizeInvoice(row?.invoiceNumber) ??
     normalizeInvoice(row?.invoiceNo) ??
+    normalizeInvoice(row?.invoice) ??
     null
   );
 }
 
 /**
- * NEW (preferred): Build a match key from an entire claim row.
+ * Build a match key from an entire claim row.
  * CIC best practice: member + invoice/bill number.
  * Fallback: member + serviceDate + billedAmount.
  */
@@ -79,19 +83,15 @@ export function buildClaimCompositeKeyFromRow(row: Partial<ClaimRow> & any): str
   const member = normalizeMember((row as any)?.memberNumber ?? "");
   const inv = getClaimInvoice(row);
 
-  if (inv) {
-    // Strongest key for CIC
-    return `${member}|INV:${inv}`;
-  }
+  if (inv) return `${member}|INV:${inv}`;
 
-  // Fallback (legacy)
   const date = normalizeDate((row as any)?.serviceDate ?? "");
   const cents = toCents(Number((row as any)?.billedAmount ?? 0));
   return `${member}|DATE:${date}|AMT:${cents}`;
 }
 
 /**
- * NEW (preferred): Build key variants from an entire remittance row.
+ * Build key variants from an entire remittance row.
  * CIC best practice: member + bill number.
  * Fallback: member + serviceDate + claimAmount with ±1–2 currency unit tolerance.
  */
@@ -99,63 +99,29 @@ export function buildRemittanceKeyVariantsFromRow(row: Partial<RemittanceRow> & 
   const member = normalizeMember((row as any)?.memberNumber ?? "");
   const bill = getRemittanceBill(row);
 
-  if (bill) {
-    // For CIC, bill/invoice match should not need tolerance variants.
-    return [`${member}|INV:${bill}`];
-  }
+  if (bill) return [`${member}|INV:${bill}`];
 
-  // Fallback (legacy tolerance matching)
   const date = normalizeDate((row as any)?.serviceDate ?? "");
   const baseCents = toCents(Number((row as any)?.claimAmount ?? 0));
-
-  // 0, ±1, ±2 currency units (in cents)
   const deltas = [0, 100, -100, 200, -200];
 
   return deltas.map((delta) => `${member}|DATE:${date}|AMT:${baseCents + delta}`);
 }
 
-/**
- * BACKWARD COMPAT: older signature (still used in some places).
- * If you can, switch callers to buildClaimCompositeKeyFromRow().
- */
 export function buildClaimCompositeKey(
   memberNumber: string,
   serviceDate: Date | string,
   billedAmount: number
 ): string {
-  return buildClaimCompositeKeyFromRow({
-    memberNumber,
-    serviceDate,
-    billedAmount,
-  } as any);
+  return buildClaimCompositeKeyFromRow({ memberNumber, serviceDate, billedAmount } as any);
 }
 
-/**
- * BACKWARD COMPAT: older signature (still used in some places).
- * If you can, switch callers to buildRemittanceKeyVariantsFromRow().
- */
 export function buildRemittanceKeyVariants(
   memberNumber: string,
   serviceDate: Date | string,
   claimAmount: number
 ): string[] {
-  return buildRemittanceKeyVariantsFromRow({
-    memberNumber,
-    serviceDate,
-    claimAmount,
-  } as any);
-}
-
-/**
- * Legacy function - kept for backward compatibility but deprecated
- * @deprecated Use buildClaimCompositeKeyFromRow instead
- */
-export function generateCompositeKey(
-  memberNumber: string,
-  serviceDate: Date
-): string {
-  const dateStr = serviceDate.toISOString().split("T")[0];
-  return `${memberNumber.trim().toLowerCase()}_${dateStr}`;
+  return buildRemittanceKeyVariantsFromRow({ memberNumber, serviceDate, claimAmount } as any);
 }
 
 /**
@@ -174,16 +140,11 @@ export function matchClaimsToRemittances(
 ): MatchResult[] {
   const results: MatchResult[] = [];
 
-  // Build a map of claims by composite key for efficient lookup
   const claimMap = new Map<string, { id: number; data: ClaimRow }>();
-  for (const claim of claims) {
-    claimMap.set(claim.compositeKey, { id: claim.id, data: claim.data });
-  }
+  for (const claim of claims) claimMap.set(claim.compositeKey, { id: claim.id, data: claim.data });
 
-  // Track which claims have been matched to avoid duplicates
   const matchedClaims = new Set<number>();
 
-  // Match each remittance to claims using key variants
   for (const rem of remittances) {
     const keyVariants = buildRemittanceKeyVariantsFromRow(rem.data as any);
 
@@ -215,14 +176,12 @@ export function matchClaimsToRemittances(
         status = "matched";
         matchType = "exact";
       } else if (paidAmount > claimAmount && claimAmount > 0) {
-        // Overpaid/adjusted but matched by key
         status = "matched";
         matchType = "partial";
       } else if (paidAmount > 0 && paidAmount < claimAmount) {
         status = "partially_paid";
         matchType = "partial";
       } else if (paidAmount === 0 && claimAmount > 0) {
-        // Matched but nothing paid (denial/inadmissible). Still valuable to link.
         status = "unpaid";
         matchType = "partial";
       } else {
@@ -240,12 +199,7 @@ export function matchClaimsToRemittances(
     }
   }
 
-  /**
-   * IMPORTANT: Do NOT automatically mark unmatched claims as "unpaid".
-   * In CIC reality, remittance statements are mixed; a claim not present in the uploaded
-   * statement may still be paid in a future statement. If you flip it to "unpaid", it may
-   * stop being eligible for future matching (depending on your query).
-   */
+  // Keep unmatched claims as-is (do NOT flip to unpaid automatically)
   for (const claim of claims) {
     if (!matchedClaims.has(claim.id)) {
       const currentStatus = (claim.data as any)?.status;
