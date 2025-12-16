@@ -28,6 +28,7 @@ import {
   deleteClaimsForPeriod,
   deleteRemittancesForPeriod,
   getPeriodsSummary,
+  updateReconRunMetrics, // ✅ Added import
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -279,8 +280,25 @@ router.post(
         claims
       );
 
+      // ✅ Create Run & Update Metrics
+      const run = await createReconRun(
+        providerName,
+        parseInt(periodYear, 10),
+        parseInt(periodMonth, 10),
+        userId
+      );
+
+      await updateReconRunMetrics(run.id, {
+        totalClaimRows: inserted.length,
+        totalRemittanceRows: 0,
+        autoMatched: 0,
+        partialMatched: 0,
+        manualReview: 0,
+      });
+
       res.json({
         success: true,
+        runId: run.id, // ✅ NEW
         provider: providerName,
         period: formatPeriod(parseInt(periodYear, 10), parseInt(periodMonth, 10)),
         claimsStored: inserted.length,
@@ -366,8 +384,20 @@ router.post(
           month
         );
 
+        // ✅ Create Run & Update Metrics
+        const run = await createReconRun(providerName, year, month, userId);
+
+        await updateReconRunMetrics(run.id, {
+          totalClaimRows: reconciliationResult.totalClaimsSearched, // “claims checked”
+          totalRemittanceRows: inserted.length,
+          autoMatched: reconciliationResult.summary.autoMatched,
+          partialMatched: reconciliationResult.summary.partialMatched,
+          manualReview: reconciliationResult.summary.manualReview,
+        });
+
         res.json({
           success: true,
+          runId: run.id, // ✅ NEW
           provider: providerName,
           filingPeriod: formatPeriod(year, month),
           filingDate: filingDate.toISOString().slice(0, 10),
@@ -472,8 +502,20 @@ router.post(
           month
         );
 
+        // ✅ Create Run & Update Metrics
+        const run = await createReconRun(providerName, year, month, userId);
+
+        await updateReconRunMetrics(run.id, {
+          totalClaimRows: reconciliationResult.totalClaimsSearched, // “claims checked”
+          totalRemittanceRows: inserted.length,
+          autoMatched: reconciliationResult.summary.autoMatched,
+          partialMatched: reconciliationResult.summary.partialMatched,
+          manualReview: reconciliationResult.summary.manualReview,
+        });
+
         res.json({
           success: true,
+          runId: run.id, // ✅ NEW
           provider: providerName,
           period: formatPeriod(year, month),
           remittancesStored: inserted.length,
