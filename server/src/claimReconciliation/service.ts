@@ -15,7 +15,10 @@ import {
   matchClaimsToRemittances,
 } from "./matching";
 
-function normalizeCurrencyForProvider(providerName: string, currency?: string | null) {
+function normalizeCurrencyForProvider(
+  providerName: string,
+  currency?: string | null
+) {
   const p = (providerName || "").toUpperCase();
   if (p === "CIC") return "USD";
   return currency || "USD";
@@ -54,10 +57,7 @@ export async function updateReconRunMetrics(
     manualReview: number;
   }>
 ) {
-  await db
-    .update(claimReconRuns)
-    .set(metrics as any)
-    .where(eq(claimReconRuns.id, runId));
+  await db.update(claimReconRuns).set(metrics as any).where(eq(claimReconRuns.id, runId));
 }
 
 /**
@@ -99,11 +99,7 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
     rawRow: claim as any,
   }));
 
-  const inserted = await db
-    .insert(claimReconClaims)
-    .values(claimsToInsert)
-    .returning();
-
+  const inserted = await db.insert(claimReconClaims).values(claimsToInsert).returning();
   return inserted;
 }
 
@@ -264,20 +260,13 @@ export async function performMatching(runId: number) {
 }
 
 export async function getReconRun(runId: number) {
-  const [run] = await db
-    .select()
-    .from(claimReconRuns)
-    .where(eq(claimReconRuns.id, runId));
-
+  const [run] = await db.select().from(claimReconRuns).where(eq(claimReconRuns.id, runId));
   return run;
 }
 
 // INSTRUCTION C: Replace getAllReconRuns with newest-first
 export async function getAllReconRuns() {
-  const runs = await db
-    .select()
-    .from(claimReconRuns)
-    .orderBy(desc(claimReconRuns.createdAt));
+  const runs = await db.select().from(claimReconRuns).orderBy(desc(claimReconRuns.createdAt));
   return runs;
 }
 
@@ -538,10 +527,27 @@ export async function getRemittanceForPeriod(providerName: string, periodYear: n
 
 export async function runClaimReconciliation(providerName: string, periodYear: number, periodMonth: number) {
   return await db.transaction(async (tx) => {
+    /**
+     * IMPORTANT FIX:
+     * Match NEW remittance lines against ALL *outstanding* claims across ALL periods.
+     * Outstanding includes claims that are still awaiting remittance OR previously marked unpaid/manual_review.
+     * We also only consider claims that have no remittanceLineId yet (to avoid overwriting already matched claims).
+     */
     const claims = await tx
       .select()
       .from(claimReconClaims)
-      .where(and(eq(claimReconClaims.providerName, providerName), eq(claimReconClaims.status, "awaiting_remittance")));
+      .where(
+        and(
+          eq(claimReconClaims.providerName, providerName),
+          isNull(claimReconClaims.remittanceLineId),
+          or(
+            eq(claimReconClaims.status, "awaiting_remittance"),
+            eq(claimReconClaims.status, "unpaid"),
+            eq(claimReconClaims.status, "manual_review"),
+            eq(claimReconClaims.status, "submitted") // legacy safety
+          )
+        )
+      );
 
     // ✅ only reconcile NEW/UNMATCHED remittance lines for that filing period
     const remittances = await tx
@@ -557,7 +563,7 @@ export async function runClaimReconciliation(providerName: string, periodYear: n
       );
 
     if (claims.length === 0) {
-      throw new Error(`No claims awaiting remittance found for ${providerName}`);
+      throw new Error(`No outstanding claims found for ${providerName} to reconcile.`);
     }
 
     if (remittances.length === 0) {
