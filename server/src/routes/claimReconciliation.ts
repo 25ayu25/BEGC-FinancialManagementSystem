@@ -4,7 +4,11 @@ import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 
-import { parseClaimsFile, parseRemittanceFile } from "../claimReconciliation/parseCic";
+import {
+  parseClaimsFile,
+  parseRemittanceFile,
+} from "../claimReconciliation/parseCic";
+
 import {
   createReconRun,
   insertClaims,
@@ -16,31 +20,36 @@ import {
   getRemittancesForRun,
   getIssueClaimsForRun,
   deleteReconRun,
-  // New staged workflow functions
+
+  // Staged workflow (claims)
   upsertClaimsForPeriod,
-  upsertRemittanceForPeriod,
   getClaimsForPeriod,
   getRemittanceForPeriod,
+
+  // Cross-period reconciliation (service)
   runClaimReconciliation,
-  // Claims inventory functions
+
+  // Claims inventory
   getAllClaims,
   deleteClaim,
   deleteClaimsForPeriod,
   deleteRemittancesForPeriod,
   getPeriodsSummary,
-  updateReconRunMetrics, // ✅ Added import
+
+  // Metrics helper
+  updateReconRunMetrics,
 } from "../claimReconciliation/service";
 
 const router = Router();
 
-// Utility function for period formatting
+/** Utility function for period formatting */
 function formatPeriod(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 /**
  * Convert an Excel serial date (1900 system) into a JS Date.
- * This is a best-effort helper for cases where parsers return numeric dates.
+ * Best-effort helper for cases where parsers return numeric dates.
  */
 function excelSerialToDate(serial: number): Date | null {
   if (!Number.isFinite(serial)) return null;
@@ -50,9 +59,7 @@ function excelSerialToDate(serial: number): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/**
- * Best-effort parse of a receivedDate from body (string) into Date.
- */
+/** Best-effort parse of a receivedDate from body (string/number/Date) into Date. */
 function parseReceivedDate(input: any): Date | null {
   if (!input) return null;
 
@@ -62,15 +69,13 @@ function parseReceivedDate(input: any): Date | null {
 
   if (typeof input === "number") {
     // Could be Excel serial
-    const d = excelSerialToDate(input);
-    return d;
+    return excelSerialToDate(input);
   }
 
   if (typeof input === "string") {
     const trimmed = input.trim();
     if (!trimmed) return null;
 
-    // Try ISO first; fallback to Date parser
     const d = new Date(trimmed);
     return Number.isNaN(d.getTime()) ? null : d;
   }
@@ -99,7 +104,6 @@ function inferStatementDateFromRemittances(remittances: any[]): Date | null {
     "eft_date",
   ];
 
-  // Scan first N rows to find a usable date
   const N = Math.min(remittances.length, 50);
   for (let i = 0; i < N; i++) {
     const r = remittances[i];
@@ -111,7 +115,6 @@ function inferStatementDateFromRemittances(remittances: any[]): Date | null {
       if (d) return d;
     }
 
-    // As a fallback, scan any value that looks like a date
     for (const v of Object.values(r)) {
       const d = parseReceivedDate(v);
       if (d) return d;
@@ -121,7 +124,7 @@ function inferStatementDateFromRemittances(remittances: any[]): Date | null {
   return null;
 }
 
-// Auth middleware - same as before
+/** Auth middleware */
 const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ error: "Authentication required" });
@@ -129,11 +132,11 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-// Configure multer for file uploads
+/** Configure multer for file uploads */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB
   },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
@@ -145,10 +148,7 @@ const upload = multer({
       .toLowerCase()
       .slice(file.originalname.lastIndexOf("."));
 
-    if (
-      allowedMimes.includes(file.mimetype) &&
-      allowedExtensions.includes(fileExtension)
-    ) {
+    if (allowedMimes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
       cb(new Error("Invalid file type. Only Excel files (.xlsx, .xls) are allowed."));
@@ -156,14 +156,27 @@ const upload = multer({
   },
 });
 
-// Shared handler for POST /upload and POST /run
+/**
+ * Ensure provider has at least one claim stored (so remittance uploads make sense).
+ * Uses existing inventory function (cheap: limit 1).
+ */
+async function ensureProviderHasClaims(providerName: string) {
+  const { claims } = await getAllClaims({ providerName, page: 1, limit: 1 });
+  if (!claims || claims.length === 0) {
+    throw new Error(`No claims found for ${providerName}. Please upload claims first.`);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Legacy combined upload/run (claims + remittance)                            */
+/* -------------------------------------------------------------------------- */
+
 const uploadHandler = async (req: Request, res: Response) => {
   try {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
     const { providerName, periodYear, periodMonth } = req.body;
     const userId = req.user?.id;
 
-    // Validate required fields
     if (!providerName || !periodYear || !periodMonth) {
       return res.status(400).json({
         error: "Missing required fields: providerName, periodYear, periodMonth",
@@ -171,9 +184,7 @@ const uploadHandler = async (req: Request, res: Response) => {
     }
 
     if (!userId) {
-      return res.status(401).json({
-        error: "User authentication required",
-      });
+      return res.status(401).json({ error: "User authentication required" });
     }
 
     if (!files?.claimsFile || !files?.remittanceFile) {
@@ -182,7 +193,6 @@ const uploadHandler = async (req: Request, res: Response) => {
       });
     }
 
-    // Parse files
     const claimsBuffer = files.claimsFile[0].buffer;
     const remittanceBuffer = files.remittanceFile[0].buffer;
 
@@ -190,18 +200,12 @@ const uploadHandler = async (req: Request, res: Response) => {
     const remittances = parseRemittanceFile(remittanceBuffer);
 
     if (claims.length === 0) {
-      return res.status(400).json({
-        error: "No valid claims found in the uploaded file",
-      });
+      return res.status(400).json({ error: "No valid claims found in the uploaded file" });
     }
-
     if (remittances.length === 0) {
-      return res.status(400).json({
-        error: "No valid remittances found in the uploaded file",
-      });
+      return res.status(400).json({ error: "No valid remittances found in the uploaded file" });
     }
 
-    // Create reconciliation run
     const run = await createReconRun(
       providerName,
       parseInt(periodYear, 10),
@@ -209,11 +213,9 @@ const uploadHandler = async (req: Request, res: Response) => {
       userId
     );
 
-    // Insert claims and remittances
     await insertClaims(run.id, claims);
     await insertRemittances(run.id, remittances);
 
-    // Perform matching
     const summary = await performMatching(run.id);
 
     res.json({
@@ -229,6 +231,10 @@ const uploadHandler = async (req: Request, res: Response) => {
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/* Staged Uploads                                                              */
+/* -------------------------------------------------------------------------- */
+
 /**
  * POST /api/claim-reconciliation/upload-claims
  * Upload claims only (without remittance) for a specific provider and period
@@ -243,7 +249,6 @@ router.post(
       const { providerName, periodYear, periodMonth } = req.body;
       const userId = req.user?.id;
 
-      // Validate required fields
       if (!providerName || !periodYear || !periodMonth) {
         return res.status(400).json({
           error: "Missing required fields: providerName, periodYear, periodMonth",
@@ -251,28 +256,19 @@ router.post(
       }
 
       if (!userId) {
-        return res.status(401).json({
-          error: "User authentication required",
-        });
+        return res.status(401).json({ error: "User authentication required" });
       }
 
       if (!req.file) {
-        return res.status(400).json({
-          error: "claimsFile is required",
-        });
+        return res.status(400).json({ error: "claimsFile is required" });
       }
 
-      // Parse claims file
-      const claimsBuffer = req.file.buffer;
-      const claims = parseClaimsFile(claimsBuffer);
+      const claims = parseClaimsFile(req.file.buffer);
 
       if (claims.length === 0) {
-        return res.status(400).json({
-          error: "No valid claims found in the uploaded file",
-        });
+        return res.status(400).json({ error: "No valid claims found in the uploaded file" });
       }
 
-      // Upsert claims for this provider+period
       const inserted = await upsertClaimsForPeriod(
         providerName,
         parseInt(periodYear, 10),
@@ -280,7 +276,7 @@ router.post(
         claims
       );
 
-      // ✅ Create Run & Update Metrics
+      // Create a run (history entry) and record metrics
       const run = await createReconRun(
         providerName,
         parseInt(periodYear, 10),
@@ -298,7 +294,7 @@ router.post(
 
       res.json({
         success: true,
-        runId: run.id, // ✅ NEW
+        runId: run.id,
         provider: providerName,
         period: formatPeriod(parseInt(periodYear, 10), parseInt(periodMonth, 10)),
         claimsStored: inserted.length,
@@ -314,15 +310,15 @@ router.post(
 );
 
 /**
- * NEW: POST /api/claim-reconciliation/upload-remittance-statement
+ * POST /api/claim-reconciliation/upload-remittance-statement
  * Upload remittance at PROVIDER level (no period selection required).
  *
- * CIC remittances are mixed across months/years. We still store the remittance rows under a
- * "filing period" derived from receivedDate (or inferred from the file, else today's date),
+ * CIC remittances are mixed across months/years.
+ * We store the statement under a filing period (derived from receivedDate / inferred / today),
  * but matching is cross-period across ALL outstanding claims.
  *
  * Required: providerName, remittanceFile
- * Optional: receivedDate (ISO date string recommended)
+ * Optional: receivedDate
  */
 router.post(
   "/upload-remittance-statement",
@@ -334,34 +330,34 @@ router.post(
       const userId = req.user?.id;
 
       if (!providerName) {
-        return res.status(400).json({
-          error: "Missing required field: providerName",
-        });
+        return res.status(400).json({ error: "Missing required field: providerName" });
       }
 
       if (!userId) {
-        return res.status(401).json({
-          error: "User authentication required",
-        });
+        return res.status(401).json({ error: "User authentication required" });
       }
 
       if (!req.file) {
-        return res.status(400).json({
-          error: "remittanceFile is required",
-        });
+        return res.status(400).json({ error: "remittanceFile is required" });
       }
 
-      // Parse remittance file
-      const remittanceBuffer = req.file.buffer;
-      const remittances = parseRemittanceFile(remittanceBuffer);
-
+      const remittances = parseRemittanceFile(req.file.buffer);
       if (remittances.length === 0) {
+        return res.status(400).json({ error: "No valid remittances found in the uploaded file" });
+      }
+
+      // Require at least one claim on file for provider
+      try {
+        await ensureProviderHasClaims(providerName);
+      } catch (e: any) {
         return res.status(400).json({
-          error: "No valid remittances found in the uploaded file",
+          error: e?.message || `No claims found for ${providerName}. Please upload claims first.`,
+          suggestion:
+            "Upload claims for this provider first (claims can be across any months/years). Then re-upload this remittance statement.",
         });
       }
 
-      // Determine a filing date (for organizing statements only)
+      // Determine filing date (for organizing statements)
       const received = parseReceivedDate(receivedDate);
       const inferred = inferStatementDateFromRemittances(remittances);
       const filingDate = received ?? inferred ?? new Date();
@@ -369,67 +365,47 @@ router.post(
       const year = filingDate.getFullYear();
       const month = filingDate.getMonth() + 1;
 
-      try {
-        const inserted = await upsertRemittanceForPeriod(
-          providerName,
-          year,
-          month,
-          remittances
-        );
+      // ✅ IMPORTANT FIX:
+      // Create the run FIRST, then insert remittances WITH runId so /runs/:runId/remittances works
+      const run = await createReconRun(providerName, year, month, userId);
 
-        // Cross-period reconciliation
-        const reconciliationResult = await runClaimReconciliation(
-          providerName,
-          year,
-          month
-        );
+      const inserted = await insertRemittances(run.id, remittances);
 
-        // ✅ Create Run & Update Metrics
-        const run = await createReconRun(providerName, year, month, userId);
+      // Cross-period reconciliation (service currently matches provider-wide outstanding claims)
+      const reconciliationResult = await runClaimReconciliation(providerName, year, month);
 
-        await updateReconRunMetrics(run.id, {
-          totalClaimRows: reconciliationResult.totalClaimsSearched, // “claims checked”
-          totalRemittanceRows: inserted.length,
+      await updateReconRunMetrics(run.id, {
+        totalClaimRows: reconciliationResult.totalClaimsSearched, // claims checked
+        totalRemittanceRows: inserted.length,
+        autoMatched: reconciliationResult.summary.autoMatched,
+        partialMatched: reconciliationResult.summary.partialMatched,
+        manualReview: reconciliationResult.summary.manualReview,
+      });
+
+      res.json({
+        success: true,
+        runId: run.id,
+        provider: providerName,
+        filingPeriod: formatPeriod(year, month),
+        filingDate: filingDate.toISOString().slice(0, 10),
+        remittancesStored: inserted.length,
+        reconciliation: {
+          totalClaimsSearched: reconciliationResult.totalClaimsSearched,
+          claimsMatched: reconciliationResult.claimsMatched,
+          totalRemittances: reconciliationResult.summary.totalRemittances,
           autoMatched: reconciliationResult.summary.autoMatched,
           partialMatched: reconciliationResult.summary.partialMatched,
           manualReview: reconciliationResult.summary.manualReview,
-        });
-
-        res.json({
-          success: true,
-          runId: run.id, // ✅ NEW
-          provider: providerName,
-          filingPeriod: formatPeriod(year, month),
-          filingDate: filingDate.toISOString().slice(0, 10),
-          remittancesStored: inserted.length,
-          reconciliation: {
-            totalClaimsSearched: reconciliationResult.totalClaimsSearched,
-            claimsMatched: reconciliationResult.claimsMatched,
-            totalRemittances: reconciliationResult.summary.totalRemittances,
-            autoMatched: reconciliationResult.summary.autoMatched,
-            partialMatched: reconciliationResult.summary.partialMatched,
-            manualReview: reconciliationResult.summary.manualReview,
-            unpaidClaims: reconciliationResult.unpaidClaims,
-            orphanRemittances: reconciliationResult.orphanRemittances,
-          },
-          message:
-            "Remittance statement uploaded. Matching ran across ALL outstanding claims (all periods).",
-          info: `Stored under filing period ${formatPeriod(
-            year,
-            month
-          )} for organization only. Matched against ${reconciliationResult.totalClaimsSearched} unpaid claims across all periods.`,
-        });
-      } catch (error: any) {
-        // If you still enforce "claims must exist first"
-        if (error.message && error.message.includes("No claims found")) {
-          return res.status(400).json({
-            error: error.message,
-            suggestion:
-              "Upload claims for this provider first (claims can be across any months/years). Then re-upload this remittance statement.",
-          });
-        }
-        throw error;
-      }
+          unpaidClaims: reconciliationResult.unpaidClaims,
+          orphanRemittances: reconciliationResult.orphanRemittances,
+        },
+        message:
+          "Remittance statement uploaded. Matching ran across ALL outstanding claims (all periods).",
+        info: `Stored under filing period ${formatPeriod(
+          year,
+          month
+        )} for organization only. Matched against ${reconciliationResult.totalClaimsSearched} outstanding claims across all periods.`,
+      });
     } catch (error: any) {
       console.error("Error uploading remittance statement:", error);
       res.status(500).json({
@@ -441,8 +417,8 @@ router.post(
 
 /**
  * LEGACY: POST /api/claim-reconciliation/upload-remittance
- * Upload remittance only for a specific provider and period (kept for compatibility).
- * Runs reconciliation automatically after upload.
+ * Upload remittance for a selected provider + month/year (kept for compatibility),
+ * but matching still runs cross-period.
  */
 router.post(
   "/upload-remittance",
@@ -453,7 +429,6 @@ router.post(
       const { providerName, periodYear, periodMonth } = req.body;
       const userId = req.user?.id;
 
-      // Validate required fields
       if (!providerName || !periodYear || !periodMonth) {
         return res.status(400).json({
           error: "Missing required fields: providerName, periodYear, periodMonth",
@@ -461,87 +436,65 @@ router.post(
       }
 
       if (!userId) {
-        return res.status(401).json({
-          error: "User authentication required",
-        });
+        return res.status(401).json({ error: "User authentication required" });
       }
 
       if (!req.file) {
-        return res.status(400).json({
-          error: "remittanceFile is required",
-        });
+        return res.status(400).json({ error: "remittanceFile is required" });
       }
 
-      // Parse remittance file
-      const remittanceBuffer = req.file.buffer;
-      const remittances = parseRemittanceFile(remittanceBuffer);
-
+      const remittances = parseRemittanceFile(req.file.buffer);
       if (remittances.length === 0) {
+        return res.status(400).json({ error: "No valid remittances found in the uploaded file" });
+      }
+
+      // Require at least one claim on file for provider
+      try {
+        await ensureProviderHasClaims(providerName);
+      } catch (e: any) {
         return res.status(400).json({
-          error: "No valid remittances found in the uploaded file",
+          error: e?.message || `No claims found for ${providerName}. Please upload claims first.`,
+          suggestion: "Please upload claims for this provider first",
         });
       }
 
       const year = parseInt(periodYear, 10);
       const month = parseInt(periodMonth, 10);
 
-      // Upsert remittances for this provider+period
-      // This will fail with 400 if no claims exist
-      try {
-        const inserted = await upsertRemittanceForPeriod(
-          providerName,
-          year,
-          month,
-          remittances
-        );
+      // ✅ IMPORTANT FIX: create run first, then store remittances with runId
+      const run = await createReconRun(providerName, year, month, userId);
 
-        // Run reconciliation automatically (now cross-period)
-        const reconciliationResult = await runClaimReconciliation(
-          providerName,
-          year,
-          month
-        );
+      const inserted = await insertRemittances(run.id, remittances);
 
-        // ✅ Create Run & Update Metrics
-        const run = await createReconRun(providerName, year, month, userId);
+      const reconciliationResult = await runClaimReconciliation(providerName, year, month);
 
-        await updateReconRunMetrics(run.id, {
-          totalClaimRows: reconciliationResult.totalClaimsSearched, // “claims checked”
-          totalRemittanceRows: inserted.length,
+      await updateReconRunMetrics(run.id, {
+        totalClaimRows: reconciliationResult.totalClaimsSearched,
+        totalRemittanceRows: inserted.length,
+        autoMatched: reconciliationResult.summary.autoMatched,
+        partialMatched: reconciliationResult.summary.partialMatched,
+        manualReview: reconciliationResult.summary.manualReview,
+      });
+
+      res.json({
+        success: true,
+        runId: run.id,
+        provider: providerName,
+        period: formatPeriod(year, month),
+        remittancesStored: inserted.length,
+        reconciliation: {
+          totalClaimsSearched: reconciliationResult.totalClaimsSearched,
+          claimsMatched: reconciliationResult.claimsMatched,
+          totalRemittances: reconciliationResult.summary.totalRemittances,
           autoMatched: reconciliationResult.summary.autoMatched,
           partialMatched: reconciliationResult.summary.partialMatched,
           manualReview: reconciliationResult.summary.manualReview,
-        });
-
-        res.json({
-          success: true,
-          runId: run.id, // ✅ NEW
-          provider: providerName,
-          period: formatPeriod(year, month),
-          remittancesStored: inserted.length,
-          reconciliation: {
-            totalClaimsSearched: reconciliationResult.totalClaimsSearched,
-            claimsMatched: reconciliationResult.claimsMatched,
-            totalRemittances: reconciliationResult.summary.totalRemittances,
-            autoMatched: reconciliationResult.summary.autoMatched,
-            partialMatched: reconciliationResult.summary.partialMatched,
-            manualReview: reconciliationResult.summary.manualReview,
-            unpaidClaims: reconciliationResult.unpaidClaims,
-            orphanRemittances: reconciliationResult.orphanRemittances,
-          },
-          message: "Remittances uploaded and cross-period reconciliation completed",
-          info: `Matched against ${reconciliationResult.totalClaimsSearched} unpaid claims across all periods`,
-        });
-      } catch (error: any) {
-        // Check if it's the "no claims found" error
-        if (error.message && error.message.includes("No claims found")) {
-          return res.status(400).json({
-            error: error.message,
-            suggestion: "Please upload claims for this provider first",
-          });
-        }
-        throw error;
-      }
+          unpaidClaims: reconciliationResult.unpaidClaims,
+          orphanRemittances: reconciliationResult.orphanRemittances,
+        },
+        message: "Remittances uploaded and cross-period reconciliation completed",
+        info: `Matched against ${reconciliationResult.totalClaimsSearched} outstanding claims across all periods`,
+      });
     } catch (error: any) {
       console.error("Error uploading remittance:", error);
       res.status(500).json({
@@ -551,7 +504,9 @@ router.post(
   }
 );
 
-// ...everything below stays the same (period status, upload/run, runs, export, claims inventory, deletes, periods-summary)
+/* -------------------------------------------------------------------------- */
+/* Period status                                                               */
+/* -------------------------------------------------------------------------- */
 
 router.get(
   "/period/:providerName/:year/:month",
@@ -565,7 +520,6 @@ router.get(
       const claims = await getClaimsForPeriod(providerName, periodYear, periodMonth);
       const remittances = await getRemittanceForPeriod(providerName, periodYear, periodMonth);
 
-      // Calculate summary statistics
       const claimsAwaiting = claims.filter((c) => c.status === "awaiting_remittance").length;
       const claimsMatched = claims.filter((c) => c.status === "matched" || c.status === "paid").length;
       const claimsPartial = claims.filter((c) => c.status === "partially_paid").length;
@@ -599,6 +553,10 @@ router.get(
   }
 );
 
+/* -------------------------------------------------------------------------- */
+/* Legacy combined endpoints                                                   */
+/* -------------------------------------------------------------------------- */
+
 router.post(
   "/upload",
   requireAuth,
@@ -618,6 +576,10 @@ router.post(
   ]),
   uploadHandler
 );
+
+/* -------------------------------------------------------------------------- */
+/* Runs                                                                        */
+/* -------------------------------------------------------------------------- */
 
 router.get("/runs", requireAuth, async (_req, res) => {
   try {
@@ -675,6 +637,10 @@ router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/* Export issues                                                               */
+/* -------------------------------------------------------------------------- */
+
 router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
@@ -691,11 +657,11 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
 
     const unpaidCount = issueClaims.filter((c) => parseFloat(c.amountPaid || "0") === 0).length;
 
-    const partialCount = issueClaims.filter(
-      (c) =>
-        parseFloat(c.amountPaid || "0") > 0 &&
-        parseFloat(c.amountPaid) < parseFloat(c.billedAmount || "0")
-    ).length;
+    const partialCount = issueClaims.filter((c) => {
+      const paid = parseFloat(c.amountPaid || "0");
+      const billed = parseFloat(c.billedAmount || "0");
+      return paid > 0 && paid < billed;
+    }).length;
 
     const problemCount = issueClaims.length;
     const fullyPaid = Math.max(totalClaims - problemCount, 0);
@@ -711,12 +677,12 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
     rows.push(["Period", periodLabel]);
     rows.push(["Run date", new Date().toISOString().slice(0, 10)]);
     rows.push([]);
-    rows.push(["Total claims sent", totalClaims]);
+    rows.push(["Total claims sent / checked", totalClaims]);
     rows.push(["Total remittances received", totalRemits]);
     rows.push(["Fully paid claims", fullyPaid]);
     rows.push(["Partially paid claims", partialCount]);
     rows.push(["Unpaid / no remittance", unpaidCount]);
-    rows.push(["Total problem claims in this file", problemCount]);
+    rows.push(["Total problem claims in this export", problemCount]);
     rows.push([]);
     rows.push([
       "Member #",
@@ -761,9 +727,12 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
       bookType: "xlsx",
     });
 
-    const filename = `CIC-issues-${run.periodYear}-${run.periodMonth}.xlsx`;
+    const filename = `CIC-issues-${run.periodYear}-${String(run.periodMonth).padStart(2, "0")}.xlsx`;
 
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(buffer);
   } catch (error: any) {
@@ -773,6 +742,10 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
     });
   }
 });
+
+/* -------------------------------------------------------------------------- */
+/* Deletes                                                                     */
+/* -------------------------------------------------------------------------- */
 
 router.delete("/runs/:runId", requireAuth, async (req, res) => {
   try {
@@ -869,6 +842,10 @@ router.delete(
     }
   }
 );
+
+/* -------------------------------------------------------------------------- */
+/* Periods summary                                                             */
+/* -------------------------------------------------------------------------- */
 
 router.get("/periods-summary", requireAuth, async (req: Request, res: Response) => {
   try {
