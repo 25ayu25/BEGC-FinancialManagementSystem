@@ -1,6 +1,13 @@
 // client/src/pages/claim-reconciliation.tsx
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
@@ -42,7 +49,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 /* -------------------------------------------------------------------------- */
-/* Icons (from lucide-react) */
+/* Icons (lucide-react) */
 /* -------------------------------------------------------------------------- */
 import {
   Upload,
@@ -166,6 +173,21 @@ function readSessionBackup(): string | null {
 /* Utility helpers */
 /* -------------------------------------------------------------------------- */
 
+const MONTHS = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
 function formatPeriodLabel(year: number, month: number): string {
   return new Date(year, month - 1).toLocaleString("default", {
     month: "long",
@@ -179,31 +201,80 @@ function pluralize(count: number, singular: string, plural?: string): string {
 }
 
 /**
- * Get currency display for a provider/claim
  * CIC should always display USD, even if stored as SSP
  */
 function getCurrencyForDisplay(providerName: string, currency?: string): string {
-  if (providerName === "CIC") {
-    return "USD";
-  }
+  if (providerName === "CIC") return "USD";
   return currency || "USD";
 }
 
 /**
- * Workflow subtitle clarifying cross-period matching behavior.
+ * Explains cross-period matching for providers
  */
 function getWorkflowDescription(providerName: string, periodLabel: string): string {
   return `Working on: ${providerName} – ${periodLabel} (claims for this month). Remittance uploads will be matched against all outstanding ${providerName} claims across all months.`;
 }
 
 /**
- * Remittance helper text.
+ * Remittance upload description
  */
 function getRemittanceUploadDescription(providerName: string): string {
   if (providerName === "CIC") {
     return "This remittance will be matched against all CIC claims that are still awaiting remittance, not just this month";
   }
   return "Upload remittance advice from insurance";
+}
+
+/**
+ * Infer a (year, month) from a filename like:
+ *  - "CIC Jan 25.xlsx"
+ *  - "claims_feb_2025.xls"
+ */
+function inferPeriodFromFilename(
+  filename: string
+): { year: string; month: string } | null {
+  const name = filename.toLowerCase();
+
+  const monthMap: Record<string, string> = {
+    jan: "1",
+    january: "1",
+    feb: "2",
+    february: "2",
+    mar: "3",
+    march: "3",
+    apr: "4",
+    april: "4",
+    may: "5",
+    jun: "6",
+    june: "6",
+    jul: "7",
+    july: "7",
+    aug: "8",
+    august: "8",
+    sep: "9",
+    sept: "9",
+    september: "9",
+    oct: "10",
+    october: "10",
+    nov: "11",
+    november: "11",
+    dec: "12",
+    december: "12",
+  };
+
+  const monthToken = Object.keys(monthMap).find((k) =>
+    new RegExp(`\\b${k}\\b`).test(name)
+  );
+  if (!monthToken) return null;
+
+  // year: 2025 or 25
+  const yearMatch = name.match(/\b(20\d{2}|\d{2})\b/);
+  if (!yearMatch) return null;
+
+  const raw = yearMatch[1];
+  const year = raw.length === 2 ? `20${raw}` : raw;
+
+  return { year, month: monthMap[monthToken] };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -217,7 +288,7 @@ interface FileDropzoneProps {
   description: string;
   disabled?: boolean;
   tintColor?: "blue" | "green";
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }
 
 function FileDropzone({
@@ -231,9 +302,7 @@ function FileDropzone({
 }: FileDropzoneProps) {
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
-      if (acceptedFiles.length > 0) {
-        onFileChange(acceptedFiles[0]);
-      }
+      if (acceptedFiles.length > 0) onFileChange(acceptedFiles[0]);
     },
     [onFileChange]
   );
@@ -241,7 +310,9 @@ function FileDropzone({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+        ".xlsx",
+      ],
       "application/vnd.ms-excel": [".xls"],
     },
     maxFiles: 1,
@@ -256,7 +327,6 @@ function FileDropzone({
 
   const iconColor = tintColor === "blue" ? "text-blue-500" : "text-green-500";
 
-  // File selected
   if (file) {
     return (
       <div className="space-y-2">
@@ -271,7 +341,10 @@ function FileDropzone({
           )}
         >
           <FileSpreadsheet className={cn("w-5 h-5 shrink-0", iconColor)} />
-          <span className="text-sm font-medium text-slate-800 truncate" title={file.name}>
+          <span
+            className="text-sm font-medium text-slate-800 truncate"
+            title={file.name}
+          >
             {file.name}
           </span>
           <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
@@ -293,7 +366,6 @@ function FileDropzone({
     );
   }
 
-  // Empty / Dragging
   return (
     <div className="space-y-2">
       <Label htmlFor={label} className="flex items-center gap-2">
@@ -317,7 +389,7 @@ function FileDropzone({
           <div className="text-center">
             <Upload className="w-5 h-5 text-slate-500 mx-auto mb-1" />
             <p className="text-sm text-slate-600">
-              <span className="font-semibold">Click to upload</span> or drag &amp; drop
+              <span className="font-semibold">Click to upload</span> or drag & drop
             </p>
             <p className="text-xs text-slate-500">Excel files (.xlsx, .xls)</p>
           </div>
@@ -336,34 +408,43 @@ export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Selection
-  const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null); // "YYYY-M"
-  const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
+  const now = new Date();
+  const didUserTouchPeriod = useRef(false);
 
-  // Form / working context
+  /* ------------------------------------------------------------------------ */
+  /* Active Period Controls (THIS fixes your issue) */
+  /* ------------------------------------------------------------------------ */
   const [providerName, setProviderName] = useState("CIC");
-  const [periodYear, setPeriodYear] = useState(new Date().getFullYear().toString());
-  const [periodMonth, setPeriodMonth] = useState((new Date().getMonth() + 1).toString());
+  const [periodYear, setPeriodYear] = useState(now.getFullYear().toString());
+  const [periodMonth, setPeriodMonth] = useState((now.getMonth() + 1).toString());
+
+  const activePeriodLabel = useMemo(() => {
+    return formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
+  }, [periodYear, periodMonth]);
+
+  /* ------------------------------------------------------------------------ */
+  /* UI State */
+  /* ------------------------------------------------------------------------ */
+  const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
 
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
 
-  // Runs details
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
   const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">("issues");
   const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
 
-  // Inventory
+  // Claims Inventory (view-only filters)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<
     "all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid"
   >("unpaid");
-  const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null); // "YYYY-M"
+  const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);
 
-  // Header particles
+  // Decorative header particles
   const particles = useMemo(() => {
     return Array.from({ length: 6 }, () => ({
       left: `${Math.random() * 100}%`,
@@ -374,14 +455,10 @@ export default function ClaimReconciliation() {
   }, []);
 
   /* ------------------------------------------------------------------------ */
-  /* Queries                                                                   */
+  /* Data loading */
   /* ------------------------------------------------------------------------ */
 
-  const {
-    data: runs = [],
-    isLoading: runsLoading,
-    isFetching: runsFetching,
-  } = useQuery<ReconRun[]>({
+  const { data: runs = [], isLoading: runsLoading, isFetching: runsFetching } = useQuery<ReconRun[]>({
     queryKey: ["/api/claim-reconciliation/runs"],
   });
 
@@ -390,38 +467,18 @@ export default function ClaimReconciliation() {
     enabled: !!selectedRunId,
   });
 
-  const {
-    data: periodsSummary = [],
-    isLoading: summaryLoading,
-  } = useQuery<PeriodSummary[]>({
-    queryKey: ["/api/claim-reconciliation/periods-summary", providerName],
-    queryFn: async () => {
-      const params = new URLSearchParams({ providerName });
-      const url = new URL(
-        `/api/claim-reconciliation/periods-summary?${params.toString()}`,
-        API_BASE_URL
-      ).toString();
+  const providerOptions = useMemo(() => {
+    const set = new Set<string>();
+    set.add("CIC");
+    runs.forEach((r) => set.add(r.providerName));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [runs]);
 
-      const headers: HeadersInit = {};
-      const backup = readSessionBackup();
-      if (backup) headers["x-session-token"] = backup;
+  /* ------------------------------------------------------------------------ */
+  /* Period status (active period) */
+  /* ------------------------------------------------------------------------ */
 
-      const response = await fetch(url, { method: "GET", credentials: "include", headers });
-      if (!response.ok) throw new Error("Failed to fetch periods summary");
-      return response.json();
-    },
-  });
-
-  const providerTotalClaims = useMemo(() => {
-    return periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
-  }, [periodsSummary]);
-
-  const providerHasAnyClaims = providerTotalClaims > 0;
-
-  const {
-    data: periodStatus,
-    isFetching: periodStatusFetching,
-  } = useQuery<PeriodStatus>({
+  const { data: periodStatus, isLoading: periodStatusLoading } = useQuery<PeriodStatus>({
     queryKey: ["/api/claim-reconciliation/period", providerName, periodYear, periodMonth],
     queryFn: async () => {
       const url = new URL(
@@ -440,6 +497,65 @@ export default function ClaimReconciliation() {
     staleTime: 2000,
     enabled: !!(providerName && periodYear && periodMonth),
   });
+
+  /* ------------------------------------------------------------------------ */
+  /* Periods summary (cards) */
+  /* ------------------------------------------------------------------------ */
+
+  const { data: periodsSummary = [], isLoading: summaryLoading } = useQuery<PeriodSummary[]>({
+    queryKey: ["/api/claim-reconciliation/periods-summary", providerName],
+    queryFn: async () => {
+      const params = new URLSearchParams({ providerName });
+      const url = new URL(`/api/claim-reconciliation/periods-summary?${params.toString()}`, API_BASE_URL).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) headers["x-session-token"] = backup;
+
+      const response = await fetch(url, { method: "GET", credentials: "include", headers });
+      if (!response.ok) throw new Error("Failed to fetch periods summary");
+      return response.json();
+    },
+  });
+
+  // Auto-select the latest period *with data* when provider changes (but never override user choice)
+  useEffect(() => {
+    if (didUserTouchPeriod.current) return;
+    if (!periodsSummary || periodsSummary.length === 0) return;
+
+    const latest = periodsSummary.reduce(
+      (best, p) => {
+        const bestKey = best.periodYear * 100 + best.periodMonth;
+        const pKey = p.periodYear * 100 + p.periodMonth;
+        return pKey > bestKey ? p : best;
+      },
+      periodsSummary[0]
+    );
+
+    setPeriodYear(String(latest.periodYear));
+    setPeriodMonth(String(latest.periodMonth));
+  }, [periodsSummary, providerName]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(periodsSummary.map((p) => p.periodYear));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [periodsSummary]);
+
+  useEffect(() => {
+    if (periodYearFilter === null && availableYears.length > 0) {
+      setPeriodYearFilter(availableYears[0]);
+    }
+  }, [availableYears, periodYearFilter]);
+
+  const filteredPeriods = useMemo(() => {
+    let filtered = periodsSummary;
+    if (periodYearFilter !== null) filtered = filtered.filter((p) => p.periodYear === periodYearFilter);
+    return filtered.slice(0, 12);
+  }, [periodsSummary, periodYearFilter]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Claims Inventory query */
+  /* ------------------------------------------------------------------------ */
 
   const { data: claimsInventory, isLoading: inventoryLoading } = useQuery<ClaimsInventoryResponse>({
     queryKey: [
@@ -464,16 +580,13 @@ export default function ClaimReconciliation() {
           const year = parseInt(parts[0], 10);
           const month = parseInt(parts[1], 10);
           if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
-            params.append("periodYear", year.toString());
-            params.append("periodMonth", month.toString());
+            params.append("periodYear", String(year));
+            params.append("periodMonth", String(month));
           }
         }
       }
 
-      const url = new URL(
-        `/api/claim-reconciliation/claims?${params.toString()}`,
-        API_BASE_URL
-      ).toString();
+      const url = new URL(`/api/claim-reconciliation/claims?${params.toString()}`, API_BASE_URL).toString();
 
       const headers: HeadersInit = {};
       const backup = readSessionBackup();
@@ -486,58 +599,44 @@ export default function ClaimReconciliation() {
     enabled: showInventory,
   });
 
-  /* ------------------------------------------------------------------------ */
-  /* Period card filtering                                                     */
-  /* ------------------------------------------------------------------------ */
-
-  const availableYears = useMemo(() => {
-    const years = new Set(periodsSummary.map((p) => p.periodYear));
-    return Array.from(years).sort((a, b) => b - a);
-  }, [periodsSummary]);
-
-  useEffect(() => {
-    if (periodYearFilter === null && availableYears.length > 0) {
-      setPeriodYearFilter(availableYears[0]);
+  const inventorySummaryStats = useMemo(() => {
+    if (!periodsSummary || periodsSummary.length === 0) {
+      return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
     }
-  }, [availableYears, periodYearFilter]);
 
-  const filteredPeriods = useMemo(() => {
-    let filtered = periodsSummary;
-    if (periodYearFilter !== null) filtered = filtered.filter((p) => p.periodYear === periodYearFilter);
-    return filtered.slice(0, 12);
-  }, [periodsSummary, periodYearFilter]);
-
-  // Auto-select latest period for this provider (so the page is never “empty”)
-  useEffect(() => {
-    if (periodsSummary.length === 0) return;
-
-    // If current selection is not present for this provider, select most recent summary period
-    const currentKey = `${periodYear}-${parseInt(periodMonth, 10)}`;
-    const exists = periodsSummary.some((p) => `${p.periodYear}-${p.periodMonth}` === currentKey);
-
-    if (!selectedPeriodKey || !exists) {
-      const latest = periodsSummary[0]; // already sorted most recent first in API
-      const key = `${latest.periodYear}-${latest.periodMonth}`;
-      setSelectedPeriodKey(key);
-      setPeriodYear(latest.periodYear.toString());
-      setPeriodMonth(latest.periodMonth.toString());
-      setInventoryPeriodFilter(key);
+    if (inventoryPeriodFilter) {
+      const [y, m] = inventoryPeriodFilter.split("-");
+      const yy = parseInt(y, 10);
+      const mm = parseInt(m, 10);
+      const p = periodsSummary.find((x) => x.periodYear === yy && x.periodMonth === mm);
+      if (!p) return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
+      return {
+        total: p.totalClaims,
+        awaiting: p.awaitingRemittance,
+        matched: p.matched,
+        unpaid: p.unpaid,
+        partial: p.partiallyPaid,
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerName, periodsSummary]);
+
+    return {
+      total: periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0),
+      awaiting: periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0),
+      matched: periodsSummary.reduce((sum, p) => sum + p.matched, 0),
+      unpaid: periodsSummary.reduce((sum, p) => sum + p.unpaid, 0),
+      partial: periodsSummary.reduce((sum, p) => sum + p.partiallyPaid, 0),
+    };
+  }, [periodsSummary, inventoryPeriodFilter]);
 
   /* ------------------------------------------------------------------------ */
-  /* Stats strip                                                               */
+  /* KPI strip stats */
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
     const totalRuns = runs.length;
 
     const totalClaims = periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
-
-    const problemClaims = periodsSummary.reduce((sum, p) => {
-      return sum + p.awaitingRemittance + p.unpaid + p.partiallyPaid;
-    }, 0);
+    const problemClaims = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance + p.unpaid + p.partiallyPaid, 0);
 
     const sortedRuns = [...runs].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -560,8 +659,56 @@ export default function ClaimReconciliation() {
   }, [runs, periodsSummary]);
 
   /* ------------------------------------------------------------------------ */
-  /* Mutations                                                                 */
+  /* Mutations */
   /* ------------------------------------------------------------------------ */
+
+  const uploadMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const uploadUrl = new URL("/api/claim-reconciliation/upload", API_BASE_URL).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) headers["x-session-token"] = backup;
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        }
+        const text = await response.text();
+        throw new Error(`Upload failed (${response.status}): ${text.substring(0, 120)}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Reconciliation completed",
+        description: `Matched ${data.summary.autoMatched} claims automatically. ${data.summary.partialMatched} need manual review.`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
+
+      setSelectedRunId(data.runId);
+      setClaimsFile(null);
+      setRemittanceFile(null);
+      setAttentionFilter("issues");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
+  });
 
   const uploadClaimsMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -571,7 +718,12 @@ export default function ClaimReconciliation() {
       const backup = readSessionBackup();
       if (backup) headers["x-session-token"] = backup;
 
-      const response = await fetch(uploadUrl, { method: "POST", body: formData, credentials: "include", headers });
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers,
+      });
 
       if (!response.ok) {
         const contentType = response.headers.get("content-type");
@@ -591,9 +743,10 @@ export default function ClaimReconciliation() {
         description: `${data.claimsStored} claims uploaded – awaiting remittance`,
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
 
       setClaimsFile(null);
     },
@@ -610,7 +763,12 @@ export default function ClaimReconciliation() {
       const backup = readSessionBackup();
       if (backup) headers["x-session-token"] = backup;
 
-      const response = await fetch(uploadUrl, { method: "POST", body: formData, credentials: "include", headers });
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers,
+      });
 
       if (!response.ok) {
         const contentType = response.headers.get("content-type");
@@ -627,16 +785,14 @@ export default function ClaimReconciliation() {
     onSuccess: (data) => {
       const reconciliation = data.reconciliation;
       const unpaidCount = (reconciliation.manualReview || 0) + (reconciliation.unpaidClaims || 0);
+      const summary = `${reconciliation.totalClaims} claims, ${reconciliation.autoMatched} matched, ${reconciliation.partialMatched} partial, ${unpaidCount} unpaid`;
 
-      toast({
-        title: "Reconciliation complete",
-        description: `${reconciliation.totalClaims} claims searched, ${reconciliation.autoMatched} matched, ${reconciliation.partialMatched} partial, ${unpaidCount} unpaid/review`,
-      });
+      toast({ title: "Reconciliation complete", description: summary });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
 
       setRemittanceFile(null);
     },
@@ -669,8 +825,12 @@ export default function ClaimReconciliation() {
     },
     onSuccess: (_data, runId) => {
       toast({ title: "Reconciliation deleted", description: "The run and its related data were removed." });
+
       if (selectedRunId === runId) setSelectedRunId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"], exact: false });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
     },
     onError: (error: Error) => {
       toast({ title: "Delete failed", description: error.message, variant: "destructive" });
@@ -752,9 +912,9 @@ export default function ClaimReconciliation() {
     },
     onSuccess: () => {
       toast({ title: "Claims deleted", description: "All claims for the period were removed." });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
     },
     onError: (error: Error) => {
       toast({ title: "Delete failed", description: error.message, variant: "destructive" });
@@ -785,92 +945,88 @@ export default function ClaimReconciliation() {
     },
     onSuccess: () => {
       toast({ title: "Remittances deleted", description: "All remittances for the period were removed." });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
     },
     onError: (error: Error) => {
       toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     },
   });
 
-  const isUploading = uploadClaimsMutation.isPending || uploadRemittanceMutation.isPending;
-  const isDeleting = deleteMutation.isPending || deletePeriodClaimsMutation.isPending || deletePeriodRemittancesMutation.isPending;
+  const isUploading =
+    uploadMutation.isPending || uploadClaimsMutation.isPending || uploadRemittanceMutation.isPending;
+  const isDeleting =
+    deleteMutation.isPending || deletePeriodClaimsMutation.isPending || deletePeriodRemittancesMutation.isPending;
   const isExporting = exportIssuesMutation.isPending;
 
   /* ------------------------------------------------------------------------ */
-  /* Stepper logic                                                             */
+  /* Stepper state */
   /* ------------------------------------------------------------------------ */
 
-  const selectedPeriodSummary = useMemo(() => {
-    if (!selectedPeriodKey) return null;
-    return periodsSummary.find((p) => `${p.periodYear}-${p.periodMonth}` === selectedPeriodKey) || null;
-  }, [periodsSummary, selectedPeriodKey]);
-
   const stepperState = useMemo(() => {
-    const periodLabel = formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
+    if (!periodStatus) {
+      return {
+        steps: {
+          claimsUploaded: { completed: false },
+          remittanceUploaded: { completed: false },
+          reconciliationRun: { completed: false },
+          reviewExceptions: { completed: false },
+        },
+        currentStep: 1 as 1 | 2 | 3 | 4,
+        primaryAction: "Upload claims file to begin",
+        primaryDisabled: true,
+      };
+    }
 
-    // Step 1 should reflect "Do we have claims inventory for provider at all?"
-    const hasAnyClaimsForProvider = providerHasAnyClaims;
-
-    const hasRemittanceForThisPeriod = !!periodStatus && periodStatus.remittances.total > 0;
-    const isReconciled = !!periodStatus && periodStatus.isReconciled;
-
-    const issuesCount =
-      (periodStatus?.claims.partiallyPaid || 0) + (periodStatus?.claims.unpaid || 0);
+    const hasClaims = periodStatus.claims.total > 0;
+    const hasRemittance = periodStatus.remittances.total > 0;
+    const isReconciled = periodStatus.isReconciled;
+    const exceptionsCount = periodStatus.claims.partiallyPaid + periodStatus.claims.unpaid;
 
     const step1 = {
-      completed: hasAnyClaimsForProvider,
-      details: hasAnyClaimsForProvider
-        ? `${providerTotalClaims} ${pluralize(providerTotalClaims, "claim")} (all periods)`
-        : undefined,
+      completed: hasClaims,
+      details: hasClaims ? `${periodStatus.claims.total} claims` : undefined,
     };
 
     const step2 = {
-      completed: hasRemittanceForThisPeriod,
-      details: hasRemittanceForThisPeriod ? `${periodStatus?.remittances.total} remittances` : undefined,
+      completed: hasRemittance,
+      details: hasRemittance ? `${periodStatus.remittances.total} remittances` : undefined,
     };
 
-    // Reconciliation happens automatically on remittance upload
     const step3 = {
-      completed: isReconciled || hasRemittanceForThisPeriod,
-      details: (isReconciled || hasRemittanceForThisPeriod) ? "Auto-run" : undefined,
+      completed: isReconciled,
+      details: isReconciled ? "Complete" : undefined,
     };
 
     const step4 = {
-      completed: (isReconciled || hasRemittanceForThisPeriod) && issuesCount === 0,
-      details:
-        (isReconciled || hasRemittanceForThisPeriod)
-          ? issuesCount > 0
-            ? `${issuesCount} issues`
-            : "No issues"
-          : undefined,
+      completed: isReconciled && exceptionsCount === 0,
+      details: exceptionsCount > 0 ? `${exceptionsCount} issues` : isReconciled ? "No issues" : undefined,
     };
 
     let currentStep: 1 | 2 | 3 | 4 = 1;
     let primaryAction = "";
     let primaryDisabled = false;
 
-    if (!hasAnyClaimsForProvider) {
+    if (!hasClaims) {
       currentStep = 1;
       primaryAction = "📄 Upload Claims File";
       primaryDisabled = !claimsFile;
-    } else if (!hasRemittanceForThisPeriod) {
+    } else if (!hasRemittance) {
       currentStep = 2;
       primaryAction = "💰 Upload Remittance File";
       primaryDisabled = !remittanceFile;
-    } else if (!(isReconciled || hasRemittanceForThisPeriod)) {
+    } else if (!isReconciled) {
       currentStep = 3;
       primaryAction = "▶️ Reconciliation runs automatically";
       primaryDisabled = true;
     } else {
       currentStep = 4;
-      primaryAction = issuesCount > 0 ? "🔍 Review Exceptions" : "✅ All Complete";
+      primaryAction = exceptionsCount > 0 ? "🔍 Review Exceptions" : "✅ All Complete";
       primaryDisabled = false;
     }
 
     return {
-      periodLabel,
       steps: {
         claimsUploaded: step1,
         remittanceUploaded: step2,
@@ -880,208 +1036,199 @@ export default function ClaimReconciliation() {
       currentStep,
       primaryAction,
       primaryDisabled,
-      issuesCount,
     };
-  }, [
-    periodStatus,
-    claimsFile,
-    remittanceFile,
-    providerHasAnyClaims,
-    providerTotalClaims,
-    periodYear,
-    periodMonth,
-  ]);
+  }, [periodStatus, claimsFile, remittanceFile]);
 
   /* ------------------------------------------------------------------------ */
-  /* Handlers                                                                  */
+  /* Smart action (THIS adds the missing Submit button) */
   /* ------------------------------------------------------------------------ */
 
-  const handleSelectPeriod = useCallback(
-    (provider: string, year: number, month: number) => {
-      const key = `${year}-${month}`;
-      setProviderName(provider);
-      setSelectedPeriodKey(key);
-      setPeriodYear(year.toString());
-      setPeriodMonth(month.toString());
-      setInventoryPeriodFilter(key);
+  const uploadAction = useMemo(() => {
+    const hasClaims = !!claimsFile;
+    const hasRemittance = !!remittanceFile;
 
-      setClaimsFile(null);
-      setRemittanceFile(null);
-    },
-    []
-  );
+    if (!hasClaims && !hasRemittance) {
+      return { type: "disabled" as const, label: "Select files to continue", disabled: true };
+    }
+    if (hasClaims && !hasRemittance) {
+      return { type: "claims-only" as const, label: `Upload Claims to ${activePeriodLabel}`, disabled: false };
+    }
+    if (!hasClaims && hasRemittance) {
+      return { type: "remittance-only" as const, label: `Upload Remittance to ${activePeriodLabel}`, disabled: false };
+    }
+    return { type: "both" as const, label: `Upload Both & Reconcile (${activePeriodLabel})`, disabled: false };
+  }, [claimsFile, remittanceFile, activePeriodLabel]);
 
-  const handleStepperAction = useCallback(() => {
-    // Step 4: scroll to exceptions/inventory
-    if (stepperState.currentStep === 4) {
-      const exceptionsSection = document.getElementById("exceptions-section");
-      if (exceptionsSection) exceptionsSection.scrollIntoView({ behavior: "smooth" });
-      else {
-        setShowInventory(true);
-        setInventoryStatusFilter("unpaid");
-      }
+  const inferredClaimsPeriod = useMemo(() => {
+    if (!claimsFile) return null;
+    return inferPeriodFromFilename(claimsFile.name);
+  }, [claimsFile]);
+
+  const claimsPeriodMismatch = useMemo(() => {
+    if (!inferredClaimsPeriod) return false;
+    return inferredClaimsPeriod.year !== periodYear || inferredClaimsPeriod.month !== periodMonth;
+  }, [inferredClaimsPeriod, periodYear, periodMonth]);
+
+  const submitClaims = useCallback(() => {
+    if (!claimsFile) {
+      toast({ title: "Missing file", description: "Please select a claims file.", variant: "destructive" });
+      return;
+    }
+    if (claimsPeriodMismatch && inferredClaimsPeriod) {
+      const inferredLabel = formatPeriodLabel(parseInt(inferredClaimsPeriod.year, 10), parseInt(inferredClaimsPeriod.month, 10));
+      toast({
+        title: "Period mismatch",
+        description: `Your file looks like ${inferredLabel}. Switch the period (top of workflow) before uploading.`,
+        variant: "destructive",
+      });
       return;
     }
 
-    // Step 1: upload claims (provider-level “inventory ready”)
-    if (!providerHasAnyClaims) {
-      if (!claimsFile) {
-        toast({
-          title: "No file selected",
-          description: "Please select a claims file to upload.",
-          variant: "destructive",
-        });
-        return;
-      }
+    const formData = new FormData();
+    formData.append("claimsFile", claimsFile);
+    formData.append("providerName", providerName);
+    formData.append("periodYear", periodYear);
+    formData.append("periodMonth", periodMonth);
+    uploadClaimsMutation.mutate(formData);
+  }, [claimsFile, providerName, periodYear, periodMonth, toast, uploadClaimsMutation, claimsPeriodMismatch, inferredClaimsPeriod]);
 
-      const formData = new FormData();
-      formData.append("claimsFile", claimsFile);
-      formData.append("providerName", providerName);
-      formData.append("periodYear", periodYear);
-      formData.append("periodMonth", periodMonth);
-      uploadClaimsMutation.mutate(formData);
+  const submitRemittance = useCallback(() => {
+    if (!remittanceFile) {
+      toast({ title: "Missing file", description: "Please select a remittance file.", variant: "destructive" });
       return;
     }
 
-    // Step 2: upload remittance (allowed even if THIS period has 0 claims; cross-period matching)
-    if (!periodStatus || periodStatus.remittances.total === 0) {
-      if (!remittanceFile) {
-        toast({
-          title: "No file selected",
-          description: "Please select a remittance file to upload.",
-          variant: "destructive",
-        });
-        return;
-      }
+    const formData = new FormData();
+    formData.append("remittanceFile", remittanceFile);
+    formData.append("providerName", providerName);
+    formData.append("periodYear", periodYear);
+    formData.append("periodMonth", periodMonth);
+    uploadRemittanceMutation.mutate(formData);
+  }, [remittanceFile, providerName, periodYear, periodMonth, toast, uploadRemittanceMutation]);
 
-      // Defensive: backend requires at least one claim for provider (any period)
-      if (!providerHasAnyClaims) {
-        toast({
-          title: "Upload claims first",
-          description: `No claims exist yet for ${providerName}. Upload claims before uploading a remittance file.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("remittanceFile", remittanceFile);
-      formData.append("providerName", providerName);
-      formData.append("periodYear", periodYear);
-      formData.append("periodMonth", periodMonth);
-      uploadRemittanceMutation.mutate(formData);
+  const submitBoth = useCallback(() => {
+    if (!claimsFile || !remittanceFile) {
+      toast({
+        title: "Missing files",
+        description: "Please select both the claims and remittance files.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (claimsPeriodMismatch && inferredClaimsPeriod) {
+      const inferredLabel = formatPeriodLabel(parseInt(inferredClaimsPeriod.year, 10), parseInt(inferredClaimsPeriod.month, 10));
+      toast({
+        title: "Period mismatch",
+        description: `Your claims file looks like ${inferredLabel}. Switch the period (top of workflow) before uploading.`,
+        variant: "destructive",
+      });
       return;
     }
 
-    // Step 3: (should not be needed)
-    toast({
-      title: "Reconciliation",
-      description: "Reconciliation runs automatically when you upload a remittance file.",
+    const formData = new FormData();
+    formData.append("claimsFile", claimsFile);
+    formData.append("remittanceFile", remittanceFile);
+    formData.append("providerName", providerName);
+    formData.append("periodYear", periodYear);
+    formData.append("periodMonth", periodMonth);
+    uploadMutation.mutate(formData);
+  }, [claimsFile, remittanceFile, providerName, periodYear, periodMonth, toast, uploadMutation, claimsPeriodMismatch, inferredClaimsPeriod]);
+
+  const runSmartAction = useCallback(() => {
+    if (uploadAction.type === "disabled") return;
+    if (uploadAction.type === "claims-only") submitClaims();
+    else if (uploadAction.type === "remittance-only") submitRemittance();
+    else submitBoth();
+  }, [uploadAction.type, submitClaims, submitRemittance, submitBoth]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Inline validation - remittance without claims in THIS period */
+  /* ------------------------------------------------------------------------ */
+
+  const showRemittanceWarning = useMemo(() => {
+    if (!remittanceFile || claimsFile) return false;
+    if (!periodStatus) return false;
+    return periodStatus.claims.total === 0;
+  }, [remittanceFile, claimsFile, periodStatus]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Contextual help text */
+  /* ------------------------------------------------------------------------ */
+
+  const helpText = useMemo(() => {
+    const hasClaims = !!claimsFile;
+    const hasRemittance = !!remittanceFile;
+    const periodHasClaims = !!periodStatus && periodStatus.claims.total > 0;
+
+    if (!hasClaims && !hasRemittance) {
+      if (periodHasClaims) return "Claims are ready! Upload the remittance file to reconcile.";
+      return "Upload your claims file to store them while waiting for remittance, or upload both files to reconcile immediately.";
+    }
+
+    if (hasClaims && !hasRemittance) return "Upload your claims file to store them while waiting for remittance.";
+    if (!hasClaims && hasRemittance) {
+      if (periodHasClaims) return "Upload remittance to reconcile against stored claims for this period.";
+      return "⚠️ No claims found for this period. Please upload claims first or select a different period.";
+    }
+
+    return "Both files ready - click Upload to reconcile immediately.";
+  }, [claimsFile, remittanceFile, periodStatus]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Run helpers */
+  /* ------------------------------------------------------------------------ */
+
+  const getRunStatus = (run: ReconRun): "awaiting_remittance" | "reconciled" | "pending_review" => {
+    if (run.totalRemittanceRows === 0) return "awaiting_remittance";
+    if (run.partialMatched > 0 || run.manualReview > 0) return "pending_review";
+    return "reconciled";
+  };
+
+  const getRunStatusBadge = (run: ReconRun) => {
+    const status = getRunStatus(run);
+    switch (status) {
+      case "awaiting_remittance":
+        return (
+          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+            <Clock className="w-3 h-3 mr-1" />
+            Awaiting remittance
+          </Badge>
+        );
+      case "pending_review":
+        return (
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Reconciled – pending review
+          </Badge>
+        );
+      case "reconciled":
+      default:
+        return (
+          <Badge className="bg-green-500 text-white hover:bg-green-600">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Reconciled
+          </Badge>
+        );
+    }
+  };
+
+  const filteredRuns = useMemo(() => {
+    if (statusFilter === "all") return runs;
+    return runs.filter((run) => {
+      const status = getRunStatus(run);
+      if (statusFilter === "awaiting_remittance") return status === "awaiting_remittance";
+      return status === "reconciled" || status === "pending_review";
     });
-  }, [
-    stepperState.currentStep,
-    providerHasAnyClaims,
-    claimsFile,
-    remittanceFile,
-    providerName,
-    periodYear,
-    periodMonth,
-    periodStatus,
-    toast,
-    uploadClaimsMutation,
-    uploadRemittanceMutation,
-  ]);
+  }, [runs, statusFilter]);
 
-  const handleDeleteRun = (runId: number) => {
-    const run = runs.find((r) => r.id === runId);
-    const label = run
-      ? `${run.providerName} – ${formatPeriodLabel(run.periodYear, run.periodMonth)}`
-      : `Run #${runId}`;
+  const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
 
-    const ok = window.confirm(
-      `Delete reconciliation run "${label}"?\n\nThis will remove the run and all its claims/remittances. This cannot be undone.`
-    );
-    if (!ok) return;
-    deleteMutation.mutate(runId);
-  };
+  const issuesCountForSelected = useMemo(() => claims.filter((c) => c.status !== "paid").length, [claims]);
 
-  const issuesCountForSelectedRun = useMemo(() => {
-    return claims.filter((c) => c.status !== "paid").length;
-  }, [claims]);
-
-  const handleExportIssues = () => {
-    if (!selectedRunId) return;
-    if (issuesCountForSelectedRun === 0) {
-      toast({ title: "Nothing to export", description: "All claims for this run are fully paid." });
-      return;
-    }
-    exportIssuesMutation.mutate(selectedRunId);
-  };
-
-  const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
-    const periodLabel = formatPeriodLabel(period.periodYear, period.periodMonth);
-
-    if (type === "claims") {
-      const claimCount = period.totalClaims;
-      const ok = window.confirm(
-        `Delete all ${claimCount} ${pluralize(claimCount, "claim")} for ${periodLabel}?\n\nThis cannot be undone.`
-      );
-      if (!ok) return;
-
-      deletePeriodClaimsMutation.mutate({
-        providerName: period.providerName,
-        year: period.periodYear,
-        month: period.periodMonth,
-      });
-    } else {
-      const ok = window.confirm(
-        `Delete all remittances for ${periodLabel}?\n\nThis cannot be undone.`
-      );
-      if (!ok) return;
-
-      deletePeriodRemittancesMutation.mutate({
-        providerName: period.providerName,
-        year: period.periodYear,
-        month: period.periodMonth,
-      });
-    }
-  };
-
-  const handleReplacePeriodFile = (period: PeriodSummary, type: "claims" | "remittances") => {
-    setProviderName(period.providerName);
-    setSelectedPeriodKey(`${period.periodYear}-${period.periodMonth}`);
-    setPeriodYear(period.periodYear.toString());
-    setPeriodMonth(period.periodMonth.toString());
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xlsx,.xls";
-
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      if (type === "claims") {
-        setClaimsFile(file);
-        const formData = new FormData();
-        formData.append("claimsFile", file);
-        formData.append("providerName", period.providerName);
-        formData.append("periodYear", period.periodYear.toString());
-        formData.append("periodMonth", period.periodMonth.toString());
-        uploadClaimsMutation.mutate(formData);
-      } else {
-        setRemittanceFile(file);
-        const formData = new FormData();
-        formData.append("remittanceFile", file);
-        formData.append("providerName", period.providerName);
-        formData.append("periodYear", period.periodYear.toString());
-        formData.append("periodMonth", period.periodMonth.toString());
-        uploadRemittanceMutation.mutate(formData);
-      }
-    };
-
-    input.click();
-  };
+  const filteredClaims = useMemo(() => {
+    if (attentionFilter === "all") return claims;
+    return claims.filter((c) => c.status !== "paid");
+  }, [claims, attentionFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -1132,68 +1279,137 @@ export default function ClaimReconciliation() {
     }
   };
 
-  const getRunStatus = (run: ReconRun): "awaiting_remittance" | "reconciled" | "pending_review" => {
-    if (run.totalRemittanceRows === 0) return "awaiting_remittance";
-    if (run.partialMatched > 0 || run.manualReview > 0) return "pending_review";
-    return "reconciled";
+  /* ------------------------------------------------------------------------ */
+  /* Handlers */
+  /* ------------------------------------------------------------------------ */
+
+  const touchPeriod = () => {
+    didUserTouchPeriod.current = true;
   };
 
-  const getRunStatusBadge = (run: ReconRun) => {
-    const status = getRunStatus(run);
-    switch (status) {
-      case "awaiting_remittance":
-        return (
-          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
-            <Clock className="w-3 h-3 mr-1" />
-            Awaiting remittance
-          </Badge>
-        );
-      case "pending_review":
-        return (
-          <Badge className="bg-orange-500 text-white hover:bg-orange-600">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Reconciled – pending review
-          </Badge>
-        );
-      case "reconciled":
-      default:
-        return (
-          <Badge className="bg-green-500 text-white hover:bg-green-600">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            Reconciled
-          </Badge>
-        );
+  const applyPeriod = (y: string, m: string) => {
+    touchPeriod();
+    setPeriodYear(y);
+    setPeriodMonth(m);
+  };
+
+  const handleSelectPeriodCard = useCallback(
+    (year: number, month: number) => {
+      touchPeriod();
+      setPeriodYear(String(year));
+      setPeriodMonth(String(month));
+      // NOTE: inventoryPeriodFilter is view-only now; user controls it inside Inventory section
+    },
+    []
+  );
+
+  const handleStepperAction = useCallback(() => {
+    if (!periodStatus) return;
+
+    const hasClaims = periodStatus.claims.total > 0;
+    const hasRemittance = periodStatus.remittances.total > 0;
+    const isReconciled = periodStatus.isReconciled;
+
+    if (!hasClaims) {
+      submitClaims();
+    } else if (!hasRemittance) {
+      submitRemittance();
+    } else if (!isReconciled) {
+      toast({
+        title: "Reconciliation Pending",
+        description: "Reconciliation will run automatically when you upload the remittance file.",
+      });
+    } else {
+      const exceptionsSection = document.getElementById("exceptions-section");
+      if (exceptionsSection) exceptionsSection.scrollIntoView({ behavior: "smooth" });
+      else setShowInventory(true);
+    }
+  }, [periodStatus, submitClaims, submitRemittance, toast]);
+
+  const handleDeleteRun = (runId: number) => {
+    const run = runs.find((r) => r.id === runId);
+    const label = run ? `${run.providerName} – ${formatPeriodLabel(run.periodYear, run.periodMonth)}` : `Run #${runId}`;
+
+    const ok = window.confirm(
+      `Delete reconciliation run "${label}"?\n\nThis will remove the run and all its claims/remittances. This cannot be undone.`
+    );
+    if (!ok) return;
+
+    deleteMutation.mutate(runId);
+  };
+
+  const handleExportIssues = () => {
+    if (!selectedRunId) return;
+    if (issuesCountForSelected === 0) {
+      toast({ title: "Nothing to export", description: "All claims for this run are fully paid." });
+      return;
+    }
+    exportIssuesMutation.mutate(selectedRunId);
+  };
+
+  const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
+    const periodLabel = formatPeriodLabel(period.periodYear, period.periodMonth);
+
+    if (type === "claims") {
+      const claimCount = period.totalClaims;
+      const ok = window.confirm(
+        `Delete all ${claimCount} ${pluralize(claimCount, "claim")} for ${periodLabel}?\n\nThis cannot be undone.`
+      );
+      if (!ok) return;
+
+      deletePeriodClaimsMutation.mutate({
+        providerName: period.providerName,
+        year: period.periodYear,
+        month: period.periodMonth,
+      });
+    } else {
+      const ok = window.confirm(`Delete all remittances for ${periodLabel}?\n\nThis cannot be undone.`);
+      if (!ok) return;
+
+      deletePeriodRemittancesMutation.mutate({
+        providerName: period.providerName,
+        year: period.periodYear,
+        month: period.periodMonth,
+      });
     }
   };
 
-  const filteredRuns = useMemo(() => {
-    if (statusFilter === "all") return runs;
-    return runs.filter((run) => {
-      const status = getRunStatus(run);
-      if (statusFilter === "awaiting_remittance") return status === "awaiting_remittance";
-      return status === "reconciled" || status === "pending_review";
-    });
-  }, [runs, statusFilter]);
+  const handleReplacePeriodFile = (period: PeriodSummary, type: "claims" | "remittances") => {
+    touchPeriod();
+    setPeriodYear(period.periodYear.toString());
+    setPeriodMonth(period.periodMonth.toString());
+    setProviderName(period.providerName);
 
-  const filteredClaimsForRun = useMemo(() => {
-    if (attentionFilter === "all") return claims;
-    return claims.filter((c) => c.status !== "paid");
-  }, [claims, attentionFilter]);
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,.xls";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
 
-  // Cross-period clarifier UI states
-  const showRemittanceBlockingWarning = useMemo(() => {
-    return !!remittanceFile && !providerHasAnyClaims;
-  }, [remittanceFile, providerHasAnyClaims]);
-
-  const showCrossPeriodInfo = useMemo(() => {
-    // If they’re uploading remittance for a period that has 0 claims, that’s OK
-    if (!remittanceFile) return false;
-    if (!selectedPeriodSummary) return false;
-    return selectedPeriodSummary.totalClaims === 0 && providerHasAnyClaims;
-  }, [remittanceFile, selectedPeriodSummary, providerHasAnyClaims]);
+      if (type === "claims") {
+        setClaimsFile(file);
+        const formData = new FormData();
+        formData.append("claimsFile", file);
+        formData.append("providerName", period.providerName);
+        formData.append("periodYear", period.periodYear.toString());
+        formData.append("periodMonth", period.periodMonth.toString());
+        uploadClaimsMutation.mutate(formData);
+      } else {
+        setRemittanceFile(file);
+        const formData = new FormData();
+        formData.append("remittanceFile", file);
+        formData.append("providerName", period.providerName);
+        formData.append("periodYear", period.periodYear.toString());
+        formData.append("periodMonth", period.periodMonth.toString());
+        uploadRemittanceMutation.mutate(formData);
+      }
+    };
+    input.click();
+  };
 
   /* ------------------------------------------------------------------------ */
-  /* Render                                                                    */
+  /* Render */
   /* ------------------------------------------------------------------------ */
 
   return (
@@ -1224,11 +1440,9 @@ export default function ClaimReconciliation() {
         <div className="relative z-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-white drop-shadow-2xl">
-                Claim Reconciliation
-              </h1>
+              <h1 className="text-3xl font-bold text-white drop-shadow-2xl">Claim Reconciliation</h1>
               <p className="text-orange-100 mt-1 drop-shadow-lg">
-                Upload claims and remittance files, then review matches, underpayments, and outstanding balances
+                Upload claim and remittance files, then review matches, underpayments, and outstanding balances
               </p>
             </div>
 
@@ -1244,7 +1458,7 @@ export default function ClaimReconciliation() {
       </div>
 
       <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
-        {/* KPI Cards */}
+        {/* KPI cards */}
         <section className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="relative overflow-hidden rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 hover:border-emerald-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
@@ -1259,11 +1473,9 @@ export default function ClaimReconciliation() {
                   </div>
                   <div className="mt-1 flex items-baseline gap-2">
                     <span className="text-2xl font-bold text-gray-900">{stats.totalRuns}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-500">runs</span>
+                    <span className="text-[11px] uppercase tracking-wide text-slate-500">periods checked</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    Latest period: {stats.lastPeriodLabel}
-                  </div>
+                  <div className="mt-1 text-[11px] text-slate-500">Latest period: {stats.lastPeriodLabel}</div>
                 </div>
               </div>
             </div>
@@ -1280,9 +1492,9 @@ export default function ClaimReconciliation() {
                   </div>
                   <div className="mt-1 flex items-baseline gap-2">
                     <span className="text-2xl font-bold text-gray-900">{stats.totalClaims.toLocaleString()}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-500">rows</span>
+                    <span className="text-[11px] uppercase tracking-wide text-slate-500">rows in total</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">Across all periods.</div>
+                  <div className="mt-1 text-[11px] text-slate-500">Across all uploads.</div>
                 </div>
               </div>
             </div>
@@ -1301,7 +1513,7 @@ export default function ClaimReconciliation() {
                     <span className="text-2xl font-bold text-orange-600">{stats.problemClaims}</span>
                     <span className="text-[11px] uppercase tracking-wide text-orange-500">not fully paid</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">Partial or unpaid claims.</div>
+                  <div className="mt-1 text-[11px] text-slate-500">Partial or unpaid claims to discuss with CIC.</div>
                 </div>
               </div>
             </div>
@@ -1310,16 +1522,20 @@ export default function ClaimReconciliation() {
           {showHelp && (
             <Card className="border border-dashed border-slate-300 bg-slate-50/80">
               <CardContent className="pt-4 text-sm text-slate-700 space-y-2">
-                <div className="font-medium text-slate-800">How the workflow works</div>
+                <div className="font-medium text-slate-800">How the reconciliation workflow works</div>
                 <ul className="list-disc list-inside space-y-1">
                   <li>
-                    <strong>Upload claims anytime:</strong> Claims are stored with <em>awaiting remittance</em>.
+                    <strong>Select any month/year:</strong> Use the Provider/Year/Month controls in the Workflow card (you
+                    can pick January 2025 even if it doesn’t exist as a card yet).
                   </li>
                   <li>
-                    <strong>Upload remittance when it arrives:</strong> It will be matched against <strong>all outstanding claims across all months</strong>.
+                    <strong>Upload claims first:</strong> Upload your claims file. Claims are stored as “awaiting remittance”.
                   </li>
                   <li>
-                    <strong>Review exceptions:</strong> Focus on <em>partial</em> and <em>unpaid</em> claims.
+                    <strong>Upload remittance later:</strong> Once remittance arrives, upload it to reconcile.
+                  </li>
+                  <li>
+                    <strong>Submit button:</strong> The “Upload…” button under the dropzones is always available once you select a file.
                   </li>
                 </ul>
               </CardContent>
@@ -1327,37 +1543,31 @@ export default function ClaimReconciliation() {
           )}
         </section>
 
-        {/* Period Overview Cards */}
+        {/* Period cards */}
         {periodsSummary.length > 0 && (
           <Card className="border-2 border-slate-200/80 shadow-lg">
             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-white">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <CardTitle className="text-lg">Your Claim Periods</CardTitle>
-                  <CardDescription>Click a period to work on uploads for that month</CardDescription>
+                  <CardDescription>Click a period card to set the active month/year.</CardDescription>
                 </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2">
                     <Label className="text-sm font-medium text-slate-700">Provider:</Label>
                     <Select
                       value={providerName}
-                      onValueChange={(value) => {
-                        setProviderName(value);
-                        setSelectedPeriodKey(null);
-                        setInventoryPeriodFilter(null);
-                        setInventoryPage(1);
-                        setSelectedRunId(null);
-                        setClaimsFile(null);
-                        setRemittanceFile(null);
+                      onValueChange={(v) => {
+                        touchPeriod();
+                        setProviderName(v);
                       }}
                     >
                       <SelectTrigger className="w-[160px] bg-white">
-                        <SelectValue placeholder="Select provider" />
+                        <SelectValue placeholder="Provider" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* Keep simple but not “hard-coded” to only CIC */}
-                        {Array.from(new Set(["CIC", ...runs.map((r) => r.providerName)])).map((p) => (
+                        {providerOptions.map((p) => (
                           <SelectItem key={p} value={p}>
                             {p}
                           </SelectItem>
@@ -1371,9 +1581,7 @@ export default function ClaimReconciliation() {
                       <Label className="text-sm font-medium text-slate-700">Year:</Label>
                       <Select
                         value={periodYearFilter?.toString() || "all"}
-                        onValueChange={(value) => {
-                          setPeriodYearFilter(value === "all" ? null : parseInt(value, 10));
-                        }}
+                        onValueChange={(value) => setPeriodYearFilter(value === "all" ? null : parseInt(value, 10))}
                       >
                         <SelectTrigger className="w-[140px] bg-white">
                           <SelectValue placeholder="Select year" />
@@ -1390,11 +1598,7 @@ export default function ClaimReconciliation() {
                     </div>
                   )}
 
-                  {selectedPeriodKey && (
-                    <Badge className="bg-orange-500 text-white">
-                      Selected: {formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10))}
-                    </Badge>
-                  )}
+                  <Badge className="bg-orange-500 text-white">Active: {activePeriodLabel}</Badge>
                 </div>
               </div>
             </CardHeader>
@@ -1402,19 +1606,26 @@ export default function ClaimReconciliation() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredPeriods.map((period) => {
-                  const periodKey = `${period.periodYear}-${period.periodMonth}`;
-                  const isSelected = selectedPeriodKey === periodKey;
+                  const isActive =
+                    period.periodYear === parseInt(periodYear, 10) &&
+                    period.periodMonth === parseInt(periodMonth, 10);
 
-                  const isReconciled = period.awaitingRemittance === 0 && period.totalClaims > 0;
-                  const hasAwaitingClaims = period.awaitingRemittance > 0;
+                  const isComplete =
+                    period.totalClaims > 0 &&
+                    period.awaitingRemittance === 0 &&
+                    period.unpaid === 0 &&
+                    period.partiallyPaid === 0;
+
+                  const hasAwaiting = period.awaitingRemittance > 0;
+                  const hasIssues = period.unpaid > 0 || period.partiallyPaid > 0;
 
                   return (
                     <div
-                      key={periodKey}
-                      onClick={() => handleSelectPeriod(period.providerName, period.periodYear, period.periodMonth)}
+                      key={`${period.periodYear}-${period.periodMonth}`}
+                      onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
                       className={cn(
                         "relative overflow-hidden rounded-xl border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-1 group cursor-pointer",
-                        isSelected
+                        isActive
                           ? "border-orange-400 bg-orange-50/50 shadow-md ring-2 ring-orange-300"
                           : "border-slate-200 bg-white hover:border-slate-300"
                       )}
@@ -1422,10 +1633,12 @@ export default function ClaimReconciliation() {
                       <div
                         className={cn(
                           "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl transition-all",
-                          isReconciled
+                          isComplete
                             ? "bg-gradient-to-br from-green-400/20 to-emerald-500/20"
-                            : hasAwaitingClaims
+                            : hasAwaiting
                             ? "bg-gradient-to-br from-blue-400/20 to-cyan-500/20"
+                            : hasIssues
+                            ? "bg-gradient-to-br from-orange-400/20 to-red-500/20"
                             : "bg-gradient-to-br from-slate-400/10 to-slate-500/10",
                           "group-hover:scale-110"
                         )}
@@ -1437,14 +1650,15 @@ export default function ClaimReconciliation() {
                             <h3 className="font-bold text-lg text-slate-800 group-hover:text-orange-600 transition-colors">
                               {formatPeriodLabel(period.periodYear, period.periodMonth)}
                             </h3>
-                            <div className="text-xs text-slate-500">{period.providerName}</div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {isReconciled ? (
+                            {isComplete ? (
                               <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            ) : hasAwaitingClaims ? (
+                            ) : hasAwaiting ? (
                               <Clock className="w-5 h-5 text-blue-600" />
+                            ) : hasIssues ? (
+                              <AlertTriangle className="w-5 h-5 text-orange-600" />
                             ) : null}
 
                             <DropdownMenu>
@@ -1521,166 +1735,222 @@ export default function ClaimReconciliation() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {isReconciled ? (
+                          {isComplete ? (
                             <Badge className="bg-green-500 text-white hover:bg-green-600">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Reconciled
+                              Complete
                             </Badge>
-                          ) : hasAwaitingClaims ? (
+                          ) : hasAwaiting ? (
                             <Badge className="bg-blue-500 text-white hover:bg-blue-600">
                               <Clock className="w-3 h-3 mr-1" />
                               Awaiting Remittance
+                            </Badge>
+                          ) : hasIssues ? (
+                            <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Needs review
                             </Badge>
                           ) : (
                             <Badge className="bg-slate-500 text-white hover:bg-slate-600">Processing</Badge>
                           )}
                         </div>
 
-                        {!isReconciled && (
-                          <div className="text-xs text-slate-500 space-y-1">
-                            {period.awaitingRemittance > 0 && <div>• {period.awaitingRemittance} awaiting remittance</div>}
-                            {period.matched > 0 && <div>• {period.matched} matched</div>}
-                            {period.partiallyPaid > 0 && <div>• {period.partiallyPaid} partially paid</div>}
-                            {period.unpaid > 0 && <div>• {period.unpaid} unpaid</div>}
-                          </div>
-                        )}
+                        <div className="text-xs text-slate-500 space-y-1">
+                          {period.awaitingRemittance > 0 && <div>• {period.awaitingRemittance} awaiting remittance</div>}
+                          {period.matched > 0 && <div>• {period.matched} matched</div>}
+                          {period.partiallyPaid > 0 && <div>• {period.partiallyPaid} partially paid</div>}
+                          {period.unpaid > 0 && <div>• {period.unpaid} unpaid</div>}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-
-              {inventoryPeriodFilter && (
-                <div className="mt-4 flex items-center justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setInventoryPeriodFilter(null);
-                      setInventoryPage(1);
-                    }}
-                    className="gap-2"
-                  >
-                    <X className="w-4 h-4" />
-                    Clear period filter
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Reconciliation Workflow */}
+        {/* Workflow */}
         <Card id="workflow-section" className="border-2 border-slate-200/80 shadow-lg">
           <CardHeader className="pb-4 bg-gradient-to-r from-orange-50 to-amber-50">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
                 <CardTitle className="text-lg md:text-xl flex items-center gap-2">
                   <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                   Reconciliation Workflow
                 </CardTitle>
-                <CardDescription>
-                  {selectedPeriodKey
-                    ? getWorkflowDescription(providerName, formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10)))
-                    : "Select a period above to begin"}
-                </CardDescription>
+                <CardDescription>{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
               </div>
 
-              {selectedPeriodKey && (
-                <div className="flex items-center gap-2 text-xs text-slate-600">
-                  {periodStatusFetching ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Refreshing…
-                    </>
-                  ) : null}
+              {/* ✅ FIX: month/year selection always available */}
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Provider</span>
+                  <Select
+                    value={providerName}
+                    onValueChange={(v) => {
+                      touchPeriod();
+                      setProviderName(v);
+                    }}
+                  >
+                    <SelectTrigger className="w-[160px] bg-white">
+                      <SelectValue placeholder="Provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {providerOptions.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Year</span>
+                  <Select value={periodYear} onValueChange={(v) => applyPeriod(v, periodMonth)}>
+                    <SelectTrigger className="w-[110px] bg-white">
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        const y = String(now.getFullYear() - 4 + i);
+                        return (
+                          <SelectItem key={y} value={y}>
+                            {y}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Month</span>
+                  <Select value={periodMonth} onValueChange={(v) => applyPeriod(periodYear, v)}>
+                    <SelectTrigger className="w-[150px] bg-white">
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Badge variant="outline" className="bg-white">
+                  Active: {activePeriodLabel}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-6 pt-4">
-            {selectedPeriodKey ? (
-              <>
-                <ReconciliationStepper
-                  steps={stepperState.steps}
-                  currentStep={stepperState.currentStep}
-                  primaryActionLabel={stepperState.primaryAction}
-                  primaryActionDisabled={
-                    isUploading ||
-                    isDeleting ||
-                    stepperState.primaryDisabled ||
-                    // block remittance upload if provider has zero claims
-                    (stepperState.currentStep === 2 && !providerHasAnyClaims)
-                  }
-                  primaryActionLoading={isUploading}
-                  onPrimaryAction={handleStepperAction}
-                />
+            <ReconciliationStepper
+              steps={stepperState.steps}
+              currentStep={stepperState.currentStep}
+              primaryActionLabel={stepperState.primaryAction}
+              primaryActionDisabled={stepperState.primaryDisabled || isUploading || isDeleting}
+              primaryActionLoading={isUploading}
+              onPrimaryAction={handleStepperAction}
+            />
 
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-700">File Upload</h3>
+            {/* File upload */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700">File Upload</h3>
+                {periodStatusLoading ? (
+                  <span className="text-xs text-muted-foreground">Loading status…</span>
+                ) : periodStatus ? (
+                  <span className="text-xs text-muted-foreground">
+                    {periodStatus.claims.total} claims • {periodStatus.remittances.total} remittances
+                  </span>
+                ) : null}
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FileDropzone
-                      label="Claims File"
-                      description="Upload claims submitted to insurance"
-                      file={claimsFile}
-                      onFileChange={setClaimsFile}
-                      disabled={isUploading || isDeleting}
-                      tintColor="blue"
-                      icon={<FileText className="w-4 h-4" />}
-                    />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <FileDropzone
+                    label="Claims File"
+                    description="Upload claims submitted to insurance"
+                    file={claimsFile}
+                    onFileChange={setClaimsFile}
+                    disabled={isUploading}
+                    tintColor="blue"
+                    icon={<FileText className="w-4 h-4" />}
+                  />
 
-                    <FileDropzone
-                      label="Remittance File"
-                      description={getRemittanceUploadDescription(providerName)}
-                      file={remittanceFile}
-                      onFileChange={setRemittanceFile}
-                      disabled={isUploading || isDeleting}
-                      tintColor="green"
-                      icon={<DollarSign className="w-4 h-4" />}
-                    />
-                  </div>
-
-                  {/* Blocking warning: no claims exist at all for provider */}
-                  {showRemittanceBlockingWarning && (
-                    <div className="flex items-start gap-3 px-4 py-3 bg-red-50 border-2 border-red-300 rounded-lg">
-                      <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm text-red-800 mb-1">
-                          No claims exist yet for {providerName}
-                        </div>
-                        <div className="text-xs text-red-700">
-                          Upload claims first. Remittances can only be matched if there are stored claims.
-                        </div>
+                  {/* Filename mismatch helper (prevents your exact confusion) */}
+                  {claimsFile && inferredClaimsPeriod && claimsPeriodMismatch && (
+                    <div className="mt-2 rounded-lg border-2 border-orange-300 bg-orange-50 px-4 py-3 text-sm">
+                      <div className="font-semibold text-orange-800">Period mismatch detected</div>
+                      <div className="text-orange-700 text-xs mt-1">
+                        File looks like{" "}
+                        <b>
+                          {formatPeriodLabel(
+                            parseInt(inferredClaimsPeriod.year, 10),
+                            parseInt(inferredClaimsPeriod.month, 10)
+                          )}
+                        </b>
+                        , but active period is <b>{activePeriodLabel}</b>.
                       </div>
-                    </div>
-                  )}
-
-                  {/* Non-blocking info: this period has 0 claims, but cross-period matching is OK */}
-                  {showCrossPeriodInfo && (
-                    <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 border-2 border-blue-300 rounded-lg">
-                      <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm text-blue-800 mb-1">
-                          No claims were submitted in this period — that’s OK
-                        </div>
-                        <div className="text-xs text-blue-700">
-                          This remittance will still be matched against all outstanding {providerName} claims across all months.
-                        </div>
-                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => applyPeriod(inferredClaimsPeriod.year, inferredClaimsPeriod.month)}
+                      >
+                        Switch active period to{" "}
+                        {formatPeriodLabel(
+                          parseInt(inferredClaimsPeriod.year, 10),
+                          parseInt(inferredClaimsPeriod.month, 10)
+                        )}
+                      </Button>
                     </div>
                   )}
                 </div>
-              </>
-            ) : (
-              <div className="text-center py-12">
-                <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-muted-foreground text-sm">
-                  Click a period card above to select it and begin.
-                </p>
+
+                <FileDropzone
+                  label="Remittance File"
+                  description={getRemittanceUploadDescription(providerName)}
+                  file={remittanceFile}
+                  onFileChange={setRemittanceFile}
+                  disabled={isUploading}
+                  tintColor="green"
+                  icon={<DollarSign className="w-4 h-4" />}
+                />
               </div>
-            )}
+
+              {showRemittanceWarning && (
+                <div className="flex items-start gap-3 px-4 py-3 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm text-orange-800 mb-1">No claims found for this period</div>
+                    <div className="text-xs text-orange-700">Please upload claims first or select a different period.</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 rounded-lg border bg-slate-50 px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 text-slate-600" />
+                <div className="text-xs text-slate-700">{helpText}</div>
+              </div>
+
+              {/* ✅ FIX: explicit Upload/Submit button (always visible) */}
+              <Button
+                type="button"
+                className="w-full"
+                onClick={runSmartAction}
+                disabled={isUploading || isDeleting || uploadAction.disabled}
+              >
+                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {uploadAction.label}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -1710,37 +1980,43 @@ export default function ClaimReconciliation() {
                 <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200 flex-wrap">
                   {(
                     [
-                      ["all", "All", ""],
-                      ["awaiting_remittance", "Awaiting Remittance", "bg-blue-500 text-white"],
-                      ["matched", "Matched", "bg-green-500 text-white"],
-                      ["partially_paid", "Partially Paid", "bg-yellow-500 text-white"],
-                      ["unpaid", "Unpaid", "bg-red-500 text-white"],
+                      { key: "all", label: "All" },
+                      { key: "awaiting_remittance", label: "Awaiting Remittance" },
+                      { key: "matched", label: "Matched" },
+                      { key: "partially_paid", label: "Partially Paid" },
+                      { key: "unpaid", label: "Unpaid" },
                     ] as const
-                  ).map(([value, labelText, activeClass]) => (
+                  ).map((x) => (
                     <button
-                      key={value}
+                      key={x.key}
                       type="button"
                       className={cn(
                         "px-4 py-2 rounded-full transition-all font-medium",
-                        inventoryStatusFilter === value
-                          ? value === "all"
-                            ? "bg-white shadow-md text-slate-900"
-                            : `shadow-md ${activeClass}`
+                        inventoryStatusFilter === x.key
+                          ? x.key === "unpaid"
+                            ? "bg-red-500 shadow-md text-white"
+                            : x.key === "matched"
+                            ? "bg-green-500 shadow-md text-white"
+                            : x.key === "awaiting_remittance"
+                            ? "bg-blue-500 shadow-md text-white"
+                            : x.key === "partially_paid"
+                            ? "bg-yellow-500 shadow-md text-white"
+                            : "bg-white shadow-md text-slate-900"
                           : "text-slate-600 hover:text-slate-900"
                       )}
                       onClick={() => {
-                        setInventoryStatusFilter(value as any);
+                        setInventoryStatusFilter(x.key);
                         setInventoryPage(1);
                       }}
                     >
-                      {labelText}
+                      {x.label}
                     </button>
                   ))}
                 </div>
               </div>
 
               {periodsSummary.length > 0 && (
-                <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <div className="mb-4 flex items-center gap-2">
                   <Label className="text-sm font-medium text-slate-700">Period:</Label>
                   <Select
                     value={inventoryPeriodFilter || "all"}
@@ -1749,15 +2025,15 @@ export default function ClaimReconciliation() {
                       setInventoryPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-[280px] bg-white">
+                    <SelectTrigger className="w-[320px] bg-white">
                       <SelectValue placeholder="All periods" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All periods</SelectItem>
                       {periodsSummary.map((period) => {
-                        const key = `${period.periodYear}-${period.periodMonth}`;
+                        const periodKey = `${period.periodYear}-${period.periodMonth}`;
                         return (
-                          <SelectItem key={key} value={key}>
+                          <SelectItem key={periodKey} value={periodKey}>
                             {formatPeriodLabel(period.periodYear, period.periodMonth)} ({period.totalClaims}{" "}
                             {pluralize(period.totalClaims, "claim")})
                           </SelectItem>
@@ -1765,34 +2041,41 @@ export default function ClaimReconciliation() {
                       })}
                     </SelectContent>
                   </Select>
+
+                  {inventoryPeriodFilter && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        setInventoryPeriodFilter(null);
+                        setInventoryPage(1);
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                      Clear
+                    </Button>
+                  )}
                 </div>
               )}
 
-              {!summaryLoading && periodsSummary.length > 0 && (
+              {!summaryLoading && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Total Claims</div>
-                    <div className="text-xl font-bold text-slate-900">
-                      {periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0)}
-                    </div>
+                    <div className="text-xl font-bold text-slate-900">{inventorySummaryStats.total}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Awaiting Remittance</div>
-                    <div className="text-xl font-bold text-blue-600">
-                      {periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0)}
-                    </div>
+                    <div className="text-xl font-bold text-blue-600">{inventorySummaryStats.awaiting}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Matched</div>
-                    <div className="text-xl font-bold text-green-600">
-                      {periodsSummary.reduce((sum, p) => sum + p.matched, 0)}
-                    </div>
+                    <div className="text-xl font-bold text-green-600">{inventorySummaryStats.matched}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Unpaid</div>
-                    <div className="text-xl font-bold text-red-600">
-                      {periodsSummary.reduce((sum, p) => sum + p.unpaid, 0)}
-                    </div>
+                    <div className="text-xl font-bold text-red-600">{inventorySummaryStats.unpaid}</div>
                   </div>
                 </div>
               )}
@@ -1805,6 +2088,7 @@ export default function ClaimReconciliation() {
                   <p className="text-muted-foreground text-sm">
                     No claims found
                     {inventoryStatusFilter !== "all" ? ` with status "${inventoryStatusFilter}"` : ""}
+                    {inventoryPeriodFilter ? ` for ${inventoryPeriodFilter}` : ""}
                   </p>
                 </div>
               ) : (
@@ -1824,16 +2108,11 @@ export default function ClaimReconciliation() {
                       </TableHeader>
                       <TableBody>
                         {claimsInventory.claims.map((claim) => (
-                          <TableRow
-                            key={claim.id}
-                            className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors"
-                          >
+                          <TableRow key={claim.id} className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors">
                             <TableCell className="font-mono text-sm">{claim.memberNumber}</TableCell>
                             <TableCell>{claim.patientName || "N/A"}</TableCell>
                             <TableCell>{new Date(claim.serviceDate).toLocaleDateString()}</TableCell>
-                            <TableCell className="text-sm">
-                              {formatPeriodLabel(claim.periodYear, claim.periodMonth)}
-                            </TableCell>
+                            <TableCell className="text-sm">{formatPeriodLabel(claim.periodYear, claim.periodMonth)}</TableCell>
                             <TableCell>
                               {getCurrencyForDisplay(claim.providerName, claim.currency)}{" "}
                               {parseFloat(claim.billedAmount).toFixed(2)}
@@ -1885,7 +2164,7 @@ export default function ClaimReconciliation() {
           )}
         </Card>
 
-        {/* Reconciliation Runs List */}
+        {/* Reconciliation history */}
         <Card id="reconciliation-history" className="border-2 border-slate-200/80 shadow-lg">
           <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white">
             <div className="flex items-center justify-between gap-2">
@@ -1905,9 +2184,7 @@ export default function ClaimReconciliation() {
                     type="button"
                     className={cn(
                       "px-4 py-2 rounded-full transition-all font-medium",
-                      statusFilter === "all"
-                        ? "bg-white shadow-md text-slate-900"
-                        : "text-slate-600 hover:text-slate-900"
+                      statusFilter === "all" ? "bg-white shadow-md text-slate-900" : "text-slate-600 hover:text-slate-900"
                     )}
                     onClick={() => setStatusFilter("all")}
                   >
@@ -1953,9 +2230,7 @@ export default function ClaimReconciliation() {
             {runsLoading ? (
               <p className="text-muted-foreground py-6 text-sm">Loading reconciliation runs…</p>
             ) : runs.length === 0 ? (
-              <p className="text-muted-foreground py-6 text-sm">
-                No reconciliation runs yet. Upload claims and remittances above.
-              </p>
+              <p className="text-muted-foreground py-6 text-sm">No reconciliation runs yet.</p>
             ) : filteredRuns.length === 0 ? (
               <p className="text-muted-foreground py-6 text-sm">No runs match the selected status filter.</p>
             ) : (
@@ -1988,18 +2263,18 @@ export default function ClaimReconciliation() {
                         <TableRow
                           key={run.id}
                           onClick={() => {
-                            // ✅ fix: clicking run selects provider + period AND opens run details
-                            handleSelectPeriod(run.providerName, run.periodYear, run.periodMonth);
+                            touchPeriod();
+                            setProviderName(run.providerName);
+                            setPeriodYear(String(run.periodYear));
+                            setPeriodMonth(String(run.periodMonth));
                             setSelectedRunId(run.id);
-                            setAttentionFilter("issues");
 
                             const workflowSection = document.getElementById("workflow-section");
                             if (workflowSection) workflowSection.scrollIntoView({ behavior: "smooth" });
                           }}
                           className={cn(
                             "odd:bg-slate-50/40 hover:bg-emerald-50/60 transition-colors cursor-pointer",
-                            selectedRunId === run.id &&
-                              "border-l-4 border-l-emerald-500 bg-emerald-50/80 hover:bg-emerald-50/90"
+                            selectedRunId === run.id && "border-l-4 border-l-emerald-500 bg-emerald-50/80"
                           )}
                         >
                           <TableCell className="font-medium">{run.providerName}</TableCell>
@@ -2038,7 +2313,8 @@ export default function ClaimReconciliation() {
                             </Badge>
                           </TableCell>
                           <TableCell>{new Date(run.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-right">
+
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="w-8 h-8" disabled={isDeleting}>
@@ -2094,6 +2370,21 @@ export default function ClaimReconciliation() {
                   </CardTitle>
                   <CardDescription>Detailed view of reconciled claims for the selected run.</CardDescription>
                 </div>
+
+                {selectedRun && (
+                  <div className="text-xs text-muted-foreground text-right">
+                    <div className="font-medium">
+                      {selectedRun.providerName} ·{" "}
+                      {new Date(selectedRun.periodYear, selectedRun.periodMonth - 1).toLocaleString("default", {
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </div>
+                    <div>
+                      {selectedRun.totalClaimRows} claims, {selectedRun.totalRemittanceRows} remittances
+                    </div>
+                  </div>
+                )}
               </div>
             </CardHeader>
 
@@ -2129,28 +2420,26 @@ export default function ClaimReconciliation() {
                         onClick={() => setAttentionFilter("issues")}
                       >
                         <AlertTriangle className="w-3 h-3" />
-                        Needs attention ({issuesCountForSelectedRun})
+                        Needs attention ({issuesCountForSelected})
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={handleExportIssues}
-                        disabled={!selectedRunId || issuesCountForSelectedRun === 0 || isExporting}
-                      >
-                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        Export for CIC
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={handleExportIssues}
+                      disabled={!selectedRunId || issuesCountForSelected === 0 || isExporting}
+                    >
+                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      Export for CIC
+                    </Button>
                   </div>
 
-                  {filteredClaimsForRun.length === 0 && attentionFilter === "issues" ? (
+                  {filteredClaims.length === 0 && attentionFilter === "issues" ? (
                     <p className="text-muted-foreground py-6 text-sm">
-                      All claims for this run are fully paid. There is nothing to follow up.
+                      All claims for this period are fully paid. There is nothing to follow up.
                     </p>
                   ) : (
                     <div className="w-full overflow-x-auto">
@@ -2166,7 +2455,7 @@ export default function ClaimReconciliation() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredClaimsForRun.map((claim) => (
+                          {filteredClaims.map((claim) => (
                             <TableRow
                               key={claim.id}
                               className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors"
@@ -2175,11 +2464,11 @@ export default function ClaimReconciliation() {
                               <TableCell>{claim.patientName || "N/A"}</TableCell>
                               <TableCell>{new Date(claim.serviceDate).toLocaleDateString()}</TableCell>
                               <TableCell>
-                                {getCurrencyForDisplay(providerName, claim.currency)}{" "}
+                                {selectedRun ? getCurrencyForDisplay(selectedRun.providerName, claim.currency) : "USD"}{" "}
                                 {parseFloat(claim.billedAmount).toFixed(2)}
                               </TableCell>
                               <TableCell>
-                                {getCurrencyForDisplay(providerName, claim.currency)}{" "}
+                                {selectedRun ? getCurrencyForDisplay(selectedRun.providerName, claim.currency) : "USD"}{" "}
                                 {parseFloat(claim.amountPaid || "0").toFixed(2)}
                               </TableCell>
                               <TableCell>{getStatusBadge(claim.status)}</TableCell>
