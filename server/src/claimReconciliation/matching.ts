@@ -2,13 +2,21 @@
 
 import type { ClaimRow, RemittanceRow, MatchResult } from "./types";
 
+/** Prevent Excel artifacts like "644472.0" from turning into "6444720" */
+function stripExcelZeroDecimals(input: unknown): string {
+  const s = String(input ?? "").trim().replace(/,/g, "");
+  if (!s) return "";
+  if (/^\d+\.0+$/.test(s)) return s.replace(/\.0+$/, "");
+  return s;
+}
+
 /**
  * Normalize a member number:
  * - uppercase
  * - remove whitespace and punctuation (so CS012160-00 === CS01216000)
  */
-const normalizeMember = (m: string) =>
-  (m || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normalizeMember = (m: unknown) =>
+  stripExcelZeroDecimals(m).toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 /**
  * Normalize invoice/bill numbers:
@@ -16,7 +24,7 @@ const normalizeMember = (m: string) =>
  */
 const normalizeInvoice = (v: unknown): string | null => {
   if (v === null || v === undefined) return null;
-  const s = String(v).trim();
+  const s = stripExcelZeroDecimals(v);
   if (!s) return null;
   const cleaned = s.toUpperCase().replace(/[^A-Z0-9]/g, "");
   return cleaned ? cleaned : null;
@@ -56,30 +64,37 @@ function getClaimInvoice(row: any): string | null {
 }
 
 /**
- * Try to read a bill/invoice-like field from a remittance row.
- * IMPORTANT: CIC commonly stores the bill/invoice under claimNumber.
+ * Remittance: return candidates in priority order.
+ * IMPORTANT: prefer BILL NO (matches CIC Invoice No) before CLAIM NO.
  */
-function getRemittanceBill(row: any): string | null {
-  return (
-    normalizeInvoice(row?.claimNumber) ??   // ✅ ADDED
-    normalizeInvoice(row?.claimNo) ??       // ✅ ADDED
-    normalizeInvoice(row?.claim) ??         // ✅ ADDED
-    normalizeInvoice(row?.billNo) ??
-    normalizeInvoice(row?.billNumber) ??
-    normalizeInvoice(row?.bill) ??
-    normalizeInvoice(row?.invoiceNumber) ??
-    normalizeInvoice(row?.invoiceNo) ??
-    normalizeInvoice(row?.invoice) ??
-    null
-  );
+function getRemittanceBillCandidates(row: any): string[] {
+  const candidates = [
+    row?.billNo,        // ✅ FIRST
+    row?.billNumber,
+    row?.invoiceNumber,
+    row?.invoiceNo,
+    row?.invoice,
+    row?.claimNumber,   // fallback
+    row?.claimNo,
+    row?.claim,
+  ];
+
+  const out: string[] = [];
+  for (const c of candidates) {
+    const v = normalizeInvoice(c);
+    if (v && !out.includes(v)) out.push(v);
+  }
+  return out;
 }
 
 /**
  * Build a match key from an entire claim row.
- * CIC best practice: member + invoice/bill number.
+ * Best: member + invoice/bill number.
  * Fallback: member + serviceDate + billedAmount.
  */
-export function buildClaimCompositeKeyFromRow(row: Partial<ClaimRow> & any): string {
+export function buildClaimCompositeKeyFromRow(
+  row: Partial<ClaimRow> & any
+): string {
   const member = normalizeMember((row as any)?.memberNumber ?? "");
   const inv = getClaimInvoice(row);
 
@@ -92,14 +107,16 @@ export function buildClaimCompositeKeyFromRow(row: Partial<ClaimRow> & any): str
 
 /**
  * Build key variants from an entire remittance row.
- * CIC best practice: member + bill number.
+ * Best: member + bill/invoice (may include both billNo and claimNumber as variants)
  * Fallback: member + serviceDate + claimAmount with ±1–2 currency unit tolerance.
  */
-export function buildRemittanceKeyVariantsFromRow(row: Partial<RemittanceRow> & any): string[] {
+export function buildRemittanceKeyVariantsFromRow(
+  row: Partial<RemittanceRow> & any
+): string[] {
   const member = normalizeMember((row as any)?.memberNumber ?? "");
-  const bill = getRemittanceBill(row);
+  const bills = getRemittanceBillCandidates(row);
 
-  if (bill) return [`${member}|INV:${bill}`];
+  if (bills.length) return bills.map((b) => `${member}|INV:${b}`);
 
   const date = normalizeDate((row as any)?.serviceDate ?? "");
   const baseCents = toCents(Number((row as any)?.claimAmount ?? 0));
@@ -140,16 +157,13 @@ export function matchClaimsToRemittances(
 ): MatchResult[] {
   const results: MatchResult[] = [];
 
-  // ISSUE 2 FIX: Debug logging to understand matching failures
-  if (process.env.NODE_ENV !== 'production') {
-    console.log("[Matching] Total claims:", claims.length);
-    console.log("[Matching] Total remittances:", remittances.length);
-    console.log("[Matching] Sample claim keys (first 3):", claims.slice(0, 3).map(c => c.compositeKey));
-    console.log("[Matching] Sample remittance keys (first 3):", remittances.slice(0, 3).map(r => r.compositeKey));
+  // ✅ Handle duplicates: map key -> queue of claims
+  const claimMap = new Map<string, Array<{ id: number; data: ClaimRow }>>();
+  for (const claim of claims) {
+    const arr = claimMap.get(claim.compositeKey) ?? [];
+    arr.push({ id: claim.id, data: claim.data });
+    claimMap.set(claim.compositeKey, arr);
   }
-
-  const claimMap = new Map<string, { id: number; data: ClaimRow }>();
-  for (const claim of claims) claimMap.set(claim.compositeKey, { id: claim.id, data: claim.data });
 
   const matchedClaims = new Set<number>();
 
@@ -157,10 +171,16 @@ export function matchClaimsToRemittances(
     const keyVariants = buildRemittanceKeyVariantsFromRow(rem.data as any);
 
     let matchedClaim: { id: number; data: ClaimRow } | undefined;
+
     for (const key of keyVariants) {
-      const claim = claimMap.get(key);
-      if (claim && !matchedClaims.has(claim.id)) {
-        matchedClaim = claim;
+      const bucket = claimMap.get(key);
+      if (!bucket || bucket.length === 0) continue;
+
+      // skip already matched in this bucket
+      while (bucket.length > 0 && matchedClaims.has(bucket[0].id)) bucket.shift();
+
+      if (bucket.length > 0) {
+        matchedClaim = bucket.shift(); // ✅ consume one claim
         break;
       }
     }
@@ -178,16 +198,14 @@ export function matchClaimsToRemittances(
         | "partially_paid"
         | "unpaid"
         | "manual_review";
+
       let matchType: "exact" | "partial" | "none";
 
       if (paidAmount === claimAmount && claimAmount > 0) {
         status = "matched";
         matchType = "exact";
-      } else if (paidAmount > claimAmount && claimAmount > 0) {
-        status = "matched";
-        matchType = "partial";
-      } else if (paidAmount > 0 && paidAmount < claimAmount) {
-        status = "partially_paid";
+      } else if (paidAmount > 0 && claimAmount > 0) {
+        status = paidAmount < claimAmount ? "partially_paid" : "matched";
         matchType = "partial";
       } else if (paidAmount === 0 && claimAmount > 0) {
         status = "unpaid";
