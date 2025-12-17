@@ -499,15 +499,7 @@ export default function ClaimReconciliation() {
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);
 
-  // Decorative header particles
-  const particles = useMemo(() => {
-    return Array.from({ length: 6 }, () => ({
-      left: `${Math.random() * 100}%`,
-      top: `${Math.random() * 100}%`,
-      duration: 3 + Math.random() * 4,
-      delay: Math.random() * 2,
-    }));
-  }, []);
+
 
   /* ------------------------------------------------------------------------ */
   /* Data loading */
@@ -1267,14 +1259,14 @@ export default function ClaimReconciliation() {
     switch (status) {
       case "awaiting_remittance":
         return (
-          <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 border-0 shadow-md">
+          <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
             <Clock className="w-3 h-3 mr-1" />
-            Awaiting remittance
+            Pending remittance
           </Badge>
         );
       case "pending_review":
         return (
-          <Badge className="bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 border-0 shadow-md">
+          <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
             <AlertCircle className="w-3 h-3 mr-1" />
             Reconciled – pending review
           </Badge>
@@ -1282,7 +1274,7 @@ export default function ClaimReconciliation() {
       case "reconciled":
       default:
         return (
-          <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 border-0 shadow-md">
+          <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Reconciled
           </Badge>
@@ -1323,28 +1315,28 @@ export default function ClaimReconciliation() {
       case "paid":
       case "matched":
         return (
-          <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 border-0 shadow-md">
+          <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             {label}
           </Badge>
         );
       case "partially_paid":
         return (
-          <Badge className="bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 border-0 shadow-md">
+          <Badge className="bg-amber-400 text-white hover:bg-amber-500 border-0">
             <Clock className="w-3 h-3 mr-1" />
             {label}
           </Badge>
         );
       case "manual_review":
         return (
-          <Badge className="bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 border-0 shadow-md">
+          <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
             <AlertCircle className="w-3 h-3 mr-1" />
             {label}
           </Badge>
         );
       case "unpaid":
         return (
-          <Badge className="bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 border-0 shadow-md">
+          <Badge className="bg-rose-400 text-white hover:bg-rose-500 border-0">
             <AlertCircle className="w-3 h-3 mr-1" />
             {label}
           </Badge>
@@ -1353,7 +1345,7 @@ export default function ClaimReconciliation() {
       case "submitted":
       default:
         return (
-          <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 border-0 shadow-md">
+          <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
             <Clock className="w-3 h-3 mr-1" />
             {label}
           </Badge>
@@ -1495,46 +1487,23 @@ export default function ClaimReconciliation() {
 
   return (
     <>
-      {/* Premium Gradient Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-600 via-amber-500 to-orange-400 p-8 shadow-2xl">
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute inset-0 reconciliation-header-pattern" />
-        </div>
-
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {particles.map((particle, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-white rounded-full opacity-30"
-              style={{
-                left: particle.left,
-                top: particle.top,
-                animation: `float ${particle.duration}s ease-in-out infinite ${particle.delay}s`,
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="absolute inset-0 backdrop-blur-[2px] bg-white/5" />
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 animate-pulse" />
-
-        <div className="relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white drop-shadow-2xl">Claim Reconciliation</h1>
-              <p className="text-orange-100 mt-1 drop-shadow-lg">
-                Upload claim and remittance files, then review matches, underpayments, and outstanding balances
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowHelp((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-md border-white/30 hover:bg-white transition-all hover:shadow-xl hover:scale-105 rounded-lg text-orange-700 font-medium text-sm"
-            >
-              <Info className="w-4 h-4" />
-              <span className="hidden sm:inline">{showHelp ? "Hide help" : "Show help"}</span>
-            </button>
+      {/* Premium Clean Header */}
+      <div className="relative rounded-2xl bg-orange-50 border border-orange-200/50 p-8 shadow-md">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Claim Reconciliation</h1>
+            <p className="text-slate-600 mt-1">
+              Upload claim and remittance files, then review matches, underpayments, and outstanding balances
+            </p>
           </div>
+
+          <button
+            onClick={() => setShowHelp((v) => !v)}
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 transition-colors rounded-lg text-slate-700 font-medium text-sm"
+          >
+            <Info className="w-4 h-4" />
+            <span className="hidden sm:inline">{showHelp ? "Hide help" : "Show help"}</span>
+          </button>
         </div>
       </div>
 
@@ -1757,12 +1726,12 @@ export default function ClaimReconciliation() {
                         className={cn(
                           "absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl transition-all duration-500 group-hover:scale-125",
                           cardState === "complete"
-                            ? "bg-gradient-to-br from-emerald-400/30 to-teal-500/30"
+                            ? "bg-emerald-400/20"
                             : cardState === "awaiting"
-                            ? "bg-gradient-to-br from-blue-400/30 to-cyan-500/30"
+                            ? "bg-sky-400/20"
                             : cardState === "needs_review"
-                            ? "bg-gradient-to-br from-orange-400/30 to-red-500/30"
-                            : "bg-gradient-to-br from-slate-400/20 to-slate-500/20"
+                            ? "bg-orange-400/20"
+                            : "bg-slate-400/15"
                         )}
                       />
 
@@ -1780,12 +1749,12 @@ export default function ClaimReconciliation() {
                             <div className={cn(
                               "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110",
                               cardState === "complete"
-                                ? "bg-gradient-to-br from-emerald-500 to-teal-600"
+                                ? "bg-emerald-400"
                                 : cardState === "awaiting"
-                                ? "bg-gradient-to-br from-blue-500 to-cyan-600"
+                                ? "bg-sky-400"
                                 : cardState === "needs_review"
-                                ? "bg-gradient-to-br from-orange-500 to-red-600"
-                                : "bg-gradient-to-br from-slate-400 to-slate-500"
+                                ? "bg-orange-400"
+                                : "bg-slate-400"
                             )}>
                               {cardState === "complete" ? (
                                 <CheckCircle2 className="w-5 h-5 text-white" />
@@ -1884,12 +1853,12 @@ export default function ClaimReconciliation() {
                                 className={cn(
                                   "h-full rounded-full transition-all duration-500",
                                   cardState === "complete"
-                                    ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                                    ? "bg-emerald-400"
                                     : cardState === "needs_review"
-                                    ? "bg-gradient-to-r from-orange-500 to-amber-500"
+                                    ? "bg-orange-400"
                                     : cardState === "awaiting"
-                                    ? "bg-gradient-to-r from-blue-500 to-cyan-500"
-                                    : "bg-gradient-to-r from-slate-400 to-slate-500"
+                                    ? "bg-sky-400"
+                                    : "bg-slate-400"
                                 )}
                                 style={{ width: `${matchedPercent}%` }}
                               />
@@ -1900,22 +1869,22 @@ export default function ClaimReconciliation() {
                         {/* Status Badge */}
                         <div className="flex items-center gap-2">
                           {cardState === "complete" ? (
-                            <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 shadow-md border-0">
+                            <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
                               Complete
                             </Badge>
                           ) : cardState === "needs_review" ? (
-                            <Badge className="bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 shadow-md border-0">
+                            <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               Needs review
                             </Badge>
                           ) : cardState === "awaiting" ? (
-                            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-md border-0">
+                            <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
                               <Clock className="w-3 h-3 mr-1" />
-                              Awaiting Remittance
+                              Pending remittance
                             </Badge>
                           ) : (
-                            <Badge className="bg-gradient-to-r from-slate-500 to-slate-600 text-white hover:from-slate-600 hover:to-slate-700 shadow-md border-0">Processing</Badge>
+                            <Badge className="bg-slate-400 text-white hover:bg-slate-500 border-0">Processing</Badge>
                           )}
                         </div>
 
@@ -1923,26 +1892,26 @@ export default function ClaimReconciliation() {
                         <div className="pt-2 space-y-1.5 text-xs text-slate-600 border-t border-slate-200/50">
                           {period.awaitingRemittance > 0 && (
                             <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              <span>{period.awaitingRemittance} awaiting remittance</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                              <span>{period.awaitingRemittance} pending remittance</span>
                             </div>
                           )}
                           {period.matched > 0 && (
                             <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              <span>{period.matched} matched</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              <span>{period.matched} paid in full</span>
                             </div>
                           )}
                           {period.partiallyPaid > 0 && (
                             <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              <span>{period.partiallyPaid} partially paid</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                              <span>{period.partiallyPaid} paid partially</span>
                             </div>
                           )}
                           {period.unpaid > 0 && (
                             <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                              <span>{period.unpaid} unpaid</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                              <span>{period.unpaid} not paid</span>
                             </div>
                           )}
                         </div>
@@ -2188,13 +2157,13 @@ export default function ClaimReconciliation() {
                           "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap flex items-center gap-2",
                           inventoryStatusFilter === x.key
                             ? x.key === "unpaid"
-                              ? "bg-gradient-to-r from-red-500 to-rose-600 shadow-lg text-white scale-105"
+                              ? "bg-rose-400 shadow-lg text-white scale-105"
                               : x.key === "matched"
-                              ? "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg text-white scale-105"
+                              ? "bg-emerald-400 shadow-lg text-white scale-105"
                               : x.key === "awaiting_remittance"
-                              ? "bg-gradient-to-r from-blue-500 to-cyan-600 shadow-lg text-white scale-105"
+                              ? "bg-sky-400 shadow-lg text-white scale-105"
                               : x.key === "partially_paid"
-                              ? "bg-gradient-to-r from-amber-500 to-yellow-600 shadow-lg text-white scale-105"
+                              ? "bg-amber-400 shadow-lg text-white scale-105"
                               : "bg-white shadow-lg text-slate-900 scale-105"
                             : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                         )}
@@ -2263,19 +2232,19 @@ export default function ClaimReconciliation() {
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
-                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{inventorySummaryStats.awaiting.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-sky-400">{inventorySummaryStats.awaiting.toLocaleString()}</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Matched</div>
-                    <div className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{inventorySummaryStats.matched.toLocaleString()}</div>
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid in full</div>
+                    <div className="text-2xl font-bold text-emerald-400">{inventorySummaryStats.matched.toLocaleString()}</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Partially Paid</div>
-                    <div className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">{inventorySummaryStats.partial.toLocaleString()}</div>
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid partially</div>
+                    <div className="text-2xl font-bold text-amber-400">{inventorySummaryStats.partial.toLocaleString()}</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Unpaid</div>
-                    <div className="text-2xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">{inventorySummaryStats.unpaid.toLocaleString()}</div>
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Not paid (0 paid)</div>
+                    <div className="text-2xl font-bold text-rose-400">{inventorySummaryStats.unpaid.toLocaleString()}</div>
                   </div>
                 </div>
               )}
@@ -2413,7 +2382,7 @@ export default function ClaimReconciliation() {
                     className={cn(
                       "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
                       statusFilter === "needs_follow_up"
-                        ? "bg-gradient-to-r from-orange-500 to-amber-600 shadow-lg text-white scale-105"
+                        ? "bg-orange-400 shadow-lg text-white scale-105"
                         : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                     )}
                     onClick={() => setStatusFilter("needs_follow_up")}
@@ -2427,7 +2396,7 @@ export default function ClaimReconciliation() {
                     className={cn(
                       "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
                       statusFilter === "completed"
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg text-white scale-105"
+                        ? "bg-emerald-400 shadow-lg text-white scale-105"
                         : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                     )}
                     onClick={() => setStatusFilter("completed")}
@@ -2455,7 +2424,7 @@ export default function ClaimReconciliation() {
                       <TableHead className="font-semibold">Status</TableHead>
                       <TableHead className="font-semibold">Claims</TableHead>
                       <TableHead className="font-semibold">Remittances</TableHead>
-                      <TableHead className="font-semibold">Auto matched</TableHead>
+                      <TableHead className="font-semibold">Paid in full</TableHead>
                       <TableHead className="font-semibold">Partial</TableHead>
                       <TableHead className="font-semibold">Review</TableHead>
                       <TableHead className="font-semibold">Date</TableHead>
@@ -2510,20 +2479,20 @@ export default function ClaimReconciliation() {
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className="text-xs font-semibold border-green-300 bg-green-50 text-green-700"
+                              className="text-xs font-semibold border-emerald-300 bg-emerald-50 text-emerald-700"
                             >
                               <CheckCircle className="w-3 h-3 mr-1" />
-                              {run.autoMatched} Matched
+                              {run.autoMatched} Paid
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge className="bg-yellow-500 text-black hover:bg-yellow-500/90 text-xs font-semibold">
+                            <Badge className="bg-amber-400 text-white hover:bg-amber-500 text-xs font-semibold">
                               <Clock className="w-3 h-3 mr-1" />
                               {run.partialMatched} Partial
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge className="bg-orange-500 text-white hover:bg-orange-500/90 text-xs font-semibold">
+                            <Badge className="bg-orange-400 text-white hover:bg-orange-500 text-xs font-semibold">
                               <AlertCircle className="w-3 h-3 mr-1" />
                               {run.manualReview} Review
                             </Badge>
@@ -2638,7 +2607,7 @@ export default function ClaimReconciliation() {
                           className={cn(
                             "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
                             attentionFilter === "waiting"
-                              ? "bg-gradient-to-r from-blue-500 to-cyan-600 shadow-lg text-white scale-105"
+                              ? "bg-sky-400 shadow-lg text-white scale-105"
                               : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                           )}
                           onClick={() => setAttentionFilter("waiting")}
@@ -2652,7 +2621,7 @@ export default function ClaimReconciliation() {
                           className={cn(
                             "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
                             attentionFilter === "follow_up"
-                              ? "bg-gradient-to-r from-orange-500 to-amber-600 shadow-lg text-white scale-105"
+                              ? "bg-orange-400 shadow-lg text-white scale-105"
                               : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                           )}
                           onClick={() => setAttentionFilter("follow_up")}
