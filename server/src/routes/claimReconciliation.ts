@@ -776,6 +776,148 @@ router.get("/claims", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/* Export Claims to Excel */
+/* -------------------------------------------------------------------------- */
+
+router.get("/export-claims", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { providerName, status, periodYear, periodMonth } = req.query;
+
+    const options = {
+      providerName: providerName as string | undefined,
+      status: status as string | undefined,
+      periodYear: periodYear ? parseInt(periodYear as string, 10) : undefined,
+      periodMonth: periodMonth ? parseInt(periodMonth as string, 10) : undefined,
+      page: undefined,
+      limit: 10000, // Get all claims for export
+    };
+
+    const result = await getAllClaims(options);
+    const claims = result.claims;
+
+    if (!claims || claims.length === 0) {
+      return res.status(404).json({ error: "No claims found for export" });
+    }
+
+    // Map status to friendly names
+    const statusLabels: Record<string, string> = {
+      awaiting_remittance: "Pending Remittance",
+      matched: "Paid in Full",
+      partially_paid: "Paid Partially",
+      unpaid: "Not Paid",
+      manual_review: "Needs Checking",
+      all: "All Status",
+    };
+
+    const statusName = statusLabels[status as string] || "All Claims";
+    const periodLabel = periodYear && periodMonth
+      ? `${new Date(parseInt(periodYear as string), parseInt(periodMonth as string) - 1).toLocaleString("default", { month: "long", year: "numeric" })}`
+      : "All Periods";
+
+    // Calculate totals
+    let totalBilled = 0;
+    let totalPaid = 0;
+    claims.forEach(c => {
+      totalBilled += parseFloat(c.billedAmount || "0");
+      totalPaid += parseFloat(c.amountPaid || "0");
+    });
+    const totalOutstanding = totalBilled - totalPaid;
+
+    // Build Excel rows
+    const rows: any[][] = [];
+
+    // Header Section (rows 1-6)
+    rows.push(["BAHR EL GHAZAL CLINIC"]);
+    rows.push([`Claims Report - ${statusName}`]);
+    rows.push([`Provider: ${providerName || "All"}`]);
+    rows.push([`Period: ${periodLabel}`]);
+    rows.push([`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`]);
+    rows.push([`Total Claims: ${claims.length} | Total Billed: USD ${totalBilled.toFixed(2)}`]);
+    rows.push([]); // Empty row
+
+    // Data Table Header (row 8)
+    rows.push([
+      "Member #",
+      "Patient Name",
+      "Service Date",
+      "Period",
+      "Billed Amount",
+      "Amount Paid",
+      "Balance",
+      "Status",
+    ]);
+
+    // Data rows
+    claims.forEach(c => {
+      const billed = parseFloat(c.billedAmount || "0");
+      const paid = parseFloat(c.amountPaid || "0");
+      const balance = billed - paid;
+
+      const periodStr = `${new Date(c.periodYear, c.periodMonth - 1).toLocaleString("default", { month: "short" })} ${c.periodYear}`;
+      
+      const statusDisplay = statusLabels[c.status] || c.status;
+
+      rows.push([
+        c.memberNumber,
+        c.patientName || "N/A",
+        new Date(c.serviceDate).toLocaleDateString(),
+        periodStr,
+        billed.toFixed(2),
+        paid.toFixed(2),
+        balance.toFixed(2),
+        statusDisplay,
+      ]);
+    });
+
+    // Summary Footer
+    rows.push([]); // Empty row
+    rows.push(["Summary"]);
+    rows.push(["Total Billed:", `USD ${totalBilled.toFixed(2)}`]);
+    rows.push(["Total Paid:", `USD ${totalPaid.toFixed(2)}`]);
+    rows.push(["Total Outstanding:", `USD ${totalOutstanding.toFixed(2)}`]);
+
+    // Create workbook
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Claims Report");
+
+    // Style: Set column widths (approximate)
+    worksheet["!cols"] = [
+      { wch: 12 }, // Member #
+      { wch: 25 }, // Patient Name
+      { wch: 12 }, // Service Date
+      { wch: 12 }, // Period
+      { wch: 14 }, // Billed Amount
+      { wch: 14 }, // Amount Paid
+      { wch: 12 }, // Balance
+      { wch: 18 }, // Status
+    ];
+
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx",
+    });
+
+    // Generate filename
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const statusSlug = (status as string || "All").replace(/_/g, "");
+    const filename = `${providerName || "All"}_Claims_${statusSlug}_${dateStr}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error("Error exporting claims:", error);
+    res.status(500).json({
+      error: error.message || "Failed to export claims",
+    });
+  }
+});
+
 router.delete("/claims/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const claimId = parseInt(req.params.id, 10);

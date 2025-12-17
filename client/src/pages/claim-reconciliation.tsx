@@ -47,6 +47,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /* -------------------------------------------------------------------------- */
 /* Icons (lucide-react) */
@@ -68,6 +74,9 @@ import {
   AlertTriangle,
   DollarSign,
   FileText,
+  LayoutGrid,
+  Table as TableIcon,
+  ChevronDown,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -474,6 +483,7 @@ export default function ClaimReconciliation() {
   /* UI State */
   /* ------------------------------------------------------------------------ */
   const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
@@ -595,9 +605,19 @@ export default function ClaimReconciliation() {
 
   useEffect(() => {
     if (periodYearFilter === null && availableYears.length > 0) {
-      setPeriodYearFilter(availableYears[0]);
+      // Default to current year instead of oldest year
+      const currentYear = new Date().getFullYear();
+      if (availableYears.includes(currentYear)) {
+        setPeriodYearFilter(currentYear);
+      } else {
+        setPeriodYearFilter(availableYears[0]);
+      }
     }
-  }, [availableYears, periodYearFilter]);
+    // Auto-switch to table view when "All" years is selected
+    if (periodYearFilter === null && periodsSummary.length > 12) {
+      setViewMode("table");
+    }
+  }, [availableYears, periodYearFilter, periodsSummary.length]);
 
   const filteredPeriods = useMemo(() => {
     let filtered = periodsSummary;
@@ -1121,12 +1141,12 @@ export default function ClaimReconciliation() {
       return { type: "disabled" as const, label: "Select files to continue", disabled: true };
     }
     if (hasClaims && !hasRemittance) {
-      return { type: "claims-only" as const, label: `Upload Claims to ${activePeriodLabel}`, disabled: false };
+      return { type: "claims-only" as const, label: `📤 Upload Claims`, disabled: false };
     }
     if (!hasClaims && hasRemittance) {
-      return { type: "remittance-only" as const, label: `Upload Remittance to ${activePeriodLabel}`, disabled: false };
+      return { type: "remittance-only" as const, label: `📤 Upload Remittance to ${activePeriodLabel}`, disabled: false };
     }
-    return { type: "both" as const, label: `Upload Both & Reconcile (${activePeriodLabel})`, disabled: false };
+    return { type: "both" as const, label: `📤 Upload & Reconcile`, disabled: false };
   }, [claimsFile, remittanceFile, activePeriodLabel]);
 
   const inferredClaimsPeriod = useMemo(() => {
@@ -1420,6 +1440,21 @@ export default function ClaimReconciliation() {
     exportIssuesMutation.mutate(selectedRunId);
   };
 
+  const handleExportClaims = (status: string) => {
+    const params = new URLSearchParams();
+    params.append("providerName", providerName);
+    if (status !== "all") {
+      params.append("status", status);
+    }
+    if (inventoryPeriodFilter) {
+      const [year, month] = inventoryPeriodFilter.split("-");
+      params.append("periodYear", year);
+      params.append("periodMonth", month);
+    }
+
+    window.location.href = `${API_BASE_URL}/api/claim-reconciliation/export-claims?${params.toString()}`;
+  };
+
   const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
     const periodLabel = formatPeriodLabel(period.periodYear, period.periodMonth);
 
@@ -1486,7 +1521,7 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   return (
-    <>
+    <TooltipProvider>
       {/* Premium Clean Header */}
       <div className="relative rounded-2xl bg-orange-50 border border-orange-200/50 p-8 shadow-md">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1654,36 +1689,81 @@ export default function ClaimReconciliation() {
                     </Select>
                   </div>
 
-                  {availableYears.length > 1 && (
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm font-medium text-slate-700">Year:</Label>
-                      <Select
-                        value={periodYearFilter?.toString() || "all"}
-                        onValueChange={(value) => setPeriodYearFilter(value === "all" ? null : parseInt(value, 10))}
-                      >
-                        <SelectTrigger className="w-[140px] bg-white">
-                          <SelectValue placeholder="Select year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All years</SelectItem>
-                          {availableYears.map((year) => (
-                            <SelectItem key={year} value={year.toString()}>
-                              {year}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
                   <Badge className="bg-orange-500 text-white">Active: {activePeriodLabel}</Badge>
                 </div>
               </div>
+
+              {/* Year Tabs and View Toggle Row */}
+              {availableYears.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+                  {/* Year Filter Tabs */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {availableYears.map((year) => (
+                      <button
+                        key={year}
+                        type="button"
+                        onClick={() => setPeriodYearFilter(year)}
+                        className={cn(
+                          "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200",
+                          periodYearFilter === year
+                            ? "bg-orange-500 text-white shadow-md"
+                            : "bg-white text-slate-700 hover:bg-orange-50 border border-slate-200"
+                        )}
+                      >
+                        {year}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setPeriodYearFilter(null)}
+                      className={cn(
+                        "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200",
+                        periodYearFilter === null
+                          ? "bg-orange-500 text-white shadow-md"
+                          : "bg-white text-slate-700 hover:bg-orange-50 border border-slate-200"
+                      )}
+                    >
+                      All
+                    </button>
+                  </div>
+
+                  {/* View Toggle */}
+                  <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-white border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("cards")}
+                      className={cn(
+                        "px-3 py-1.5 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-1.5",
+                        viewMode === "cards"
+                          ? "bg-orange-500 text-white shadow-sm"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                      Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("table")}
+                      className={cn(
+                        "px-3 py-1.5 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-1.5",
+                        viewMode === "table"
+                          ? "bg-orange-500 text-white shadow-sm"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      <TableIcon className="w-4 h-4" />
+                      Table
+                    </button>
+                  </div>
+                </div>
+              )}
             </CardHeader>
 
             <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredPeriods.map((period) => {
+              {viewMode === "cards" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredPeriods.map((period) => {
                   const isActive =
                     period.periodYear === parseInt(periodYear, 10) &&
                     period.periodMonth === parseInt(periodMonth, 10);
@@ -1845,7 +1925,18 @@ export default function ClaimReconciliation() {
                         {period.totalClaims > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-slate-600 font-medium">Match Progress</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-600 font-medium">Remittance coverage</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">Percentage of claims found in remittance files.</p>
+                                    <p className="text-xs font-semibold mt-1">Formula: (Paid in full + Paid partially) ÷ Total claims</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
                               <span className="font-bold text-slate-700">{matchedPercent}%</span>
                             </div>
                             <div className="h-2 bg-slate-200/80 rounded-full overflow-hidden backdrop-blur-sm">
@@ -1928,6 +2019,176 @@ export default function ClaimReconciliation() {
                   );
                 })}
               </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200/50">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
+                      <TableRow className="hover:bg-slate-50/90">
+                        <TableHead className="font-semibold">Period</TableHead>
+                        <TableHead className="font-semibold">Claims</TableHead>
+                        <TableHead className="font-semibold">Billed</TableHead>
+                        <TableHead className="font-semibold">Remittance Coverage</TableHead>
+                        <TableHead className="font-semibold">Status</TableHead>
+                        <TableHead className="font-semibold text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPeriods.map((period) => {
+                        const isActive =
+                          period.periodYear === parseInt(periodYear, 10) &&
+                          period.periodMonth === parseInt(periodMonth, 10);
+
+                        const isComplete =
+                          period.totalClaims > 0 &&
+                          period.awaitingRemittance === 0 &&
+                          period.unpaid === 0 &&
+                          period.partiallyPaid === 0;
+
+                        const hasIssues = period.unpaid > 0 || period.partiallyPaid > 0;
+                        const hasAwaiting = period.awaitingRemittance > 0;
+
+                        const cardState: "complete" | "needs_review" | "awaiting" | "processing" =
+                          isComplete ? "complete" : hasIssues ? "needs_review" : hasAwaiting ? "awaiting" : "processing";
+
+                        const matchedPercent = period.totalClaims > 0 
+                          ? ((period.matched / period.totalClaims) * 100).toFixed(0) 
+                          : "0";
+
+                        return (
+                          <TableRow
+                            key={`${period.periodYear}-${period.periodMonth}`}
+                            onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
+                            className={cn(
+                              "cursor-pointer transition-all duration-200",
+                              isActive
+                                ? "bg-orange-50/50 hover:bg-orange-50/70"
+                                : "hover:bg-slate-50/50"
+                            )}
+                          >
+                            <TableCell className="font-semibold">
+                              {formatPeriodLabel(period.periodYear, period.periodMonth)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-semibold">{period.totalClaims}</span>
+                                <span className="text-xs text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
+                              {parseFloat(period.totalBilled).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={cn(
+                                      "h-full rounded-full transition-all duration-500",
+                                      cardState === "complete"
+                                        ? "bg-emerald-400"
+                                        : cardState === "needs_review"
+                                        ? "bg-orange-400"
+                                        : cardState === "awaiting"
+                                        ? "bg-sky-400"
+                                        : "bg-slate-400"
+                                    )}
+                                    style={{ width: `${matchedPercent}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-semibold text-slate-700 w-10 text-right">
+                                  {matchedPercent}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {cardState === "complete" ? (
+                                <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Complete
+                                </Badge>
+                              ) : cardState === "needs_review" ? (
+                                <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
+                                  <AlertTriangle className="w-3 h-3 mr-1" />
+                                  Needs review
+                                </Badge>
+                              ) : cardState === "awaiting" ? (
+                                <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-slate-400 text-white hover:bg-slate-500 border-0">Processing</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="w-8 h-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                                    onClick={(e) => e.stopPropagation()}
+                                    disabled={isDeleting || isUploading}
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReplacePeriodFile(period, "claims");
+                                    }}
+                                    disabled={isUploading}
+                                    className="cursor-pointer"
+                                  >
+                                    <Upload className="w-3 h-3 mr-2" />
+                                    Replace claims file
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePeriod(period, "claims");
+                                    }}
+                                    disabled={isDeleting}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-2" />
+                                    Delete claims
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReplacePeriodFile(period, "remittances");
+                                    }}
+                                    disabled={isUploading}
+                                    className="cursor-pointer"
+                                  >
+                                    <Upload className="w-3 h-3 mr-2" />
+                                    Replace remittance
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePeriod(period, "remittances");
+                                    }}
+                                    disabled={isDeleting}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-2" />
+                                    Delete remittances
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -2101,12 +2362,29 @@ export default function ClaimReconciliation() {
 
               <Button
                 type="button"
-                className="w-full"
+                className={cn(
+                  "w-full h-12 text-base font-semibold transition-all duration-200",
+                  uploadAction.type === "disabled" && "bg-slate-300 hover:bg-slate-300 cursor-not-allowed",
+                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 text-white",
+                  uploadAction.type === "remittance-only" && "bg-green-500 hover:bg-green-600 text-white",
+                  uploadAction.type === "both" && "bg-orange-500 hover:bg-orange-600 text-white"
+                )}
                 onClick={runSmartAction}
                 disabled={isUploading || isDeleting || uploadAction.disabled}
               >
-                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                {uploadAction.label}
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    {uploadAction.type === "claims-only" && <Upload className="w-5 h-5 mr-2" />}
+                    {uploadAction.type === "remittance-only" && <Upload className="w-5 h-5 mr-2" />}
+                    {uploadAction.type === "both" && <Upload className="w-5 h-5 mr-2" />}
+                    {uploadAction.label}
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
@@ -2221,6 +2499,59 @@ export default function ClaimReconciliation() {
                       Clear
                     </Button>
                   )}
+
+                  {/* Export Button */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 ml-auto hover:bg-green-50 hover:border-green-300 transition-all"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export
+                        <ChevronDown className="w-3 h-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem
+                        onClick={() => handleExportClaims("all")}
+                        className="cursor-pointer"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export All Claims ({inventorySummaryStats.total})
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => handleExportClaims("awaiting_remittance")}
+                        className="cursor-pointer"
+                      >
+                        <Clock className="w-4 h-4 mr-2" />
+                        Export Pending Remittance ({inventorySummaryStats.awaiting})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleExportClaims("matched")}
+                        className="cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Export Paid in Full ({inventorySummaryStats.matched})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleExportClaims("partially_paid")}
+                        className="cursor-pointer"
+                      >
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        Export Paid Partially ({inventorySummaryStats.partial})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleExportClaims("unpaid")}
+                        className="cursor-pointer"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Export Not Paid ({inventorySummaryStats.unpaid})
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
 
@@ -2700,6 +3031,6 @@ export default function ClaimReconciliation() {
           </Card>
         )}
       </div>
-    </>
+    </TooltipProvider>
   );
 }
