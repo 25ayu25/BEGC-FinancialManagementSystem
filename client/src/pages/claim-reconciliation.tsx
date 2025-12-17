@@ -225,25 +225,51 @@ function getRemittanceUploadDescription(providerName: string): string {
   return "Upload remittance advice from insurance";
 }
 
-/**
- * Status grouping (fixes “Needs attention” counting Awaiting Remittance)
- */
-const SETTLED_STATUSES = new Set(["paid", "matched"]);
-const AWAITING_STATUSES = new Set(["awaiting_remittance", "submitted"]);
-const ATTENTION_STATUSES = new Set(["unpaid", "partially_paid", "manual_review"]);
+/* -------------------------------------------------------------------------- */
+/* A) Status label + grouping helpers */
+/* -------------------------------------------------------------------------- */
 
-function isSettledStatus(status?: string | null): boolean {
-  return !!status && SETTLED_STATUSES.has(status);
+function claimStatusLabel(status: string): string {
+  switch (status) {
+    case "matched":
+    case "paid":
+      return "Paid in full";
+    case "partially_paid":
+      return "Underpaid";
+    case "unpaid":
+      return "Not paid (0 paid)";
+    case "manual_review":
+      return "Needs review";
+    case "awaiting_remittance":
+    case "submitted":
+    default:
+      return "Not paid yet";
+  }
 }
-function isAwaitingStatus(status?: string | null): boolean {
-  return !!status && AWAITING_STATUSES.has(status);
+
+function claimStatusGroup(status: string): "paid" | "waiting" | "follow_up" {
+  switch (status) {
+    case "matched":
+    case "paid":
+      return "paid";
+    case "partially_paid":
+    case "unpaid":
+    case "manual_review":
+      return "follow_up";
+    case "awaiting_remittance":
+    case "submitted":
+    default:
+      return "waiting";
+  }
 }
-function isAttentionStatus(status?: string | null): boolean {
-  return !!status && ATTENTION_STATUSES.has(status);
-}
-function isExceptionStatus(status?: string | null): boolean {
-  // “Exceptions” = anything not settled (includes awaiting + unpaid/partial/review)
-  return !isSettledStatus(status);
+
+/* -------------------------------------------------------------------------- */
+/* D) Reconciliation history run grouping */
+/* -------------------------------------------------------------------------- */
+
+function runGroup(run: ReconRun): "needs_follow_up" | "completed" {
+  if (run.partialMatched > 0 || run.manualReview > 0) return "needs_follow_up";
+  return "completed";
 }
 
 /**
@@ -425,8 +451,6 @@ function FileDropzone({
 /* Main Component */
 /* -------------------------------------------------------------------------- */
 
-type DetailsFilter = "all" | "awaiting" | "attention";
-
 export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -456,15 +480,20 @@ export default function ClaimReconciliation() {
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
-  // Run Details filter (fix: awaiting remittance != needs attention)
-  const [detailsFilter, setDetailsFilter] = useState<DetailsFilter>("attention");
+  // B) Claims Details filters + wording
+  const [attentionFilter, setAttentionFilter] = useState<
+    "all" | "waiting" | "follow_up"
+  >("follow_up");
 
-  const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
+  // D) Reconciliation History tabs (fixed)
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "needs_follow_up" | "completed"
+  >("all");
 
   // Claims Inventory (view-only filters)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<
     "all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid"
-  >("all"); // ✅ default to All (matches your screenshots)
+  >("all");
   const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);
@@ -744,7 +773,7 @@ export default function ClaimReconciliation() {
       setSelectedRunId(data.runId);
       setClaimsFile(null);
       setRemittanceFile(null);
-      setDetailsFilter("attention");
+      setAttentionFilter("follow_up");
     },
     onError: (error: Error) => {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
@@ -924,7 +953,7 @@ export default function ClaimReconciliation() {
       a.remove();
       URL.revokeObjectURL(url);
 
-      toast({ title: "Export ready", description: "Exceptions were exported." });
+      toast({ title: "Export ready", description: "Needs follow-up items were exported." });
     },
     onError: (error: Error) => {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
@@ -1255,71 +1284,63 @@ export default function ClaimReconciliation() {
     }
   };
 
+  // D) Updated filteredRuns
   const filteredRuns = useMemo(() => {
     if (statusFilter === "all") return actualReconciliationRuns;
-    return actualReconciliationRuns.filter((run) => {
-      const status = getRunStatus(run);
-      if (statusFilter === "awaiting_remittance") return status === "awaiting_remittance";
-      return status === "reconciled" || status === "pending_review";
-    });
+    return actualReconciliationRuns.filter((run) => runGroup(run) === statusFilter);
   }, [actualReconciliationRuns, statusFilter]);
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
 
-  const exceptionsCountForSelected = useMemo(
-    () => claims.filter((c) => isExceptionStatus(c.status)).length,
+  // B) Replace counts + filtering logic for Claims Details
+  const waitingCountForSelected = useMemo(
+    () => claims.filter((c) => claimStatusGroup(c.status) === "waiting").length,
     [claims]
   );
-  const awaitingCountForSelected = useMemo(
-    () => claims.filter((c) => isAwaitingStatus(c.status)).length,
-    [claims]
-  );
-  const attentionCountForSelected = useMemo(
-    () => claims.filter((c) => isAttentionStatus(c.status)).length,
+
+  const followUpCountForSelected = useMemo(
+    () => claims.filter((c) => claimStatusGroup(c.status) === "follow_up").length,
     [claims]
   );
 
   const filteredClaims = useMemo(() => {
-    if (detailsFilter === "all") return claims;
-    if (detailsFilter === "awaiting") return claims.filter((c) => isAwaitingStatus(c.status));
-    return claims.filter((c) => isAttentionStatus(c.status));
-  }, [claims, detailsFilter]);
+    if (attentionFilter === "all") return claims;
+    if (attentionFilter === "waiting") return claims.filter((c) => claimStatusGroup(c.status) === "waiting");
+    return claims.filter((c) => claimStatusGroup(c.status) === "follow_up");
+  }, [claims, attentionFilter]);
 
+  // C) Update badges text using claimStatusLabel()
   const getStatusBadge = (status: string) => {
+    const label = claimStatusLabel(status);
+
     switch (status) {
       case "paid":
-        return (
-          <Badge className="bg-green-500 text-white hover:bg-green-600">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            Paid
-          </Badge>
-        );
       case "matched":
         return (
           <Badge className="bg-green-500 text-white hover:bg-green-600">
             <CheckCircle2 className="w-3 h-3 mr-1" />
-            Matched
+            {label}
           </Badge>
         );
       case "partially_paid":
         return (
           <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">
             <Clock className="w-3 h-3 mr-1" />
-            Partial
+            {label}
           </Badge>
         );
       case "manual_review":
         return (
           <Badge className="bg-orange-500 text-white hover:bg-orange-600">
             <AlertCircle className="w-3 h-3 mr-1" />
-            Review
+            {label}
           </Badge>
         );
       case "unpaid":
         return (
           <Badge className="bg-red-500 text-white hover:bg-red-600">
             <AlertCircle className="w-3 h-3 mr-1" />
-            Unpaid
+            {label}
           </Badge>
         );
       case "awaiting_remittance":
@@ -1328,7 +1349,7 @@ export default function ClaimReconciliation() {
         return (
           <Badge className="bg-blue-500 text-white hover:bg-blue-600">
             <Clock className="w-3 h-3 mr-1" />
-            Awaiting Remittance
+            {label}
           </Badge>
         );
     }
@@ -1394,8 +1415,8 @@ export default function ClaimReconciliation() {
 
   const handleExportIssues = () => {
     if (!selectedRunId) return;
-    if (exceptionsCountForSelected === 0) {
-      toast({ title: "Nothing to export", description: "No exceptions for this run." });
+    if (followUpCountForSelected === 0) {
+      toast({ title: "Nothing to export", description: "No needs follow-up items for this run." });
       return;
     }
     exportIssuesMutation.mutate(selectedRunId);
@@ -1676,7 +1697,7 @@ export default function ClaimReconciliation() {
                   const hasAwaiting = period.awaitingRemittance > 0;
                   const hasIssues = period.unpaid > 0 || period.partiallyPaid > 0;
 
-                  // ✅ Priority: issues > awaiting (so Feb shows “Needs review” if partial exists)
+                  // ✅ Priority: issues > awaiting
                   const cardState: "complete" | "needs_review" | "awaiting" | "processing" =
                     isComplete ? "complete" : hasIssues ? "needs_review" : hasAwaiting ? "awaiting" : "processing";
 
@@ -2251,39 +2272,34 @@ export default function ClaimReconciliation() {
                   >
                     All ({actualReconciliationRuns.length})
                   </button>
+
                   <button
                     type="button"
                     className={cn(
                       "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                      statusFilter === "awaiting_remittance"
-                        ? "bg-blue-500 shadow-md text-white"
+                      statusFilter === "needs_follow_up"
+                        ? "bg-orange-500 shadow-md text-white"
                         : "text-slate-600 hover:text-slate-900"
                     )}
-                    onClick={() => setStatusFilter("awaiting_remittance")}
+                    onClick={() => setStatusFilter("needs_follow_up")}
                   >
-                    <Clock className="w-3 h-3" />
-                    Awaiting remittance (
-                    {actualReconciliationRuns.filter((r) => getRunStatus(r) === "awaiting_remittance").length})
+                    <AlertTriangle className="w-3 h-3" />
+                    Needs follow-up (
+                    {actualReconciliationRuns.filter((r) => runGroup(r) === "needs_follow_up").length})
                   </button>
+
                   <button
                     type="button"
                     className={cn(
                       "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                      statusFilter === "reconciled"
+                      statusFilter === "completed"
                         ? "bg-green-500 shadow-md text-white"
                         : "text-slate-600 hover:text-slate-900"
                     )}
-                    onClick={() => setStatusFilter("reconciled")}
+                    onClick={() => setStatusFilter("completed")}
                   >
                     <CheckCircle2 className="w-3 h-3" />
-                    Reconciled (
-                    {
-                      actualReconciliationRuns.filter((r) => {
-                        const s = getRunStatus(r);
-                        return s === "reconciled" || s === "pending_review";
-                      }).length
-                    }
-                    )
+                    Completed ({actualReconciliationRuns.filter((r) => runGroup(r) === "completed").length})
                   </button>
                 </div>
               </div>
@@ -2294,7 +2310,7 @@ export default function ClaimReconciliation() {
             ) : actualReconciliationRuns.length === 0 ? (
               <p className="text-muted-foreground py-6 text-sm">No reconciliation runs yet.</p>
             ) : filteredRuns.length === 0 ? (
-              <p className="text-muted-foreground py-6 text-sm">No runs match the selected status filter.</p>
+              <p className="text-muted-foreground py-6 text-sm">No runs match the selected filter.</p>
             ) : (
               <div className="w-full overflow-x-auto">
                 <Table>
@@ -2330,9 +2346,8 @@ export default function ClaimReconciliation() {
                             setPeriodYear(String(run.periodYear));
                             setPeriodMonth(String(run.periodMonth));
                             setSelectedRunId(run.id);
-                            setDetailsFilter("attention");
+                            setAttentionFilter("follow_up");
 
-                            // Scroll after render
                             window.setTimeout(() => {
                               document.getElementById("claims-details-section")?.scrollIntoView({ behavior: "smooth" });
                             }, 50);
@@ -2391,7 +2406,7 @@ export default function ClaimReconciliation() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedRunId(run.id);
-                                    setDetailsFilter("attention");
+                                    setAttentionFilter("follow_up");
                                   }}
                                   className={cn("cursor-pointer", selectedRunId === run.id && "bg-slate-100")}
                                 >
@@ -2449,7 +2464,8 @@ export default function ClaimReconciliation() {
                       })}
                     </div>
                     <div>
-                      {selectedRun.totalClaimRows} claims{claims.length > 0 && claims.length !== selectedRun.totalClaimRows ? ` (${claims.length} shown)` : ""},{" "}
+                      {selectedRun.totalClaimRows} claims
+                      {claims.length > 0 && claims.length !== selectedRun.totalClaimRows ? ` (${claims.length} shown)` : ""},{" "}
                       {selectedRun.totalRemittanceRows} remittances
                     </div>
                   </div>
@@ -2465,46 +2481,47 @@ export default function ClaimReconciliation() {
               ) : (
                 <>
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 py-3">
+                    {/* B4) Updated pills */}
                     <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200">
                       <button
                         type="button"
                         className={cn(
                           "px-4 py-2 rounded-full transition-all font-medium",
-                          detailsFilter === "all"
+                          attentionFilter === "all"
                             ? "bg-white shadow-md text-slate-900"
                             : "text-slate-600 hover:text-slate-900"
                         )}
-                        onClick={() => setDetailsFilter("all")}
+                        onClick={() => setAttentionFilter("all")}
                       >
-                        All claims ({claims.length})
+                        Open claims ({claims.length})
                       </button>
 
                       <button
                         type="button"
                         className={cn(
                           "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                          detailsFilter === "awaiting"
+                          attentionFilter === "waiting"
                             ? "bg-blue-500 shadow-md text-white"
                             : "text-slate-600 hover:text-slate-900"
                         )}
-                        onClick={() => setDetailsFilter("awaiting")}
+                        onClick={() => setAttentionFilter("waiting")}
                       >
                         <Clock className="w-3 h-3" />
-                        Awaiting remittance ({awaitingCountForSelected})
+                        Not paid yet ({waitingCountForSelected})
                       </button>
 
                       <button
                         type="button"
                         className={cn(
                           "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                          detailsFilter === "attention"
+                          attentionFilter === "follow_up"
                             ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-md text-white"
                             : "text-slate-600 hover:text-slate-900"
                         )}
-                        onClick={() => setDetailsFilter("attention")}
+                        onClick={() => setAttentionFilter("follow_up")}
                       >
                         <AlertTriangle className="w-3 h-3" />
-                        Needs attention ({attentionCountForSelected})
+                        Needs follow-up ({followUpCountForSelected})
                       </button>
                     </div>
 
@@ -2514,7 +2531,7 @@ export default function ClaimReconciliation() {
                       size="sm"
                       className="gap-2"
                       onClick={handleExportIssues}
-                      disabled={!selectedRunId || exceptionsCountForSelected === 0 || isExporting}
+                      disabled={!selectedRunId || followUpCountForSelected === 0 || isExporting}
                     >
                       {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                       Export for {selectedRun?.providerName ?? providerName}
@@ -2523,10 +2540,10 @@ export default function ClaimReconciliation() {
 
                   {filteredClaims.length === 0 ? (
                     <p className="text-muted-foreground py-6 text-sm">
-                      {detailsFilter === "attention"
-                        ? "No unpaid/partial/review items for this run."
-                        : detailsFilter === "awaiting"
-                        ? "No claims are awaiting remittance for this run."
+                      {attentionFilter === "follow_up"
+                        ? "No needs follow-up items for this run."
+                        : attentionFilter === "waiting"
+                        ? "No not-paid-yet items for this run."
                         : "No claims to display."}
                     </p>
                   ) : (
