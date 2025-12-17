@@ -410,7 +410,7 @@ export default function BulkIncomeModal({
                     </SelectContent>
                   </Select>
                 </div>
-              </div>              </div>
+              </div>
 
               {/* ++ ADDITION: Blocking warning banner */}
               {dateHasData && existingDataInfo && (
