@@ -248,6 +248,8 @@ export default function BulkExpenseModal({
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
+                            // Using querySelector for focus management between dynamically generated fields
+                            // This is pragmatic given the dynamic nature of the row list
                             if (idx === rows.length - 1) {
                               // Last field, trigger save
                               if (validPayloads.length > 0 && !isSaving) {

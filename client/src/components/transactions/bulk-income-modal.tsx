@@ -221,6 +221,11 @@ export default function BulkIncomeModal({
   }, [validProvPayloads, providerCurrency]);
 
   const savingDisabled = validDeptPayloads.length === 0 && validProvPayloads.length === 0;
+  
+  // Check if save operation is allowed
+  const canSave = useMemo(() => {
+    return !savingDisabled && !isSaving && !dateHasData && !checkingDate;
+  }, [savingDisabled, isSaving, dateHasData, checkingDate]);
 
   const saveAll = async () => {
     // ++ MODIFICATION: Block if date has existing data
@@ -471,6 +476,8 @@ export default function BulkIncomeModal({
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
+                              // Using querySelector for focus management between dynamically generated fields
+                              // This is pragmatic given the dynamic nature of the row list
                               if (idx === deptRows.length - 1) {
                                 // Last field in dept section, focus first provider input
                                 const firstProvInput = document.querySelector('[data-provider-input="0"]') as HTMLInputElement;
@@ -535,9 +542,11 @@ export default function BulkIncomeModal({
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
+                              // Using querySelector for focus management between dynamically generated fields
+                              // This is pragmatic given the dynamic nature of the row list
                               if (idx === provRows.length - 1) {
-                                // Last field, trigger save
-                                if (!savingDisabled && !isSaving && !dateHasData) {
+                                // Last field, trigger save if allowed
+                                if (canSave) {
                                   saveAll();
                                 }
                               } else {

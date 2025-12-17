@@ -473,7 +473,7 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
         <div className="flex flex-wrap gap-2 mt-2">
           {filters.type !== 'all' && (
             <Badge variant="secondary" className="flex items-center gap-1">
-              Type: {filters.type}
+              Type: {filters.type.charAt(0).toUpperCase() + filters.type.slice(1)}
               <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('type')} />
             </Badge>
           )}
