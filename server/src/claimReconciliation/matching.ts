@@ -140,6 +140,14 @@ export function matchClaimsToRemittances(
 ): MatchResult[] {
   const results: MatchResult[] = [];
 
+  // ISSUE 2 FIX: Debug logging to understand matching failures
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[Matching] Total claims:", claims.length);
+    console.log("[Matching] Total remittances:", remittances.length);
+    console.log("[Matching] Sample claim keys (first 3):", claims.slice(0, 3).map(c => c.compositeKey));
+    console.log("[Matching] Sample remittance keys (first 3):", remittances.slice(0, 3).map(r => r.compositeKey));
+  }
+
   const claimMap = new Map<string, { id: number; data: ClaimRow }>();
   for (const claim of claims) claimMap.set(claim.compositeKey, { id: claim.id, data: claim.data });
 

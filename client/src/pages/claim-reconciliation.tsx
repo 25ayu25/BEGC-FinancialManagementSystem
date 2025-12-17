@@ -462,6 +462,12 @@ export default function ClaimReconciliation() {
     queryKey: ["/api/claim-reconciliation/runs"],
   });
 
+  // ISSUE 3 FIX: Filter to only show actual reconciliation runs (with remittances > 0)
+  // This prevents claims-only uploads from cluttering the Reconciliation History
+  const actualReconciliationRuns = useMemo(() => {
+    return runs.filter(run => run.totalRemittanceRows > 0);
+  }, [runs]);
+
   const { data: claims = [], isLoading: claimsLoading } = useQuery<ClaimDetail[]>({
     queryKey: [`/api/claim-reconciliation/runs/${selectedRunId}/claims`],
     enabled: !!selectedRunId,
@@ -1219,13 +1225,13 @@ export default function ClaimReconciliation() {
   };
 
   const filteredRuns = useMemo(() => {
-    if (statusFilter === "all") return runs;
-    return runs.filter((run) => {
+    if (statusFilter === "all") return actualReconciliationRuns;
+    return actualReconciliationRuns.filter((run) => {
       const status = getRunStatus(run);
       if (statusFilter === "awaiting_remittance") return status === "awaiting_remittance";
       return status === "reconciled" || status === "pending_review";
     });
-  }, [runs, statusFilter]);
+  }, [actualReconciliationRuns, statusFilter]);
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
 
@@ -2187,7 +2193,7 @@ export default function ClaimReconciliation() {
           </CardHeader>
 
           <CardContent className="pt-0">
-            {runs.length > 0 && (
+            {actualReconciliationRuns.length > 0 && (
               <div className="py-3 mb-2">
                 <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200">
                   <button
@@ -2198,7 +2204,7 @@ export default function ClaimReconciliation() {
                     )}
                     onClick={() => setStatusFilter("all")}
                   >
-                    All ({runs.length})
+                    All ({actualReconciliationRuns.length})
                   </button>
                   <button
                     type="button"
@@ -2211,7 +2217,7 @@ export default function ClaimReconciliation() {
                     onClick={() => setStatusFilter("awaiting_remittance")}
                   >
                     <Clock className="w-3 h-3" />
-                    Awaiting remittance ({runs.filter((r) => getRunStatus(r) === "awaiting_remittance").length})
+                    Awaiting remittance ({actualReconciliationRuns.filter((r) => getRunStatus(r) === "awaiting_remittance").length})
                   </button>
                   <button
                     type="button"
@@ -2226,7 +2232,7 @@ export default function ClaimReconciliation() {
                     <CheckCircle2 className="w-3 h-3" />
                     Reconciled (
                     {
-                      runs.filter((r) => {
+                      actualReconciliationRuns.filter((r) => {
                         const s = getRunStatus(r);
                         return s === "reconciled" || s === "pending_review";
                       }).length
@@ -2239,7 +2245,7 @@ export default function ClaimReconciliation() {
 
             {runsLoading ? (
               <p className="text-muted-foreground py-6 text-sm">Loading reconciliation runs…</p>
-            ) : runs.length === 0 ? (
+            ) : actualReconciliationRuns.length === 0 ? (
               <p className="text-muted-foreground py-6 text-sm">No reconciliation runs yet.</p>
             ) : filteredRuns.length === 0 ? (
               <p className="text-muted-foreground py-6 text-sm">No runs match the selected status filter.</p>

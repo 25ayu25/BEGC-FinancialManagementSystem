@@ -767,6 +767,18 @@ export async function runClaimReconciliation(
         .where(eq(claimReconRemittances.id, orphan.id));
     }
 
+    // ISSUE 1 FIX: Mark unmatched claims as "unpaid"
+    // Claims that were checked in this reconciliation but not matched should be marked as "unpaid"
+    const matchedClaimIds = new Set(matchedOnly.map((m) => m.claimId));
+    const unmatchedClaims = claims.filter((c) => !matchedClaimIds.has(c.id));
+
+    for (const claim of unmatchedClaims) {
+      await tx
+        .update(claimReconClaims)
+        .set({ status: "unpaid" })
+        .where(eq(claimReconClaims.id, claim.id));
+    }
+
     const summary: ReconciliationSummary = {
       totalClaims: claims.length,
       totalRemittances: remittances.length,
@@ -778,7 +790,7 @@ export async function runClaimReconciliation(
     return {
       summary,
       orphanRemittances: orphanRemittances.length,
-      unpaidClaims: matchedOnly.filter((m) => m.status === "unpaid").length,
+      unpaidClaims: unmatchedClaims.length,
       totalClaimsSearched: claims.length,
       claimsMatched: matchedOnly.length,
     };
