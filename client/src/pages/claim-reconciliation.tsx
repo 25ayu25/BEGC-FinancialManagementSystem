@@ -1138,18 +1138,19 @@ export default function ClaimReconciliation() {
   const uploadAction = useMemo(() => {
     const hasClaims = !!claimsFile;
     const hasRemittance = !!remittanceFile;
+    const periodLabel = formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
 
     if (!hasClaims && !hasRemittance) {
       return { type: "disabled" as const, label: "Select files to continue", disabled: true };
     }
     if (hasClaims && !hasRemittance) {
-      return { type: "claims-only" as const, label: `📤 Upload Claims`, disabled: false };
+      return { type: "claims-only" as const, label: `Upload Claims`, disabled: false };
     }
     if (!hasClaims && hasRemittance) {
-      return { type: "remittance-only" as const, label: `📤 Upload Remittance`, disabled: false };
+      return { type: "remittance-only" as const, label: `Upload Remittance to ${periodLabel}`, disabled: false };
     }
-    return { type: "both" as const, label: `📤 Upload & Reconcile`, disabled: false };
-  }, [claimsFile, remittanceFile]);
+    return { type: "both" as const, label: `Upload & Reconcile`, disabled: false };
+  }, [claimsFile, remittanceFile, periodYear, periodMonth]);
 
   const inferredClaimsPeriod = useMemo(() => {
     if (!claimsFile) return null;
@@ -2518,11 +2519,11 @@ export default function ClaimReconciliation() {
               <Button
                 type="button"
                 className={cn(
-                  "w-full h-12 text-base font-semibold transition-all duration-200",
-                  uploadAction.type === "disabled" && "bg-slate-300 hover:bg-slate-300 cursor-not-allowed",
-                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 text-white",
-                  uploadAction.type === "remittance-only" && "bg-green-500 hover:bg-green-600 text-white",
-                  uploadAction.type === "both" && "bg-orange-500 hover:bg-orange-600 text-white"
+                  "w-full h-12 text-base font-semibold transition-all duration-200 shadow-lg",
+                  uploadAction.type === "disabled" && "bg-slate-400 hover:bg-slate-400 cursor-not-allowed text-white",
+                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/30",
+                  uploadAction.type === "remittance-only" && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30",
+                  uploadAction.type === "both" && "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30"
                 )}
                 onClick={runSmartAction}
                 disabled={isUploading || isDeleting || uploadAction.disabled}
@@ -2534,9 +2535,7 @@ export default function ClaimReconciliation() {
                   </>
                 ) : (
                   <>
-                    {uploadAction.type === "claims-only" && <Upload className="w-5 h-5 mr-2" />}
-                    {uploadAction.type === "remittance-only" && <Upload className="w-5 h-5 mr-2" />}
-                    {uploadAction.type === "both" && <Upload className="w-5 h-5 mr-2" />}
+                    {uploadAction.type !== "disabled" && <Upload className="w-5 h-5 mr-2" />}
                     {uploadAction.label}
                   </>
                 )}
@@ -2674,7 +2673,7 @@ export default function ClaimReconciliation() {
                         className="cursor-pointer px-3 py-2.5 hover:bg-slate-100 rounded-md transition-colors"
                       >
                         <Download className="w-4 h-4 mr-2 text-slate-600" />
-                        <span className="flex-1">Export All Claims</span>
+                        <span className="flex-1">Export all claims</span>
                         <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.total})</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="my-1" />
@@ -2683,7 +2682,7 @@ export default function ClaimReconciliation() {
                         className="cursor-pointer px-3 py-2.5 hover:bg-sky-50 rounded-md transition-colors"
                       >
                         <Clock className="w-4 h-4 mr-2 text-sky-600" />
-                        <span className="flex-1">Pending Remittance</span>
+                        <span className="flex-1">Pending remittance</span>
                         <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.awaiting})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -2691,7 +2690,7 @@ export default function ClaimReconciliation() {
                         className="cursor-pointer px-3 py-2.5 hover:bg-emerald-50 rounded-md transition-colors"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />
-                        <span className="flex-1">Paid in Full</span>
+                        <span className="flex-1">Paid in full</span>
                         <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.matched})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -2699,7 +2698,7 @@ export default function ClaimReconciliation() {
                         className="cursor-pointer px-3 py-2.5 hover:bg-amber-50 rounded-md transition-colors"
                       >
                         <AlertCircle className="w-4 h-4 mr-2 text-amber-600" />
-                        <span className="flex-1">Paid Partially</span>
+                        <span className="flex-1">Paid partially</span>
                         <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.partial})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -2707,7 +2706,7 @@ export default function ClaimReconciliation() {
                         className="cursor-pointer px-3 py-2.5 hover:bg-rose-50 rounded-md transition-colors"
                       >
                         <X className="w-4 h-4 mr-2 text-rose-600" />
-                        <span className="flex-1">Not Paid</span>
+                        <span className="flex-1">Not paid (0 paid)</span>
                         <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.unpaid})</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
