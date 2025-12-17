@@ -1,16 +1,17 @@
+// shared/schema.ts
 import { sql } from "drizzle-orm";
-import { 
-  pgTable, 
-  text, 
-  varchar, 
-  decimal, 
+import {
+  pgTable,
+  text,
+  varchar,
+  decimal,
   numeric, // Added for new tables
-  timestamp, 
-  boolean, 
-  integer, 
-  jsonb, 
-  serial, 
-  date, 
+  timestamp,
+  boolean,
+  integer,
+  jsonb,
+  serial,
+  date,
   uniqueIndex // Added for new tables
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -243,6 +244,10 @@ export const claimReconRemittances = pgTable("claim_recon_remittances", {
   employerName: varchar("employer_name", { length: 256 }),
   patientName: varchar("patient_name", { length: 256 }),
   memberNumber: varchar("member_number", { length: 64 }).notNull(),
+
+  // ✅ NEW: this is the field that matches CIC "Invoice No"
+  billNo: varchar("bill_no", { length: 64 }),
+
   claimNumber: varchar("claim_number", { length: 64 }),
   relationship: varchar("relationship", { length: 64 }),
   serviceDate: date("service_date").notNull(),
@@ -260,7 +265,6 @@ export const claimReconRemittances = pgTable("claim_recon_remittances", {
   rawRow: jsonb("raw_row"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
-
 
 /* =======================
    Insert Schemas (Zod)
@@ -340,7 +344,6 @@ export const insertClaimReconClaimSchema = createInsertSchema(claimReconClaims).
 export const insertClaimReconRemittanceSchema = createInsertSchema(claimReconRemittances).omit({
   id: true,
 });
-
 
 /* =======================
    Types
