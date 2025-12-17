@@ -180,7 +180,7 @@ function readSessionBackup(): string | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Utility helpers */
+/* Constants */
 /* -------------------------------------------------------------------------- */
 
 const MONTHS = [
@@ -197,6 +197,8 @@ const MONTHS = [
   { value: "11", label: "November" },
   { value: "12", label: "December" },
 ];
+
+const MAX_CARDS_PER_VIEW = 12;
 
 function formatPeriodLabel(year: number, month: number): string {
   return new Date(year, month - 1).toLocaleString("default", {
@@ -614,7 +616,7 @@ export default function ClaimReconciliation() {
       }
     }
     // Auto-switch to table view when "All" years is selected
-    if (periodYearFilter === null && periodsSummary.length > 12) {
+    if (periodYearFilter === null && periodsSummary.length > MAX_CARDS_PER_VIEW) {
       setViewMode("table");
     }
   }, [availableYears, periodYearFilter, periodsSummary.length]);
@@ -622,7 +624,7 @@ export default function ClaimReconciliation() {
   const filteredPeriods = useMemo(() => {
     let filtered = periodsSummary;
     if (periodYearFilter !== null) filtered = filtered.filter((p) => p.periodYear === periodYearFilter);
-    return filtered.slice(0, 12);
+    return filtered.slice(0, MAX_CARDS_PER_VIEW);
   }, [periodsSummary, periodYearFilter]);
 
   /* ------------------------------------------------------------------------ */
@@ -1144,10 +1146,10 @@ export default function ClaimReconciliation() {
       return { type: "claims-only" as const, label: `📤 Upload Claims`, disabled: false };
     }
     if (!hasClaims && hasRemittance) {
-      return { type: "remittance-only" as const, label: `📤 Upload Remittance to ${activePeriodLabel}`, disabled: false };
+      return { type: "remittance-only" as const, label: `📤 Upload Remittance`, disabled: false };
     }
     return { type: "both" as const, label: `📤 Upload & Reconcile`, disabled: false };
-  }, [claimsFile, remittanceFile, activePeriodLabel]);
+  }, [claimsFile, remittanceFile]);
 
   const inferredClaimsPeriod = useMemo(() => {
     if (!claimsFile) return null;

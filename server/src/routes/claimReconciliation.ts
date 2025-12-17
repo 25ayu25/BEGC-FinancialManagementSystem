@@ -42,6 +42,10 @@ import {
 
 const router = Router();
 
+// Constants
+const CLINIC_NAME = "BAHR EL GHAZAL CLINIC";
+const MAX_EXPORT_LIMIT = 10000; // Maximum records for Excel export
+
 /** Utility function for period formatting */
 function formatPeriod(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
@@ -790,7 +794,7 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
       periodYear: periodYear ? parseInt(periodYear as string, 10) : undefined,
       periodMonth: periodMonth ? parseInt(periodMonth as string, 10) : undefined,
       page: undefined,
-      limit: 10000, // Get all claims for export
+      limit: MAX_EXPORT_LIMIT, // Use configurable constant for export limit
     };
 
     const result = await getAllClaims(options);
@@ -798,6 +802,11 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
 
     if (!claims || claims.length === 0) {
       return res.status(404).json({ error: "No claims found for export" });
+    }
+
+    // Warn if results were limited
+    if (claims.length >= MAX_EXPORT_LIMIT) {
+      console.warn(`Export limit reached: ${claims.length} claims. Some records may be excluded.`);
     }
 
     // Map status to friendly names
@@ -827,8 +836,8 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
     // Build Excel rows
     const rows: any[][] = [];
 
-    // Header Section (rows 1-6)
-    rows.push(["BAHR EL GHAZAL CLINIC"]);
+    // Header Section (rows 1-6) - use configurable clinic name
+    rows.push([CLINIC_NAME]);
     rows.push([`Claims Report - ${statusName}`]);
     rows.push([`Provider: ${providerName || "All"}`]);
     rows.push([`Period: ${periodLabel}`]);
