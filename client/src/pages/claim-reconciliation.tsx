@@ -1734,7 +1734,6 @@ export default function ClaimReconciliation() {
             </Card>
           )}
         </section>
-        </section>
 
         {/* Period cards - Premium Glass-morphism Design */}
         {periodsSummary.length > 0 && (
