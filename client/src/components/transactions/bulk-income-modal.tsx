@@ -60,7 +60,6 @@ export default function BulkIncomeModal({
   });
   const [cashCurrency, setCashCurrency] = useState<"SSP" | "USD">("SSP");
   const [providerCurrency, setProviderCurrency] = useState<"SSP" | "USD">("USD");
-  const [notes, setNotes] = useState("");
 
   const [deptRows, setDeptRows] = useState<DeptRow[]>([
     { departmentId: undefined, amount: "" },
@@ -262,7 +261,7 @@ export default function BulkIncomeModal({
             insuranceProviderId: null, // cash
             amount: String(r.amount),
             currency: cashCurrency,
-            description: notes || "Daily income",
+            description: "Daily income",
             receiptPath: null,
             expenseCategory: null,
             staffType: null,
@@ -280,7 +279,7 @@ export default function BulkIncomeModal({
             insuranceProviderId: r.insuranceProviderId,
             amount: String(r.amount),
             currency: providerCurrency, // usually USD
-            description: notes || "Insurance daily total",
+            description: "Insurance daily total",
             receiptPath: null,
             expenseCategory: null,
             staffType: null,
@@ -340,7 +339,6 @@ export default function BulkIncomeModal({
         // reset & close for next entry
         setDeptRows([{ departmentId: undefined, amount: "" }]);
         setProvRows([{ insuranceProviderId: undefined, amount: "" }]);
-        setNotes("");
         onOpenChange(false);
       }
     } catch (error) {
@@ -371,36 +369,46 @@ export default function BulkIncomeModal({
           )}
 
           {/* header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold">Daily Bulk Income</h2>
-            <button onClick={() => onOpenChange(false)} className="px-2 py-1 rounded hover:bg-slate-100 text-gray-500 hover:text-gray-700">
-              <X className="h-4 w-4" />
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Daily Bulk Income</h2>
+              <p className="text-sm text-gray-600 mt-1">Enter cash by department and insurance totals</p>
+            </div>
+            <button 
+              onClick={() => onOpenChange(false)} 
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
             </button>
           </div>
 
           {/* ++ MODIFICATION: Wrap form body and footer in a fieldset to disable all controls during save */}
           <fieldset disabled={isSaving}>
             {/* body */}
-            <div className="p-4 space-y-6">
-              {/* top controls */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-6 space-y-6">
+              {/* top controls - REMOVED NOTES FIELD */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="mb-1 block">Transaction Date</Label>
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Transaction Date</Label>
+                  <Input 
+                    type="date" 
+                    value={date} 
+                    onChange={(e) => setDate(e.target.value)} 
+                    className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Currency (cash by department)</Label>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Currency (cash by department)</Label>
                   <Select value={cashCurrency} onValueChange={(v: "SSP" | "USD") => setCashCurrency(v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="SSP">SSP (South Sudanese Pound)</SelectItem>
                       <SelectItem value="USD">USD (US Dollar)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label className="mb-1 block">Notes (optional)</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., ‘Daily totals’" />
                 </div>
               </div>
 
@@ -425,13 +433,37 @@ export default function BulkIncomeModal({
               )}
 
               <div className="flex gap-2 flex-wrap">
-                <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 6 Departments</Button>
-                <Button type="button" variant="outline" onClick={clearAllDeptRows}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={prefillDepartments}
+                  className="h-10 px-4 font-medium border-gray-300 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all"
+                >
+                  Prefill 6 Departments
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={clearAllDeptRows}
+                  className="h-10 px-4 font-medium text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-700 hover:bg-red-50 transition-all"
+                >
                   <X className="h-4 w-4 mr-2" />
                   Clear Dept Rows
                 </Button>
-                <Button type="button" variant="outline" onClick={prefillProviders}>Prefill Insurances</Button>
-                <Button type="button" variant="outline" onClick={clearAllProvRows}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={prefillProviders}
+                  className="h-10 px-4 font-medium border-gray-300 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all"
+                >
+                  Prefill Insurances
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={clearAllProvRows}
+                  className="h-10 px-4 font-medium text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-700 hover:bg-red-50 transition-all"
+                >
                   <X className="h-4 w-4 mr-2" />
                   Clear Ins Rows
                 </Button>
@@ -448,19 +480,25 @@ export default function BulkIncomeModal({
               </div>
 
               {/* CASH BY DEPARTMENT */}
-              <div className="border rounded-lg">
-                <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Cash by Department</div>
-                <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
+              <div className="border rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-gradient-to-r from-teal-50 to-emerald-50 border-b border-teal-100">
+                  <h3 className="text-sm font-semibold text-teal-900 uppercase tracking-wide">
+                    Cash by Department
+                  </h3>
+                </div>
+                <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b">
                   <div className="col-span-7">Department</div>
                   <div className="col-span-4 text-right">Amount</div>
                   <div className="col-span-1" />
                 </div>
                 <div className="divide-y">
                   {deptRows.map((row, idx) => (
-                    <div key={idx} className={`grid grid-cols-12 gap-2 px-3 py-3 ${justPrefilledDepts ? 'animate-flash-green' : ''}`}>
+                    <div key={idx} className={`grid grid-cols-12 gap-3 px-4 py-3 ${justPrefilledDepts ? 'animate-flash-green' : ''}`}>
                       <div className="col-span-7">
                         <Select value={row.departmentId ?? undefined} onValueChange={(v) => patchDept(idx, { departmentId: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                          <SelectTrigger className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
                           <SelectContent>
                             {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                           </SelectContent>
@@ -469,7 +507,7 @@ export default function BulkIncomeModal({
                       <div className="col-span-4">
                         <Input 
                           inputMode="numeric" 
-                          className="text-right" 
+                          className="h-11 text-right font-medium focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
                           placeholder="0"
                           value={row.amount} 
                           onChange={(e) => patchDept(idx, { amount: e.target.value })}
@@ -499,34 +537,61 @@ export default function BulkIncomeModal({
                   ))}
                 </div>
                 {cashCurrency === 'SSP' && totalSSP > 0 && (
-                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
-                    Total SSP: {totalSSP.toLocaleString()}
+                  <div className="px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-t-2 border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                        Total SSP
+                      </span>
+                      <span className="text-2xl font-bold text-green-700">
+                        {totalSSP.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 )}
                 {cashCurrency === 'USD' && validDeptPayloads.length > 0 && (
-                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
-                    Total USD: {validDeptPayloads.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                  <div className="px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-t-2 border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                        Total USD
+                      </span>
+                      <span className="text-2xl font-bold text-green-700">
+                        {validDeptPayloads.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 )}
-                <div className="p-3">
-                  <Button type="button" variant="outline" onClick={addDeptRow}>＋ Add row</Button>
+                <div className="p-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={addDeptRow}
+                    className="h-10 px-4 font-medium border-gray-300 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all"
+                  >
+                    ＋ Add row
+                  </Button>
                 </div>
               </div>
 
               {/* INSURANCE TOTALS */}
-              <div className="border rounded-lg">
-                <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-700 rounded-t-lg">Insurance Totals (by provider)</div>
-                <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-600 border-b">
+              <div className="border rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <h3 className="text-sm font-semibold text-blue-900 uppercase tracking-wide">
+                    Insurance Totals (by provider)
+                  </h3>
+                </div>
+                <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b">
                   <div className="col-span-7">Insurance Provider</div>
                   <div className="col-span-4 text-right">Amount</div>
                   <div className="col-span-1" />
                 </div>
                 <div className="divide-y">
                   {provRows.map((row, idx) => (
-                    <div key={idx} className={`grid grid-cols-12 gap-2 px-3 py-3 ${justPrefilledProvs ? 'animate-flash-green' : ''}`}>
+                    <div key={idx} className={`grid grid-cols-12 gap-3 px-4 py-3 ${justPrefilledProvs ? 'animate-flash-green' : ''}`}>
                       <div className="col-span-7">
                         <Select value={row.insuranceProviderId ?? undefined} onValueChange={(v) => patchProv(idx, { insuranceProviderId: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                          <SelectTrigger className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
                           <SelectContent>
                             {insuranceProviders.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                           </SelectContent>
@@ -535,7 +600,7 @@ export default function BulkIncomeModal({
                       <div className="col-span-4">
                         <Input 
                           inputMode="numeric" 
-                          className="text-right" 
+                          className="h-11 text-right font-medium focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
                           placeholder="0"
                           value={row.amount} 
                           onChange={(e) => patchProv(idx, { amount: e.target.value })}
@@ -566,28 +631,59 @@ export default function BulkIncomeModal({
                   ))}
                 </div>
                 {totalUSD > 0 && (
-                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
-                    Total USD: {totalUSD.toLocaleString()}
+                  <div className="px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-t-2 border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                        Total USD
+                      </span>
+                      <span className="text-2xl font-bold text-green-700">
+                        {totalUSD.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 )}
                 {totalProvSSP > 0 && (
-                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
-                    Total SSP: {totalProvSSP.toLocaleString()}
+                  <div className="px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-t-2 border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                        Total SSP
+                      </span>
+                      <span className="text-2xl font-bold text-green-700">
+                        {totalProvSSP.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 )}
-                <div className="p-3">
-                  <Button type="button" variant="outline" onClick={addProvRow}>＋ Add row</Button>
+                <div className="p-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={addProvRow}
+                    className="h-10 px-4 font-medium border-gray-300 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all"
+                  >
+                    ＋ Add row
+                  </Button>
                 </div>
               </div>
             </div>
 
             {/* footer */}
-            <div className="flex items-center justify-between gap-3 p-4 border-t">
+            <div className="flex items-center justify-between gap-3 p-6 border-t">
               <span className="text-xs text-gray-500">💡 Tip: Press Enter to move to next field or save</span>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  className="h-11 px-6 font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </Button>
                 {/* ++ MODIFICATION: Update save button to show loading state and disable if date has data */}
-                <Button onClick={saveAll} disabled={savingDisabled || isSaving || dateHasData || checkingDate}>
+                <Button 
+                  onClick={saveAll} 
+                  disabled={savingDisabled || isSaving || dateHasData || checkingDate}
+                  className="h-11 px-6 bg-teal-600 hover:bg-teal-700 text-white font-semibold shadow-sm hover:shadow-md transition-all"
+                >
                   {checkingDate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {checkingDate ? "Checking date..." : isSaving ? "Saving..." : "Save Daily Income"}

@@ -171,47 +171,74 @@ export default function BulkExpenseModal({
       <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" onClick={() => onOpenChange(false)} />
       <div className="absolute inset-0 flex items-start justify-center p-6">
         <div className="w-full max-w-2xl rounded-xl bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 max-h-[90vh] overflow-auto relative">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold">Bulk Expenses</h2>
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Bulk Expenses</h2>
+              <p className="text-sm text-gray-600 mt-1">Record multiple expenses for the day</p>
+            </div>
             <button
               onClick={() => onOpenChange(false)}
-              className="px-2 py-1 rounded hover:bg-slate-100 text-gray-500 hover:text-gray-700"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
             </button>
           </div>
 
-          <div className="p-4 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="p-6 space-y-6">
+            {/* Row 1: Date and Currency */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="mb-1 block">Transaction Date</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">Transaction Date</Label>
+                <Input 
+                  type="date" 
+                  value={date} 
+                  onChange={(e) => setDate(e.target.value)} 
+                  className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
               </div>
               <div>
-                <Label className="mb-1 block">Currency</Label>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">Currency</Label>
                 <Select value={currency} onValueChange={(v: "SSP" | "USD") => setCurrency(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="SSP">SSP</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="SSP">SSP (South Sudanese Pound)</SelectItem>
+                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end gap-2">
-                <Button type="button" variant="outline" onClick={prefillCommon}>
-                  Prefill Expenses
-                </Button>
-                <Button type="button" variant="outline" onClick={clearAllRows}>
-                  <X className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-              </div>
             </div>
 
-            <div className="border rounded-lg">
-              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50 text-xs font-medium text-slate-600 rounded-t-lg">
+            {/* Row 2: Action Buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={prefillCommon}
+                className="h-10 px-4 font-medium border-gray-300 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all"
+              >
+                Prefill Expenses
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={clearAllRows}
+                className="h-10 px-4 font-medium text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-700 hover:bg-red-50 transition-all"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear Expense Rows
+              </Button>
+            </div>
+
+            <div className="border rounded-xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100">
+                <h3 className="text-sm font-semibold text-red-900 uppercase tracking-wide">
+                  Expense Categories
+                </h3>
+              </div>
+              <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b">
                 <div className="col-span-7">Expense Category</div>
                 <div className="col-span-4 text-right">Amount</div>
                 <div className="col-span-1" />
@@ -219,13 +246,13 @@ export default function BulkExpenseModal({
 
               <div className="divide-y">
                 {rows.map((row, idx) => (
-                  <div key={idx} className={`grid grid-cols-12 gap-2 px-3 py-3 ${justPrefilled ? 'animate-flash-green' : ''}`}>
+                  <div key={idx} className={`grid grid-cols-12 gap-3 px-4 py-3 ${justPrefilled ? 'animate-flash-green' : ''}`}>
                     <div className="col-span-7">
                       <Select
                         value={row.expenseCategory ?? undefined}
                         onValueChange={(v: ExpenseCategory) => patch(idx, { expenseCategory: v })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
                           <SelectValue placeholder="Select expense category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -241,7 +268,7 @@ export default function BulkExpenseModal({
                     <div className="col-span-4">
                       <Input
                         inputMode="numeric"
-                        className="text-right"
+                        className="h-11 text-right font-medium focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                         placeholder="0"
                         value={row.amount}
                         onChange={(e) => patch(idx, { amount: e.target.value })}
@@ -282,32 +309,66 @@ export default function BulkExpenseModal({
               </div>
 
               {totalSSP > 0 && (
-                <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
-                  Total SSP: {totalSSP.toLocaleString()}
+                <div className="px-4 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-t-2 border-red-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                      Total SSP
+                    </span>
+                    <span className="text-2xl font-bold text-red-700">
+                      {totalSSP.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               )}
               {totalUSD > 0 && (
-                <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
-                  Total USD: {totalUSD.toLocaleString()}
+                <div className="px-4 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-t-2 border-red-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                      Total USD
+                    </span>
+                    <span className="text-2xl font-bold text-red-700">
+                      {totalUSD.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               )}
 
-              <div className="p-3">
-                <Button type="button" variant="outline" onClick={addRow}>
+              <div className="p-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={addRow}
+                  className="h-10 px-4 font-medium border-gray-300 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all"
+                >
                   ＋ Add row
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 p-4 border-t">
+          <div className="flex items-center justify-between gap-3 p-6 border-t">
             <span className="text-xs text-gray-500">💡 Tip: Press Enter to move to next field or save</span>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => onOpenChange(false)}
+                className="h-11 px-6 font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all"
+              >
                 Cancel
               </Button>
-              <Button onClick={saveAll} disabled={validPayloads.length === 0 || isSaving}>
-                Save Expenses
+              <Button 
+                onClick={saveAll} 
+                disabled={validPayloads.length === 0 || isSaving}
+                className="h-11 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold shadow-sm hover:shadow-md transition-all"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Expenses'
+                )}
               </Button>
             </div>
           </div>
