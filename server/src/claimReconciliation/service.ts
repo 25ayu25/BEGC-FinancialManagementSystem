@@ -41,15 +41,6 @@ function toISODate(d: Date): string {
 }
 
 /**
- * Safe parse of stored ISO date strings. Returns undefined if invalid.
- */
-function parseDbDate(val: any): Date | undefined {
-  if (!val) return undefined;
-  const d = new Date(val);
-  return isValidDate(d) ? d : undefined;
-}
-
-/**
  * Create a new reconciliation run
  */
 export async function createReconRun(
@@ -99,35 +90,31 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
   if (!run) throw new Error(`Run ${runId} not found`);
 
   const claimsToInsert = claims
-    .filter((c) => (c.billedAmount ?? 0) > 0 && !!c.memberNumber)
-    .map((claim) => {
-      const serviceDate = isValidDate(claim.serviceDate) ? claim.serviceDate : undefined;
-
-      return {
-        runId,
-        providerName: run.providerName,
-        periodYear: run.periodYear,
-        periodMonth: run.periodMonth,
+    .filter((c) => isValidDate(c.serviceDate))
+    .map((claim) => ({
+      runId,
+      providerName: run.providerName,
+      periodYear: run.periodYear,
+      periodMonth: run.periodMonth,
+      memberNumber: claim.memberNumber,
+      patientName: claim.patientName || null,
+      serviceDate: toISODate(claim.serviceDate),
+      invoiceNumber: claim.invoiceNumber || null,
+      claimType: claim.claimType || null,
+      schemeName: claim.schemeName || null,
+      benefitDesc: claim.benefitDesc || null,
+      billedAmount: claim.billedAmount.toString(),
+      currency: normalizeCurrencyForProvider(run.providerName, claim.currency),
+      status: "submitted" as const,
+      amountPaid: "0",
+      compositeKey: buildClaimCompositeKeyFromRow({
         memberNumber: claim.memberNumber,
-        patientName: claim.patientName || null,
-        serviceDate: serviceDate ? toISODate(serviceDate) : null,
-        invoiceNumber: claim.invoiceNumber || null,
-        claimType: claim.claimType || null,
-        schemeName: claim.schemeName || null,
-        benefitDesc: claim.benefitDesc || null,
-        billedAmount: claim.billedAmount.toString(),
-        currency: normalizeCurrencyForProvider(run.providerName, claim.currency),
-        status: "submitted" as const,
-        amountPaid: "0",
-        compositeKey: buildClaimCompositeKeyFromRow({
-          memberNumber: claim.memberNumber,
-          invoiceNumber: claim.invoiceNumber,
-          serviceDate: serviceDate, // may be undefined; matcher will fallback only if needed
-          billedAmount: claim.billedAmount,
-        } as any),
-        rawRow: claim as any,
-      };
-    });
+        invoiceNumber: claim.invoiceNumber,
+        serviceDate: claim.serviceDate,
+        billedAmount: claim.billedAmount,
+      } as any),
+      rawRow: claim as any,
+    }));
 
   const inserted = await db.insert(claimReconClaims).values(claimsToInsert).returning();
   return inserted;
@@ -145,15 +132,13 @@ export async function insertRemittances(runId: number, remittances: RemittanceRo
   if (!run) throw new Error(`Run ${runId} not found`);
 
   const remittancesToInsert = remittances
-    .filter((r) => !!r.memberNumber && ((r.claimAmount ?? 0) > 0 || (r.paidAmount ?? 0) > 0 || !!r.billNo || !!r.claimNumber))
+    .filter((r) => isValidDate(r.serviceDate))
     .map((rem) => {
-      const serviceDate = isValidDate(rem.serviceDate) ? rem.serviceDate : undefined;
-
       const keyVariants = buildRemittanceKeyVariantsFromRow({
         memberNumber: rem.memberNumber,
-        billNo: rem.billNo, // ✅ critical
+        billNo: rem.billNo, // ✅ IMPORTANT
         claimNumber: rem.claimNumber,
-        serviceDate: serviceDate,
+        serviceDate: rem.serviceDate,
         claimAmount: rem.claimAmount,
       } as any);
 
@@ -165,10 +150,10 @@ export async function insertRemittances(runId: number, remittances: RemittanceRo
         employerName: rem.employerName || null,
         patientName: rem.patientName || null,
         memberNumber: rem.memberNumber,
-        billNo: rem.billNo || null, // ✅ persist
+        billNo: rem.billNo || null, // ✅ STORE
         claimNumber: rem.claimNumber || null,
         relationship: rem.relationship || null,
-        serviceDate: serviceDate ? toISODate(serviceDate) : null,
+        serviceDate: toISODate(rem.serviceDate),
         claimAmount: rem.claimAmount.toString(),
         paidAmount: rem.paidAmount.toString(),
         paymentNo: rem.paymentNo || null,
@@ -200,60 +185,52 @@ export async function performMatching(runId: number) {
     .from(claimReconRemittances)
     .where(eq(claimReconRemittances.runId, runId));
 
-  const claimData = claims.map((c) => {
-    const sd = parseDbDate(c.serviceDate);
+  const claimData = claims.map((c) => ({
+    id: c.id,
+    compositeKey: buildClaimCompositeKeyFromRow({
+      memberNumber: c.memberNumber,
+      invoiceNumber: c.invoiceNumber,
+      serviceDate: new Date(c.serviceDate),
+      billedAmount: parseFloat(c.billedAmount),
+      status: c.status,
+    } as any),
+    data: {
+      memberNumber: c.memberNumber,
+      patientName: c.patientName || undefined,
+      serviceDate: new Date(c.serviceDate),
+      invoiceNumber: c.invoiceNumber || undefined,
+      claimType: c.claimType || undefined,
+      schemeName: c.schemeName || undefined,
+      benefitDesc: c.benefitDesc || undefined,
+      billedAmount: parseFloat(c.billedAmount),
+      currency: c.currency,
+      status: c.status as any,
+    } as any,
+  }));
 
-    return {
-      id: c.id,
-      compositeKey: buildClaimCompositeKeyFromRow({
-        memberNumber: c.memberNumber,
-        invoiceNumber: c.invoiceNumber,
-        serviceDate: sd,
-        billedAmount: parseFloat(c.billedAmount),
-        status: c.status,
-      } as any),
-      data: {
-        memberNumber: c.memberNumber,
-        patientName: c.patientName || undefined,
-        serviceDate: sd,
-        invoiceNumber: c.invoiceNumber || undefined,
-        claimType: c.claimType || undefined,
-        schemeName: c.schemeName || undefined,
-        benefitDesc: c.benefitDesc || undefined,
-        billedAmount: parseFloat(c.billedAmount),
-        currency: c.currency,
-        status: c.status as any,
-      } as any,
-    };
-  });
-
-  const remitData = remittances.map((r) => {
-    const sd = parseDbDate(r.serviceDate);
-
-    return {
-      id: r.id,
-      compositeKey: buildRemittanceKeyVariantsFromRow({
-        memberNumber: r.memberNumber,
-        billNo: (r as any).billNo, // ✅ use r.billNo once schema is updated
-        claimNumber: r.claimNumber,
-        serviceDate: sd,
-        claimAmount: parseFloat(r.claimAmount),
-      } as any)[0],
-      data: {
-        employerName: r.employerName || undefined,
-        patientName: r.patientName || undefined,
-        memberNumber: r.memberNumber,
-        billNo: (r as any).billNo || undefined, // ✅
-        claimNumber: r.claimNumber || undefined,
-        relationship: r.relationship || undefined,
-        serviceDate: sd,
-        claimAmount: parseFloat(r.claimAmount),
-        paidAmount: parseFloat(r.paidAmount),
-        paymentNo: r.paymentNo || undefined,
-        paymentMode: r.paymentMode || undefined,
-      } as any,
-    };
-  });
+  const remitData = remittances.map((r) => ({
+    id: r.id,
+    compositeKey: buildRemittanceKeyVariantsFromRow({
+      memberNumber: r.memberNumber,
+      billNo: (r as any).billNo, // ✅ now exists after schema update
+      claimNumber: r.claimNumber,
+      serviceDate: new Date(r.serviceDate),
+      claimAmount: parseFloat(r.claimAmount),
+    } as any)[0],
+    data: {
+      employerName: r.employerName || undefined,
+      patientName: r.patientName || undefined,
+      memberNumber: r.memberNumber,
+      billNo: (r as any).billNo || undefined, // ✅
+      claimNumber: r.claimNumber || undefined,
+      relationship: r.relationship || undefined,
+      serviceDate: new Date(r.serviceDate),
+      claimAmount: parseFloat(r.claimAmount),
+      paidAmount: parseFloat(r.paidAmount),
+      paymentNo: r.paymentNo || undefined,
+      paymentMode: r.paymentMode || undefined,
+    } as any,
+  }));
 
   const matches = matchClaimsToRemittances(claimData, remitData);
 
@@ -502,36 +479,32 @@ export async function upsertClaimsForPeriod(
       );
 
     const claimsToInsert = claims
-      .filter((c) => !!c.memberNumber && (c.billedAmount ?? 0) > 0)
-      .map((claim) => {
-        const serviceDate = isValidDate(claim.serviceDate) ? claim.serviceDate : undefined;
-
-        return {
-          runId: null,
-          providerName,
-          periodYear,
-          periodMonth,
+      .filter((c) => isValidDate(c.serviceDate))
+      .map((claim) => ({
+        runId: null,
+        providerName,
+        periodYear,
+        periodMonth,
+        memberNumber: claim.memberNumber,
+        patientName: claim.patientName || null,
+        serviceDate: toISODate(claim.serviceDate),
+        invoiceNumber: claim.invoiceNumber || null,
+        claimType: claim.claimType || null,
+        schemeName: claim.schemeName || null,
+        benefitDesc: claim.benefitDesc || null,
+        billedAmount: claim.billedAmount.toString(),
+        currency: normalizeCurrencyForProvider(providerName, claim.currency),
+        status: "awaiting_remittance" as const,
+        amountPaid: "0",
+        compositeKey: buildClaimCompositeKeyFromRow({
           memberNumber: claim.memberNumber,
-          patientName: claim.patientName || null,
-          serviceDate: serviceDate ? toISODate(serviceDate) : null,
-          invoiceNumber: claim.invoiceNumber || null,
-          claimType: claim.claimType || null,
-          schemeName: claim.schemeName || null,
-          benefitDesc: claim.benefitDesc || null,
-          billedAmount: claim.billedAmount.toString(),
-          currency: normalizeCurrencyForProvider(providerName, claim.currency),
-          status: "awaiting_remittance" as const,
-          amountPaid: "0",
-          compositeKey: buildClaimCompositeKeyFromRow({
-            memberNumber: claim.memberNumber,
-            invoiceNumber: claim.invoiceNumber,
-            serviceDate: serviceDate,
-            billedAmount: claim.billedAmount,
-            status: "awaiting_remittance",
-          } as any),
-          rawRow: claim as any,
-        };
-      });
+          invoiceNumber: claim.invoiceNumber,
+          serviceDate: claim.serviceDate,
+          billedAmount: claim.billedAmount,
+          status: "awaiting_remittance",
+        } as any),
+        rawRow: claim as any,
+      }));
 
     return await tx.insert(claimReconClaims).values(claimsToInsert).returning();
   });
@@ -559,15 +532,13 @@ export async function upsertRemittanceForPeriod(
       );
 
     const toInsert = remittances
-      .filter((r) => !!r.memberNumber && ((r.claimAmount ?? 0) > 0 || (r.paidAmount ?? 0) > 0 || !!r.billNo || !!r.claimNumber))
+      .filter((r) => isValidDate(r.serviceDate))
       .map((rem) => {
-        const serviceDate = isValidDate(rem.serviceDate) ? rem.serviceDate : undefined;
-
         const keyVariants = buildRemittanceKeyVariantsFromRow({
           memberNumber: rem.memberNumber,
-          billNo: rem.billNo, // ✅ critical
+          billNo: rem.billNo, // ✅ IMPORTANT
           claimNumber: rem.claimNumber,
-          serviceDate: serviceDate,
+          serviceDate: rem.serviceDate,
           claimAmount: rem.claimAmount,
         } as any);
 
@@ -579,10 +550,10 @@ export async function upsertRemittanceForPeriod(
           employerName: rem.employerName || null,
           patientName: rem.patientName || null,
           memberNumber: rem.memberNumber,
-          billNo: rem.billNo || null, // ✅ persist
+          billNo: rem.billNo || null, // ✅ STORE
           claimNumber: rem.claimNumber || null,
           relationship: rem.relationship || null,
-          serviceDate: serviceDate ? toISODate(serviceDate) : null,
+          serviceDate: toISODate(rem.serviceDate),
           claimAmount: rem.claimAmount.toString(),
           paidAmount: rem.paidAmount.toString(),
           paymentNo: rem.paymentNo || null,
@@ -596,16 +567,13 @@ export async function upsertRemittanceForPeriod(
       });
 
     if (toInsert.length === 0) {
-      throw new Error("No valid remittance rows found");
+      throw new Error("No valid remittance rows found (invalid/missing serviceDate)");
     }
 
     return await tx.insert(claimReconRemittances).values(toInsert).returning();
   });
 }
 
-/**
- * Prefer staged canonical (runId null). Fallback to any claims for that period.
- */
 export async function getClaimsForPeriod(providerName: string, periodYear: number, periodMonth: number) {
   const staged = await db
     .select()
@@ -633,9 +601,6 @@ export async function getClaimsForPeriod(providerName: string, periodYear: numbe
     );
 }
 
-/**
- * Prefer staged canonical (runId null). Fallback to any remittances for that period.
- */
 export async function getRemittanceForPeriod(providerName: string, periodYear: number, periodMonth: number) {
   const staged = await db
     .select()
@@ -687,7 +652,12 @@ export async function runClaimReconciliation(
       ? await tx
           .select()
           .from(claimReconRemittances)
-          .where(and(eq(claimReconRemittances.runId, opts.runId), isNull(claimReconRemittances.matchedClaimId)))
+          .where(
+            and(
+              eq(claimReconRemittances.runId, opts.runId),
+              isNull(claimReconRemittances.matchedClaimId)
+            )
+          )
       : await tx
           .select()
           .from(claimReconRemittances)
@@ -707,68 +677,61 @@ export async function runClaimReconciliation(
       );
     }
 
-    const claimData = claims.map((c) => {
-      const sd = parseDbDate(c.serviceDate);
+    const claimData = claims.map((c) => ({
+      id: c.id,
+      compositeKey: buildClaimCompositeKeyFromRow({
+        memberNumber: c.memberNumber,
+        invoiceNumber: c.invoiceNumber,
+        serviceDate: new Date(c.serviceDate),
+        billedAmount: parseFloat(c.billedAmount),
+        status: c.status,
+      } as any),
+      data: {
+        memberNumber: c.memberNumber,
+        patientName: c.patientName || undefined,
+        serviceDate: new Date(c.serviceDate),
+        invoiceNumber: c.invoiceNumber || undefined,
+        claimType: c.claimType || undefined,
+        schemeName: c.schemeName || undefined,
+        benefitDesc: c.benefitDesc || undefined,
+        billedAmount: parseFloat(c.billedAmount),
+        currency: c.currency,
+        status: c.status as any,
+      } as any,
+    }));
 
-      return {
-        id: c.id,
-        compositeKey: buildClaimCompositeKeyFromRow({
-          memberNumber: c.memberNumber,
-          invoiceNumber: c.invoiceNumber,
-          serviceDate: sd,
-          billedAmount: parseFloat(c.billedAmount),
-          status: c.status,
-        } as any),
-        data: {
-          memberNumber: c.memberNumber,
-          patientName: c.patientName || undefined,
-          serviceDate: sd,
-          invoiceNumber: c.invoiceNumber || undefined,
-          claimType: c.claimType || undefined,
-          schemeName: c.schemeName || undefined,
-          benefitDesc: c.benefitDesc || undefined,
-          billedAmount: parseFloat(c.billedAmount),
-          currency: c.currency,
-          status: c.status as any,
-        } as any,
-      };
-    });
-
-    const remitData = remittances.map((r) => {
-      const sd = parseDbDate(r.serviceDate);
-
-      return {
-        id: r.id,
-        compositeKey: buildRemittanceKeyVariantsFromRow({
-          memberNumber: r.memberNumber,
-          billNo: (r as any).billNo, // ✅ use r.billNo once schema is updated
-          claimNumber: r.claimNumber,
-          serviceDate: sd,
-          claimAmount: parseFloat(r.claimAmount),
-        } as any)[0],
-        data: {
-          employerName: r.employerName || undefined,
-          patientName: r.patientName || undefined,
-          memberNumber: r.memberNumber,
-          billNo: (r as any).billNo || undefined, // ✅
-          claimNumber: r.claimNumber || undefined,
-          relationship: r.relationship || undefined,
-          serviceDate: sd,
-          claimAmount: parseFloat(r.claimAmount),
-          paidAmount: parseFloat(r.paidAmount),
-          paymentNo: r.paymentNo || undefined,
-          paymentMode: r.paymentMode || undefined,
-        } as any,
-      };
-    });
+    const remitData = remittances.map((r) => ({
+      id: r.id,
+      compositeKey: buildRemittanceKeyVariantsFromRow({
+        memberNumber: r.memberNumber,
+        billNo: (r as any).billNo, // ✅
+        claimNumber: r.claimNumber,
+        serviceDate: new Date(r.serviceDate),
+        claimAmount: parseFloat(r.claimAmount),
+      } as any)[0],
+      data: {
+        employerName: r.employerName || undefined,
+        patientName: r.patientName || undefined,
+        memberNumber: r.memberNumber,
+        billNo: (r as any).billNo || undefined, // ✅
+        claimNumber: r.claimNumber || undefined,
+        relationship: r.relationship || undefined,
+        serviceDate: new Date(r.serviceDate),
+        claimAmount: parseFloat(r.claimAmount),
+        paidAmount: parseFloat(r.paidAmount),
+        paymentNo: r.paymentNo || undefined,
+        paymentMode: r.paymentMode || undefined,
+      } as any,
+    }));
 
     const matches = matchClaimsToRemittances(claimData, remitData);
     const matchedOnly = matches.filter((m) => m.remittanceId !== null);
 
     const matchedRemittanceIds = new Set<number>();
-    for (const match of matchedOnly) matchedRemittanceIds.add(match.remittanceId as number);
 
     for (const match of matchedOnly) {
+      matchedRemittanceIds.add(match.remittanceId as number);
+
       await tx
         .update(claimReconClaims)
         .set({
@@ -800,6 +763,14 @@ export async function runClaimReconciliation(
         .where(eq(claimReconRemittances.id, orphan.id));
     }
 
+    // ISSUE 1 FIX: Mark unmatched claims as "unpaid"
+    const matchedClaimIds = new Set(matchedOnly.map((m) => m.claimId));
+    const unmatchedClaims = claims.filter((c) => !matchedClaimIds.has(c.id));
+
+    for (const claim of unmatchedClaims) {
+      await tx.update(claimReconClaims).set({ status: "unpaid" }).where(eq(claimReconClaims.id, claim.id));
+    }
+
     const summary: ReconciliationSummary = {
       totalClaims: claims.length,
       totalRemittances: remittances.length,
@@ -811,6 +782,7 @@ export async function runClaimReconciliation(
     return {
       summary,
       orphanRemittances: orphanRemittances.length,
+      unpaidClaims: unmatchedClaims.length,
       totalClaimsSearched: claims.length,
       claimsMatched: matchedOnly.length,
     };
@@ -927,7 +899,7 @@ export async function getPeriodsSummary(providerName?: string) {
       const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
 
       const totalBilled = period.claims.reduce((sum, c) => sum + parseFloat(c.billedAmount), 0);
-      const totalPaid = period.claims.reduce((sum, c) => sum + parseFloat(c.amountPaid || "0"), 0);
+      const totalPaid = period.claims.reduce((sum, c) => sum + parseFloat((c as any).amountPaid || "0"), 0);
 
       const currency = period.claims[0]?.currency || "USD";
 
