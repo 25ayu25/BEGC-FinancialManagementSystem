@@ -633,10 +633,13 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
-    const totalRuns = runs.length;
+    // Only count runs where actual reconciliation occurred (i.e., runs with remittances > 0)
+    const reconciliationsDone = runs.filter(run => run.totalRemittanceRows > 0).length;
 
     const totalClaims = periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
-    const problemClaims = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance + p.unpaid + p.partiallyPaid, 0);
+    // Only count CONFIRMED problems (unpaid + partiallyPaid), exclude awaiting remittance
+    const problemClaims = periodsSummary.reduce((sum, p) => sum + p.unpaid + p.partiallyPaid, 0);
+    const awaitingRemittance = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0);
 
     const sortedRuns = [...runs].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -650,9 +653,10 @@ export default function ClaimReconciliation() {
       : "—";
 
     return {
-      totalRuns,
+      reconciliationsDone,
       totalClaims,
       problemClaims,
+      awaitingRemittance,
       lastPeriodLabel,
       latestRunId: latest?.id ?? null,
     };
@@ -1474,8 +1478,8 @@ export default function ClaimReconciliation() {
                     Reconciliations done
                   </div>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.totalRuns}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-500">periods checked</span>
+                    <span className="text-2xl font-bold text-gray-900">{stats.reconciliationsDone}</span>
+                    <span className="text-[11px] uppercase tracking-wide text-slate-500">with remittances</span>
                   </div>
                   <div className="mt-1 text-[11px] text-slate-500">Latest period: {stats.lastPeriodLabel}</div>
                 </div>
@@ -1513,9 +1517,13 @@ export default function ClaimReconciliation() {
                   </div>
                   <div className="mt-1 flex items-baseline gap-2">
                     <span className="text-2xl font-bold text-orange-600">{stats.problemClaims}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-orange-500">not fully paid</span>
+                    <span className="text-[11px] uppercase tracking-wide text-orange-500">confirmed issues</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">Partial or unpaid claims to discuss with CIC.</div>
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    {stats.awaitingRemittance > 0 
+                      ? `Unpaid/partial claims. ${stats.awaitingRemittance} awaiting verification.`
+                      : "Unpaid or partially paid after reconciliation."}
+                  </div>
                 </div>
               </div>
             </div>
