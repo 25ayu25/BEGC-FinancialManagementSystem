@@ -68,6 +68,8 @@ export default function BulkIncomeModal({
   const [provRows, setProvRows] = useState<ProviderRow[]>([
     { insuranceProviderId: undefined, amount: "" },
   ]);
+  const [justPrefilledDepts, setJustPrefilledDepts] = useState(false);
+  const [justPrefilledProvs, setJustPrefilledProvs] = useState(false);
 
   useEffect(() => {
     if (initialDate) setDate(initialDate);
@@ -130,6 +132,13 @@ export default function BulkIncomeModal({
       return;
     }
     setDeptRows(list.map((id) => ({ departmentId: id, amount: "" })));
+    setJustPrefilledDepts(true);
+    setTimeout(() => setJustPrefilledDepts(false), 600);
+    
+    toast({
+      title: "✓ 6 departments prefilled",
+      description: "Enter amounts for each department.",
+    });
   };
 
   const prefillProviders = () => {
@@ -143,6 +152,29 @@ export default function BulkIncomeModal({
     }
     setProvRows(list.map((id) => ({ insuranceProviderId: id, amount: "" })));
     setProviderCurrency("USD");
+    setJustPrefilledProvs(true);
+    setTimeout(() => setJustPrefilledProvs(false), 600);
+    
+    toast({
+      title: "✓ Insurance providers prefilled",
+      description: "Enter amounts for each provider.",
+    });
+  };
+
+  const clearAllDeptRows = () => {
+    setDeptRows([{ departmentId: undefined, amount: "" }]);
+    toast({
+      title: "Department rows cleared",
+      description: "All department entries have been removed.",
+    });
+  };
+
+  const clearAllProvRows = () => {
+    setProvRows([{ insuranceProviderId: undefined, amount: "" }]);
+    toast({
+      title: "Insurance rows cleared",
+      description: "All insurance entries have been removed.",
+    });
   };
 
   // Parse amounts like "80,000"
@@ -168,6 +200,25 @@ export default function BulkIncomeModal({
       }))
       .filter((r) => r.insuranceProviderId && r.amount > 0);
   }, [provRows]);
+
+  // Calculate running totals
+  const totalSSP = useMemo(() => {
+    return validDeptPayloads.reduce((sum, r) => sum + r.amount, 0);
+  }, [validDeptPayloads]);
+
+  const totalUSD = useMemo(() => {
+    if (providerCurrency === 'USD') {
+      return validProvPayloads.reduce((sum, r) => sum + r.amount, 0);
+    }
+    return 0;
+  }, [validProvPayloads, providerCurrency]);
+
+  const totalProvSSP = useMemo(() => {
+    if (providerCurrency === 'SSP') {
+      return validProvPayloads.reduce((sum, r) => sum + r.amount, 0);
+    }
+    return 0;
+  }, [validProvPayloads, providerCurrency]);
 
   const savingDisabled = validDeptPayloads.length === 0 && validProvPayloads.length === 0;
 
@@ -251,7 +302,24 @@ export default function BulkIncomeModal({
       }
 
       if (ok) {
-        toast({ title: "Saved", description: `${ok} transaction${ok > 1 ? "s" : ""} created.` });
+        const totalTransactions = validDeptPayloads.length + validProvPayloads.length;
+        const totalSSPAmount = validDeptPayloads.reduce((sum, r) => sum + r.amount, 0) + 
+                               (providerCurrency === 'SSP' ? validProvPayloads.reduce((sum, r) => sum + r.amount, 0) : 0);
+        const totalUSDAmount = providerCurrency === 'USD' ? validProvPayloads.reduce((sum, r) => sum + r.amount, 0) : 0;
+        
+        let description = `${totalTransactions} transaction${totalTransactions > 1 ? 's' : ''} added`;
+        if (totalSSPAmount > 0 && totalUSDAmount > 0) {
+          description += `: SSP ${totalSSPAmount.toLocaleString()} and USD ${totalUSDAmount.toLocaleString()}`;
+        } else if (totalSSPAmount > 0) {
+          description += `: SSP ${totalSSPAmount.toLocaleString()}`;
+        } else if (totalUSDAmount > 0) {
+          description += `: USD ${totalUSDAmount.toLocaleString()}`;
+        }
+        
+        toast({ 
+          title: "✓ Transactions saved successfully", 
+          description 
+        });
         qc.invalidateQueries({ queryKey: ["/api/transactions"] });
         qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
       }
@@ -353,7 +421,15 @@ export default function BulkIncomeModal({
 
               <div className="flex gap-2 flex-wrap">
                 <Button type="button" variant="outline" onClick={prefillDepartments}>Prefill 6 Departments</Button>
+                <Button type="button" variant="outline" onClick={clearAllDeptRows}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Dept Rows
+                </Button>
                 <Button type="button" variant="outline" onClick={prefillProviders}>Prefill Insurances</Button>
+                <Button type="button" variant="outline" onClick={clearAllProvRows}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Ins Rows
+                </Button>
                 <div className="ml-auto flex items-center gap-2">
                   <Label className="text-xs text-slate-600">Provider currency</Label>
                   <Select value={providerCurrency} onValueChange={(v: "SSP" | "USD") => setProviderCurrency(v)}>
@@ -376,7 +452,7 @@ export default function BulkIncomeModal({
                 </div>
                 <div className="divide-y">
                   {deptRows.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                    <div key={idx} className={`grid grid-cols-12 gap-2 px-3 py-3 ${justPrefilledDepts ? 'animate-flash-green' : ''}`}>
                       <div className="col-span-7">
                         <Select value={row.departmentId ?? undefined} onValueChange={(v) => patchDept(idx, { departmentId: v })}>
                           <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
@@ -395,6 +471,16 @@ export default function BulkIncomeModal({
                     </div>
                   ))}
                 </div>
+                {cashCurrency === 'SSP' && totalSSP > 0 && (
+                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
+                    Total SSP: {totalSSP.toLocaleString()}
+                  </div>
+                )}
+                {cashCurrency === 'USD' && validDeptPayloads.length > 0 && (
+                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
+                    Total USD: {validDeptPayloads.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                  </div>
+                )}
                 <div className="p-3">
                   <Button type="button" variant="outline" onClick={addDeptRow}>＋ Add row</Button>
                 </div>
@@ -410,7 +496,7 @@ export default function BulkIncomeModal({
                 </div>
                 <div className="divide-y">
                   {provRows.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                    <div key={idx} className={`grid grid-cols-12 gap-2 px-3 py-3 ${justPrefilledProvs ? 'animate-flash-green' : ''}`}>
                       <div className="col-span-7">
                         <Select value={row.insuranceProviderId ?? undefined} onValueChange={(v) => patchProv(idx, { insuranceProviderId: v })}>
                           <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
@@ -429,6 +515,16 @@ export default function BulkIncomeModal({
                     </div>
                   ))}
                 </div>
+                {totalUSD > 0 && (
+                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
+                    Total USD: {totalUSD.toLocaleString()}
+                  </div>
+                )}
+                {totalProvSSP > 0 && (
+                  <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
+                    Total SSP: {totalProvSSP.toLocaleString()}
+                  </div>
+                )}
                 <div className="p-3">
                   <Button type="button" variant="outline" onClick={addProvRow}>＋ Add row</Button>
                 </div>

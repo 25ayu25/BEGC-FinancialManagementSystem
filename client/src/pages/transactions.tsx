@@ -68,6 +68,8 @@ export default function Transactions() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(50);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'department' | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -176,8 +178,29 @@ export default function Transactions() {
       map[key].transactionCount += 1;
     }
 
-    return Object.values(map).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-  }, [transactions]);
+    // Sort transactions within each month group
+    const sorted = Object.values(map).map((group) => {
+      let sortedTransactions = [...group.transactions];
+      if (sortBy) {
+        sortedTransactions.sort((a, b) => {
+          let comparison = 0;
+          if (sortBy === 'date') {
+            comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+          } else if (sortBy === 'amount') {
+            comparison = Number(a.amount) - Number(b.amount);
+          } else if (sortBy === 'department') {
+            const deptA = a.departmentId ? getDepartmentName(a.departmentId) : (a.expenseCategory || '');
+            const deptB = b.departmentId ? getDepartmentName(b.departmentId) : (b.expenseCategory || '');
+            comparison = deptA.localeCompare(deptB);
+          }
+          return sortOrder === 'asc' ? comparison : -comparison;
+        });
+      }
+      return { ...group, transactions: sortedTransactions };
+    });
+
+    return sorted.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [transactions, sortBy, sortOrder]);
 
   const toggleMonth = (key: string) =>
     setExpandedMonths((prev) => {
@@ -185,6 +208,17 @@ export default function Transactions() {
       n.has(key) ? n.delete(key) : n.add(key);
       return n;
     });
+
+  const handleSort = (column: 'date' | 'amount' | 'department') => {
+    if (sortBy === column) {
+      // Toggle order if clicking the same column
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to desc
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+  };
 
   /* -------------------------------- UI ---------------------------------- */
 
@@ -308,10 +342,25 @@ export default function Transactions() {
                             <table className="w-full">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Date</th>
+                                  <th 
+                                    className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => handleSort('date')}
+                                  >
+                                    Date {sortBy === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                  </th>
                                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Description</th>
-                                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Department</th>
-                                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Amount</th>
+                                  <th 
+                                    className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => handleSort('department')}
+                                  >
+                                    Department {sortBy === 'department' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                  </th>
+                                  <th 
+                                    className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => handleSort('amount')}
+                                  >
+                                    Amount {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                  </th>
                                   <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Status</th>
                                   <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Actions</th>
                                 </tr>
@@ -321,9 +370,14 @@ export default function Transactions() {
                                   <tr key={t.id} className="hover:bg-gray-50">
                                     <td className="py-3 px-4 text-sm text-gray-900">{formatUTCDate(t.date)}</td>
                                     <td className="py-3 px-4 text-sm text-gray-900">
-                                      {t.insuranceProviderName
-                                        ? `${t.insuranceProviderName} ${t.description || "Income"}`
-                                        : t.description || (t.type === "income" ? "Income" : "Expense")}
+                                      <div className="flex items-center gap-2">
+                                        <span className={`flex h-2 w-2 rounded-full ${t.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
+                                        <span>
+                                          {t.insuranceProviderName
+                                            ? `${t.insuranceProviderName} ${t.description || "Income"}`
+                                            : t.description || (t.type === "income" ? "Income" : "Expense")}
+                                        </span>
+                                      </div>
                                     </td>
                                     <td className="py-3 px-4">
                                       <Badge variant={t.type === "income" ? "default" : "destructive"}>
