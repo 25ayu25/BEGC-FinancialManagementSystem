@@ -1138,18 +1138,19 @@ export default function ClaimReconciliation() {
   const uploadAction = useMemo(() => {
     const hasClaims = !!claimsFile;
     const hasRemittance = !!remittanceFile;
+    const periodLabel = formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
 
     if (!hasClaims && !hasRemittance) {
       return { type: "disabled" as const, label: "Select files to continue", disabled: true };
     }
     if (hasClaims && !hasRemittance) {
-      return { type: "claims-only" as const, label: `📤 Upload Claims`, disabled: false };
+      return { type: "claims-only" as const, label: `Upload Claims`, disabled: false };
     }
     if (!hasClaims && hasRemittance) {
-      return { type: "remittance-only" as const, label: `📤 Upload Remittance`, disabled: false };
+      return { type: "remittance-only" as const, label: `Upload Remittance to ${periodLabel}`, disabled: false };
     }
-    return { type: "both" as const, label: `📤 Upload & Reconcile`, disabled: false };
-  }, [claimsFile, remittanceFile]);
+    return { type: "both" as const, label: `Upload & Reconcile`, disabled: false };
+  }, [claimsFile, remittanceFile, periodYear, periodMonth]);
 
   const inferredClaimsPeriod = useMemo(() => {
     if (!claimsFile) return null;
@@ -1602,8 +1603,28 @@ export default function ClaimReconciliation() {
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </div>
 
-            {/* Claims to Follow Up Card */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-orange-200/50">
+            {/* Claims to Follow Up Card - Clickable */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowInventory(true);
+                // Apply filters for follow-up items
+                setInventoryStatusFilter("all");
+                // Scroll to inventory after a brief delay to allow state update
+                setTimeout(() => {
+                  const inventorySection = document.getElementById("exceptions-section");
+                  if (inventorySection) {
+                    inventorySection.scrollIntoView({ behavior: "smooth", block: "start" });
+                    // Add highlight animation
+                    inventorySection.classList.add("ring-4", "ring-orange-400/50", "ring-offset-2");
+                    setTimeout(() => {
+                      inventorySection.classList.remove("ring-4", "ring-orange-400/50", "ring-offset-2");
+                    }, 2000);
+                  }
+                }, 100);
+              }}
+              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-orange-200/50 cursor-pointer text-left w-full"
+            >
               <div className="absolute inset-0 bg-gradient-to-br from-orange-400/10 via-transparent to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-orange-400/20 to-red-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
               
@@ -1625,31 +1646,90 @@ export default function ClaimReconciliation() {
                       ? `Plus ${stats.awaitingRemittance} awaiting remittance`
                       : "Unpaid or partially paid"}
                   </p>
+                  <p className="text-xs text-orange-600 font-medium mt-2 flex items-center gap-1">
+                    <span>Click to view details</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </p>
                 </div>
               </div>
               
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-            </div>
+            </button>
           </div>
 
           {showHelp && (
             <Card className="border border-dashed border-slate-300 bg-slate-50/80">
-              <CardContent className="pt-4 text-sm text-slate-700 space-y-2">
-                <div className="font-medium text-slate-800">How the reconciliation workflow works</div>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>
-                    <strong>Select any month/year:</strong> Use the Provider/Year/Month controls in the Workflow card.
-                  </li>
-                  <li>
-                    <strong>Upload claims first:</strong> Claims store as “awaiting remittance”.
-                  </li>
-                  <li>
-                    <strong>Upload remittance later:</strong> Upload it to reconcile.
-                  </li>
-                  <li>
-                    <strong>Submit button:</strong> The “Upload…” button under the dropzones is available once you select a file.
-                  </li>
-                </ul>
+              <CardContent className="pt-6 text-sm text-slate-700 space-y-4">
+                <div>
+                  <div className="font-semibold text-slate-800 text-base mb-3">📋 How the reconciliation workflow works</div>
+                  <ul className="list-disc list-inside space-y-2 ml-1">
+                    <li>
+                      <strong>Select Provider/Year/Month:</strong> Use the controls in the Workflow card to set your active period.
+                    </li>
+                    <li>
+                      <strong>Upload claims first:</strong> Claims are stored with status "Pending remittance" until a remittance file is uploaded.
+                    </li>
+                    <li>
+                      <strong>Upload remittance later:</strong> When you upload a remittance, the system automatically reconciles it against all outstanding claims for that provider.
+                    </li>
+                    <li>
+                      <strong>Review results:</strong> Check the Claims Inventory to see which claims were paid in full, partially paid, or remain unpaid.
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border-t border-slate-300 pt-4">
+                  <div className="font-semibold text-slate-800 mb-2">📊 Status Definitions</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                    <div><span className="font-semibold">Pending remittance:</span> Claims awaiting remittance upload</div>
+                    <div><span className="font-semibold">Paid in full:</span> Paid amount = Billed amount</div>
+                    <div><span className="font-semibold">Paid partially:</span> Paid amount less than Billed amount</div>
+                    <div><span className="font-semibold">Not paid (0 paid):</span> No payment received</div>
+                    <div><span className="font-semibold">Needs review:</span> Requires manual attention</div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-300 pt-4">
+                  <div className="font-semibold text-slate-800 mb-2">🧮 Metric Formulas</div>
+                  <div className="space-y-1 text-xs">
+                    <div><span className="font-semibold">Paid in full %:</span> (Paid in full claims ÷ Total claims) × 100</div>
+                    <div><span className="font-semibold">Seen in remittance %:</span> ((Total - Pending remittance) ÷ Total claims) × 100</div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-300 pt-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowInventory(true);
+                        setTimeout(() => {
+                          document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
+                        }, 100);
+                      }}
+                      className="gap-2"
+                    >
+                      <FileStack className="w-4 h-4" />
+                      Open Claims Inventory
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowInventory(true);
+                        setInventoryStatusFilter("partially_paid");
+                        setTimeout(() => {
+                          document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
+                        }, 100);
+                      }}
+                      className="gap-2"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      View Follow-ups
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1783,9 +1863,17 @@ export default function ClaimReconciliation() {
                   const cardState: "complete" | "needs_review" | "awaiting" | "processing" =
                     isComplete ? "complete" : hasIssues ? "needs_review" : hasAwaiting ? "awaiting" : "processing";
 
-                  // Calculate progress percentage
-                  const matchedPercent = period.totalClaims > 0 
-                    ? ((period.matched / period.totalClaims) * 100).toFixed(0) 
+                  // Calculate metrics
+                  // Paid in full % = (matched / totalClaims) * 100
+                  const paidInFullPercent = period.totalClaims > 0 
+                    ? ((period.matched / period.totalClaims) * 100).toFixed(1) 
+                    : "0";
+                  
+                  // Seen in remittance % = ((totalClaims - pendingRemittance) / totalClaims) * 100
+                  // This includes matched, partially paid, and unpaid (excludes only awaiting_remittance)
+                  const seenInRemittanceCount = period.totalClaims - period.awaitingRemittance;
+                  const seenInRemittancePercent = period.totalClaims > 0
+                    ? ((seenInRemittanceCount / period.totalClaims) * 100).toFixed(1)
                     : "0";
 
                   return (
@@ -1912,52 +2000,90 @@ export default function ClaimReconciliation() {
                           </div>
                         </div>
 
-                        {/* Claims count and amount */}
-                        <div className="space-y-1">
-                          <div className="text-3xl font-bold text-slate-900 tracking-tight">
-                            {period.totalClaims.toLocaleString()} <span className="text-lg font-medium text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
+                        {/* Headline Metric: Paid in Full % */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Paid in Full</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">Percent of claims fully paid (paid amount equals billed amount).</p>
+                                <p className="text-xs font-semibold mt-1">Formula: (Paid in full ÷ Total claims) × 100</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
-                          <div className="text-sm text-slate-600 font-medium">
+                          <div className="text-4xl font-bold text-slate-900 tracking-tight">
+                            {paidInFullPercent}%
+                          </div>
+                        </div>
+
+                        {/* Supporting Metrics */}
+                        <div className="space-y-2 pt-3 border-t border-slate-200/50">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-600 font-medium">Seen in remittance</span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-xs">Percent of claims that appear in a remittance (matched by Member + Bill/Invoice).</p>
+                                  <p className="text-xs font-semibold mt-1">Formula: ((Total - Pending remittance) ÷ Total claims) × 100</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                            <span className="font-bold text-slate-700">{seenInRemittancePercent}%</span>
+                          </div>
+                          
+                          {/* Stacked Progress Bar */}
+                          <div className="h-3 bg-slate-200/80 rounded-full overflow-hidden backdrop-blur-sm flex">
+                            {/* Paid in full segment */}
+                            {period.matched > 0 && (
+                              <div 
+                                className="bg-emerald-400 transition-all duration-500" 
+                                style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
+                                title={`Paid in full: ${period.matched}`}
+                              />
+                            )}
+                            {/* Paid partially segment */}
+                            {period.partiallyPaid > 0 && (
+                              <div 
+                                className="bg-amber-400 transition-all duration-500" 
+                                style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
+                                title={`Paid partially: ${period.partiallyPaid}`}
+                              />
+                            )}
+                            {/* Not paid (0 paid) segment */}
+                            {period.unpaid > 0 && (
+                              <div 
+                                className="bg-rose-400 transition-all duration-500" 
+                                style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
+                                title={`Not paid: ${period.unpaid}`}
+                              />
+                            )}
+                            {/* Pending remittance segment */}
+                            {period.awaitingRemittance > 0 && (
+                              <div 
+                                className="bg-sky-300 transition-all duration-500" 
+                                style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
+                                title={`Pending remittance: ${period.awaitingRemittance}`}
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Claims count and amount */}
+                        <div className="space-y-1 pt-2">
+                          <div className="text-lg font-semibold text-slate-700">
+                            {period.totalClaims.toLocaleString()} <span className="text-sm font-medium text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
+                          </div>
+                          <div className="text-xs text-slate-600">
                             {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
                             {parseFloat(period.totalBilled).toLocaleString()} billed
                           </div>
                         </div>
-
-                        {/* Progress Bar */}
-                        {period.totalClaims > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-600 font-medium">Remittance coverage</span>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    <p className="text-xs">Percentage of claims found in remittance files.</p>
-                                    <p className="text-xs font-semibold mt-1">Formula: (Paid in full + Paid partially) ÷ Total claims</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
-                              <span className="font-bold text-slate-700">{matchedPercent}%</span>
-                            </div>
-                            <div className="h-2 bg-slate-200/80 rounded-full overflow-hidden backdrop-blur-sm">
-                              <div 
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-500",
-                                  cardState === "complete"
-                                    ? "bg-emerald-400"
-                                    : cardState === "needs_review"
-                                    ? "bg-orange-400"
-                                    : cardState === "awaiting"
-                                    ? "bg-sky-400"
-                                    : "bg-slate-400"
-                                )}
-                                style={{ width: `${matchedPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
 
                         {/* Status Badge */}
                         <div className="flex items-center gap-2">
@@ -2029,7 +2155,7 @@ export default function ClaimReconciliation() {
                         <TableHead className="font-semibold">Period</TableHead>
                         <TableHead className="font-semibold">Claims</TableHead>
                         <TableHead className="font-semibold">Billed</TableHead>
-                        <TableHead className="font-semibold">Remittance Coverage</TableHead>
+                        <TableHead className="font-semibold">Metrics</TableHead>
                         <TableHead className="font-semibold">Status</TableHead>
                         <TableHead className="font-semibold text-right">Actions</TableHead>
                       </TableRow>
@@ -2052,8 +2178,14 @@ export default function ClaimReconciliation() {
                         const cardState: "complete" | "needs_review" | "awaiting" | "processing" =
                           isComplete ? "complete" : hasIssues ? "needs_review" : hasAwaiting ? "awaiting" : "processing";
 
-                        const matchedPercent = period.totalClaims > 0 
-                          ? ((period.matched / period.totalClaims) * 100).toFixed(0) 
+                        // Calculate metrics
+                        const paidInFullPercent = period.totalClaims > 0 
+                          ? ((period.matched / period.totalClaims) * 100).toFixed(1) 
+                          : "0";
+                        
+                        const seenInRemittanceCount = period.totalClaims - period.awaitingRemittance;
+                        const seenInRemittancePercent = period.totalClaims > 0
+                          ? ((seenInRemittanceCount / period.totalClaims) * 100).toFixed(1)
                           : "0";
 
                         return (
@@ -2081,25 +2213,46 @@ export default function ClaimReconciliation() {
                               {parseFloat(period.totalBilled).toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                  <div
-                                    className={cn(
-                                      "h-full rounded-full transition-all duration-500",
-                                      cardState === "complete"
-                                        ? "bg-emerald-400"
-                                        : cardState === "needs_review"
-                                        ? "bg-orange-400"
-                                        : cardState === "awaiting"
-                                        ? "bg-sky-400"
-                                        : "bg-slate-400"
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 space-y-1">
+                                  {/* Stacked bar visualization */}
+                                  <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden flex">
+                                    {period.matched > 0 && (
+                                      <div 
+                                        className="bg-emerald-400 transition-all duration-500" 
+                                        style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
+                                        title={`Paid in full: ${period.matched}`}
+                                      />
                                     )}
-                                    style={{ width: `${matchedPercent}%` }}
-                                  />
+                                    {period.partiallyPaid > 0 && (
+                                      <div 
+                                        className="bg-amber-400 transition-all duration-500" 
+                                        style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
+                                        title={`Paid partially: ${period.partiallyPaid}`}
+                                      />
+                                    )}
+                                    {period.unpaid > 0 && (
+                                      <div 
+                                        className="bg-rose-400 transition-all duration-500" 
+                                        style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
+                                        title={`Not paid: ${period.unpaid}`}
+                                      />
+                                    )}
+                                    {period.awaitingRemittance > 0 && (
+                                      <div 
+                                        className="bg-sky-300 transition-all duration-500" 
+                                        style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
+                                        title={`Pending remittance: ${period.awaitingRemittance}`}
+                                      />
+                                    )}
+                                  </div>
+                                  {/* Metrics text */}
+                                  <div className="flex items-center gap-3 text-xs">
+                                    <span className="text-slate-600">Paid in full: <span className="font-semibold text-slate-800">{paidInFullPercent}%</span></span>
+                                    <span className="text-slate-400">•</span>
+                                    <span className="text-slate-600">Seen: <span className="font-semibold text-slate-800">{seenInRemittancePercent}%</span></span>
+                                  </div>
                                 </div>
-                                <span className="text-sm font-semibold text-slate-700 w-10 text-right">
-                                  {matchedPercent}%
-                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -2365,11 +2518,11 @@ export default function ClaimReconciliation() {
               <Button
                 type="button"
                 className={cn(
-                  "w-full h-12 text-base font-semibold transition-all duration-200",
-                  uploadAction.type === "disabled" && "bg-slate-300 hover:bg-slate-300 cursor-not-allowed",
-                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 text-white",
-                  uploadAction.type === "remittance-only" && "bg-green-500 hover:bg-green-600 text-white",
-                  uploadAction.type === "both" && "bg-orange-500 hover:bg-orange-600 text-white"
+                  "w-full h-12 text-base font-semibold transition-all duration-200 shadow-lg",
+                  uploadAction.type === "disabled" && "bg-slate-400 hover:bg-slate-400 cursor-not-allowed text-white",
+                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/30",
+                  uploadAction.type === "remittance-only" && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30",
+                  uploadAction.type === "both" && "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30"
                 )}
                 onClick={runSmartAction}
                 disabled={isUploading || isDeleting || uploadAction.disabled}
@@ -2381,9 +2534,7 @@ export default function ClaimReconciliation() {
                   </>
                 ) : (
                   <>
-                    {uploadAction.type === "claims-only" && <Upload className="w-5 h-5 mr-2" />}
-                    {uploadAction.type === "remittance-only" && <Upload className="w-5 h-5 mr-2" />}
-                    {uploadAction.type === "both" && <Upload className="w-5 h-5 mr-2" />}
+                    {uploadAction.type !== "disabled" && <Upload className="w-5 h-5 mr-2" />}
                     {uploadAction.label}
                   </>
                 )}
@@ -2515,42 +2666,47 @@ export default function ClaimReconciliation() {
                         <ChevronDown className="w-3 h-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuContent align="end" className="w-64 bg-white shadow-xl border border-slate-200 p-1 z-50">
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("all")}
-                        className="cursor-pointer"
+                        className="cursor-pointer px-3 py-2.5 hover:bg-slate-100 rounded-md transition-colors"
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export All Claims ({inventorySummaryStats.total})
+                        <Download className="w-4 h-4 mr-2 text-slate-600" />
+                        <span className="flex-1">Export all claims</span>
+                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.total})</span>
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      <DropdownMenuSeparator className="my-1" />
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("awaiting_remittance")}
-                        className="cursor-pointer"
+                        className="cursor-pointer px-3 py-2.5 hover:bg-sky-50 rounded-md transition-colors"
                       >
-                        <Clock className="w-4 h-4 mr-2" />
-                        Export Pending Remittance ({inventorySummaryStats.awaiting})
+                        <Clock className="w-4 h-4 mr-2 text-sky-600" />
+                        <span className="flex-1">Pending remittance</span>
+                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.awaiting})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("matched")}
-                        className="cursor-pointer"
+                        className="cursor-pointer px-3 py-2.5 hover:bg-emerald-50 rounded-md transition-colors"
                       >
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                        Export Paid in Full ({inventorySummaryStats.matched})
+                        <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />
+                        <span className="flex-1">Paid in full</span>
+                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.matched})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("partially_paid")}
-                        className="cursor-pointer"
+                        className="cursor-pointer px-3 py-2.5 hover:bg-amber-50 rounded-md transition-colors"
                       >
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        Export Paid Partially ({inventorySummaryStats.partial})
+                        <AlertCircle className="w-4 h-4 mr-2 text-amber-600" />
+                        <span className="flex-1">Paid partially</span>
+                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.partial})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("unpaid")}
-                        className="cursor-pointer"
+                        className="cursor-pointer px-3 py-2.5 hover:bg-rose-50 rounded-md transition-colors"
                       >
-                        <X className="w-4 h-4 mr-2" />
-                        Export Not Paid ({inventorySummaryStats.unpaid})
+                        <X className="w-4 h-4 mr-2 text-rose-600" />
+                        <span className="flex-1">Not paid (0 paid)</span>
+                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.unpaid})</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

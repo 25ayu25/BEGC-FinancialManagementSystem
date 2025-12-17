@@ -809,14 +809,14 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
       console.warn(`Export limit reached: ${claims.length} claims. Some records may be excluded.`);
     }
 
-    // Map status to friendly names
+    // Map status to friendly names (consistent terminology)
     const statusLabels: Record<string, string> = {
-      awaiting_remittance: "Pending Remittance",
-      matched: "Paid in Full",
-      partially_paid: "Paid Partially",
-      unpaid: "Not Paid",
-      manual_review: "Needs Checking",
-      all: "All Status",
+      awaiting_remittance: "Pending remittance",
+      matched: "Paid in full",
+      partially_paid: "Paid partially",
+      unpaid: "Not paid (0 paid)",
+      manual_review: "Needs review",
+      all: "All",
     };
 
     const statusName = statusLabels[status as string] || "All Claims";
@@ -908,10 +908,11 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
       bookType: "xlsx",
     });
 
-    // Generate filename
+    // Generate filename: CIC_Claims_{StatusOrAll}_{YYYY-MM-DD}.xlsx
     const dateStr = new Date().toISOString().slice(0, 10);
-    const statusSlug = (status as string || "All").replace(/_/g, "");
-    const filename = `${providerName || "All"}_Claims_${statusSlug}_${dateStr}.xlsx`;
+    const statusSlug = status ? String(status).replace(/_/g, "") : "All";
+    const providerSlug = (providerName as string || "All").replace(/\s+/g, "");
+    const filename = `${providerSlug}_Claims_${statusSlug}_${dateStr}.xlsx`;
 
     res.setHeader(
       "Content-Type",
