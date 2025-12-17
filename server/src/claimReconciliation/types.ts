@@ -3,11 +3,22 @@
 export interface ClaimRow {
   memberNumber: string;
   patientName?: string;
-  serviceDate: Date;
+
+  /**
+   * Some rows may rely on invoice matching and may not have a usable date.
+   * (We still strongly prefer having it when available.)
+   */
+  serviceDate?: Date;
+
+  /**
+   * CIC "Invoice No" (this is the key that matches remittance "BILL NO")
+   */
   invoiceNumber?: string;
+
   claimType?: string;
   schemeName?: string;
   benefitDesc?: string;
+
   billedAmount: number;
   currency?: string;
 }
@@ -15,12 +26,30 @@ export interface ClaimRow {
 export interface RemittanceRow {
   employerName?: string;
   patientName?: string;
+
   memberNumber: string;
+
+  /**
+   * BAHR remittance "BILL NO" (this is what matches ClaimRow.invoiceNumber)
+   */
+  billNo?: string;
+
+  /**
+   * BAHR remittance "CLAIM NO" (often a DP... id; useful for reference, not best for matching)
+   */
   claimNumber?: string;
+
   relationship?: string;
-  serviceDate: Date;
+
+  /**
+   * Some remittance rows may not have a parseable date;
+   * matching should still work via billNo/invoiceNumber.
+   */
+  serviceDate?: Date;
+
   claimAmount: number;
   paidAmount: number;
+
   paymentNo?: string;
   paymentMode?: string;
 }
@@ -30,7 +59,13 @@ export interface MatchResult {
   remittanceId: number | null;
   matchType: "exact" | "partial" | "none";
   amountPaid: number;
-  status: "awaiting_remittance" | "matched" | "paid" | "partially_paid" | "unpaid" | "manual_review";
+  status:
+    | "awaiting_remittance"
+    | "matched"
+    | "paid"
+    | "partially_paid"
+    | "unpaid"
+    | "manual_review";
 }
 
 export interface ReconciliationSummary {
