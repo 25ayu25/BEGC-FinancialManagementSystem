@@ -150,6 +150,7 @@ interface PeriodSummary {
   matched: number;
   partiallyPaid: number;
   unpaid: number;
+  manualReview: number;
   totalBilled: string;
   totalPaid: string;
   currency: string;
@@ -235,15 +236,15 @@ function claimStatusLabel(status: string): string {
     case "paid":
       return "Paid in full";
     case "partially_paid":
-      return "Underpaid";
+      return "Paid partially";
     case "unpaid":
       return "Not paid (0 paid)";
     case "manual_review":
-      return "Needs review";
+      return "Needs checking";
     case "awaiting_remittance":
     case "submitted":
     default:
-      return "Not paid yet";
+      return "Pending remittance";
   }
 }
 
@@ -704,7 +705,12 @@ export default function ClaimReconciliation() {
     const reconciliationsDone = runs.filter(run => run.totalRemittanceRows > 0).length;
 
     const totalClaims = periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
-    const problemClaims = periodsSummary.reduce((sum, p) => sum + p.unpaid + p.partiallyPaid, 0);
+    // Claims to follow up: partially paid, unpaid (with remittance), and manual review
+    // EXCLUDES awaiting_remittance (not yet in any remittance)
+    const problemClaims = periodsSummary.reduce(
+      (sum, p) => sum + p.unpaid + p.partiallyPaid + (p.manualReview || 0), 
+      0
+    );
     const awaitingRemittance = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0);
 
     const sortedRuns = [...runs].sort(
@@ -2059,10 +2065,10 @@ export default function ClaimReconciliation() {
                   {(
                     [
                       { key: "all", label: "All" },
-                      { key: "awaiting_remittance", label: "Awaiting Remittance" },
-                      { key: "matched", label: "Matched" },
-                      { key: "partially_paid", label: "Partially Paid" },
-                      { key: "unpaid", label: "Unpaid" },
+                      { key: "awaiting_remittance", label: "Pending remittance" },
+                      { key: "matched", label: "Paid in full" },
+                      { key: "partially_paid", label: "Paid partially" },
+                      { key: "unpaid", label: "Not paid (0 paid)" },
                     ] as const
                   ).map((x) => (
                     <button
@@ -2144,7 +2150,7 @@ export default function ClaimReconciliation() {
                     <div className="text-xl font-bold text-slate-900">{inventorySummaryStats.total}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500 mb-1">Awaiting Remittance</div>
+                    <div className="text-xs text-slate-500 mb-1">Pending remittance</div>
                     <div className="text-xl font-bold text-blue-600">{inventorySummaryStats.awaiting}</div>
                   </div>
                   <div>
