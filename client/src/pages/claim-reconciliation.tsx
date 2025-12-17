@@ -2651,7 +2651,6 @@ export default function ClaimReconciliation() {
                         </button>
                       </div>
                     </div>
-                    </div>
 
                     <Button
                       type="button"
