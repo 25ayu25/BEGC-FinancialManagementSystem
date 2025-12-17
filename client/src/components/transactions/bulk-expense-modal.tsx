@@ -42,6 +42,7 @@ export default function BulkExpenseModal({
   const [currency, setCurrency] = useState<"SSP" | "USD">("SSP");
   const [rows, setRows] = useState<Row[]>([{ expenseCategory: undefined, amount: "" }]);
   const [isSaving, setIsSaving] = useState(false);
+  const [justPrefilled, setJustPrefilled] = useState(false);
 
   useEffect(() => {
     if (initialDate) setDate(initialDate);
@@ -65,6 +66,21 @@ export default function BulkExpenseModal({
     [rows]
   );
 
+  // Calculate running total
+  const totalSSP = useMemo(() => {
+    if (currency === 'SSP') {
+      return validPayloads.reduce((sum, r) => sum + r.amountNum, 0);
+    }
+    return 0;
+  }, [validPayloads, currency]);
+
+  const totalUSD = useMemo(() => {
+    if (currency === 'USD') {
+      return validPayloads.reduce((sum, r) => sum + r.amountNum, 0);
+    }
+    return 0;
+  }, [validPayloads, currency]);
+
   // Optional convenience: include Fuel here if you want it to prefill as well
   const prefillCommon = () => {
     const preferred: ExpenseCategory[] = [
@@ -75,6 +91,21 @@ export default function BulkExpenseModal({
       "Fuel", // 👈 newly added
     ].filter((c) => (EXPENSE_CATEGORIES as readonly string[]).includes(c));
     setRows(preferred.map((name) => ({ expenseCategory: name, amount: "" })));
+    setJustPrefilled(true);
+    setTimeout(() => setJustPrefilled(false), 600);
+    
+    toast({
+      title: "✓ Expense categories prefilled",
+      description: "Enter amounts for each category.",
+    });
+  };
+
+  const clearAllRows = () => {
+    setRows([{ expenseCategory: undefined, amount: "" }]);
+    toast({
+      title: "Expense rows cleared",
+      description: "All expense entries have been removed.",
+    });
   };
 
   const saveAll = async () => {
@@ -113,7 +144,11 @@ export default function BulkExpenseModal({
     const fail = results.length - ok;
 
     if (ok) {
-      toast({ title: "Saved", description: `${ok} expense${ok > 1 ? "s" : ""} created.` });
+      const totalAmount = validPayloads.reduce((sum, r) => sum + r.amountNum, 0);
+      toast({ 
+        title: "✓ Expenses saved successfully", 
+        description: `${ok} expense${ok > 1 ? "s" : ""} totaling ${currency} ${totalAmount.toLocaleString()} have been added.` 
+      });
       qc.invalidateQueries({ queryKey: ["/api/transactions"] });
       qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
     }
@@ -164,9 +199,13 @@ export default function BulkExpenseModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <Button type="button" variant="outline" onClick={prefillCommon}>
                   Prefill Expenses
+                </Button>
+                <Button type="button" variant="outline" onClick={clearAllRows}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear All
                 </Button>
               </div>
             </div>
@@ -180,7 +219,7 @@ export default function BulkExpenseModal({
 
               <div className="divide-y">
                 {rows.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-3">
+                  <div key={idx} className={`grid grid-cols-12 gap-2 px-3 py-3 ${justPrefilled ? 'animate-flash-green' : ''}`}>
                     <div className="col-span-7">
                       <Select
                         value={row.expenseCategory ?? undefined}
@@ -206,6 +245,24 @@ export default function BulkExpenseModal({
                         placeholder="0"
                         value={row.amount}
                         onChange={(e) => patch(idx, { amount: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // Using querySelector for focus management between dynamically generated fields
+                            // This is pragmatic given the dynamic nature of the row list
+                            if (idx === rows.length - 1) {
+                              // Last field, trigger save
+                              if (validPayloads.length > 0 && !isSaving) {
+                                saveAll();
+                              }
+                            } else {
+                              // Focus next input
+                              const nextInput = document.querySelector(`[data-expense-input="${idx + 1}"]`) as HTMLInputElement;
+                              if (nextInput) nextInput.focus();
+                            }
+                          }
+                        }}
+                        data-expense-input={idx}
                       />
                     </div>
 
@@ -224,6 +281,17 @@ export default function BulkExpenseModal({
                 ))}
               </div>
 
+              {totalSSP > 0 && (
+                <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
+                  Total SSP: {totalSSP.toLocaleString()}
+                </div>
+              )}
+              {totalUSD > 0 && (
+                <div className="px-3 py-2 bg-green-50 border-t font-semibold text-green-900">
+                  Total USD: {totalUSD.toLocaleString()}
+                </div>
+              )}
+
               <div className="p-3">
                 <Button type="button" variant="outline" onClick={addRow}>
                   ＋ Add row
@@ -232,13 +300,16 @@ export default function BulkExpenseModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 p-4 border-t">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveAll} disabled={validPayloads.length === 0 || isSaving}>
-              Save Expenses
-            </Button>
+          <div className="flex items-center justify-between gap-3 p-4 border-t">
+            <span className="text-xs text-gray-500">💡 Tip: Press Enter to move to next field or save</span>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveAll} disabled={validPayloads.length === 0 || isSaving}>
+                Save Expenses
+              </Button>
+            </div>
           </div>
 
           {isSaving && (

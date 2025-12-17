@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -39,6 +40,7 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
     startDate: "",
     endDate: "",
   });
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);
 
   const { data: queryDepartments } = useQuery({
     queryKey: ["/api/departments"],
@@ -78,7 +80,56 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
       endDate: "",
     };
     setFilters(clearedFilters);
+    setActiveQuickFilter(null);
     onFilterChange?.({});
+  };
+
+  const clearFilter = (key: string) => {
+    const newFilters = { ...filters };
+    if (key === 'type') {
+      newFilters.type = 'all';
+    } else if (key === 'departmentId') {
+      newFilters.departmentId = 'all';
+    } else if (key === 'insuranceProviderId') {
+      newFilters.insuranceProviderId = 'all';
+    } else if (key === 'searchQuery') {
+      newFilters.searchQuery = '';
+    } else if (key === 'startDate') {
+      newFilters.startDate = '';
+      setActiveQuickFilter(null);
+    } else if (key === 'endDate') {
+      newFilters.endDate = '';
+      setActiveQuickFilter(null);
+    }
+    setFilters(newFilters);
+    
+    const apiFilters = Object.fromEntries(
+      Object.entries(newFilters).map(([k, v]) => {
+        if (k === 'startDate' || k === 'endDate') {
+          return [k, v === "" ? undefined : v];
+        }
+        return [k, (v === "" || v === "all") ? undefined : v];
+      })
+    );
+    
+    onFilterChange?.(apiFilters);
+  };
+
+  const applyQuickFilter = (label: string, startDate: string, endDate: string) => {
+    const newFilters = { ...filters, startDate, endDate };
+    setFilters(newFilters);
+    setActiveQuickFilter(label);
+    
+    const apiFilters = Object.fromEntries(
+      Object.entries(newFilters).map(([k, v]) => {
+        if (k === 'startDate' || k === 'endDate') {
+          return [k, v === "" ? undefined : v];
+        }
+        return [k, (v === "" || v === "all") ? undefined : v];
+      })
+    );
+    
+    onFilterChange?.(apiFilters);
   };
 
   const hasActiveFilters = Object.values(filters).some(value => value !== "" && value !== "all");
@@ -353,7 +404,112 @@ export default function TransactionFilters({ onFilterChange, onExport, transacti
             </div>
           </div>
 
+          {/* Quick Date Filters */}
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant={activeQuickFilter === 'Today' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${yyyy}-${mm}-${dd}`;
+                applyQuickFilter('Today', todayStr, todayStr);
+              }}
+            >
+              Today
+            </Button>
+            <Button
+              variant={activeQuickFilter === 'This Week' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                const dayOfWeek = today.getDay();
+                const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday as start of week
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - diff);
+                
+                const startYyyy = weekStart.getFullYear();
+                const startMm = String(weekStart.getMonth() + 1).padStart(2, '0');
+                const startDd = String(weekStart.getDate()).padStart(2, '0');
+                const startStr = `${startYyyy}-${startMm}-${startDd}`;
+                
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${yyyy}-${mm}-${dd}`;
+                
+                applyQuickFilter('This Week', startStr, todayStr);
+              }}
+            >
+              This Week
+            </Button>
+            <Button
+              variant={activeQuickFilter === 'This Month' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const monthStart = `${yyyy}-${mm}-01`;
+                
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${yyyy}-${mm}-${dd}`;
+                
+                applyQuickFilter('This Month', monthStart, todayStr);
+              }}
+            >
+              This Month
+            </Button>
+          </div>
 
+
+        </div>
+      )}
+
+      {/* Active Filter Tags */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {filters.type !== 'all' && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Type: {filters.type.charAt(0).toUpperCase() + filters.type.slice(1)}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('type')} />
+            </Badge>
+          )}
+          {filters.departmentId !== 'all' && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Department: {((departments as any[]) || []).find((d: any) => d.id === filters.departmentId)?.name || 'Unknown'}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('departmentId')} />
+            </Badge>
+          )}
+          {filters.insuranceProviderId !== 'all' && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Insurance: {((insuranceProviders as any[]) || []).find((p: any) => p.id === filters.insuranceProviderId)?.name || 'Unknown'}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('insuranceProviderId')} />
+            </Badge>
+          )}
+          {filters.searchQuery && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Search: "{filters.searchQuery}"
+              <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('searchQuery')} />
+            </Badge>
+          )}
+          {filters.startDate && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              From: {format(new Date(filters.startDate + 'T12:00:00'), "MMM d, yyyy")}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('startDate')} />
+            </Badge>
+          )}
+          {filters.endDate && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              To: {format(new Date(filters.endDate + 'T12:00:00'), "MMM d, yyyy")}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => clearFilter('endDate')} />
+            </Badge>
+          )}
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            Clear All
+          </Button>
         </div>
       )}
     </div>
