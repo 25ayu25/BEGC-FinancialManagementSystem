@@ -12,6 +12,19 @@ function norm(val: unknown): string {
 }
 
 /**
+ * Clean ID-like cells to avoid Excel artifacts:
+ * - trims
+ * - removes commas
+ * - converts "644472.0" -> "644472"
+ */
+function cleanId(val: unknown): string {
+  const s = String(val ?? "").trim().replace(/,/g, "");
+  if (!s) return "";
+  if (/^\d+\.0+$/.test(s)) return s.replace(/\.0+$/, "");
+  return s;
+}
+
+/**
  * Parse date from various Excel / text formats.
  */
 function parseDate(val: any): Date | null {
@@ -24,8 +37,6 @@ function parseDate(val: any): Date | null {
 
   // Excel serial date number
   if (typeof val === "number") {
-    // Excel's "day 1" is 1899-12-31, with a leap-year bug around 1900,
-    // but for modern dates this simple conversion is fine.
     const excelEpoch = new Date(1899, 11, 30); // 1899-12-30
     const millis = val * 24 * 60 * 60 * 1000;
     const d = new Date(excelEpoch.getTime() + millis);
@@ -134,11 +145,13 @@ function findColumnIndex(
  * Check if a row contains a member number/ID column header
  */
 function hasMemberHeader(texts: string[]): boolean {
-  return texts.some((t) => 
-    (t.includes("member") && (t.includes("number") || t.includes("no") || t.includes("id"))) ||
-    t.includes("membernumber") ||
-    t.includes("membershipno") ||
-    t.includes("membership_no")
+  return texts.some(
+    (t) =>
+      (t.includes("member") &&
+        (t.includes("number") || t.includes("no") || t.includes("id"))) ||
+      t.includes("membernumber") ||
+      t.includes("membershipno") ||
+      t.includes("membership_no")
   );
 }
 
@@ -146,15 +159,14 @@ function hasMemberHeader(texts: string[]): boolean {
  * Check if a row contains either patient name OR amount column header
  */
 function hasPatientOrAmountHeader(texts: string[]): boolean {
-  return texts.some((t) => 
-    (t.includes("patient") && t.includes("name")) || 
-    t.includes("patientname") || 
-    t.includes("patient_name")
-  ) || 
-  texts.some((t) => 
-    t.includes("amount") || 
-    t.includes("billed") || 
-    t.includes("claim")
+  return (
+    texts.some(
+      (t) =>
+        (t.includes("patient") && t.includes("name")) ||
+        t.includes("patientname") ||
+        t.includes("patient_name")
+    ) ||
+    texts.some((t) => t.includes("amount") || t.includes("billed") || t.includes("claim"))
   );
 }
 
@@ -164,39 +176,26 @@ function hasPatientOrAmountHeader(texts: string[]): boolean {
 
 /**
  * Detect currency from file content.
- * Looks for "USD" in header rows (clinic name, title, etc.)
+ * Looks for "USD" / "SSP" in header rows (clinic name, title, etc.)
  * Defaults to USD for CIC provider.
  */
 function detectCurrency(rows: RowArray[]): string {
-  // Check first 10 rows for currency indicators
   for (let i = 0; i < Math.min(10, rows.length); i++) {
     const row = rows[i];
     if (!Array.isArray(row)) continue;
-    
+
     for (const cell of row) {
       const cellText = norm(cell);
-      // Look for explicit "USD" in any cell
-      if (cellText.includes("usd")) {
-        return "USD";
-      }
-      // Look for explicit "SSP" in any cell
-      if (cellText.includes("ssp")) {
-        return "SSP";
-      }
+      if (cellText.includes("usd")) return "USD";
+      if (cellText.includes("ssp")) return "SSP";
     }
   }
-  
-  // Default to USD for CIC (based on problem statement)
+
   return "USD";
 }
 
 /**
  * Parse Claims Submitted Excel file (CIC Smart Billing report).
- *
- * Screenshot columns:
- *   No., Billing Date, Account Name, Scheme Name, Benefit Description,
- *   Member Number, Patient Name, Patient File No, Invoice No,
- *   Claim Type, Amount
  */
 export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -206,26 +205,19 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
   const rows = readRows(sheet);
   if (rows.length === 0) return [];
 
-  // Detect currency from file content (defaults to USD for CIC)
   const detectedCurrency = detectCurrency(rows);
 
-  // Detect the header row with more lenient criteria:
-  // - Require member number/id/no AND
-  // - Either patient name OR amount (to handle both formats)
   const headerIdx = findHeaderRowIndex(rows, [
     (texts) => hasMemberHeader(texts) && hasPatientOrAmountHeader(texts),
   ]);
 
   if (headerIdx === -1) {
-    console.error(
-      "[parseClaimsFile] Could not detect header row – returning empty result"
-    );
+    console.error("[parseClaimsFile] Could not detect header row – returning empty result");
     return [];
   }
 
   const headerRow = rows[headerIdx];
 
-  // Map the important columns with more variations
   const colMemberNumber = findColumnIndex(headerRow, [
     "member number",
     "membership no",
@@ -237,6 +229,7 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
     "member id",
     "memberid",
   ]);
+
   const colPatientName = findColumnIndex(headerRow, [
     "patient name",
     "patientname",
@@ -244,6 +237,7 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
     "patient",
     "name",
   ]);
+
   const colServiceDate = findColumnIndex(headerRow, [
     "service date",
     "billing date",
@@ -254,6 +248,7 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
     "service_date",
     "date",
   ]);
+
   const colInvoiceNumber = findColumnIndex(headerRow, [
     "invoice no",
     "invoice number",
@@ -262,8 +257,21 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
     "invoice_no",
     "invoice_number",
   ]);
-  const colClaimType = findColumnIndex(headerRow, ["claim type", "type", "claimtype", "claim_type"]);
-  const colSchemeName = findColumnIndex(headerRow, ["scheme name", "schemename", "scheme_name", "scheme"]);
+
+  const colClaimType = findColumnIndex(headerRow, [
+    "claim type",
+    "type",
+    "claimtype",
+    "claim_type",
+  ]);
+
+  const colSchemeName = findColumnIndex(headerRow, [
+    "scheme name",
+    "schemename",
+    "scheme_name",
+    "scheme",
+  ]);
+
   const colBenefitDesc = findColumnIndex(headerRow, [
     "benefit description",
     "benefit desc",
@@ -273,6 +281,7 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
     "benefitdesc",
     "benefit_desc",
   ]);
+
   const colAmount = findColumnIndex(headerRow, [
     "amount",
     "billed amount",
@@ -282,50 +291,44 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
     "claimamount",
     "claim_amount",
   ]);
+
   const colCurrency = findColumnIndex(headerRow, ["currency"]);
 
   const results: ClaimRow[] = [];
 
-  // Data rows start after the header
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!Array.isArray(row)) continue;
 
-    const memberRaw =
-      colMemberNumber != null ? row[colMemberNumber] : undefined;
+    const memberRaw = colMemberNumber != null ? row[colMemberNumber] : undefined;
     const serviceRaw = colServiceDate != null ? row[colServiceDate] : undefined;
     const amountRaw = colAmount != null ? row[colAmount] : undefined;
 
-    const memberNumber = String(memberRaw ?? "").trim();
-    const serviceDate = parseDate(serviceRaw);
+    const memberNumber = cleanId(memberRaw);
+    const serviceDate = parseDate(serviceRaw) ?? undefined;
     const billedAmount = parseAmount(amountRaw);
 
-    // Skip obviously empty rows
-    if (!memberNumber && !serviceDate && billedAmount === 0) continue;
-
-    // Require at least a date + positive amount
-    if (!serviceDate || billedAmount <= 0) continue;
-
-    const patientName =
-      colPatientName != null ? String(row[colPatientName] ?? "").trim() : "";
     const invoiceNumber =
-      colInvoiceNumber != null
-        ? String(row[colInvoiceNumber] ?? "").trim()
-        : "";
-    const claimType =
-      colClaimType != null ? String(row[colClaimType] ?? "").trim() : "";
-    const schemeName =
-      colSchemeName != null ? String(row[colSchemeName] ?? "").trim() : "";
-    const benefitDesc =
-      colBenefitDesc != null ? String(row[colBenefitDesc] ?? "").trim() : "";
-    
-    // Use currency column if available, otherwise use detected currency from file
+      colInvoiceNumber != null ? cleanId(row[colInvoiceNumber]) : "";
+
+    // Skip obviously empty rows
+    if (!memberNumber && !serviceDate && !invoiceNumber && billedAmount === 0) continue;
+
+    // Require positive amount
+    if (billedAmount <= 0) continue;
+
+    // Accept if invoice exists OR date exists (fallback matching uses date+amount)
+    if (!invoiceNumber && !serviceDate) continue;
+
+    const patientName = colPatientName != null ? String(row[colPatientName] ?? "").trim() : "";
+    const claimType = colClaimType != null ? String(row[colClaimType] ?? "").trim() : "";
+    const schemeName = colSchemeName != null ? String(row[colSchemeName] ?? "").trim() : "";
+    const benefitDesc = colBenefitDesc != null ? String(row[colBenefitDesc] ?? "").trim() : "";
+
     let currency = detectedCurrency;
     if (colCurrency != null) {
       const cellCurrency = String(row[colCurrency] ?? "").trim();
-      if (cellCurrency) {
-        currency = cellCurrency.toUpperCase();
-      }
+      if (cellCurrency) currency = cellCurrency.toUpperCase();
     }
 
     results.push({
@@ -350,11 +353,6 @@ export function parseClaimsFile(buffer: Buffer): ClaimRow[] {
 
 /**
  * Parse Remittance Advice Excel file.
- *
- * Screenshot columns (approx):
- *   SL#, CORPORATE NAME, BILL NO, MEMBER NAME, MEMBERSHIP NO, PRIMARY MEMBER,
- *   CLAIM NO, LOSS DATE, CLAIM AMOUNT, PAY TO, PAYEE NAME, PAYABLE AMT.,
- *   INADMISSIBLE AMT, PAYMENT MODE, CHEQUE/EFT NO, CHEQUE/EFT DATE, REMARKS, REASONS
  */
 export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -364,24 +362,19 @@ export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
   const rows = readRows(sheet);
   if (rows.length === 0) return [];
 
-  // Header row detection: we expect "member name" / "membership no" and some
-  // of the claim/payment columns.
+  // Header detection: require membership + (bill/claim/payable signals)
   const headerIdx = findHeaderRowIndex(rows, [
     (texts) =>
-      texts.some((t) => t.includes("member name")) &&
       texts.some((t) => t.includes("membership")) &&
-      texts.some(
-        (t) =>
-          t.includes("claim") ||
-          t.includes("payable") ||
-          t.includes("paid amount")
-      ),
+      (texts.some((t) => t.includes("member name")) || texts.some((t) => t.includes("member"))) &&
+      (texts.some((t) => t.includes("bill")) ||
+        texts.some((t) => t.includes("claim")) ||
+        texts.some((t) => t.includes("payable")) ||
+        texts.some((t) => t.includes("paid amount"))),
   ]);
 
   if (headerIdx === -1) {
-    console.error(
-      "[parseRemittanceFile] Could not detect header row – returning empty result"
-    );
+    console.error("[parseRemittanceFile] Could not detect header row – returning empty result");
     return [];
   }
 
@@ -392,46 +385,59 @@ export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
     "employer name",
     "corporate",
   ]);
+
   const colPatientName = findColumnIndex(headerRow, [
     "member name",
     "patient name",
   ]);
+
   const colMemberNumber = findColumnIndex(headerRow, [
     "membership no",
     "member number",
     "member no",
+    "membership number",
   ]);
-  const colClaimNumber = findColumnIndex(headerRow, [
-    "claim no",
-    "claim number",
+
+  // ✅ BILL NO is the key that matches CIC invoice number
+  const colBillNo = findColumnIndex(headerRow, [
+    "bill no",
+    "bill number",
+    "bill#",
+    "invoice no",
+    "invoice number",
   ]);
+
+  const colClaimNumber = findColumnIndex(headerRow, ["claim no", "claim number"]);
+
   const colRelationship = findColumnIndex(headerRow, ["relationship"]);
+
   const colServiceDate = findColumnIndex(headerRow, [
     "loss date",
     "service date",
     "date of service",
   ]);
+
   const colClaimAmount = findColumnIndex(headerRow, [
     "claim amount",
     "claim amt",
     "claimed amount",
   ]);
+
   const colPaidAmount = findColumnIndex(headerRow, [
     "paid amount",
     "payable amt",
     "payable amount",
     "amount paid",
   ]);
+
   const colPaymentNo = findColumnIndex(headerRow, [
     "cheque/eft no",
     "cheque no",
     "payment no",
     "payment number",
   ]);
-  const colPaymentMode = findColumnIndex(headerRow, [
-    "payment mode",
-    "mode",
-  ]);
+
+  const colPaymentMode = findColumnIndex(headerRow, ["payment mode", "mode"]);
 
   const results: RemittanceRow[] = [];
 
@@ -439,48 +445,45 @@ export function parseRemittanceFile(buffer: Buffer): RemittanceRow[] {
     const row = rows[i];
     if (!Array.isArray(row)) continue;
 
-    const memberRaw =
-      colMemberNumber != null ? row[colMemberNumber] : undefined;
-    const serviceRaw = colServiceDate != null ? row[colServiceDate] : undefined;
+    const memberRaw = colMemberNumber != null ? row[colMemberNumber] : undefined;
+    const memberNumber = cleanId(memberRaw);
 
-    const memberNumber = String(memberRaw ?? "").trim();
-    const serviceDate = parseDate(serviceRaw);
+    const billNo = colBillNo != null ? cleanId(row[colBillNo]) : "";
 
-    // If this row has no member or date, skip
-    if (!memberNumber && !serviceDate) continue;
-
-    const employerName =
-      colEmployerName != null ? String(row[colEmployerName] ?? "").trim() : "";
-    const patientName =
-      colPatientName != null ? String(row[colPatientName] ?? "").trim() : "";
     const claimNumber =
-      colClaimNumber != null ? String(row[colClaimNumber] ?? "").trim() : "";
-    const relationship =
-      colRelationship != null ? String(row[colRelationship] ?? "").trim() : "";
+      colClaimNumber != null ? cleanId(row[colClaimNumber]) : "";
 
-    const claimAmountRaw =
-      colClaimAmount != null ? row[colClaimAmount] : undefined;
-    const paidAmountRaw =
-      colPaidAmount != null ? row[colPaidAmount] : undefined;
+    const serviceRaw = colServiceDate != null ? row[colServiceDate] : undefined;
+    const serviceDate = parseDate(serviceRaw) ?? undefined;
+
+    // Keep rows if we have member + (bill/claim id), even if date is missing
+    const hasAnyId = !!billNo || !!claimNumber;
+    if (!memberNumber && !hasAnyId && !serviceDate) continue;
+
+    const employerName = colEmployerName != null ? String(row[colEmployerName] ?? "").trim() : "";
+    const patientName = colPatientName != null ? String(row[colPatientName] ?? "").trim() : "";
+    const relationship = colRelationship != null ? String(row[colRelationship] ?? "").trim() : "";
+
+    const claimAmountRaw = colClaimAmount != null ? row[colClaimAmount] : undefined;
+    const paidAmountRaw = colPaidAmount != null ? row[colPaidAmount] : undefined;
 
     const claimAmount = parseAmount(claimAmountRaw);
     const paidAmount = parseAmount(paidAmountRaw);
 
-    const paymentNo =
-      colPaymentNo != null ? String(row[colPaymentNo] ?? "").trim() : "";
-    const paymentMode =
-      colPaymentMode != null ? String(row[colPaymentMode] ?? "").trim() : "";
+    const paymentNo = colPaymentNo != null ? cleanId(row[colPaymentNo]) : "";
+    const paymentMode = colPaymentMode != null ? String(row[colPaymentMode] ?? "").trim() : "";
 
-    // If there is literally nothing financial on the row, skip it.
-    if (!memberNumber && claimAmount === 0 && paidAmount === 0) continue;
+    // If there is literally nothing meaningful, skip it
+    if (!memberNumber && !hasAnyId && claimAmount === 0 && paidAmount === 0) continue;
 
     results.push({
       employerName: employerName || undefined,
       patientName: patientName || undefined,
       memberNumber,
+      billNo: billNo || undefined, // ✅ ADDED
       claimNumber: claimNumber || undefined,
       relationship: relationship || undefined,
-      serviceDate: serviceDate ?? undefined,
+      serviceDate,
       claimAmount,
       paidAmount,
       paymentNo: paymentNo || undefined,
