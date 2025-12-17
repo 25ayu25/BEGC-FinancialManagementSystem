@@ -1330,7 +1330,7 @@ export default function ClaimReconciliation() {
         );
       case "partially_paid":
         return (
-          <Badge className="bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700 border-0 shadow-md">
+          <Badge className="bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 border-0 shadow-md">
             <Clock className="w-3 h-3 mr-1" />
             {label}
           </Badge>
