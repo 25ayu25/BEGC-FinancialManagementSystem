@@ -2479,7 +2479,7 @@ export default function ClaimReconciliation() {
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className="text-xs font-semibold border-emerald-300 bg-emerald-50 text-emerald-700"
+                              className="text-xs font-semibold border-emerald-400/50 bg-emerald-50 text-emerald-600"
                             >
                               <CheckCircle className="w-3 h-3 mr-1" />
                               {run.autoMatched} Paid in full
