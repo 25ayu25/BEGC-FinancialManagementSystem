@@ -1267,14 +1267,14 @@ export default function ClaimReconciliation() {
     switch (status) {
       case "awaiting_remittance":
         return (
-          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+          <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 border-0 shadow-md">
             <Clock className="w-3 h-3 mr-1" />
             Awaiting remittance
           </Badge>
         );
       case "pending_review":
         return (
-          <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+          <Badge className="bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 border-0 shadow-md">
             <AlertCircle className="w-3 h-3 mr-1" />
             Reconciled – pending review
           </Badge>
@@ -1282,7 +1282,7 @@ export default function ClaimReconciliation() {
       case "reconciled":
       default:
         return (
-          <Badge className="bg-green-500 text-white hover:bg-green-600">
+          <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 border-0 shadow-md">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Reconciled
           </Badge>
@@ -1323,28 +1323,28 @@ export default function ClaimReconciliation() {
       case "paid":
       case "matched":
         return (
-          <Badge className="bg-green-500 text-white hover:bg-green-600">
+          <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 border-0 shadow-md">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             {label}
           </Badge>
         );
       case "partially_paid":
         return (
-          <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">
+          <Badge className="bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700 border-0 shadow-md">
             <Clock className="w-3 h-3 mr-1" />
             {label}
           </Badge>
         );
       case "manual_review":
         return (
-          <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+          <Badge className="bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 border-0 shadow-md">
             <AlertCircle className="w-3 h-3 mr-1" />
             {label}
           </Badge>
         );
       case "unpaid":
         return (
-          <Badge className="bg-red-500 text-white hover:bg-red-600">
+          <Badge className="bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 border-0 shadow-md">
             <AlertCircle className="w-3 h-3 mr-1" />
             {label}
           </Badge>
@@ -1353,7 +1353,7 @@ export default function ClaimReconciliation() {
       case "submitted":
       default:
         return (
-          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+          <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 border-0 shadow-md">
             <Clock className="w-3 h-3 mr-1" />
             {label}
           </Badge>
@@ -1539,68 +1539,90 @@ export default function ClaimReconciliation() {
       </div>
 
       <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
-        {/* KPI cards */}
+        {/* KPI cards - Enhanced Premium Design */}
         <section className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="relative overflow-hidden rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 hover:border-emerald-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-400/20 to-teal-500/20 rounded-full blur-2xl group-hover:scale-110 transition-transform" />
-              <div className="relative flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
-                      <CheckCircle className="w-4 h-4 text-white" />
-                    </div>
-                    Reconciliations done
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Reconciliations Done Card */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-emerald-200/50">
+              {/* Animated gradient background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              {/* Floating orb effect */}
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-emerald-400/20 to-teal-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
+              
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 flex items-center justify-center shadow-lg group-hover:shadow-emerald-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
+                    <CheckCircle className="w-7 h-7 text-white" />
                   </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.reconciliationsDone}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-500">with remittances</span>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Reconciliations Done</p>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.reconciliationsDone}</span>
+                    <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">with remittances</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">Latest period: {stats.lastPeriodLabel}</div>
+                  <p className="text-xs text-slate-500 mt-2">Latest: {stats.lastPeriodLabel}</p>
                 </div>
               </div>
+              
+              {/* Bottom accent line */}
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </div>
 
-            <div className="relative overflow-hidden rounded-xl border-2 border-blue-200 bg-white px-4 py-3 hover:border-blue-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-cyan-500/20 rounded-full blur-2xl group-hover:scale-110 transition-transform" />
-              <div className="relative flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-md">
-                      <FileStack className="w-4 h-4 text-white" />
-                    </div>
-                    Claims processed
+            {/* Claims Processed Card */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-200/50">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 via-transparent to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-cyan-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
+              
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
+                    <FileStack className="w-7 h-7 text-white" />
                   </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.totalClaims.toLocaleString()}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-500">rows in total</span>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Claims Processed</p>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.totalClaims.toLocaleString()}</span>
+                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">total rows</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">Across all uploads.</div>
+                  <p className="text-xs text-slate-500 mt-2">Across all uploads</p>
                 </div>
               </div>
+              
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </div>
 
-            <div className="relative overflow-hidden rounded-xl border-2 border-orange-200 bg-white px-4 py-3 hover:border-orange-300 transition-all hover:shadow-xl hover:-translate-y-1 group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/20 to-red-500/20 rounded-full blur-2xl group-hover:scale-110 transition-transform" />
-              <div className="relative flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-md">
-                      <AlertTriangle className="w-4 h-4 text-white" />
-                    </div>
-                    Claims to follow up
+            {/* Claims to Follow Up Card */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-orange-200/50">
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-400/10 via-transparent to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-orange-400/20 to-red-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
+              
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 flex items-center justify-center shadow-lg group-hover:shadow-orange-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
+                    <AlertTriangle className="w-7 h-7 text-white" />
                   </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-orange-600">{stats.problemClaims}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-orange-500">confirmed issues</span>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Claims to Follow Up</p>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold text-orange-600 tracking-tight">{stats.problemClaims}</span>
+                    <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded-full">issues</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
+                  <p className="text-xs text-slate-500 mt-2">
                     {stats.awaitingRemittance > 0
-                      ? `Unpaid/partial claims. ${stats.awaitingRemittance} awaiting remittance.`
-                      : "Unpaid or partially paid after reconciliation."}
-                  </div>
+                      ? `Plus ${stats.awaitingRemittance} awaiting remittance`
+                      : "Unpaid or partially paid"}
+                  </p>
                 </div>
               </div>
+              
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </div>
           </div>
 
@@ -1627,14 +1649,17 @@ export default function ClaimReconciliation() {
           )}
         </section>
 
-        {/* Period cards */}
+        {/* Period cards - Premium Glass-morphism Design */}
         {periodsSummary.length > 0 && (
-          <Card className="border-2 border-slate-200/80 shadow-lg">
-            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-white">
+          <Card className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Your Claim Periods</CardTitle>
-                  <CardDescription>Click a period card to set the active month/year.</CardDescription>
+                  <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                    Your Claim Periods
+                  </CardTitle>
+                  <CardDescription className="mt-1">Click a period card to set the active month/year.</CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -1687,8 +1712,8 @@ export default function ClaimReconciliation() {
               </div>
             </CardHeader>
 
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredPeriods.map((period) => {
                   const isActive =
                     period.periodYear === parseInt(periodYear, 10) &&
@@ -1703,58 +1728,82 @@ export default function ClaimReconciliation() {
                   const hasAwaiting = period.awaitingRemittance > 0;
                   const hasIssues = period.unpaid > 0 || period.partiallyPaid > 0;
 
-                  // ✅ Priority: issues > awaiting
+                  // Priority: issues > awaiting
                   const cardState: "complete" | "needs_review" | "awaiting" | "processing" =
                     isComplete ? "complete" : hasIssues ? "needs_review" : hasAwaiting ? "awaiting" : "processing";
+
+                  // Calculate progress percentage
+                  const matchedPercent = period.totalClaims > 0 
+                    ? ((period.matched / period.totalClaims) * 100).toFixed(0) 
+                    : "0";
 
                   return (
                     <div
                       key={`${period.periodYear}-${period.periodMonth}`}
                       onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
                       className={cn(
-                        "relative overflow-hidden rounded-xl border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-1 group cursor-pointer",
+                        "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 cursor-pointer backdrop-blur-sm",
+                        "hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02]",
                         isActive
-                          ? "border-orange-400 bg-orange-50/50 shadow-md ring-2 ring-orange-300"
-                          : "border-slate-200 bg-white hover:border-slate-300"
+                          ? "border-2 border-orange-400/50 bg-gradient-to-br from-orange-50/90 via-white/90 to-amber-50/90 shadow-xl shadow-orange-500/20 ring-2 ring-orange-300/30"
+                          : "border border-slate-200/50 bg-white/80 hover:border-slate-300/70 hover:bg-white/95"
                       )}
                     >
+                      {/* Glass-morphism overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      
+                      {/* Floating gradient orb */}
                       <div
                         className={cn(
-                          "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl transition-all",
+                          "absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl transition-all duration-500 group-hover:scale-125",
                           cardState === "complete"
-                            ? "bg-gradient-to-br from-green-400/20 to-emerald-500/20"
+                            ? "bg-gradient-to-br from-emerald-400/30 to-teal-500/30"
                             : cardState === "awaiting"
-                            ? "bg-gradient-to-br from-blue-400/20 to-cyan-500/20"
+                            ? "bg-gradient-to-br from-blue-400/30 to-cyan-500/30"
                             : cardState === "needs_review"
-                            ? "bg-gradient-to-br from-orange-400/20 to-red-500/20"
-                            : "bg-gradient-to-br from-slate-400/10 to-slate-500/10",
-                          "group-hover:scale-110"
+                            ? "bg-gradient-to-br from-orange-400/30 to-red-500/30"
+                            : "bg-gradient-to-br from-slate-400/20 to-slate-500/20"
                         )}
                       />
 
-                      <div className="relative space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-bold text-lg text-slate-800 group-hover:text-orange-600 transition-colors">
+                      <div className="relative space-y-4">
+                        {/* Header with title and actions */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 space-y-1">
+                            <h3 className="font-bold text-xl text-slate-800 group-hover:text-orange-600 transition-colors duration-200">
                               {formatPeriodLabel(period.periodYear, period.periodMonth)}
                             </h3>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {cardState === "complete" ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            ) : cardState === "awaiting" ? (
-                              <Clock className="w-5 h-5 text-blue-600" />
-                            ) : cardState === "needs_review" ? (
-                              <AlertTriangle className="w-5 h-5 text-orange-600" />
-                            ) : null}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Status Icon */}
+                            <div className={cn(
+                              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110",
+                              cardState === "complete"
+                                ? "bg-gradient-to-br from-emerald-500 to-teal-600"
+                                : cardState === "awaiting"
+                                ? "bg-gradient-to-br from-blue-500 to-cyan-600"
+                                : cardState === "needs_review"
+                                ? "bg-gradient-to-br from-orange-500 to-red-600"
+                                : "bg-gradient-to-br from-slate-400 to-slate-500"
+                            )}>
+                              {cardState === "complete" ? (
+                                <CheckCircle2 className="w-5 h-5 text-white" />
+                              ) : cardState === "awaiting" ? (
+                                <Clock className="w-5 h-5 text-white" />
+                              ) : cardState === "needs_review" ? (
+                                <AlertTriangle className="w-5 h-5 text-white" />
+                              ) : (
+                                <FileText className="w-5 h-5 text-white" />
+                              )}
+                            </div>
 
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="w-7 h-7 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                                  className="w-8 h-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
                                   onClick={(e) => e.stopPropagation()}
                                   disabled={isDeleting || isUploading}
                                 >
@@ -1812,44 +1861,100 @@ export default function ClaimReconciliation() {
                           </div>
                         </div>
 
-                        <div className="w-full text-left">
-                          <div className="text-2xl font-bold text-slate-900">
-                            {period.totalClaims} {pluralize(period.totalClaims, "claim")}
+                        {/* Claims count and amount */}
+                        <div className="space-y-1">
+                          <div className="text-3xl font-bold text-slate-900 tracking-tight">
+                            {period.totalClaims.toLocaleString()} <span className="text-lg font-medium text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
                           </div>
-                          <div className="text-sm text-slate-600">
+                          <div className="text-sm text-slate-600 font-medium">
                             {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
                             {parseFloat(period.totalBilled).toLocaleString()} billed
                           </div>
                         </div>
 
+                        {/* Progress Bar */}
+                        {period.totalClaims > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-600 font-medium">Match Progress</span>
+                              <span className="font-bold text-slate-700">{matchedPercent}%</span>
+                            </div>
+                            <div className="h-2 bg-slate-200/80 rounded-full overflow-hidden backdrop-blur-sm">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  cardState === "complete"
+                                    ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                                    : cardState === "needs_review"
+                                    ? "bg-gradient-to-r from-orange-500 to-amber-500"
+                                    : cardState === "awaiting"
+                                    ? "bg-gradient-to-r from-blue-500 to-cyan-500"
+                                    : "bg-gradient-to-r from-slate-400 to-slate-500"
+                                )}
+                                style={{ width: `${matchedPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Status Badge */}
                         <div className="flex items-center gap-2">
                           {cardState === "complete" ? (
-                            <Badge className="bg-green-500 text-white hover:bg-green-600">
+                            <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 shadow-md border-0">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
                               Complete
                             </Badge>
                           ) : cardState === "needs_review" ? (
-                            <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+                            <Badge className="bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 shadow-md border-0">
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               Needs review
                             </Badge>
                           ) : cardState === "awaiting" ? (
-                            <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-md border-0">
                               <Clock className="w-3 h-3 mr-1" />
                               Awaiting Remittance
                             </Badge>
                           ) : (
-                            <Badge className="bg-slate-500 text-white hover:bg-slate-600">Processing</Badge>
+                            <Badge className="bg-gradient-to-r from-slate-500 to-slate-600 text-white hover:from-slate-600 hover:to-slate-700 shadow-md border-0">Processing</Badge>
                           )}
                         </div>
 
-                        <div className="text-xs text-slate-500 space-y-1">
-                          {period.awaitingRemittance > 0 && <div>• {period.awaitingRemittance} awaiting remittance</div>}
-                          {period.matched > 0 && <div>• {period.matched} matched</div>}
-                          {period.partiallyPaid > 0 && <div>• {period.partiallyPaid} partially paid</div>}
-                          {period.unpaid > 0 && <div>• {period.unpaid} unpaid</div>}
+                        {/* Breakdown stats */}
+                        <div className="pt-2 space-y-1.5 text-xs text-slate-600 border-t border-slate-200/50">
+                          {period.awaitingRemittance > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <span>{period.awaitingRemittance} awaiting remittance</span>
+                            </div>
+                          )}
+                          {period.matched > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span>{period.matched} matched</span>
+                            </div>
+                          )}
+                          {period.partiallyPaid > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              <span>{period.partiallyPaid} partially paid</span>
+                            </div>
+                          )}
+                          {period.unpaid > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                              <span>{period.unpaid} unpaid</span>
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      {/* Bottom gradient accent */}
+                      <div className={cn(
+                        "absolute bottom-0 left-0 right-0 h-1 transition-all duration-300",
+                        isActive 
+                          ? "bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500"
+                          : "bg-gradient-to-r from-transparent via-slate-300/50 to-transparent group-hover:via-orange-500/50"
+                      )} />
                     </div>
                   );
                 })}
@@ -2059,43 +2164,47 @@ export default function ClaimReconciliation() {
           </CardHeader>
 
           {showInventory && (
-            <CardContent className="pt-0">
-              <div className="py-3 mb-2">
-                <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200 flex-wrap">
+            <CardContent className="pt-4 space-y-6">
+              <div className="overflow-x-auto pb-2">
+                <div className="inline-flex items-center gap-2 p-1.5 rounded-2xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 shadow-md border border-slate-200/50">
                   {(
                     [
-                      { key: "all", label: "All" },
-                      { key: "awaiting_remittance", label: "Pending remittance" },
-                      { key: "matched", label: "Paid in full" },
-                      { key: "partially_paid", label: "Paid partially" },
-                      { key: "unpaid", label: "Not paid (0 paid)" },
+                      { key: "all", label: "All", icon: null },
+                      { key: "awaiting_remittance", label: "Pending remittance", icon: Clock },
+                      { key: "matched", label: "Paid in full", icon: CheckCircle2 },
+                      { key: "partially_paid", label: "Paid partially", icon: AlertCircle },
+                      { key: "unpaid", label: "Not paid (0 paid)", icon: X },
                     ] as const
-                  ).map((x) => (
-                    <button
-                      key={x.key}
-                      type="button"
-                      className={cn(
-                        "px-4 py-2 rounded-full transition-all font-medium",
-                        inventoryStatusFilter === x.key
-                          ? x.key === "unpaid"
-                            ? "bg-red-500 shadow-md text-white"
-                            : x.key === "matched"
-                            ? "bg-green-500 shadow-md text-white"
-                            : x.key === "awaiting_remittance"
-                            ? "bg-blue-500 shadow-md text-white"
-                            : x.key === "partially_paid"
-                            ? "bg-yellow-500 shadow-md text-white"
-                            : "bg-white shadow-md text-slate-900"
-                          : "text-slate-600 hover:text-slate-900"
-                      )}
-                      onClick={() => {
-                        setInventoryStatusFilter(x.key);
-                        setInventoryPage(1);
-                      }}
-                    >
-                      {x.label}
-                    </button>
-                  ))}
+                  ).map((x) => {
+                    const Icon = x.icon;
+                    return (
+                      <button
+                        key={x.key}
+                        type="button"
+                        className={cn(
+                          "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap flex items-center gap-2",
+                          inventoryStatusFilter === x.key
+                            ? x.key === "unpaid"
+                              ? "bg-gradient-to-r from-red-500 to-rose-600 shadow-lg text-white scale-105"
+                              : x.key === "matched"
+                              ? "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg text-white scale-105"
+                              : x.key === "awaiting_remittance"
+                              ? "bg-gradient-to-r from-blue-500 to-cyan-600 shadow-lg text-white scale-105"
+                              : x.key === "partially_paid"
+                              ? "bg-gradient-to-r from-amber-500 to-yellow-600 shadow-lg text-white scale-105"
+                              : "bg-white shadow-lg text-slate-900 scale-105"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                        )}
+                        onClick={() => {
+                          setInventoryStatusFilter(x.key);
+                          setInventoryPage(1);
+                        }}
+                      >
+                        {Icon && <Icon className="w-4 h-4" />}
+                        {x.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -2144,26 +2253,26 @@ export default function ClaimReconciliation() {
               )}
 
               {!summaryLoading && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Total Claims</div>
-                    <div className="text-xl font-bold text-slate-900">{inventorySummaryStats.total}</div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Claims</div>
+                    <div className="text-2xl font-bold text-slate-900">{inventorySummaryStats.total.toLocaleString()}</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Pending remittance</div>
-                    <div className="text-xl font-bold text-blue-600">{inventorySummaryStats.awaiting}</div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
+                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{inventorySummaryStats.awaiting.toLocaleString()}</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Matched</div>
-                    <div className="text-xl font-bold text-green-600">{inventorySummaryStats.matched}</div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Matched</div>
+                    <div className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{inventorySummaryStats.matched.toLocaleString()}</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Partially Paid</div>
-                    <div className="text-xl font-bold text-yellow-600">{inventorySummaryStats.partial}</div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Partially Paid</div>
+                    <div className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">{inventorySummaryStats.partial.toLocaleString()}</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Unpaid</div>
-                    <div className="text-xl font-bold text-red-600">{inventorySummaryStats.unpaid}</div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Unpaid</div>
+                    <div className="text-2xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">{inventorySummaryStats.unpaid.toLocaleString()}</div>
                   </div>
                 </div>
               )}
@@ -2181,31 +2290,38 @@ export default function ClaimReconciliation() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200/50">
                     <Table>
-                      <TableHeader>
-                        <TableRow className="bg-slate-50/50">
-                          <TableHead>Member #</TableHead>
-                          <TableHead>Patient Name</TableHead>
-                          <TableHead>Service Date</TableHead>
-                          <TableHead>Period</TableHead>
-                          <TableHead>Billed Amount</TableHead>
-                          <TableHead>Amount Paid</TableHead>
-                          <TableHead>Status</TableHead>
+                      <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
+                        <TableRow className="hover:bg-slate-50/90">
+                          <TableHead className="font-semibold">Member #</TableHead>
+                          <TableHead className="font-semibold">Patient Name</TableHead>
+                          <TableHead className="font-semibold">Service Date</TableHead>
+                          <TableHead className="font-semibold">Period</TableHead>
+                          <TableHead className="font-semibold">Billed Amount</TableHead>
+                          <TableHead className="font-semibold">Amount Paid</TableHead>
+                          <TableHead className="font-semibold">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {claimsInventory.claims.map((claim) => (
-                          <TableRow key={claim.id} className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors">
-                            <TableCell className="font-mono text-sm">{claim.memberNumber}</TableCell>
-                            <TableCell>{claim.patientName || "N/A"}</TableCell>
+                        {claimsInventory.claims.map((claim, idx) => (
+                          <TableRow 
+                            key={claim.id} 
+                            className={cn(
+                              "transition-all duration-200",
+                              idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
+                              "hover:bg-orange-50/50 hover:shadow-sm"
+                            )}
+                          >
+                            <TableCell className="font-mono text-sm font-medium">{claim.memberNumber}</TableCell>
+                            <TableCell className="font-medium">{claim.patientName || "N/A"}</TableCell>
                             <TableCell>{new Date(claim.serviceDate).toLocaleDateString()}</TableCell>
                             <TableCell className="text-sm">{formatPeriodLabel(claim.periodYear, claim.periodMonth)}</TableCell>
-                            <TableCell>
+                            <TableCell className="font-semibold">
                               {getCurrencyForDisplay(claim.providerName, claim.currency)}{" "}
                               {parseFloat(claim.billedAmount).toFixed(2)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="font-semibold">
                               {getCurrencyForDisplay(claim.providerName, claim.currency)}{" "}
                               {parseFloat(claim.amountPaid || "0").toFixed(2)}
                             </TableCell>
@@ -2266,13 +2382,15 @@ export default function ClaimReconciliation() {
 
           <CardContent className="pt-0">
             {actualReconciliationRuns.length > 0 && (
-              <div className="py-3 mb-2">
-                <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200">
+              <div className="overflow-x-auto pb-2">
+                <div className="inline-flex items-center gap-2 p-1.5 rounded-2xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 shadow-md border border-slate-200/50">
                   <button
                     type="button"
                     className={cn(
-                      "px-4 py-2 rounded-full transition-all font-medium",
-                      statusFilter === "all" ? "bg-white shadow-md text-slate-900" : "text-slate-600 hover:text-slate-900"
+                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap",
+                      statusFilter === "all" 
+                        ? "bg-white shadow-lg text-slate-900 scale-105" 
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                     )}
                     onClick={() => setStatusFilter("all")}
                   >
@@ -2282,29 +2400,28 @@ export default function ClaimReconciliation() {
                   <button
                     type="button"
                     className={cn(
-                      "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
+                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
                       statusFilter === "needs_follow_up"
-                        ? "bg-orange-500 shadow-md text-white"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "bg-gradient-to-r from-orange-500 to-amber-600 shadow-lg text-white scale-105"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                     )}
                     onClick={() => setStatusFilter("needs_follow_up")}
                   >
-                    <AlertTriangle className="w-3 h-3" />
-                    Needs follow-up (
-                    {actualReconciliationRuns.filter((r) => runGroup(r) === "needs_follow_up").length})
+                    <AlertTriangle className="w-4 h-4" />
+                    Needs follow-up ({actualReconciliationRuns.filter((r) => runGroup(r) === "needs_follow_up").length})
                   </button>
 
                   <button
                     type="button"
                     className={cn(
-                      "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
+                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
                       statusFilter === "completed"
-                        ? "bg-green-500 shadow-md text-white"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg text-white scale-105"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                     )}
                     onClick={() => setStatusFilter("completed")}
                   >
-                    <CheckCircle2 className="w-3 h-3" />
+                    <CheckCircle2 className="w-4 h-4" />
                     Completed ({actualReconciliationRuns.filter((r) => runGroup(r) === "completed").length})
                   </button>
                 </div>
@@ -2318,25 +2435,25 @@ export default function ClaimReconciliation() {
             ) : filteredRuns.length === 0 ? (
               <p className="text-muted-foreground py-6 text-sm">No runs match the selected filter.</p>
             ) : (
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto rounded-xl border border-slate-200/50">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Provider</TableHead>
-                      <TableHead>Period</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Claims</TableHead>
-                      <TableHead>Remittances</TableHead>
-                      <TableHead>Auto matched</TableHead>
-                      <TableHead>Partial</TableHead>
-                      <TableHead>Review</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                  <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
+                    <TableRow className="hover:bg-slate-50/90">
+                      <TableHead className="font-semibold">Provider</TableHead>
+                      <TableHead className="font-semibold">Period</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">Claims</TableHead>
+                      <TableHead className="font-semibold">Remittances</TableHead>
+                      <TableHead className="font-semibold">Auto matched</TableHead>
+                      <TableHead className="font-semibold">Partial</TableHead>
+                      <TableHead className="font-semibold">Review</TableHead>
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="text-right font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
-                    {filteredRuns.map((run) => {
+                    {filteredRuns.map((run, idx) => {
                       const periodLabel = new Date(run.periodYear, run.periodMonth - 1).toLocaleString("default", {
                         month: "short",
                         year: "numeric",
@@ -2359,8 +2476,10 @@ export default function ClaimReconciliation() {
                             }, 50);
                           }}
                           className={cn(
-                            "odd:bg-slate-50/40 hover:bg-emerald-50/60 transition-colors cursor-pointer",
-                            selectedRunId === run.id && "border-l-4 border-l-emerald-500 bg-emerald-50/80"
+                            "transition-all duration-200 cursor-pointer",
+                            idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
+                            "hover:bg-emerald-50/60 hover:shadow-sm",
+                            selectedRunId === run.id && "border-l-4 border-l-emerald-500 bg-emerald-50/80 shadow-md"
                           )}
                         >
                           <TableCell className="font-medium">{run.providerName}</TableCell>
@@ -2486,49 +2605,52 @@ export default function ClaimReconciliation() {
                 <p className="text-muted-foreground py-6 text-sm">No claims found for this run.</p>
               ) : (
                 <>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 py-3">
-                    {/* B4) Updated pills */}
-                    <div className="inline-flex items-center rounded-full bg-gradient-to-r from-slate-100 to-slate-50 p-1 text-xs shadow-sm border border-slate-200">
-                      <button
-                        type="button"
-                        className={cn(
-                          "px-4 py-2 rounded-full transition-all font-medium",
-                          attentionFilter === "all"
-                            ? "bg-white shadow-md text-slate-900"
-                            : "text-slate-600 hover:text-slate-900"
-                        )}
-                        onClick={() => setAttentionFilter("all")}
-                      >
-                        Open claims ({claims.length})
-                      </button>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-4">
+                    {/* Enhanced tabs with premium styling */}
+                    <div className="overflow-x-auto pb-2">
+                      <div className="inline-flex items-center gap-2 p-1.5 rounded-2xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 shadow-md border border-slate-200/50">
+                        <button
+                          type="button"
+                          className={cn(
+                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap",
+                            attentionFilter === "all"
+                              ? "bg-white shadow-lg text-slate-900 scale-105"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                          )}
+                          onClick={() => setAttentionFilter("all")}
+                        >
+                          All Claims ({claims.length})
+                        </button>
 
-                      <button
-                        type="button"
-                        className={cn(
-                          "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                          attentionFilter === "waiting"
-                            ? "bg-blue-500 shadow-md text-white"
-                            : "text-slate-600 hover:text-slate-900"
-                        )}
-                        onClick={() => setAttentionFilter("waiting")}
-                      >
-                        <Clock className="w-3 h-3" />
-                        Not paid yet ({waitingCountForSelected})
-                      </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
+                            attentionFilter === "waiting"
+                              ? "bg-gradient-to-r from-blue-500 to-cyan-600 shadow-lg text-white scale-105"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                          )}
+                          onClick={() => setAttentionFilter("waiting")}
+                        >
+                          <Clock className="w-4 h-4" />
+                          Not paid yet ({waitingCountForSelected})
+                        </button>
 
-                      <button
-                        type="button"
-                        className={cn(
-                          "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                          attentionFilter === "follow_up"
-                            ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-md text-white"
-                            : "text-slate-600 hover:text-slate-900"
-                        )}
-                        onClick={() => setAttentionFilter("follow_up")}
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        Needs follow-up ({followUpCountForSelected})
-                      </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
+                            attentionFilter === "follow_up"
+                              ? "bg-gradient-to-r from-orange-500 to-amber-600 shadow-lg text-white scale-105"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                          )}
+                          onClick={() => setAttentionFilter("follow_up")}
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          Needs follow-up ({followUpCountForSelected})
+                        </button>
+                      </div>
+                    </div>
                     </div>
 
                     <Button
@@ -2553,32 +2675,36 @@ export default function ClaimReconciliation() {
                         : "No claims to display."}
                     </p>
                   ) : (
-                    <div className="w-full overflow-x-auto">
+                    <div className="w-full overflow-x-auto rounded-xl border border-slate-200/50">
                       <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Member #</TableHead>
-                            <TableHead>Patient name</TableHead>
-                            <TableHead>Service date</TableHead>
-                            <TableHead>Billed amount</TableHead>
-                            <TableHead>Amount paid</TableHead>
-                            <TableHead>Status</TableHead>
+                        <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
+                          <TableRow className="hover:bg-slate-50/90">
+                            <TableHead className="font-semibold">Member #</TableHead>
+                            <TableHead className="font-semibold">Patient name</TableHead>
+                            <TableHead className="font-semibold">Service date</TableHead>
+                            <TableHead className="font-semibold">Billed amount</TableHead>
+                            <TableHead className="font-semibold">Amount paid</TableHead>
+                            <TableHead className="font-semibold">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredClaims.map((claim) => (
+                          {filteredClaims.map((claim, idx) => (
                             <TableRow
                               key={claim.id}
-                              className="odd:bg-slate-50/40 hover:bg-slate-100/80 transition-colors"
+                              className={cn(
+                                "transition-all duration-200",
+                                idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
+                                "hover:bg-orange-50/50 hover:shadow-sm"
+                              )}
                             >
-                              <TableCell className="font-mono">{claim.memberNumber}</TableCell>
-                              <TableCell>{claim.patientName || "N/A"}</TableCell>
+                              <TableCell className="font-mono font-medium">{claim.memberNumber}</TableCell>
+                              <TableCell className="font-medium">{claim.patientName || "N/A"}</TableCell>
                               <TableCell>{new Date(claim.serviceDate).toLocaleDateString()}</TableCell>
-                              <TableCell>
+                              <TableCell className="font-semibold">
                                 {selectedRun ? getCurrencyForDisplay(selectedRun.providerName, claim.currency) : "USD"}{" "}
                                 {parseFloat(claim.billedAmount).toFixed(2)}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="font-semibold">
                                 {selectedRun ? getCurrencyForDisplay(selectedRun.providerName, claim.currency) : "USD"}{" "}
                                 {parseFloat(claim.amountPaid || "0").toFixed(2)}
                               </TableCell>
