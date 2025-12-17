@@ -6,7 +6,7 @@ import {
   claimReconClaims,
   claimReconRemittances,
 } from "@shared/schema";
-import { eq, and, or, isNull, desc, inArray } from "drizzle-orm";
+import { eq, and, or, isNull, desc, inArray, sql } from "drizzle-orm";
 import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
 import {
   buildClaimCompositeKeyFromRow,
@@ -212,7 +212,7 @@ export async function performMatching(runId: number) {
     id: r.id,
     compositeKey: buildRemittanceKeyVariantsFromRow({
       memberNumber: r.memberNumber,
-      billNo: (r as any).billNo, // ✅ now exists after schema update
+      billNo: r.billNo,
       claimNumber: r.claimNumber,
       serviceDate: new Date(r.serviceDate),
       claimAmount: parseFloat(r.claimAmount),
@@ -221,7 +221,7 @@ export async function performMatching(runId: number) {
       employerName: r.employerName || undefined,
       patientName: r.patientName || undefined,
       memberNumber: r.memberNumber,
-      billNo: (r as any).billNo || undefined, // ✅
+      billNo: r.billNo || undefined,
       claimNumber: r.claimNumber || undefined,
       relationship: r.relationship || undefined,
       serviceDate: new Date(r.serviceDate),
@@ -704,7 +704,7 @@ export async function runClaimReconciliation(
       id: r.id,
       compositeKey: buildRemittanceKeyVariantsFromRow({
         memberNumber: r.memberNumber,
-        billNo: (r as any).billNo, // ✅
+        billNo: r.billNo,
         claimNumber: r.claimNumber,
         serviceDate: new Date(r.serviceDate),
         claimAmount: parseFloat(r.claimAmount),
@@ -713,7 +713,7 @@ export async function runClaimReconciliation(
         employerName: r.employerName || undefined,
         patientName: r.patientName || undefined,
         memberNumber: r.memberNumber,
-        billNo: (r as any).billNo || undefined, // ✅
+        billNo: r.billNo || undefined,
         claimNumber: r.claimNumber || undefined,
         relationship: r.relationship || undefined,
         serviceDate: new Date(r.serviceDate),
@@ -763,13 +763,11 @@ export async function runClaimReconciliation(
         .where(eq(claimReconRemittances.id, orphan.id));
     }
 
-    // ISSUE 1 FIX: Mark unmatched claims as "unpaid"
+    // FIX: Do NOT mark unmatched claims as "unpaid"
+    // Unmatched claims (no remittance line found) should remain as "awaiting_remittance"
+    // Only claims with remittanceLineId AND amountPaid=0 should be marked "unpaid" (handled by matching logic)
     const matchedClaimIds = new Set(matchedOnly.map((m) => m.claimId));
     const unmatchedClaims = claims.filter((c) => !matchedClaimIds.has(c.id));
-
-    for (const claim of unmatchedClaims) {
-      await tx.update(claimReconClaims).set({ status: "unpaid" }).where(eq(claimReconClaims.id, claim.id));
-    }
 
     const summary: ReconciliationSummary = {
       totalClaims: claims.length,
@@ -816,11 +814,14 @@ export async function getAllClaims(options?: {
   const offset = (page - 1) * limit;
   const claims = await query.limit(limit).offset(offset);
 
-  let countQuery = db.select().from(claimReconClaims);
-  if (filters.length > 0) countQuery = (countQuery.where(and(...filters)) as any);
+  // Use efficient COUNT(*) instead of loading all records
+  const whereClause = filters.length > 0 ? and(...filters) : undefined;
+  const [{ count }] = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(claimReconClaims)
+    .where(whereClause);
 
-  const allClaims = await countQuery;
-  const total = allClaims.length;
+  const total = count;
 
   return {
     claims,
@@ -897,6 +898,7 @@ export async function getPeriodsSummary(providerName?: string) {
       const matched = period.claims.filter((c) => c.status === "matched" || c.status === "paid").length;
       const partiallyPaid = period.claims.filter((c) => c.status === "partially_paid").length;
       const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
+      const manualReview = period.claims.filter((c) => c.status === "manual_review").length;
 
       const totalBilled = period.claims.reduce((sum, c) => sum + parseFloat(c.billedAmount), 0);
       const totalPaid = period.claims.reduce((sum, c) => sum + parseFloat((c as any).amountPaid || "0"), 0);
@@ -912,6 +914,7 @@ export async function getPeriodsSummary(providerName?: string) {
         matched,
         partiallyPaid,
         unpaid,
+        manualReview,
         totalBilled: totalBilled.toFixed(2),
         totalPaid: totalPaid.toFixed(2),
         currency,
