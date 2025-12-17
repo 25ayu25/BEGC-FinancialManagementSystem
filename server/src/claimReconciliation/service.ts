@@ -32,6 +32,14 @@ function isRemittanceRun(run: any) {
   return (run?.totalRemittanceRows ?? 0) > 0;
 }
 
+function isValidDate(d: any): d is Date {
+  return d instanceof Date && !Number.isNaN(d.getTime());
+}
+
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Create a new reconciliation run
  */
@@ -81,36 +89,34 @@ export async function insertClaims(runId: number, claims: ClaimRow[]) {
 
   if (!run) throw new Error(`Run ${runId} not found`);
 
-  const claimsToInsert = claims.map((claim) => ({
-    runId,
-    providerName: run.providerName,
-    periodYear: run.periodYear,
-    periodMonth: run.periodMonth,
-    memberNumber: claim.memberNumber,
-    patientName: claim.patientName || null,
-    serviceDate: claim.serviceDate.toISOString().split("T")[0],
-    invoiceNumber: claim.invoiceNumber || null,
-    claimType: claim.claimType || null,
-    schemeName: claim.schemeName || null,
-    benefitDesc: claim.benefitDesc || null,
-    billedAmount: claim.billedAmount.toString(),
-    currency: normalizeCurrencyForProvider(run.providerName, claim.currency),
-    status: "submitted" as const,
-    amountPaid: "0",
-    compositeKey: buildClaimCompositeKeyFromRow({
+  const claimsToInsert = claims
+    .filter((c) => isValidDate(c.serviceDate))
+    .map((claim) => ({
+      runId,
+      providerName: run.providerName,
+      periodYear: run.periodYear,
+      periodMonth: run.periodMonth,
       memberNumber: claim.memberNumber,
-      invoiceNumber: claim.invoiceNumber,
-      serviceDate: claim.serviceDate,
-      billedAmount: claim.billedAmount,
-    } as any),
-    rawRow: claim as any,
-  }));
+      patientName: claim.patientName || null,
+      serviceDate: toISODate(claim.serviceDate),
+      invoiceNumber: claim.invoiceNumber || null,
+      claimType: claim.claimType || null,
+      schemeName: claim.schemeName || null,
+      benefitDesc: claim.benefitDesc || null,
+      billedAmount: claim.billedAmount.toString(),
+      currency: normalizeCurrencyForProvider(run.providerName, claim.currency),
+      status: "submitted" as const,
+      amountPaid: "0",
+      compositeKey: buildClaimCompositeKeyFromRow({
+        memberNumber: claim.memberNumber,
+        invoiceNumber: claim.invoiceNumber,
+        serviceDate: claim.serviceDate,
+        billedAmount: claim.billedAmount,
+      } as any),
+      rawRow: claim as any,
+    }));
 
-  const inserted = await db
-    .insert(claimReconClaims)
-    .values(claimsToInsert)
-    .returning();
-
+  const inserted = await db.insert(claimReconClaims).values(claimsToInsert).returning();
   return inserted;
 }
 
@@ -125,35 +131,35 @@ export async function insertRemittances(runId: number, remittances: RemittanceRo
 
   if (!run) throw new Error(`Run ${runId} not found`);
 
-  const remittancesToInsert = remittances.map((rem) => {
-    const keyVariants = buildRemittanceKeyVariantsFromRow({
-      memberNumber: rem.memberNumber,
-      claimNumber: rem.claimNumber,
-      serviceDate: rem.serviceDate,
-      claimAmount: rem.claimAmount,
-      billNo: (rem as any).billNo,
-      billNumber: (rem as any).billNumber,
-    } as any);
+  const remittancesToInsert = remittances
+    .filter((r) => isValidDate(r.serviceDate))
+    .map((rem) => {
+      const keyVariants = buildRemittanceKeyVariantsFromRow({
+        memberNumber: rem.memberNumber,
+        claimNumber: rem.claimNumber,
+        serviceDate: rem.serviceDate,
+        claimAmount: rem.claimAmount,
+      } as any);
 
-    return {
-      runId,
-      providerName: run.providerName,
-      periodYear: run.periodYear,
-      periodMonth: run.periodMonth,
-      employerName: rem.employerName || null,
-      patientName: rem.patientName || null,
-      memberNumber: rem.memberNumber,
-      claimNumber: rem.claimNumber || null,
-      relationship: rem.relationship || null,
-      serviceDate: rem.serviceDate.toISOString().split("T")[0],
-      claimAmount: rem.claimAmount.toString(),
-      paidAmount: rem.paidAmount.toString(),
-      paymentNo: rem.paymentNo || null,
-      paymentMode: rem.paymentMode || null,
-      compositeKey: keyVariants[0],
-      rawRow: rem as any,
-    };
-  });
+      return {
+        runId,
+        providerName: run.providerName,
+        periodYear: run.periodYear,
+        periodMonth: run.periodMonth,
+        employerName: rem.employerName || null,
+        patientName: rem.patientName || null,
+        memberNumber: rem.memberNumber,
+        claimNumber: rem.claimNumber || null,
+        relationship: rem.relationship || null,
+        serviceDate: toISODate(rem.serviceDate),
+        claimAmount: rem.claimAmount.toString(),
+        paidAmount: rem.paidAmount.toString(),
+        paymentNo: rem.paymentNo || null,
+        paymentMode: rem.paymentMode || null,
+        compositeKey: keyVariants[0],
+        rawRow: rem as any,
+      };
+    });
 
   const inserted = await db
     .insert(claimReconRemittances)
@@ -205,8 +211,6 @@ export async function performMatching(runId: number) {
     compositeKey: buildRemittanceKeyVariantsFromRow({
       memberNumber: r.memberNumber,
       claimNumber: r.claimNumber,
-      billNo: (r as any).billNo,
-      billNumber: (r as any).billNumber,
       serviceDate: new Date(r.serviceDate),
       claimAmount: parseFloat(r.claimAmount),
     } as any)[0],
@@ -281,13 +285,12 @@ export async function getReconRun(runId: number) {
 }
 
 export async function getAllReconRuns() {
-  const runs = await db.select().from(claimReconRuns).orderBy(desc(claimReconRuns.createdAt));
-  return runs;
+  return await db.select().from(claimReconRuns).orderBy(desc(claimReconRuns.createdAt));
 }
 
 /**
  * IMPORTANT FIX:
- * - claims-only runs: show claims for that run/period (136 for Nov 2025)
+ * - claims-only runs: show claims for that period
  * - remittance runs: show outstanding claims across ALL periods for that provider
  */
 export async function getClaimsForRun(runId: number) {
@@ -313,6 +316,21 @@ export async function getClaimsForRun(runId: number) {
       );
   }
 
+  // Prefer canonical staged claims for that period (runId null) if present
+  const staged = await db
+    .select()
+    .from(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, run.providerName),
+        eq(claimReconClaims.periodYear, run.periodYear),
+        eq(claimReconClaims.periodMonth, run.periodMonth),
+        isNull(claimReconClaims.runId)
+      )
+    );
+
+  if (staged.length > 0) return staged;
+
   return await db
     .select()
     .from(claimReconClaims)
@@ -335,6 +353,21 @@ export async function getRemittancesForRun(runId: number) {
 
   const run = await getReconRun(runId);
   if (!run) return [];
+
+  // Prefer canonical staged remittances for that period (runId null) if present
+  const staged = await db
+    .select()
+    .from(claimReconRemittances)
+    .where(
+      and(
+        eq(claimReconRemittances.providerName, run.providerName),
+        eq(claimReconRemittances.periodYear, run.periodYear),
+        eq(claimReconRemittances.periodMonth, run.periodMonth),
+        isNull(claimReconRemittances.runId)
+      )
+    );
+
+  if (staged.length > 0) return staged;
 
   return await db
     .select()
@@ -380,7 +413,8 @@ export async function getIssueClaimsForRun(runId: number) {
       );
   }
 
-  return await db
+  // Prefer canonical staged claims for that period if present
+  const staged = await db
     .select()
     .from(claimReconClaims)
     .where(
@@ -388,15 +422,26 @@ export async function getIssueClaimsForRun(runId: number) {
         eq(claimReconClaims.providerName, run.providerName),
         eq(claimReconClaims.periodYear, run.periodYear),
         eq(claimReconClaims.periodMonth, run.periodMonth),
-        or(
-          eq(claimReconClaims.status, "awaiting_remittance"),
-          eq(claimReconClaims.status, "unpaid"),
-          eq(claimReconClaims.status, "partially_paid"),
-          eq(claimReconClaims.status, "manual_review"),
-          eq(claimReconClaims.status, "submitted")
-        )
+        isNull(claimReconClaims.runId)
       )
     );
+
+  const base = staged.length > 0 ? staged : await db
+    .select()
+    .from(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, run.providerName),
+        eq(claimReconClaims.periodYear, run.periodYear),
+        eq(claimReconClaims.periodMonth, run.periodMonth)
+      )
+    );
+
+  return base.filter((c: any) =>
+    ["awaiting_remittance", "unpaid", "partially_paid", "manual_review", "submitted"].includes(
+      c.status
+    )
+  );
 }
 
 export async function deleteReconRun(runId: number) {
@@ -431,43 +476,166 @@ export async function upsertClaimsForPeriod(
         )
       );
 
-    const claimsToInsert = claims.map((claim) => ({
-      runId: null,
-      providerName,
-      periodYear,
-      periodMonth,
-      memberNumber: claim.memberNumber,
-      patientName: claim.patientName || null,
-      serviceDate: claim.serviceDate.toISOString().split("T")[0],
-      invoiceNumber: claim.invoiceNumber || null,
-      claimType: claim.claimType || null,
-      schemeName: claim.schemeName || null,
-      benefitDesc: claim.benefitDesc || null,
-      billedAmount: claim.billedAmount.toString(),
-      currency: normalizeCurrencyForProvider(providerName, claim.currency),
-      status: "awaiting_remittance" as const,
-      amountPaid: "0",
-      compositeKey: buildClaimCompositeKeyFromRow({
+    const claimsToInsert = claims
+      .filter((c) => isValidDate(c.serviceDate))
+      .map((claim) => ({
+        runId: null,
+        providerName,
+        periodYear,
+        periodMonth,
         memberNumber: claim.memberNumber,
-        invoiceNumber: claim.invoiceNumber,
-        serviceDate: claim.serviceDate,
-        billedAmount: claim.billedAmount,
-        status: "awaiting_remittance",
-      } as any),
-      rawRow: claim as any,
-    }));
+        patientName: claim.patientName || null,
+        serviceDate: toISODate(claim.serviceDate),
+        invoiceNumber: claim.invoiceNumber || null,
+        claimType: claim.claimType || null,
+        schemeName: claim.schemeName || null,
+        benefitDesc: claim.benefitDesc || null,
+        billedAmount: claim.billedAmount.toString(),
+        currency: normalizeCurrencyForProvider(providerName, claim.currency),
+        status: "awaiting_remittance" as const,
+        amountPaid: "0",
+        compositeKey: buildClaimCompositeKeyFromRow({
+          memberNumber: claim.memberNumber,
+          invoiceNumber: claim.invoiceNumber,
+          serviceDate: claim.serviceDate,
+          billedAmount: claim.billedAmount,
+          status: "awaiting_remittance",
+        } as any),
+        rawRow: claim as any,
+      }));
 
     return await tx.insert(claimReconClaims).values(claimsToInsert).returning();
   });
 }
 
 /**
- * Cross-period claim reconciliation:
- * - claims: ALL outstanding claims across all periods for provider
- * - remittances: only NEW/unmatched lines for the uploaded statement (period or runId)
- *
- * IMPORTANT: Only update claims when a remittance match exists.
- * Do NOT overwrite previous remittance links if a claim isn't in the new statement.
+ * ✅ MISSING EXPORT FIX: upsertRemittanceForPeriod
+ * Stores a remittance statement under provider + (filing) period.
+ */
+export async function upsertRemittanceForPeriod(
+  providerName: string,
+  periodYear: number,
+  periodMonth: number,
+  remittances: RemittanceRow[]
+) {
+  return await db.transaction(async (tx) => {
+    // Replace canonical staged statement for that filing period
+    await tx
+      .delete(claimReconRemittances)
+      .where(
+        and(
+          eq(claimReconRemittances.providerName, providerName),
+          eq(claimReconRemittances.periodYear, periodYear),
+          eq(claimReconRemittances.periodMonth, periodMonth),
+          isNull(claimReconRemittances.runId)
+        )
+      );
+
+    const toInsert = remittances
+      .filter((r) => isValidDate(r.serviceDate))
+      .map((rem) => {
+        const keyVariants = buildRemittanceKeyVariantsFromRow({
+          memberNumber: rem.memberNumber,
+          claimNumber: rem.claimNumber,
+          serviceDate: rem.serviceDate,
+          claimAmount: rem.claimAmount,
+        } as any);
+
+        return {
+          runId: null,
+          providerName,
+          periodYear,
+          periodMonth,
+          employerName: rem.employerName || null,
+          patientName: rem.patientName || null,
+          memberNumber: rem.memberNumber,
+          claimNumber: rem.claimNumber || null,
+          relationship: rem.relationship || null,
+          serviceDate: toISODate(rem.serviceDate),
+          claimAmount: rem.claimAmount.toString(),
+          paidAmount: rem.paidAmount.toString(),
+          paymentNo: rem.paymentNo || null,
+          paymentMode: rem.paymentMode || null,
+          compositeKey: keyVariants[0],
+          matchedClaimId: null,
+          matchType: null,
+          status: null,
+          rawRow: rem as any,
+        };
+      });
+
+    if (toInsert.length === 0) {
+      throw new Error("No valid remittance rows found (invalid/missing serviceDate)");
+    }
+
+    return await tx.insert(claimReconRemittances).values(toInsert).returning();
+  });
+}
+
+/**
+ * ✅ MISSING EXPORT FIX: getClaimsForPeriod
+ * Prefer staged canonical (runId null). Fallback to any claims for that period.
+ */
+export async function getClaimsForPeriod(providerName: string, periodYear: number, periodMonth: number) {
+  const staged = await db
+    .select()
+    .from(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, providerName),
+        eq(claimReconClaims.periodYear, periodYear),
+        eq(claimReconClaims.periodMonth, periodMonth),
+        isNull(claimReconClaims.runId)
+      )
+    );
+
+  if (staged.length > 0) return staged;
+
+  return await db
+    .select()
+    .from(claimReconClaims)
+    .where(
+      and(
+        eq(claimReconClaims.providerName, providerName),
+        eq(claimReconClaims.periodYear, periodYear),
+        eq(claimReconClaims.periodMonth, periodMonth)
+      )
+    );
+}
+
+/**
+ * ✅ MISSING EXPORT FIX: getRemittanceForPeriod
+ * Prefer staged canonical (runId null). Fallback to any remittances for that period.
+ */
+export async function getRemittanceForPeriod(providerName: string, periodYear: number, periodMonth: number) {
+  const staged = await db
+    .select()
+    .from(claimReconRemittances)
+    .where(
+      and(
+        eq(claimReconRemittances.providerName, providerName),
+        eq(claimReconRemittances.periodYear, periodYear),
+        eq(claimReconRemittances.periodMonth, periodMonth),
+        isNull(claimReconRemittances.runId)
+      )
+    );
+
+  if (staged.length > 0) return staged;
+
+  return await db
+    .select()
+    .from(claimReconRemittances)
+    .where(
+      and(
+        eq(claimReconRemittances.providerName, providerName),
+        eq(claimReconRemittances.periodYear, periodYear),
+        eq(claimReconRemittances.periodMonth, periodMonth)
+      )
+    );
+}
+
+/**
+ * Cross-period claim reconciliation
  */
 export async function runClaimReconciliation(
   providerName: string,
@@ -543,8 +711,6 @@ export async function runClaimReconciliation(
       compositeKey: buildRemittanceKeyVariantsFromRow({
         memberNumber: r.memberNumber,
         claimNumber: r.claimNumber,
-        billNo: (r as any).billNo,
-        billNumber: (r as any).billNumber,
         serviceDate: new Date(r.serviceDate),
         claimAmount: parseFloat(r.claimAmount),
       } as any)[0],
@@ -602,7 +768,7 @@ export async function runClaimReconciliation(
     }
 
     const summary: ReconciliationSummary = {
-      totalClaims: claims.length, // ✅ claims checked
+      totalClaims: claims.length,
       totalRemittances: remittances.length,
       autoMatched: matchedOnly.filter((m) => m.matchType === "exact").length,
       partialMatched: matchedOnly.filter((m) => m.matchType === "partial").length,
@@ -620,7 +786,7 @@ export async function runClaimReconciliation(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Claims inventory + periods summary (unchanged from your version)           */
+/* Claims inventory + periods summary                                         */
 /* -------------------------------------------------------------------------- */
 
 export async function getAllClaims(options?: {
@@ -635,19 +801,19 @@ export async function getAllClaims(options?: {
 
   let query = db.select().from(claimReconClaims);
 
-  const filters = [];
+  const filters: any[] = [];
   if (providerName) filters.push(eq(claimReconClaims.providerName, providerName));
   if (status) filters.push(eq(claimReconClaims.status, status));
   if (periodYear !== undefined) filters.push(eq(claimReconClaims.periodYear, periodYear));
   if (periodMonth !== undefined) filters.push(eq(claimReconClaims.periodMonth, periodMonth));
 
-  if (filters.length > 0) query = query.where(and(...filters)) as any;
+  if (filters.length > 0) query = (query.where(and(...filters)) as any);
 
   const offset = (page - 1) * limit;
   const claims = await query.limit(limit).offset(offset);
 
   let countQuery = db.select().from(claimReconClaims);
-  if (filters.length > 0) countQuery = countQuery.where(and(...filters)) as any;
+  if (filters.length > 0) countQuery = (countQuery.where(and(...filters)) as any);
 
   const allClaims = await countQuery;
   const total = allClaims.length;
@@ -698,7 +864,7 @@ export async function getPeriodsSummary(providerName?: string) {
   const filters = providerName ? [eq(claimReconClaims.providerName, providerName)] : [];
 
   let query = db.select().from(claimReconClaims);
-  if (filters.length > 0) query = query.where(and(...filters)) as any;
+  if (filters.length > 0) query = (query.where(and(...filters)) as any);
 
   const allClaims = await query;
 
