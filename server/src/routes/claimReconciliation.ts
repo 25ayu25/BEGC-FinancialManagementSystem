@@ -42,6 +42,10 @@ import {
 
 const router = Router();
 
+// Constants
+const CLINIC_NAME = "BAHR EL GHAZAL CLINIC";
+const MAX_EXPORT_LIMIT = 10000; // Maximum records for Excel export
+
 /** Utility function for period formatting */
 function formatPeriod(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
@@ -772,6 +776,153 @@ router.get("/claims", requireAuth, async (req: Request, res: Response) => {
     console.error("Error fetching claims:", error);
     res.status(500).json({
       error: error.message || "Failed to fetch claims",
+    });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Export Claims to Excel */
+/* -------------------------------------------------------------------------- */
+
+router.get("/export-claims", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { providerName, status, periodYear, periodMonth } = req.query;
+
+    const options = {
+      providerName: providerName as string | undefined,
+      status: status as string | undefined,
+      periodYear: periodYear ? parseInt(periodYear as string, 10) : undefined,
+      periodMonth: periodMonth ? parseInt(periodMonth as string, 10) : undefined,
+      page: undefined,
+      limit: MAX_EXPORT_LIMIT, // Use configurable constant for export limit
+    };
+
+    const result = await getAllClaims(options);
+    const claims = result.claims;
+
+    if (!claims || claims.length === 0) {
+      return res.status(404).json({ error: "No claims found for export" });
+    }
+
+    // Warn if results were limited
+    if (claims.length >= MAX_EXPORT_LIMIT) {
+      console.warn(`Export limit reached: ${claims.length} claims. Some records may be excluded.`);
+    }
+
+    // Map status to friendly names
+    const statusLabels: Record<string, string> = {
+      awaiting_remittance: "Pending Remittance",
+      matched: "Paid in Full",
+      partially_paid: "Paid Partially",
+      unpaid: "Not Paid",
+      manual_review: "Needs Checking",
+      all: "All Status",
+    };
+
+    const statusName = statusLabels[status as string] || "All Claims";
+    const periodLabel = periodYear && periodMonth
+      ? `${new Date(parseInt(periodYear as string), parseInt(periodMonth as string) - 1).toLocaleString("default", { month: "long", year: "numeric" })}`
+      : "All Periods";
+
+    // Calculate totals
+    let totalBilled = 0;
+    let totalPaid = 0;
+    claims.forEach(c => {
+      totalBilled += parseFloat(c.billedAmount || "0");
+      totalPaid += parseFloat(c.amountPaid || "0");
+    });
+    const totalOutstanding = totalBilled - totalPaid;
+
+    // Build Excel rows
+    const rows: any[][] = [];
+
+    // Header Section (rows 1-6) - use configurable clinic name
+    rows.push([CLINIC_NAME]);
+    rows.push([`Claims Report - ${statusName}`]);
+    rows.push([`Provider: ${providerName || "All"}`]);
+    rows.push([`Period: ${periodLabel}`]);
+    rows.push([`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`]);
+    rows.push([`Total Claims: ${claims.length} | Total Billed: USD ${totalBilled.toFixed(2)}`]);
+    rows.push([]); // Empty row
+
+    // Data Table Header (row 8)
+    rows.push([
+      "Member #",
+      "Patient Name",
+      "Service Date",
+      "Period",
+      "Billed Amount",
+      "Amount Paid",
+      "Balance",
+      "Status",
+    ]);
+
+    // Data rows
+    claims.forEach(c => {
+      const billed = parseFloat(c.billedAmount || "0");
+      const paid = parseFloat(c.amountPaid || "0");
+      const balance = billed - paid;
+
+      const periodStr = `${new Date(c.periodYear, c.periodMonth - 1).toLocaleString("default", { month: "short" })} ${c.periodYear}`;
+      
+      const statusDisplay = statusLabels[c.status] || c.status;
+
+      rows.push([
+        c.memberNumber,
+        c.patientName || "N/A",
+        new Date(c.serviceDate).toLocaleDateString(),
+        periodStr,
+        billed.toFixed(2),
+        paid.toFixed(2),
+        balance.toFixed(2),
+        statusDisplay,
+      ]);
+    });
+
+    // Summary Footer
+    rows.push([]); // Empty row
+    rows.push(["Summary"]);
+    rows.push(["Total Billed:", `USD ${totalBilled.toFixed(2)}`]);
+    rows.push(["Total Paid:", `USD ${totalPaid.toFixed(2)}`]);
+    rows.push(["Total Outstanding:", `USD ${totalOutstanding.toFixed(2)}`]);
+
+    // Create workbook
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Claims Report");
+
+    // Style: Set column widths (approximate)
+    worksheet["!cols"] = [
+      { wch: 12 }, // Member #
+      { wch: 25 }, // Patient Name
+      { wch: 12 }, // Service Date
+      { wch: 12 }, // Period
+      { wch: 14 }, // Billed Amount
+      { wch: 14 }, // Amount Paid
+      { wch: 12 }, // Balance
+      { wch: 18 }, // Status
+    ];
+
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx",
+    });
+
+    // Generate filename
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const statusSlug = (status as string || "All").replace(/_/g, "");
+    const filename = `${providerName || "All"}_Claims_${statusSlug}_${dateStr}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error("Error exporting claims:", error);
+    res.status(500).json({
+      error: error.message || "Failed to export claims",
     });
   }
 });
