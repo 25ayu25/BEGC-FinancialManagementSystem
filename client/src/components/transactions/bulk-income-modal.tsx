@@ -462,8 +462,28 @@ export default function BulkIncomeModal({
                         </Select>
                       </div>
                       <div className="col-span-4">
-                        <Input inputMode="numeric" className="text-right" placeholder="0"
-                          value={row.amount} onChange={(e) => patchDept(idx, { amount: e.target.value })} />
+                        <Input 
+                          inputMode="numeric" 
+                          className="text-right" 
+                          placeholder="0"
+                          value={row.amount} 
+                          onChange={(e) => patchDept(idx, { amount: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (idx === deptRows.length - 1) {
+                                // Last field in dept section, focus first provider input
+                                const firstProvInput = document.querySelector('[data-provider-input="0"]') as HTMLInputElement;
+                                if (firstProvInput) firstProvInput.focus();
+                              } else {
+                                // Focus next dept input
+                                const nextInput = document.querySelector(`[data-dept-input="${idx + 1}"]`) as HTMLInputElement;
+                                if (nextInput) nextInput.focus();
+                              }
+                            }
+                          }}
+                          data-dept-input={idx}
+                        />
                       </div>
                       <div className="col-span-1 flex items-center justify-end">
                         <Button type="button" variant="ghost" size="icon" onClick={() => rmDeptRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
@@ -506,8 +526,29 @@ export default function BulkIncomeModal({
                         </Select>
                       </div>
                       <div className="col-span-4">
-                        <Input inputMode="numeric" className="text-right" placeholder="0"
-                          value={row.amount} onChange={(e) => patchProv(idx, { amount: e.target.value })} />
+                        <Input 
+                          inputMode="numeric" 
+                          className="text-right" 
+                          placeholder="0"
+                          value={row.amount} 
+                          onChange={(e) => patchProv(idx, { amount: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (idx === provRows.length - 1) {
+                                // Last field, trigger save
+                                if (!savingDisabled && !isSaving && !dateHasData) {
+                                  saveAll();
+                                }
+                              } else {
+                                // Focus next provider input
+                                const nextInput = document.querySelector(`[data-provider-input="${idx + 1}"]`) as HTMLInputElement;
+                                if (nextInput) nextInput.focus();
+                              }
+                            }
+                          }}
+                          data-provider-input={idx}
+                        />
                       </div>
                       <div className="col-span-1 flex items-center justify-end">
                         <Button type="button" variant="ghost" size="icon" onClick={() => rmProvRow(idx)} className="hover:bg-red-50 hover:text-red-600">🗑️</Button>
@@ -532,14 +573,17 @@ export default function BulkIncomeModal({
             </div>
 
             {/* footer */}
-            <div className="flex items-center justify-end gap-3 p-4 border-t">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              {/* ++ MODIFICATION: Update save button to show loading state and disable if date has data */}
-              <Button onClick={saveAll} disabled={savingDisabled || isSaving || dateHasData || checkingDate}>
-                {checkingDate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {checkingDate ? "Checking date..." : isSaving ? "Saving..." : "Save Daily Income"}
-              </Button>
+            <div className="flex items-center justify-between gap-3 p-4 border-t">
+              <span className="text-xs text-gray-500">💡 Tip: Press Enter to move to next field or save</span>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                {/* ++ MODIFICATION: Update save button to show loading state and disable if date has data */}
+                <Button onClick={saveAll} disabled={savingDisabled || isSaving || dateHasData || checkingDate}>
+                  {checkingDate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {checkingDate ? "Checking date..." : isSaving ? "Saving..." : "Save Daily Income"}
+                </Button>
+              </div>
             </div>
           </fieldset>
         </div>

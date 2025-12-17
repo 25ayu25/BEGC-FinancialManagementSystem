@@ -245,6 +245,22 @@ export default function BulkExpenseModal({
                         placeholder="0"
                         value={row.amount}
                         onChange={(e) => patch(idx, { amount: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (idx === rows.length - 1) {
+                              // Last field, trigger save
+                              if (validPayloads.length > 0 && !isSaving) {
+                                saveAll();
+                              }
+                            } else {
+                              // Focus next input
+                              const nextInput = document.querySelector(`[data-expense-input="${idx + 1}"]`) as HTMLInputElement;
+                              if (nextInput) nextInput.focus();
+                            }
+                          }
+                        }}
+                        data-expense-input={idx}
                       />
                     </div>
 
@@ -282,13 +298,16 @@ export default function BulkExpenseModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 p-4 border-t">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveAll} disabled={validPayloads.length === 0 || isSaving}>
-              Save Expenses
-            </Button>
+          <div className="flex items-center justify-between gap-3 p-4 border-t">
+            <span className="text-xs text-gray-500">💡 Tip: Press Enter to move to next field or save</span>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveAll} disabled={validPayloads.length === 0 || isSaving}>
+                Save Expenses
+              </Button>
+            </div>
           </div>
 
           {isSaving && (
