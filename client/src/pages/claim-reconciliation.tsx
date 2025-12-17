@@ -226,6 +226,27 @@ function getRemittanceUploadDescription(providerName: string): string {
 }
 
 /**
+ * Status grouping (fixes “Needs attention” counting Awaiting Remittance)
+ */
+const SETTLED_STATUSES = new Set(["paid", "matched"]);
+const AWAITING_STATUSES = new Set(["awaiting_remittance", "submitted"]);
+const ATTENTION_STATUSES = new Set(["unpaid", "partially_paid", "manual_review"]);
+
+function isSettledStatus(status?: string | null): boolean {
+  return !!status && SETTLED_STATUSES.has(status);
+}
+function isAwaitingStatus(status?: string | null): boolean {
+  return !!status && AWAITING_STATUSES.has(status);
+}
+function isAttentionStatus(status?: string | null): boolean {
+  return !!status && ATTENTION_STATUSES.has(status);
+}
+function isExceptionStatus(status?: string | null): boolean {
+  // “Exceptions” = anything not settled (includes awaiting + unpaid/partial/review)
+  return !isSettledStatus(status);
+}
+
+/**
  * Infer a (year, month) from a filename like:
  *  - "CIC Jan 25.xlsx"
  *  - "claims_feb_2025.xls"
@@ -404,6 +425,8 @@ function FileDropzone({
 /* Main Component */
 /* -------------------------------------------------------------------------- */
 
+type DetailsFilter = "all" | "awaiting" | "attention";
+
 export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -412,7 +435,7 @@ export default function ClaimReconciliation() {
   const didUserTouchPeriod = useRef(false);
 
   /* ------------------------------------------------------------------------ */
-  /* Active Period Controls (THIS fixes your issue) */
+  /* Active Period Controls */
   /* ------------------------------------------------------------------------ */
   const [providerName, setProviderName] = useState("CIC");
   const [periodYear, setPeriodYear] = useState(now.getFullYear().toString());
@@ -433,13 +456,15 @@ export default function ClaimReconciliation() {
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
-  const [attentionFilter, setAttentionFilter] = useState<"all" | "issues">("issues");
+  // Run Details filter (fix: awaiting remittance != needs attention)
+  const [detailsFilter, setDetailsFilter] = useState<DetailsFilter>("attention");
+
   const [statusFilter, setStatusFilter] = useState<"all" | "awaiting_remittance" | "reconciled">("all");
 
   // Claims Inventory (view-only filters)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<
     "all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid"
-  >("unpaid");
+  >("all"); // ✅ default to All (matches your screenshots)
   const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);
@@ -462,8 +487,7 @@ export default function ClaimReconciliation() {
     queryKey: ["/api/claim-reconciliation/runs"],
   });
 
-  // ISSUE 3 FIX: Filter to only show actual reconciliation runs (with remittances > 0)
-  // This prevents claims-only uploads from cluttering the Reconciliation History
+  // Filter to only show actual reconciliation runs (with remittances > 0)
   const actualReconciliationRuns = useMemo(() => {
     return runs.filter(run => run.totalRemittanceRows > 0);
   }, [runs]);
@@ -524,7 +548,7 @@ export default function ClaimReconciliation() {
     },
   });
 
-  // Auto-select the latest period *with data* when provider changes (but never override user choice)
+  // Auto-select the latest period *with data* when provider changes (but never override user-chosen period)
   useEffect(() => {
     if (didUserTouchPeriod.current) return;
     if (!periodsSummary || periodsSummary.length === 0) return;
@@ -605,6 +629,15 @@ export default function ClaimReconciliation() {
     enabled: showInventory,
   });
 
+  const inventoryPeriodLabel = useMemo(() => {
+    if (!inventoryPeriodFilter) return null;
+    const [y, m] = inventoryPeriodFilter.split("-");
+    const yy = parseInt(y, 10);
+    const mm = parseInt(m, 10);
+    if (!isNaN(yy) && !isNaN(mm)) return formatPeriodLabel(yy, mm);
+    return inventoryPeriodFilter;
+  }, [inventoryPeriodFilter]);
+
   const inventorySummaryStats = useMemo(() => {
     if (!periodsSummary || periodsSummary.length === 0) {
       return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
@@ -639,11 +672,9 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
-    // Only count runs where actual reconciliation occurred (i.e., runs with remittances > 0)
     const reconciliationsDone = runs.filter(run => run.totalRemittanceRows > 0).length;
 
     const totalClaims = periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
-    // Only count CONFIRMED problems (unpaid + partiallyPaid), exclude awaiting remittance
     const problemClaims = periodsSummary.reduce((sum, p) => sum + p.unpaid + p.partiallyPaid, 0);
     const awaitingRemittance = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0);
 
@@ -713,7 +744,7 @@ export default function ClaimReconciliation() {
       setSelectedRunId(data.runId);
       setClaimsFile(null);
       setRemittanceFile(null);
-      setAttentionFilter("issues");
+      setDetailsFilter("attention");
     },
     onError: (error: Error) => {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
@@ -893,7 +924,7 @@ export default function ClaimReconciliation() {
       a.remove();
       URL.revokeObjectURL(url);
 
-      toast({ title: "Export ready", description: "Problem claims were exported for CIC." });
+      toast({ title: "Export ready", description: "Exceptions were exported." });
     },
     onError: (error: Error) => {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
@@ -1052,7 +1083,7 @@ export default function ClaimReconciliation() {
   }, [periodStatus, claimsFile, remittanceFile]);
 
   /* ------------------------------------------------------------------------ */
-  /* Smart action (THIS adds the missing Submit button) */
+  /* Smart action */
   /* ------------------------------------------------------------------------ */
 
   const uploadAction = useMemo(() => {
@@ -1235,12 +1266,24 @@ export default function ClaimReconciliation() {
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
 
-  const issuesCountForSelected = useMemo(() => claims.filter((c) => c.status !== "paid").length, [claims]);
+  const exceptionsCountForSelected = useMemo(
+    () => claims.filter((c) => isExceptionStatus(c.status)).length,
+    [claims]
+  );
+  const awaitingCountForSelected = useMemo(
+    () => claims.filter((c) => isAwaitingStatus(c.status)).length,
+    [claims]
+  );
+  const attentionCountForSelected = useMemo(
+    () => claims.filter((c) => isAttentionStatus(c.status)).length,
+    [claims]
+  );
 
   const filteredClaims = useMemo(() => {
-    if (attentionFilter === "all") return claims;
-    return claims.filter((c) => c.status !== "paid");
-  }, [claims, attentionFilter]);
+    if (detailsFilter === "all") return claims;
+    if (detailsFilter === "awaiting") return claims.filter((c) => isAwaitingStatus(c.status));
+    return claims.filter((c) => isAttentionStatus(c.status));
+  }, [claims, detailsFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -1310,7 +1353,6 @@ export default function ClaimReconciliation() {
       touchPeriod();
       setPeriodYear(String(year));
       setPeriodMonth(String(month));
-      // NOTE: inventoryPeriodFilter is view-only now; user controls it inside Inventory section
     },
     []
   );
@@ -1352,8 +1394,8 @@ export default function ClaimReconciliation() {
 
   const handleExportIssues = () => {
     if (!selectedRunId) return;
-    if (issuesCountForSelected === 0) {
-      toast({ title: "Nothing to export", description: "All claims for this run are fully paid." });
+    if (exceptionsCountForSelected === 0) {
+      toast({ title: "Nothing to export", description: "No exceptions for this run." });
       return;
     }
     exportIssuesMutation.mutate(selectedRunId);
@@ -1526,8 +1568,8 @@ export default function ClaimReconciliation() {
                     <span className="text-[11px] uppercase tracking-wide text-orange-500">confirmed issues</span>
                   </div>
                   <div className="mt-1 text-[11px] text-slate-500">
-                    {stats.awaitingRemittance > 0 
-                      ? `Unpaid/partial claims. ${stats.awaitingRemittance} awaiting verification.`
+                    {stats.awaitingRemittance > 0
+                      ? `Unpaid/partial claims. ${stats.awaitingRemittance} awaiting remittance.`
                       : "Unpaid or partially paid after reconciliation."}
                   </div>
                 </div>
@@ -1541,17 +1583,16 @@ export default function ClaimReconciliation() {
                 <div className="font-medium text-slate-800">How the reconciliation workflow works</div>
                 <ul className="list-disc list-inside space-y-1">
                   <li>
-                    <strong>Select any month/year:</strong> Use the Provider/Year/Month controls in the Workflow card (you
-                    can pick January 2025 even if it doesn’t exist as a card yet).
+                    <strong>Select any month/year:</strong> Use the Provider/Year/Month controls in the Workflow card.
                   </li>
                   <li>
-                    <strong>Upload claims first:</strong> Upload your claims file. Claims are stored as “awaiting remittance”.
+                    <strong>Upload claims first:</strong> Claims store as “awaiting remittance”.
                   </li>
                   <li>
-                    <strong>Upload remittance later:</strong> Once remittance arrives, upload it to reconcile.
+                    <strong>Upload remittance later:</strong> Upload it to reconcile.
                   </li>
                   <li>
-                    <strong>Submit button:</strong> The “Upload…” button under the dropzones is always available once you select a file.
+                    <strong>Submit button:</strong> The “Upload…” button under the dropzones is available once you select a file.
                   </li>
                 </ul>
               </CardContent>
@@ -1575,7 +1616,7 @@ export default function ClaimReconciliation() {
                     <Select
                       value={providerName}
                       onValueChange={(v) => {
-                        touchPeriod();
+                        // ✅ Do NOT mark period “touched” for provider changes
                         setProviderName(v);
                       }}
                     >
@@ -1635,6 +1676,10 @@ export default function ClaimReconciliation() {
                   const hasAwaiting = period.awaitingRemittance > 0;
                   const hasIssues = period.unpaid > 0 || period.partiallyPaid > 0;
 
+                  // ✅ Priority: issues > awaiting (so Feb shows “Needs review” if partial exists)
+                  const cardState: "complete" | "needs_review" | "awaiting" | "processing" =
+                    isComplete ? "complete" : hasIssues ? "needs_review" : hasAwaiting ? "awaiting" : "processing";
+
                   return (
                     <div
                       key={`${period.periodYear}-${period.periodMonth}`}
@@ -1649,11 +1694,11 @@ export default function ClaimReconciliation() {
                       <div
                         className={cn(
                           "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl transition-all",
-                          isComplete
+                          cardState === "complete"
                             ? "bg-gradient-to-br from-green-400/20 to-emerald-500/20"
-                            : hasAwaiting
+                            : cardState === "awaiting"
                             ? "bg-gradient-to-br from-blue-400/20 to-cyan-500/20"
-                            : hasIssues
+                            : cardState === "needs_review"
                             ? "bg-gradient-to-br from-orange-400/20 to-red-500/20"
                             : "bg-gradient-to-br from-slate-400/10 to-slate-500/10",
                           "group-hover:scale-110"
@@ -1669,11 +1714,11 @@ export default function ClaimReconciliation() {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {isComplete ? (
+                            {cardState === "complete" ? (
                               <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            ) : hasAwaiting ? (
+                            ) : cardState === "awaiting" ? (
                               <Clock className="w-5 h-5 text-blue-600" />
-                            ) : hasIssues ? (
+                            ) : cardState === "needs_review" ? (
                               <AlertTriangle className="w-5 h-5 text-orange-600" />
                             ) : null}
 
@@ -1751,20 +1796,20 @@ export default function ClaimReconciliation() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {isComplete ? (
+                          {cardState === "complete" ? (
                             <Badge className="bg-green-500 text-white hover:bg-green-600">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
                               Complete
                             </Badge>
-                          ) : hasAwaiting ? (
-                            <Badge className="bg-blue-500 text-white hover:bg-blue-600">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Awaiting Remittance
-                            </Badge>
-                          ) : hasIssues ? (
+                          ) : cardState === "needs_review" ? (
                             <Badge className="bg-orange-500 text-white hover:bg-orange-600">
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               Needs review
+                            </Badge>
+                          ) : cardState === "awaiting" ? (
+                            <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Awaiting Remittance
                             </Badge>
                           ) : (
                             <Badge className="bg-slate-500 text-white hover:bg-slate-600">Processing</Badge>
@@ -1798,14 +1843,13 @@ export default function ClaimReconciliation() {
                 <CardDescription>{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
               </div>
 
-              {/* ✅ FIX: month/year selection always available */}
               <div className="flex flex-wrap items-end gap-2">
                 <div className="grid gap-1">
                   <span className="text-xs text-muted-foreground">Provider</span>
                   <Select
                     value={providerName}
                     onValueChange={(v) => {
-                      touchPeriod();
+                      // ✅ Do NOT mark period “touched” for provider changes
                       setProviderName(v);
                     }}
                   >
@@ -1874,7 +1918,6 @@ export default function ClaimReconciliation() {
               onPrimaryAction={handleStepperAction}
             />
 
-            {/* File upload */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700">File Upload</h3>
@@ -1899,7 +1942,6 @@ export default function ClaimReconciliation() {
                     icon={<FileText className="w-4 h-4" />}
                   />
 
-                  {/* Filename mismatch helper (prevents your exact confusion) */}
                   {claimsFile && inferredClaimsPeriod && claimsPeriodMismatch && (
                     <div className="mt-2 rounded-lg border-2 border-orange-300 bg-orange-50 px-4 py-3 text-sm">
                       <div className="font-semibold text-orange-800">Period mismatch detected</div>
@@ -1956,7 +1998,6 @@ export default function ClaimReconciliation() {
                 <div className="text-xs text-slate-700">{helpText}</div>
               </div>
 
-              {/* ✅ FIX: explicit Upload/Submit button (always visible) */}
               <Button
                 type="button"
                 className="w-full"
@@ -2076,7 +2117,7 @@ export default function ClaimReconciliation() {
               )}
 
               {!summaryLoading && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Total Claims</div>
                     <div className="text-xl font-bold text-slate-900">{inventorySummaryStats.total}</div>
@@ -2088,6 +2129,10 @@ export default function ClaimReconciliation() {
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Matched</div>
                     <div className="text-xl font-bold text-green-600">{inventorySummaryStats.matched}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">Partially Paid</div>
+                    <div className="text-xl font-bold text-yellow-600">{inventorySummaryStats.partial}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 mb-1">Unpaid</div>
@@ -2104,7 +2149,7 @@ export default function ClaimReconciliation() {
                   <p className="text-muted-foreground text-sm">
                     No claims found
                     {inventoryStatusFilter !== "all" ? ` with status "${inventoryStatusFilter}"` : ""}
-                    {inventoryPeriodFilter ? ` for ${inventoryPeriodFilter}` : ""}
+                    {inventoryPeriodLabel ? ` for ${inventoryPeriodLabel}` : ""}
                   </p>
                 </div>
               ) : (
@@ -2217,7 +2262,8 @@ export default function ClaimReconciliation() {
                     onClick={() => setStatusFilter("awaiting_remittance")}
                   >
                     <Clock className="w-3 h-3" />
-                    Awaiting remittance ({actualReconciliationRuns.filter((r) => getRunStatus(r) === "awaiting_remittance").length})
+                    Awaiting remittance (
+                    {actualReconciliationRuns.filter((r) => getRunStatus(r) === "awaiting_remittance").length})
                   </button>
                   <button
                     type="button"
@@ -2284,9 +2330,12 @@ export default function ClaimReconciliation() {
                             setPeriodYear(String(run.periodYear));
                             setPeriodMonth(String(run.periodMonth));
                             setSelectedRunId(run.id);
+                            setDetailsFilter("attention");
 
-                            const workflowSection = document.getElementById("workflow-section");
-                            if (workflowSection) workflowSection.scrollIntoView({ behavior: "smooth" });
+                            // Scroll after render
+                            window.setTimeout(() => {
+                              document.getElementById("claims-details-section")?.scrollIntoView({ behavior: "smooth" });
+                            }, 50);
                           }}
                           className={cn(
                             "odd:bg-slate-50/40 hover:bg-emerald-50/60 transition-colors cursor-pointer",
@@ -2342,7 +2391,7 @@ export default function ClaimReconciliation() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedRunId(run.id);
-                                    setAttentionFilter("issues");
+                                    setDetailsFilter("attention");
                                   }}
                                   className={cn("cursor-pointer", selectedRunId === run.id && "bg-slate-100")}
                                 >
@@ -2376,7 +2425,10 @@ export default function ClaimReconciliation() {
 
         {/* Claims Details */}
         {selectedRunId && (
-          <Card className="border-2 border-slate-200/80 shadow-lg border-l-4 border-l-orange-400">
+          <Card
+            id="claims-details-section"
+            className="border-2 border-slate-200/80 shadow-lg border-l-4 border-l-orange-400"
+          >
             <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-amber-50">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -2384,7 +2436,7 @@ export default function ClaimReconciliation() {
                     <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                     Claims details — Run #{selectedRunId}
                   </CardTitle>
-                  <CardDescription>Detailed view of reconciled claims for the selected run.</CardDescription>
+                  <CardDescription>Detailed view of claims for the selected run.</CardDescription>
                 </div>
 
                 {selectedRun && (
@@ -2397,7 +2449,8 @@ export default function ClaimReconciliation() {
                       })}
                     </div>
                     <div>
-                      {selectedRun.totalClaimRows} claims, {selectedRun.totalRemittanceRows} remittances
+                      {selectedRun.totalClaimRows} claims{claims.length > 0 && claims.length !== selectedRun.totalClaimRows ? ` (${claims.length} shown)` : ""},{" "}
+                      {selectedRun.totalRemittanceRows} remittances
                     </div>
                   </div>
                 )}
@@ -2417,26 +2470,41 @@ export default function ClaimReconciliation() {
                         type="button"
                         className={cn(
                           "px-4 py-2 rounded-full transition-all font-medium",
-                          attentionFilter === "all"
+                          detailsFilter === "all"
                             ? "bg-white shadow-md text-slate-900"
                             : "text-slate-600 hover:text-slate-900"
                         )}
-                        onClick={() => setAttentionFilter("all")}
+                        onClick={() => setDetailsFilter("all")}
                       >
                         All claims ({claims.length})
                       </button>
+
                       <button
                         type="button"
                         className={cn(
                           "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
-                          attentionFilter === "issues"
+                          detailsFilter === "awaiting"
+                            ? "bg-blue-500 shadow-md text-white"
+                            : "text-slate-600 hover:text-slate-900"
+                        )}
+                        onClick={() => setDetailsFilter("awaiting")}
+                      >
+                        <Clock className="w-3 h-3" />
+                        Awaiting remittance ({awaitingCountForSelected})
+                      </button>
+
+                      <button
+                        type="button"
+                        className={cn(
+                          "px-4 py-2 rounded-full transition-all font-medium flex items-center gap-1",
+                          detailsFilter === "attention"
                             ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-md text-white"
                             : "text-slate-600 hover:text-slate-900"
                         )}
-                        onClick={() => setAttentionFilter("issues")}
+                        onClick={() => setDetailsFilter("attention")}
                       >
                         <AlertTriangle className="w-3 h-3" />
-                        Needs attention ({issuesCountForSelected})
+                        Needs attention ({attentionCountForSelected})
                       </button>
                     </div>
 
@@ -2446,16 +2514,20 @@ export default function ClaimReconciliation() {
                       size="sm"
                       className="gap-2"
                       onClick={handleExportIssues}
-                      disabled={!selectedRunId || issuesCountForSelected === 0 || isExporting}
+                      disabled={!selectedRunId || exceptionsCountForSelected === 0 || isExporting}
                     >
                       {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      Export for CIC
+                      Export for {selectedRun?.providerName ?? providerName}
                     </Button>
                   </div>
 
-                  {filteredClaims.length === 0 && attentionFilter === "issues" ? (
+                  {filteredClaims.length === 0 ? (
                     <p className="text-muted-foreground py-6 text-sm">
-                      All claims for this period are fully paid. There is nothing to follow up.
+                      {detailsFilter === "attention"
+                        ? "No unpaid/partial/review items for this run."
+                        : detailsFilter === "awaiting"
+                        ? "No claims are awaiting remittance for this run."
+                        : "No claims to display."}
                     </p>
                   ) : (
                     <div className="w-full overflow-x-auto">
