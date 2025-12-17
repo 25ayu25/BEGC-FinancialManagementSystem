@@ -1905,13 +1905,13 @@ export default function ClaimReconciliation() {
                           {period.partiallyPaid > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                              <span>{period.partiallyPaid} paid partially</span>
+                              <span>{period.partiallyPaid} Paid partially</span>
                             </div>
                           )}
                           {period.unpaid > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                              <span>{period.unpaid} not paid</span>
+                              <span>{period.unpaid} Not paid (0 paid)</span>
                             </div>
                           )}
                         </div>
@@ -2482,7 +2482,7 @@ export default function ClaimReconciliation() {
                               className="text-xs font-semibold border-emerald-300 bg-emerald-50 text-emerald-700"
                             >
                               <CheckCircle className="w-3 h-3 mr-1" />
-                              {run.autoMatched} Paid
+                              {run.autoMatched} Paid in full
                             </Badge>
                           </TableCell>
                           <TableCell>
