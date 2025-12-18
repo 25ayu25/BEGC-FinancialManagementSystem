@@ -288,7 +288,7 @@ router.post(
         provider: providerName,
         period: formatPeriod(parseInt(periodYear, 10), parseInt(periodMonth, 10)),
         claimsStored: inserted.length,
-        message: `${inserted.length} claims stored and awaiting remittance`,
+        message: `${inserted.length} claims stored and pending payment statement`,
       });
     } catch (error: any) {
       console.error("Error uploading claims:", error);
