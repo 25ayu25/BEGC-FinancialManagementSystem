@@ -1073,10 +1073,10 @@ export default function ClaimReconciliation() {
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const error = await response.json();
-          throw new Error(error.error || "Failed to delete remittances");
+          throw new Error(error.error || "Failed to delete payment statements");
         }
         const text = await response.text();
-        throw new Error(`Failed to delete remittances (${response.status}): ${text.substring(0, 120)}`);
+        throw new Error(`Failed to delete payment statements (${response.status}): ${text.substring(0, 120)}`);
       }
 
       return response.json();
@@ -1129,7 +1129,7 @@ export default function ClaimReconciliation() {
 
     const step2 = {
       completed: hasRemittance,
-      details: hasRemittance ? `${periodStatus.remittances.total} remittances` : undefined,
+      details: hasRemittance ? `${periodStatus.remittances.total} payment statements` : undefined,
     };
 
     const step3 = {
@@ -1152,7 +1152,7 @@ export default function ClaimReconciliation() {
       primaryDisabled = !claimsFile;
     } else if (!hasRemittance) {
       currentStep = 2;
-      primaryAction = "💰 Upload Remittance File";
+      primaryAction = "💰 Upload Payment Statement File";
       primaryDisabled = !paymentStatementFile;
     } else if (!isReconciled) {
       currentStep = 3;
@@ -1193,7 +1193,7 @@ export default function ClaimReconciliation() {
       return { type: "claims-only" as const, label: `Upload Claims`, disabled: false };
     }
     if (!hasClaims && hasRemittance) {
-      return { type: "remittance-only" as const, label: `Upload Remittance to ${periodLabel}`, disabled: false };
+      return { type: "remittance-only" as const, label: `Upload Payment Statement to ${periodLabel}`, disabled: false };
     }
     return { type: "both" as const, label: `Upload & Reconcile`, disabled: false };
   }, [claimsFile, paymentStatementFile, periodYear, periodMonth]);
