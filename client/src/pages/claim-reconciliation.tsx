@@ -485,6 +485,7 @@ export default function ClaimReconciliation() {
   /* UI State */
   /* ------------------------------------------------------------------------ */
   const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
+  const didUserTouchYearFilter = useRef(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
@@ -606,6 +607,9 @@ export default function ClaimReconciliation() {
   }, [periodsSummary]);
 
   useEffect(() => {
+    // Don't override user's explicit choice
+    if (didUserTouchYearFilter.current) return;
+    
     if (periodYearFilter === null && availableYears.length > 0) {
       // Default to current year instead of oldest year
       const currentYear = new Date().getFullYear();
@@ -1443,7 +1447,7 @@ export default function ClaimReconciliation() {
     exportIssuesMutation.mutate(selectedRunId);
   };
 
-  const handleExportClaims = (status: string) => {
+  const handleExportClaims = async (status: string) => {
     const params = new URLSearchParams();
     params.append("providerName", providerName);
     if (status !== "all") {
@@ -1455,7 +1459,47 @@ export default function ClaimReconciliation() {
       params.append("periodMonth", month);
     }
 
-    window.location.href = `${API_BASE_URL}/api/claim-reconciliation/export-claims?${params.toString()}`;
+    const url = `${API_BASE_URL}/api/claim-reconciliation/export-claims?${params.toString()}`;
+    
+    const headers: HeadersInit = {};
+    const backup = readSessionBackup();
+    if (backup) headers["x-session-token"] = backup;
+
+    try {
+      const response = await fetch(url, { 
+        method: "GET", 
+        credentials: "include", 
+        headers 
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Export failed");
+        }
+        throw new Error(`Export failed (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      let fileName = `${providerName}_Claims_${status}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      if (match?.[1]) fileName = match[1];
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      toast({ title: "Export ready", description: "Claims exported successfully." });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
@@ -1609,7 +1653,7 @@ export default function ClaimReconciliation() {
               onClick={() => {
                 setShowInventory(true);
                 // Apply filters for follow-up items
-                setInventoryStatusFilter("all");
+                setInventoryStatusFilter("partially_paid");
                 // Scroll to inventory after a brief delay to allow state update
                 setTimeout(() => {
                   const inventorySection = document.getElementById("exceptions-section");
@@ -1784,7 +1828,10 @@ export default function ClaimReconciliation() {
                       <button
                         key={year}
                         type="button"
-                        onClick={() => setPeriodYearFilter(year)}
+                        onClick={() => {
+                          didUserTouchYearFilter.current = true;
+                          setPeriodYearFilter(year);
+                        }}
                         className={cn(
                           "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200",
                           periodYearFilter === year
@@ -1797,7 +1844,10 @@ export default function ClaimReconciliation() {
                     ))}
                     <button
                       type="button"
-                      onClick={() => setPeriodYearFilter(null)}
+                      onClick={() => {
+                        didUserTouchYearFilter.current = true;
+                        setPeriodYearFilter(null);
+                      }}
                       className={cn(
                         "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200",
                         periodYearFilter === null
