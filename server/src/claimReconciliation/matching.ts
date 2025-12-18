@@ -201,14 +201,23 @@ export function matchClaimsToRemittances(
 
       let matchType: "exact" | "partial" | "none";
 
+      // STRICT STATUS RULES (Requirement 4):
+      // - matched AND paidAmount == billedAmount → "matched"/"paid"
+      // - matched AND 0 < paidAmount < billedAmount → "partially_paid"
+      // - matched AND paidAmount == 0 → "unpaid" (Not paid (0 paid))
       if (paidAmount === claimAmount && claimAmount > 0) {
         status = "matched";
         matchType = "exact";
-      } else if (paidAmount > 0 && claimAmount > 0) {
-        status = paidAmount < claimAmount ? "partially_paid" : "matched";
+      } else if (paidAmount > 0 && paidAmount < claimAmount && claimAmount > 0) {
+        status = "partially_paid";
         matchType = "partial";
       } else if (paidAmount === 0 && claimAmount > 0) {
+        // Claim is in the statement but with $0 paid
         status = "unpaid";
+        matchType = "partial";
+      } else if (paidAmount > claimAmount && claimAmount > 0) {
+        // Overpayment - mark as matched but flag for review
+        status = "matched";
         matchType = "partial";
       } else {
         status = "manual_review";
@@ -225,7 +234,9 @@ export function matchClaimsToRemittances(
     }
   }
 
-  // Keep unmatched claims as-is (do NOT flip to unpaid automatically)
+  // CRITICAL (Requirement 4): Keep unmatched claims as "awaiting_remittance"
+  // If claim NOT matched to any statement line → status must remain "awaiting_remittance"
+  // DO NOT mark unmatched as "unpaid"
   for (const claim of claims) {
     if (!matchedClaims.has(claim.id)) {
       const currentStatus = (claim.data as any)?.status;
@@ -235,6 +246,7 @@ export function matchClaimsToRemittances(
         remittanceId: null,
         matchType: "none",
         amountPaid: 0,
+        // Preserve existing status if it's already set, otherwise "awaiting_remittance"
         status: (currentStatus as any) ?? "awaiting_remittance",
       });
     }
