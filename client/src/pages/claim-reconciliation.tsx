@@ -270,7 +270,7 @@ function getWorkflowDescription(providerName: string, periodLabel: string): stri
  */
 function getRemittanceUploadDescription(providerName: string): string {
   if (providerName === "CIC") {
-    return "This payment statement will be matched against all CIC claims that are still awaiting payment statement, not just this month";
+    return "This payment statement will be matched against all CIC claims that are still awaiting a payment statement, not just this month";
   }
   return "Upload payment statement/remittance advice from insurance";
 }
@@ -2406,19 +2406,22 @@ export default function ClaimReconciliation() {
               </div>
               
               {/* Issue 3: Show "View all X periods" button if more than 6 exist */}
-              {periodsSummary.filter(p => periodYearFilter === null || p.periodYear === periodYearFilter).length > MAX_CARDS_DEFAULT && (
-                <div className="mt-6 flex justify-center">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setViewMode("table")}
-                    className="gap-2 hover:bg-orange-50 hover:border-orange-300 transition-all shadow-sm"
-                  >
-                    <TableIcon className="w-5 h-5" />
-                    View all {periodsSummary.filter(p => periodYearFilter === null || p.periodYear === periodYearFilter).length} periods
-                  </Button>
-                </div>
-              )}
+              {(() => {
+                const filteredPeriodsCount = periodsSummary.filter(p => periodYearFilter === null || p.periodYear === periodYearFilter).length;
+                return filteredPeriodsCount > MAX_CARDS_DEFAULT && (
+                  <div className="mt-6 flex justify-center">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => setViewMode("table")}
+                      className="gap-2 hover:bg-orange-50 hover:border-orange-300 transition-all shadow-sm"
+                    >
+                      <TableIcon className="w-5 h-5" />
+                      View all {filteredPeriodsCount} periods
+                    </Button>
+                  </div>
+                );
+              })()}
                 </>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-200/50">
@@ -3195,7 +3198,7 @@ export default function ClaimReconciliation() {
                               </div>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">Total claims checked across all outstanding periods during this reconciliation run</p>
+                              <p className="text-xs">Number of claims processed during this reconciliation, including claims from previous periods</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
