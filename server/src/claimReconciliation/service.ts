@@ -818,7 +818,8 @@ export async function runClaimReconciliation(
     }
 
     // Record all claims processed in this run (Issue 1 fix) - Batch insert for performance
-    if (opts?.runId) {
+    // Only record if runId is provided (for new run tracking)
+    if (opts?.runId && matches.length > 0) {
       const runClaimsToInsert = matches.map(match => {
         const statusBefore = claimStatusBefore.get(match.claimId);
         const statusAfter = match.status;
@@ -829,7 +830,7 @@ export async function runClaimReconciliation(
         }
 
         return {
-          runId: opts.runId!,
+          runId: opts.runId,
           claimId: match.claimId,
           statusBeforeRun: statusBefore || null,
           statusAfterRun: statusAfter,
@@ -839,9 +840,7 @@ export async function runClaimReconciliation(
         };
       });
 
-      if (runClaimsToInsert.length > 0) {
-        await tx.insert(claimReconRunClaims).values(runClaimsToInsert);
-      }
+      await tx.insert(claimReconRunClaims).values(runClaimsToInsert);
     }
 
     const orphanRemittances = remittances.filter((r) => !matchedRemittanceIds.has(r.id));

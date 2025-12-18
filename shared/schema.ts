@@ -279,7 +279,7 @@ export const claimReconRunClaims = pgTable("claim_recon_run_claims", {
   amountPaidInRun: decimal("amount_paid_in_run", { precision: 12, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
-  uniqueRunClaim: uniqueIndex("unique_run_claim_idx").on(table.runId, table.claimId),
+  uniqueRunClaimIdx: uniqueIndex("idx_claim_recon_run_claims_run_id_claim_id").on(table.runId, table.claimId),
 }));
 
 /* =======================
