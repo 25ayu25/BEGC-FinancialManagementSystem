@@ -2212,11 +2212,11 @@ export default function ClaimReconciliation() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="w-8 h-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                                  className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-sm"
                                   onClick={(e) => e.stopPropagation()}
                                   disabled={isDeleting || isUploading}
                                 >
-                                  <MoreHorizontal className="w-4 h-4" />
+                                  <MoreHorizontal className="w-5 h-5" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
@@ -2570,11 +2570,11 @@ export default function ClaimReconciliation() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="w-8 h-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                                    className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-sm"
                                     onClick={(e) => e.stopPropagation()}
                                     disabled={isDeleting || isUploading}
                                   >
-                                    <MoreHorizontal className="w-4 h-4" />
+                                    <MoreHorizontal className="w-5 h-5" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
