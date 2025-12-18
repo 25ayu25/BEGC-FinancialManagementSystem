@@ -510,24 +510,24 @@ export async function getIssueClaimsForRun(runId: number) {
 
 export async function deleteReconRun(runId: number) {
   await db.transaction(async (tx) => {
-    // Step 1: Nullify matched_remittance_id in claim_recon_run_claims for this run
-    // This breaks the FK reference to remittances, preventing FK violations during deletion
-    // (Defense in depth: also have ON DELETE SET NULL on the FK constraint itself)
+    // Step 1: Nullify matched_remittance_id in claim_recon_run_claims
+    // This breaks the FK reference to remittances, preventing FK violations
+    // Defense in depth: code + DB constraint (ON DELETE SET NULL)
     await tx
       .update(claimReconRunClaims)
       .set({ matchedRemittanceId: null })
       .where(eq(claimReconRunClaims.runId, runId));
 
     // Step 2: Delete remittances for this run
-    // Now safe from FK violations since we nullified all references in step 1
+    // Safe now that all FK references are nullified
     await tx.delete(claimReconRemittances).where(eq(claimReconRemittances.runId, runId));
     
     // Step 3: Delete claims for this run
-    // Explicit deletion for clarity (could cascade from step 4, but being explicit is safer)
+    // Explicit for predictable execution (would cascade from step 4 via runId FK)
     await tx.delete(claimReconClaims).where(eq(claimReconClaims.runId, runId));
     
-    // Step 4: Delete the run itself
-    // The claimReconRunClaims entries will CASCADE delete via the runId FK constraint
+    // Step 4: Delete the run
+    // claimReconRunClaims will cascade via runId FK (claims already deleted above)
     await tx.delete(claimReconRuns).where(eq(claimReconRuns.id, runId));
   });
 
