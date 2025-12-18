@@ -635,11 +635,9 @@ export default function ClaimReconciliation() {
         setPeriodYearFilter(availableYears[0]);
       }
     }
-    // Auto-switch to table view when "All" years is selected
-    if (periodYearFilter === null && periodsSummary.length > MAX_CARDS_DEFAULT) {
-      setViewMode("table");
-    }
-  }, [availableYears, periodYearFilter, periodsSummary.length]);
+    // REMOVED: Auto-switch to table view when periodYearFilter is null and periodsSummary.length > MAX_CARDS_DEFAULT
+    // This was causing the cards view to automatically switch to table view, preventing cards from being the default
+  }, [availableYears, periodYearFilter]);
 
   const filteredPeriods = useMemo(() => {
     let filtered = periodsSummary;
@@ -2212,14 +2210,14 @@ export default function ClaimReconciliation() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-sm"
+                                  className="p-2 rounded-lg border-2 border-gray-400 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-md hover:shadow-lg"
                                   onClick={(e) => e.stopPropagation()}
                                   disabled={isDeleting || isUploading}
                                 >
                                   <MoreHorizontal className="w-5 h-5" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2570,14 +2568,14 @@ export default function ClaimReconciliation() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-sm"
+                                    className="p-2 rounded-lg border-2 border-gray-400 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-md hover:shadow-lg"
                                     onClick={(e) => e.stopPropagation()}
                                     disabled={isDeleting || isUploading}
                                   >
                                     <MoreHorizontal className="w-5 h-5" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
                                   <DropdownMenuItem
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -3320,12 +3318,12 @@ export default function ClaimReconciliation() {
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 border border-gray-200" disabled={isDeleting}>
+                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg border-2 border-gray-400 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 shadow-md hover:shadow-lg transition-colors" disabled={isDeleting}>
                                   <span className="sr-only">Open menu</span>
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedRunId(run.id);
