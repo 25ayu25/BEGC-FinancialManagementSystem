@@ -1872,7 +1872,7 @@ export default function ClaimReconciliation() {
                       </div>
                       <div className="text-sm text-slate-600 mb-2">Percentage of claims appearing in remittance</div>
                       <div className="text-xs font-mono bg-white/80 rounded-lg px-3 py-2 text-slate-700 border border-sky-200">
-                        ((Total - Pending) ÷ Total claims) × 100
+                        ((Total - Pending remittance) ÷ Total claims) × 100
                       </div>
                     </div>
 
