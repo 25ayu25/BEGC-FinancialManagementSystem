@@ -77,6 +77,13 @@ import {
   LayoutGrid,
   Table as TableIcon,
   ChevronDown,
+  Lightbulb,
+  ArrowRight,
+  Search,
+  Zap,
+  HelpCircle,
+  TrendingUp,
+  Calculator,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -1702,80 +1709,323 @@ export default function ClaimReconciliation() {
           </div>
 
           {showHelp && (
-            <Card className="border border-dashed border-slate-300 bg-slate-50/80">
-              <CardContent className="pt-6 text-sm text-slate-700 space-y-4">
-                <div>
-                  <div className="font-semibold text-slate-800 text-base mb-3">📋 How the reconciliation workflow works</div>
-                  <ul className="list-disc list-inside space-y-2 ml-1">
-                    <li>
-                      <strong>Select Provider/Year/Month:</strong> Use the controls in the Workflow card to set your active period.
-                    </li>
-                    <li>
-                      <strong>Upload claims first:</strong> Claims are stored with status "Pending remittance" until a remittance file is uploaded.
-                    </li>
-                    <li>
-                      <strong>Upload remittance later:</strong> When you upload a remittance, the system automatically reconciles it against all outstanding claims for that provider.
-                    </li>
-                    <li>
-                      <strong>Review results:</strong> Check the Claims Inventory to see which claims were paid in full, partially paid, or remain unpaid.
-                    </li>
-                  </ul>
-                </div>
+            <div className="space-y-6">
+              {/* Section 1: Quick Start Guide - Visual Workflow */}
+              <Card className="border border-slate-200/50 shadow-xl backdrop-blur-sm bg-gradient-to-br from-white via-white to-orange-50/30 overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-orange-400/10 to-amber-400/10 rounded-full blur-3xl" />
+                <CardHeader className="relative pb-4 border-b border-slate-200/50">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+                      <ArrowRight className="w-5 h-5 text-white" />
+                    </div>
+                    Quick Start Guide
+                  </CardTitle>
+                  <CardDescription>Follow these 4 steps to reconcile your claims</CardDescription>
+                </CardHeader>
+                <CardContent className="relative pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Step 1 */}
+                    <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-200/50 hover:border-blue-300 hover:shadow-lg transition-all duration-300">
+                      <div className="absolute -top-8 -right-8 w-24 h-24 bg-blue-400/20 rounded-full blur-2xl" />
+                      <div className="relative space-y-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                          <FileText className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-bold text-blue-700 uppercase tracking-wide">Step 1</div>
+                          <div className="text-base font-bold text-slate-800">Upload Claims</div>
+                          <div className="text-xs text-slate-600 leading-relaxed">Upload your claims file for a specific month</div>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="border-t border-slate-300 pt-4">
-                  <div className="font-semibold text-slate-800 mb-2">📊 Status Definitions</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                    <div><span className="font-semibold">Pending remittance:</span> Claims awaiting remittance upload</div>
-                    <div><span className="font-semibold">Paid in full:</span> Paid amount = Billed amount</div>
-                    <div><span className="font-semibold">Paid partially:</span> Paid amount less than Billed amount</div>
-                    <div><span className="font-semibold">Not paid (0 paid):</span> No payment received</div>
-                    <div><span className="font-semibold">Needs review:</span> Requires manual attention</div>
-                  </div>
-                </div>
+                    {/* Step 2 */}
+                    <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200/50 hover:border-emerald-300 hover:shadow-lg transition-all duration-300">
+                      <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl" />
+                      <div className="relative space-y-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md">
+                          <DollarSign className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Step 2</div>
+                          <div className="text-base font-bold text-slate-800">Upload Remittance</div>
+                          <div className="text-xs text-slate-600 leading-relaxed">Upload the remittance/payment file from insurance</div>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="border-t border-slate-300 pt-4">
-                  <div className="font-semibold text-slate-800 mb-2">🧮 Metric Formulas</div>
-                  <div className="space-y-1 text-xs">
-                    <div><span className="font-semibold">Paid in full %:</span> (Paid in full claims ÷ Total claims) × 100</div>
-                    <div><span className="font-semibold">Seen in remittance %:</span> ((Total - Pending remittance) ÷ Total claims) × 100</div>
-                  </div>
-                </div>
+                    {/* Step 3 */}
+                    <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-amber-50 to-amber-100/50 border-2 border-amber-200/50 hover:border-amber-300 hover:shadow-lg transition-all duration-300">
+                      <div className="absolute -top-8 -right-8 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl" />
+                      <div className="relative space-y-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-md">
+                          <Zap className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-bold text-amber-700 uppercase tracking-wide">Step 3</div>
+                          <div className="text-base font-bold text-slate-800">Auto-Reconciliation</div>
+                          <div className="text-xs text-slate-600 leading-relaxed">System automatically matches claims to payments</div>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="border-t border-slate-300 pt-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowInventory(true);
-                        setTimeout(() => {
-                          document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                        }, 100);
-                      }}
-                      className="gap-2"
-                    >
-                      <FileStack className="w-4 h-4" />
-                      Open Claims Inventory
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowInventory(true);
-                        setInventoryStatusFilter("partially_paid");
-                        setTimeout(() => {
-                          document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                        }, 100);
-                      }}
-                      className="gap-2"
-                    >
-                      <AlertTriangle className="w-4 h-4" />
-                      View Follow-ups
-                    </Button>
+                    {/* Step 4 */}
+                    <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-purple-50 to-purple-100/50 border-2 border-purple-200/50 hover:border-purple-300 hover:shadow-lg transition-all duration-300">
+                      <div className="absolute -top-8 -right-8 w-24 h-24 bg-purple-400/20 rounded-full blur-2xl" />
+                      <div className="relative space-y-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                          <Search className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-bold text-purple-700 uppercase tracking-wide">Step 4</div>
+                          <div className="text-base font-bold text-slate-800">Review Results</div>
+                          <div className="text-xs text-slate-600 leading-relaxed">Check paid, partial, and unpaid claims</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Section 2: Status Legend */}
+                <Card className="border border-slate-200/50 shadow-xl backdrop-blur-sm bg-white">
+                  <CardHeader className="pb-4 border-b border-slate-200/50">
+                    <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center shadow-lg">
+                        <Info className="w-5 h-5 text-white" />
+                      </div>
+                      Status Legend
+                    </CardTitle>
+                    <CardDescription>Understanding claim status colors</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-sky-50/50 border border-sky-200/50 hover:bg-sky-50 transition-colors">
+                      <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0 px-3 py-1">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Pending remittance
+                      </Badge>
+                      <div className="text-sm text-slate-600">Claims uploaded, waiting for remittance file</div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/50 hover:bg-emerald-50 transition-colors">
+                      <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0 px-3 py-1">
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Paid in full
+                      </Badge>
+                      <div className="text-sm text-slate-600">Payment received matches billed amount</div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50/50 border border-amber-200/50 hover:bg-amber-50 transition-colors">
+                      <Badge className="bg-amber-400 text-white hover:bg-amber-500 border-0 px-3 py-1">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Paid partially
+                      </Badge>
+                      <div className="text-sm text-slate-600">Payment received is less than billed amount</div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-rose-50/50 border border-rose-200/50 hover:bg-rose-50 transition-colors">
+                      <Badge className="bg-rose-400 text-white hover:bg-rose-500 border-0 px-3 py-1">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Not paid (0 paid)
+                      </Badge>
+                      <div className="text-sm text-slate-600">Claim was in remittance but $0 paid</div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-50/50 border border-orange-200/50 hover:bg-orange-50 transition-colors">
+                      <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0 px-3 py-1">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Needs review
+                      </Badge>
+                      <div className="text-sm text-slate-600">Requires manual attention</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Section 3: Understanding the Metrics */}
+                <Card className="border border-slate-200/50 shadow-xl backdrop-blur-sm bg-white">
+                  <CardHeader className="pb-4 border-b border-slate-200/50">
+                    <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shadow-lg">
+                        <Calculator className="w-5 h-5 text-white" />
+                      </div>
+                      Understanding the Metrics
+                    </CardTitle>
+                    <CardDescription>How we calculate key performance indicators</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200/50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-5 h-5 text-emerald-600" />
+                        <div className="font-bold text-slate-800">Paid in full %</div>
+                      </div>
+                      <div className="text-sm text-slate-600 mb-2">Percentage of claims fully paid</div>
+                      <div className="text-xs font-mono bg-white/80 rounded-lg px-3 py-2 text-slate-700 border border-emerald-200">
+                        (Paid in full ÷ Total claims) × 100
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-gradient-to-br from-sky-50 to-sky-100/50 border-2 border-sky-200/50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-5 h-5 text-sky-600" />
+                        <div className="font-bold text-slate-800">Seen in remittance %</div>
+                      </div>
+                      <div className="text-sm text-slate-600 mb-2">Percentage of claims appearing in remittance</div>
+                      <div className="text-xs font-mono bg-white/80 rounded-lg px-3 py-2 text-slate-700 border border-sky-200">
+                        ((Total - Pending) ÷ Total claims) × 100
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/50 border-2 border-amber-200/50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        <div className="font-bold text-slate-800">Claims to follow up</div>
+                      </div>
+                      <div className="text-sm text-slate-600 mb-2">Count of claims requiring attention</div>
+                      <div className="text-xs font-mono bg-white/80 rounded-lg px-3 py-2 text-slate-700 border border-amber-200">
+                        Partially paid + Not paid claims
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Section 4: Pro Tips for Staff */}
+              <Card className="border border-slate-200/50 shadow-xl backdrop-blur-sm bg-gradient-to-br from-white via-white to-amber-50/30 overflow-hidden">
+                <div className="absolute top-0 left-0 w-64 h-64 bg-gradient-to-br from-amber-400/10 to-orange-400/10 rounded-full blur-3xl" />
+                <CardHeader className="relative pb-4 border-b border-slate-200/50">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
+                      <Lightbulb className="w-5 h-5 text-white" />
+                    </div>
+                    Pro Tips for Staff
+                  </CardTitle>
+                  <CardDescription>Best practices to streamline your workflow</CardDescription>
+                </CardHeader>
+                <CardContent className="relative pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/50 hover:shadow-md transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Lightbulb className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-sm text-slate-700 leading-relaxed">
+                        Upload claims as soon as you submit them to insurance - don't wait for remittance
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-sky-50/50 border border-blue-200/50 hover:shadow-md transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-sky-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Lightbulb className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-sm text-slate-700 leading-relaxed">
+                        Remittances are matched against ALL outstanding claims, not just the selected month
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-purple-50 to-violet-50/50 border border-purple-200/50 hover:shadow-md transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-400 to-violet-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Lightbulb className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-sm text-slate-700 leading-relaxed">
+                        Click any period card to quickly switch to that month's data
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-green-50/50 border border-emerald-200/50 hover:shadow-md transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-green-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Lightbulb className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-sm text-slate-700 leading-relaxed">
+                        Use the Export button to download claims for follow-up with insurance
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-rose-50 to-pink-50/50 border border-rose-200/50 hover:shadow-md transition-all md:col-span-2">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-400 to-pink-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Lightbulb className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-sm text-slate-700 leading-relaxed">
+                        <span className="font-semibold">"Paid partially"</span> claims are your priority - these need investigation
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Section 5: Common Questions (Optional FAQ) */}
+              <Card className="border border-slate-200/50 shadow-xl backdrop-blur-sm bg-white">
+                <CardHeader className="pb-4 border-b border-slate-200/50">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg">
+                      <HelpCircle className="w-5 h-5 text-white" />
+                    </div>
+                    Common Questions
+                  </CardTitle>
+                  <CardDescription>Frequently asked questions about reconciliation</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+                    <div className="bg-gradient-to-r from-slate-50 to-white px-4 py-3 border-b border-slate-200">
+                      <div className="font-semibold text-slate-800 text-sm">❓ Why do my claims show "Pending remittance"?</div>
+                    </div>
+                    <div className="px-4 py-3 text-sm text-slate-600 leading-relaxed">
+                      Claims show as "Pending remittance" when they've been uploaded but no matching remittance file has been processed yet. Once you upload a remittance file, the system will automatically match them.
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+                    <div className="bg-gradient-to-r from-slate-50 to-white px-4 py-3 border-b border-slate-200">
+                      <div className="font-semibold text-slate-800 text-sm">❓ What should I do with "Paid partially" claims?</div>
+                    </div>
+                    <div className="px-4 py-3 text-sm text-slate-600 leading-relaxed">
+                      "Paid partially" claims require follow-up with the insurance company. Export these claims using the Export button, review the payment amounts, and contact the insurer to clarify why the full amount wasn't paid.
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+                    <div className="bg-gradient-to-r from-slate-50 to-white px-4 py-3 border-b border-slate-200">
+                      <div className="font-semibold text-slate-800 text-sm">❓ How do I fix a claim that was matched incorrectly?</div>
+                    </div>
+                    <div className="px-4 py-3 text-sm text-slate-600 leading-relaxed">
+                      If a claim was matched incorrectly, you can delete the reconciliation run from the History section and re-upload the files. Make sure the member numbers and claim identifiers match exactly between your claims and remittance files.
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Action Buttons - Enhanced */}
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="default"
+                  size="lg"
+                  onClick={() => {
+                    setShowInventory(true);
+                    setTimeout(() => {
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                  }}
+                  className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all"
+                >
+                  <FileStack className="w-5 h-5" />
+                  Open Claims Inventory
+                </Button>
+                <Button
+                  variant="default"
+                  size="lg"
+                  onClick={() => {
+                    setShowInventory(true);
+                    setInventoryStatusFilter("partially_paid");
+                    setTimeout(() => {
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                  }}
+                  className="gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
+                >
+                  <AlertTriangle className="w-5 h-5" />
+                  View Follow-ups
+                </Button>
+              </div>
+            </div>
           )}
         </section>
 
@@ -2927,7 +3177,7 @@ export default function ClaimReconciliation() {
                     onClick={() => setStatusFilter("needs_follow_up")}
                   >
                     <AlertTriangle className="w-4 h-4" />
-                    Needs follow-up ({actualReconciliationRuns.filter((r) => runGroup(r) === "needs_follow_up").length})
+                    Runs with follow-up ({actualReconciliationRuns.filter((r) => runGroup(r) === "needs_follow_up").length})
                   </button>
 
                   <button
@@ -2941,7 +3191,7 @@ export default function ClaimReconciliation() {
                     onClick={() => setStatusFilter("completed")}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Completed ({actualReconciliationRuns.filter((r) => runGroup(r) === "completed").length})
+                    Fully reconciled ({actualReconciliationRuns.filter((r) => runGroup(r) === "completed").length})
                   </button>
                 </div>
               </div>
