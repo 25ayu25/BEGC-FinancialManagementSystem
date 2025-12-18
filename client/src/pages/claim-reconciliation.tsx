@@ -108,6 +108,7 @@ interface ReconRun {
   autoMatched: number;
   partialMatched: number;
   manualReview: number;
+  unpaidCount: number;
   status?: "awaiting_remittance" | "reconciled" | "pending_review";
 }
 
@@ -245,7 +246,7 @@ function getRemittanceUploadDescription(providerName: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* A) Status label + grouping helpers */
+/* A) Status label + grouping helpers - ISSUE 4 FIX */
 /* -------------------------------------------------------------------------- */
 
 function claimStatusLabel(status: string): string {
@@ -258,11 +259,11 @@ function claimStatusLabel(status: string): string {
     case "unpaid":
       return "Not paid (0 paid)";
     case "manual_review":
-      return "Needs checking";
+      return "Needs manual check";
     case "awaiting_remittance":
     case "submitted":
     default:
-      return "Pending remittance";
+      return "Pending payment statement";
   }
 }
 
@@ -283,12 +284,12 @@ function claimStatusGroup(status: string): "paid" | "waiting" | "follow_up" {
 }
 
 /* -------------------------------------------------------------------------- */
-/* D) Reconciliation history run grouping */
+/* D) Reconciliation history run grouping - ISSUE 2 FIX */
 /* -------------------------------------------------------------------------- */
 
 function runGroup(run: ReconRun): "needs_follow_up" | "completed" {
-  if (run.partialMatched > 0 || run.manualReview > 0) return "needs_follow_up";
-  return "completed";
+  const hasIssues = (run.partialMatched > 0) || (run.manualReview > 0) || (run.unpaidCount > 0);
+  return hasIssues ? "needs_follow_up" : "completed";
 }
 
 /**
@@ -1616,10 +1617,10 @@ export default function ClaimReconciliation() {
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Reconciliations Done</p>
+                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Payment Statements Uploaded</p>
                   <div className="flex items-baseline gap-3">
                     <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.reconciliationsDone}</span>
-                    <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">with remittances</span>
+                    <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">statements processed</span>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">Latest: {stats.lastPeriodLabel}</p>
                 </div>
@@ -1642,12 +1643,12 @@ export default function ClaimReconciliation() {
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Total Claims</p>
+                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Total Claims Uploaded</p>
                   <div className="flex items-baseline gap-3">
                     <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.totalClaims.toLocaleString()}</span>
-                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">uploaded</span>
+                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">all periods</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-2">Across all uploads</p>
+                  <p className="text-xs text-slate-500 mt-2">Across all months</p>
                 </div>
               </div>
               
