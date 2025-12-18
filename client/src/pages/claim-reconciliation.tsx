@@ -838,7 +838,7 @@ export default function ClaimReconciliation() {
 
       setSelectedRunId(data.runId);
       setClaimsFile(null);
-      setRemittanceFile(null);
+      setPaymentStatementFile(null);
       setAttentionFilter("follow_up");
     },
     onError: (error: Error) => {
@@ -932,7 +932,7 @@ export default function ClaimReconciliation() {
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
       if (data?.runId) setSelectedRunId(data.runId);
 
-      setRemittanceFile(null);
+      setPaymentStatementFile(null);
     },
     onError: (error: Error) => {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
@@ -1604,7 +1604,7 @@ export default function ClaimReconciliation() {
         formData.append("periodMonth", period.periodMonth.toString());
         uploadClaimsMutation.mutate(formData);
       } else {
-        setRemittanceFile(file);
+        setPaymentStatementFile(file);
         const formData = new FormData();
         formData.append("paymentStatementFile", file);
         formData.append("providerName", period.providerName);
@@ -2853,7 +2853,7 @@ export default function ClaimReconciliation() {
                   label="Remittance File"
                   description={getRemittanceUploadDescription(providerName)}
                   file={paymentStatementFile}
-                  onFileChange={setRemittanceFile}
+                  onFileChange={setPaymentStatementFile}
                   disabled={isUploading}
                   tintColor="green"
                   icon={<DollarSign className="w-4 h-4" />}
