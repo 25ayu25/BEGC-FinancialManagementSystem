@@ -261,8 +261,8 @@ export async function performMatching(runId: number) {
       .where(eq(claimReconRemittances.id, match.remittanceId));
   }
 
-  // Record all claims processed in this run (Issue 1 fix)
-  for (const match of matches) {
+  // Record all claims processed in this run (Issue 1 fix) - Batch insert for performance
+  const runClaimsToInsert = matches.map(match => {
     const statusBefore = claimStatusBefore.get(match.claimId);
     const statusAfter = match.status;
     
@@ -271,7 +271,7 @@ export async function performMatching(runId: number) {
       unpaidCount++;
     }
 
-    await db.insert(claimReconRunClaims).values({
+    return {
       runId,
       claimId: match.claimId,
       statusBeforeRun: statusBefore || null,
@@ -279,7 +279,11 @@ export async function performMatching(runId: number) {
       matchedRemittanceId: match.remittanceId || null,
       matchType: match.matchType || "unmatched",
       amountPaidInRun: match.amountPaid.toString(),
-    });
+    };
+  });
+
+  if (runClaimsToInsert.length > 0) {
+    await db.insert(claimReconRunClaims).values(runClaimsToInsert);
   }
 
   const matchedOnly = matches.filter((m) => m.remittanceId !== null);
@@ -813,9 +817,9 @@ export async function runClaimReconciliation(
         .where(eq(claimReconRemittances.id, match.remittanceId as number));
     }
 
-    // Record all claims processed in this run (Issue 1 fix)
+    // Record all claims processed in this run (Issue 1 fix) - Batch insert for performance
     if (opts?.runId) {
-      for (const match of matches) {
+      const runClaimsToInsert = matches.map(match => {
         const statusBefore = claimStatusBefore.get(match.claimId);
         const statusAfter = match.status;
         
@@ -824,15 +828,19 @@ export async function runClaimReconciliation(
           unpaidCount++;
         }
 
-        await tx.insert(claimReconRunClaims).values({
-          runId: opts.runId,
+        return {
+          runId: opts.runId!,
           claimId: match.claimId,
           statusBeforeRun: statusBefore || null,
           statusAfterRun: statusAfter,
           matchedRemittanceId: match.remittanceId || null,
           matchType: match.matchType || "unmatched",
           amountPaidInRun: match.amountPaid.toString(),
-        });
+        };
+      });
+
+      if (runClaimsToInsert.length > 0) {
+        await tx.insert(claimReconRunClaims).values(runClaimsToInsert);
       }
     }
 
