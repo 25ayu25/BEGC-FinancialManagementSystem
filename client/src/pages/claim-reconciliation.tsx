@@ -1338,6 +1338,16 @@ export default function ClaimReconciliation() {
     return actualReconciliationRuns.filter((run) => runGroup(run) === statusFilter);
   }, [actualReconciliationRuns, statusFilter]);
 
+  // Issue 7: Create lookup map for period claims to avoid O(n²) complexity
+  const periodClaimsLookup = useMemo(() => {
+    const map = new Map<string, number>();
+    periodsSummary.forEach(p => {
+      const key = `${p.providerName}-${p.periodYear}-${p.periodMonth}`;
+      map.set(key, p.totalClaims);
+    });
+    return map;
+  }, [periodsSummary]);
+
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
 
   // B) Replace counts + filtering logic for Claims Details
@@ -3238,11 +3248,9 @@ export default function ClaimReconciliation() {
                       });
                       const isLatest = stats.latestRunId === run.id;
                       
-                      // Issue 7: Get period-specific claims count
-                      const periodSummary = periodsSummary.find(
-                        p => p.periodYear === run.periodYear && p.periodMonth === run.periodMonth && p.providerName === run.providerName
-                      );
-                      const periodClaimsCount = periodSummary?.totalClaims ?? 0;
+                      // Issue 7: Get period-specific claims count using lookup map for O(1) performance
+                      const periodKey = `${run.providerName}-${run.periodYear}-${run.periodMonth}`;
+                      const periodClaimsCount = periodClaimsLookup.get(periodKey) ?? 0;
 
                       return (
                         <TableRow
@@ -3311,7 +3319,7 @@ export default function ClaimReconciliation() {
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8 p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 border border-gray-200" disabled={isDeleting}>
+                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 border border-gray-200" disabled={isDeleting}>
                                   <span className="sr-only">Open menu</span>
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
