@@ -1875,7 +1875,7 @@ export default function ClaimReconciliation() {
       <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
         {/* KPI cards - Enhanced Premium Design */}
         <section className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-3">{/* Rest of KPI cards */}
+          <div className="grid gap-6 md:grid-cols-3">
             {/* Reconciliations Done Card */}
             <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-emerald-200/50">
               {/* Animated gradient background */}
@@ -1983,8 +1983,9 @@ export default function ClaimReconciliation() {
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </button>
           </div>
+        </section>
 
-          {/* Period cards - Premium Glass-morphism Design */}
+        {/* Period cards - Premium Glass-morphism Design */}
         {periodsSummary.length > 0 && (
           <Card className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
@@ -2099,7 +2100,8 @@ export default function ClaimReconciliation() {
 
             <CardContent className="pt-6">
               {viewMode === "cards" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredPeriods.map((period) => {
                   const isActive =
                     period.periodYear === parseInt(periodYear, 10) &&
@@ -2417,6 +2419,7 @@ export default function ClaimReconciliation() {
                   </Button>
                 </div>
               )}
+                </>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-200/50">
                   <Table>
