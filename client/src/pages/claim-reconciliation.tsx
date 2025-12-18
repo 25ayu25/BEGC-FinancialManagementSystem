@@ -752,7 +752,9 @@ export default function ClaimReconciliation() {
     );
     const awaitingRemittance = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0);
 
-    const sortedRuns = [...runs].sort(
+    // Issue 5: Get the most recent reconciliation run (with remittances) based on createdAt
+    const runsWithRemittances = runs.filter(run => run.totalRemittanceRows > 0);
+    const sortedRuns = [...runsWithRemittances].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
     const latest = sortedRuns[0];
@@ -1335,6 +1337,17 @@ export default function ClaimReconciliation() {
     if (statusFilter === "all") return actualReconciliationRuns;
     return actualReconciliationRuns.filter((run) => runGroup(run) === statusFilter);
   }, [actualReconciliationRuns, statusFilter]);
+
+  // Issue 7: Create lookup map for period claims to avoid O(n²) complexity
+  const periodClaimsLookup = useMemo(() => {
+    const map = new Map<string, number>();
+    periodsSummary.forEach(p => {
+      // Use pipe delimiter to avoid collisions (unlikely in provider names)
+      const key = `${p.providerName}|${p.periodYear}|${p.periodMonth}`;
+      map.set(key, p.totalClaims);
+    });
+    return map;
+  }, [periodsSummary]);
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) || null;
 
@@ -2545,7 +2558,7 @@ export default function ClaimReconciliation() {
                               ) : cardState === "awaiting" ? (
                                 <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
                                   <Clock className="w-3 h-3 mr-1" />
-                                  Pending
+                                  Pending payment statement
                                 </Badge>
                               ) : (
                                 <Badge className="bg-slate-400 text-white hover:bg-slate-500 border-0">Processing</Badge>
@@ -3187,6 +3200,22 @@ export default function ClaimReconciliation() {
                       <TableHead className="font-semibold">Provider</TableHead>
                       <TableHead className="font-semibold">Period</TableHead>
                       <TableHead className="font-semibold">Status</TableHead>
+                      {/* Issue 7: Period claims column */}
+                      <TableHead className="font-semibold">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1 cursor-help">
+                                <span>Period claims</span>
+                                <Info className="w-3 h-3 text-slate-400" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs">Claims uploaded for this specific period only</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
                       {/* Issue 4: Updated columns */}
                       <TableHead className="font-semibold">
                         <TooltipProvider>
@@ -3219,6 +3248,10 @@ export default function ClaimReconciliation() {
                         year: "numeric",
                       });
                       const isLatest = stats.latestRunId === run.id;
+                      
+                      // Issue 7: Get period-specific claims count using lookup map for O(1) performance
+                      const periodKey = `${run.providerName}|${run.periodYear}|${run.periodMonth}`;
+                      const periodClaimsCount = periodClaimsLookup.get(periodKey) ?? 0;
 
                       return (
                         <TableRow
@@ -3254,6 +3287,8 @@ export default function ClaimReconciliation() {
                             </div>
                           </TableCell>
                           <TableCell>{getRunStatusBadge(run)}</TableCell>
+                          {/* Issue 7: Period claims - claims for this specific period only */}
+                          <TableCell>{periodClaimsCount}</TableCell>
                           {/* Issue 4: Claims checked (cross-period) */}
                           <TableCell>{run.totalClaimRows}</TableCell>
                           {/* Issue 4: Payment statements (renamed from Remittances) */}
@@ -3285,7 +3320,7 @@ export default function ClaimReconciliation() {
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8" disabled={isDeleting}>
+                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 border border-gray-200" disabled={isDeleting}>
                                   <span className="sr-only">Open menu</span>
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
