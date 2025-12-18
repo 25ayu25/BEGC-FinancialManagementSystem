@@ -510,8 +510,20 @@ export async function getIssueClaimsForRun(runId: number) {
 
 export async function deleteReconRun(runId: number) {
   await db.transaction(async (tx) => {
-    await tx.delete(claimReconClaims).where(eq(claimReconClaims.runId, runId));
+    // First, nullify matched_remittance_id in claim_recon_run_claims for this run
+    // to break the FK reference before deleting remittances
+    await tx
+      .update(claimReconRunClaims)
+      .set({ matchedRemittanceId: null })
+      .where(eq(claimReconRunClaims.runId, runId));
+
+    // Now safe to delete remittances (referenced by matched_remittance_id)
     await tx.delete(claimReconRemittances).where(eq(claimReconRemittances.runId, runId));
+    
+    // Delete claims for this run
+    await tx.delete(claimReconClaims).where(eq(claimReconClaims.runId, runId));
+    
+    // Finally delete the run itself (run_claims join table will cascade delete)
     await tx.delete(claimReconRuns).where(eq(claimReconRuns.id, runId));
   });
 
