@@ -1342,7 +1342,8 @@ export default function ClaimReconciliation() {
   const periodClaimsLookup = useMemo(() => {
     const map = new Map<string, number>();
     periodsSummary.forEach(p => {
-      const key = `${p.providerName}-${p.periodYear}-${p.periodMonth}`;
+      // Use pipe delimiter to avoid collisions (unlikely in provider names)
+      const key = `${p.providerName}|${p.periodYear}|${p.periodMonth}`;
       map.set(key, p.totalClaims);
     });
     return map;
@@ -3249,7 +3250,7 @@ export default function ClaimReconciliation() {
                       const isLatest = stats.latestRunId === run.id;
                       
                       // Issue 7: Get period-specific claims count using lookup map for O(1) performance
-                      const periodKey = `${run.providerName}-${run.periodYear}-${run.periodMonth}`;
+                      const periodKey = `${run.providerName}|${run.periodYear}|${run.periodMonth}`;
                       const periodClaimsCount = periodClaimsLookup.get(periodKey) ?? 0;
 
                       return (
