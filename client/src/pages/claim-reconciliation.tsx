@@ -503,6 +503,7 @@ export default function ClaimReconciliation() {
   const [periodYearFilter, setPeriodYearFilter] = useState<number | null>(null);
   const didUserTouchYearFilter = useRef(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [showAllCards, setShowAllCards] = useState(false);
 
   const [claimsFile, setClaimsFile] = useState<File | null>(null);
   const [remittanceFile, setRemittanceFile] = useState<File | null>(null);
@@ -641,14 +642,32 @@ export default function ClaimReconciliation() {
 
   const filteredPeriods = useMemo(() => {
     let filtered = periodsSummary;
-    if (periodYearFilter !== null) filtered = filtered.filter((p) => p.periodYear === periodYearFilter);
     
-    // Issue 3: Limit to 6 cards in cards view, show all in table view
-    if (viewMode === "cards") {
-      return filtered.slice(0, MAX_CARDS_DEFAULT);
+    // Filter by year
+    if (periodYearFilter !== null) {
+      filtered = filtered.filter((p) => p.periodYear === periodYearFilter);
     }
-    return filtered;
-  }, [periodsSummary, periodYearFilter, viewMode]);
+    
+    // Sort periods chronologically
+    const sorted = [...filtered].sort((a, b) => {
+      if (periodYearFilter === null) {
+        // For "All" years: Sort by year descending (2025, 2024, ...), then by month ascending within each year
+        if (a.periodYear !== b.periodYear) {
+          return b.periodYear - a.periodYear; // Descending by year
+        }
+        return a.periodMonth - b.periodMonth; // Ascending by month within year
+      } else {
+        // For specific year: Sort by month ascending (Jan → Dec)
+        return a.periodMonth - b.periodMonth;
+      }
+    });
+    
+    // Limit to 6 cards in cards view when not expanded, show all when expanded or in table view
+    if (viewMode === "cards" && !showAllCards) {
+      return sorted.slice(0, MAX_CARDS_DEFAULT);
+    }
+    return sorted;
+  }, [periodsSummary, periodYearFilter, viewMode, showAllCards]);
 
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory query */
@@ -2048,6 +2067,7 @@ export default function ClaimReconciliation() {
                         onClick={() => {
                           didUserTouchYearFilter.current = true;
                           setPeriodYearFilter(year);
+                          setShowAllCards(false); // Reset to collapsed view when filter changes
                         }}
                         className={cn(
                           "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200",
@@ -2064,6 +2084,7 @@ export default function ClaimReconciliation() {
                       onClick={() => {
                         didUserTouchYearFilter.current = true;
                         setPeriodYearFilter(null);
+                        setShowAllCards(false); // Reset to collapsed view when filter changes
                       }}
                       className={cn(
                         "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200",
@@ -2416,22 +2437,39 @@ export default function ClaimReconciliation() {
                 })}
               </div>
               
-              {/* Issue 3: Show "View all X periods" button if more than 6 exist */}
+              {/* Show "View all X periods" button when more than 6 exist and not expanded */}
+              {/* Show "Show less" button when expanded */}
               {(() => {
                 const filteredPeriodsCount = periodsSummary.filter(p => periodYearFilter === null || p.periodYear === periodYearFilter).length;
-                return filteredPeriodsCount > MAX_CARDS_DEFAULT && (
-                  <div className="mt-6 flex justify-center">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setViewMode("table")}
-                      className="gap-2 hover:bg-orange-50 hover:border-orange-300 transition-all shadow-sm"
-                    >
-                      <TableIcon className="w-5 h-5" />
-                      View all {filteredPeriodsCount} periods
-                    </Button>
-                  </div>
-                );
+                
+                if (filteredPeriodsCount > MAX_CARDS_DEFAULT) {
+                  return (
+                    <div className="mt-6 flex justify-center">
+                      {!showAllCards ? (
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => setShowAllCards(true)}
+                          className="gap-2 hover:bg-orange-50 hover:border-orange-300 transition-all shadow-sm"
+                        >
+                          <LayoutGrid className="w-5 h-5" />
+                          View all {filteredPeriodsCount} periods
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => setShowAllCards(false)}
+                          className="gap-2 hover:bg-orange-50 hover:border-orange-300 transition-all shadow-sm"
+                        >
+                          <LayoutGrid className="w-5 h-5" />
+                          Show less
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
               })()}
                 </>
               ) : (
