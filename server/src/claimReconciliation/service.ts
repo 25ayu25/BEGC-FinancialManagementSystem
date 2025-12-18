@@ -5,8 +5,9 @@ import {
   claimReconRuns,
   claimReconClaims,
   claimReconRemittances,
+  claimReconRunClaims,
 } from "@shared/schema";
-import { eq, and, or, isNull, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, or, isNull, desc, inArray, sql, count } from "drizzle-orm";
 import type { ClaimRow, RemittanceRow, ReconciliationSummary } from "./types";
 import {
   buildClaimCompositeKeyFromRow,
@@ -70,6 +71,7 @@ export async function updateReconRunMetrics(
     autoMatched: number;
     partialMatched: number;
     manualReview: number;
+    unpaidCount: number;
   }>
 ) {
   await db
@@ -234,6 +236,10 @@ export async function performMatching(runId: number) {
 
   const matches = matchClaimsToRemittances(claimData, remitData);
 
+  // Track status before updates for run claims join table
+  const claimStatusBefore = new Map(claims.map(c => [c.id, c.status]));
+  let unpaidCount = 0;
+
   for (const match of matches) {
     if (!match.remittanceId) continue;
 
@@ -255,6 +261,27 @@ export async function performMatching(runId: number) {
       .where(eq(claimReconRemittances.id, match.remittanceId));
   }
 
+  // Record all claims processed in this run (Issue 1 fix)
+  for (const match of matches) {
+    const statusBefore = claimStatusBefore.get(match.claimId);
+    const statusAfter = match.status;
+    
+    // Count unpaid claims (Issue 2)
+    if (statusAfter === "unpaid") {
+      unpaidCount++;
+    }
+
+    await db.insert(claimReconRunClaims).values({
+      runId,
+      claimId: match.claimId,
+      statusBeforeRun: statusBefore || null,
+      statusAfterRun: statusAfter,
+      matchedRemittanceId: match.remittanceId || null,
+      matchType: match.matchType || "unmatched",
+      amountPaidInRun: match.amountPaid.toString(),
+    });
+  }
+
   const matchedOnly = matches.filter((m) => m.remittanceId !== null);
 
   const summary: ReconciliationSummary = {
@@ -273,6 +300,7 @@ export async function performMatching(runId: number) {
       autoMatched: summary.autoMatched,
       partialMatched: summary.partialMatched,
       manualReview: summary.manualReview,
+      unpaidCount,
     })
     .where(eq(claimReconRuns.id, runId));
 
@@ -293,11 +321,41 @@ export async function getAllReconRuns() {
 }
 
 /**
- * IMPORTANT FIX:
- * - claims-only runs: show claims for that period
- * - remittance runs: show outstanding claims across ALL periods for that provider
+ * ISSUE 1 FIX: Get claims that were actually processed in this specific run
+ * Uses the join table to return exactly the claims that were considered during the run
  */
 export async function getClaimsForRun(runId: number) {
+  // First check if we have run claims recorded in the join table (new approach)
+  const runClaimsFromJoinTable = await db
+    .select({
+      id: claimReconClaims.id,
+      memberNumber: claimReconClaims.memberNumber,
+      patientName: claimReconClaims.patientName,
+      serviceDate: claimReconClaims.serviceDate,
+      invoiceNumber: claimReconClaims.invoiceNumber,
+      claimType: claimReconClaims.claimType,
+      schemeName: claimReconClaims.schemeName,
+      benefitDesc: claimReconClaims.benefitDesc,
+      billedAmount: claimReconClaims.billedAmount,
+      currency: claimReconClaims.currency,
+      status: claimReconClaims.status,
+      amountPaid: claimReconClaims.amountPaid,
+      remittanceLineId: claimReconClaims.remittanceLineId,
+      compositeKey: claimReconClaims.compositeKey,
+      runId: claimReconClaims.runId,
+      providerName: claimReconClaims.providerName,
+      periodYear: claimReconClaims.periodYear,
+      periodMonth: claimReconClaims.periodMonth,
+      rawRow: claimReconClaims.rawRow,
+      createdAt: claimReconClaims.createdAt,
+    })
+    .from(claimReconRunClaims)
+    .innerJoin(claimReconClaims, eq(claimReconRunClaims.claimId, claimReconClaims.id))
+    .where(eq(claimReconRunClaims.runId, runId));
+
+  if (runClaimsFromJoinTable.length > 0) return runClaimsFromJoinTable;
+
+  // Fallback to legacy behavior for old runs (before join table was added)
   const runClaims = await db
     .select()
     .from(claimReconClaims)
@@ -728,6 +786,10 @@ export async function runClaimReconciliation(
     const matchedOnly = matches.filter((m) => m.remittanceId !== null);
 
     const matchedRemittanceIds = new Set<number>();
+    
+    // Track status before updates for run claims join table
+    const claimStatusBefore = new Map(claims.map(c => [c.id, c.status]));
+    let unpaidCount = 0;
 
     for (const match of matchedOnly) {
       matchedRemittanceIds.add(match.remittanceId as number);
@@ -749,6 +811,29 @@ export async function runClaimReconciliation(
           status: null,
         })
         .where(eq(claimReconRemittances.id, match.remittanceId as number));
+    }
+
+    // Record all claims processed in this run (Issue 1 fix)
+    if (opts?.runId) {
+      for (const match of matches) {
+        const statusBefore = claimStatusBefore.get(match.claimId);
+        const statusAfter = match.status;
+        
+        // Count unpaid claims (Issue 2)
+        if (statusAfter === "unpaid") {
+          unpaidCount++;
+        }
+
+        await tx.insert(claimReconRunClaims).values({
+          runId: opts.runId,
+          claimId: match.claimId,
+          statusBeforeRun: statusBefore || null,
+          statusAfterRun: statusAfter,
+          matchedRemittanceId: match.remittanceId || null,
+          matchType: match.matchType || "unmatched",
+          amountPaidInRun: match.amountPaid.toString(),
+        });
+      }
     }
 
     const orphanRemittances = remittances.filter((r) => !matchedRemittanceIds.has(r.id));
@@ -781,6 +866,7 @@ export async function runClaimReconciliation(
       summary,
       orphanRemittances: orphanRemittances.length,
       unpaidClaims: unmatchedClaims.length,
+      unpaidCount, // Include for metrics update
       totalClaimsSearched: claims.length,
       claimsMatched: matchedOnly.length,
     };

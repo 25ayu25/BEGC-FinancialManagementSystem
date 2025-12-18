@@ -196,6 +196,7 @@ export const claimReconRuns = pgTable("claim_recon_runs", {
   autoMatched: integer("auto_matched").notNull().default(0),
   partialMatched: integer("partial_matched").notNull().default(0),
   manualReview: integer("manual_review").notNull().default(0),
+  unpaidCount: integer("unpaid_count").notNull().default(0),
 });
 
 // 2) Raw "Claims Submitted" rows
@@ -265,6 +266,21 @@ export const claimReconRemittances = pgTable("claim_recon_remittances", {
   rawRow: jsonb("raw_row"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// 4) Join table to track which claims were processed in each run (Issue 1 fix)
+export const claimReconRunClaims = pgTable("claim_recon_run_claims", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull().references(() => claimReconRuns.id, { onDelete: "cascade" }),
+  claimId: integer("claim_id").notNull().references(() => claimReconClaims.id, { onDelete: "cascade" }),
+  statusBeforeRun: varchar("status_before_run", { length: 50 }),
+  statusAfterRun: varchar("status_after_run", { length: 50 }).notNull(),
+  matchedRemittanceId: integer("matched_remittance_id").references(() => claimReconRemittances.id),
+  matchType: varchar("match_type", { length: 50 }), // 'exact', 'partial', 'unmatched'
+  amountPaidInRun: decimal("amount_paid_in_run", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueRunClaim: uniqueIndex("unique_run_claim_idx").on(table.runId, table.claimId),
+}));
 
 /* =======================
    Insert Schemas (Zod)
@@ -343,6 +359,11 @@ export const insertClaimReconClaimSchema = createInsertSchema(claimReconClaims).
 
 export const insertClaimReconRemittanceSchema = createInsertSchema(claimReconRemittances).omit({
   id: true,
+});
+
+export const insertClaimReconRunClaimSchema = createInsertSchema(claimReconRunClaims).omit({
+  id: true,
+  createdAt: true,
 });
 
 /* =======================

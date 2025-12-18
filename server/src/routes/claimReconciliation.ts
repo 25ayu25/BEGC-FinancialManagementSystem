@@ -362,7 +362,7 @@ router.post(
       const inserted = await insertRemittances(run.id, remittances);
 
       // Cross-period reconciliation (service currently matches provider-wide outstanding claims)
-      const reconciliationResult = await runClaimReconciliation(providerName, year, month);
+      const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
       await updateReconRunMetrics(run.id, {
         totalClaimRows: reconciliationResult.totalClaimsSearched, // claims checked
@@ -370,6 +370,7 @@ router.post(
         autoMatched: reconciliationResult.summary.autoMatched,
         partialMatched: reconciliationResult.summary.partialMatched,
         manualReview: reconciliationResult.summary.manualReview,
+        unpaidCount: reconciliationResult.unpaidCount || 0,
       });
 
       res.json({
@@ -456,7 +457,7 @@ router.post(
 
       const inserted = await insertRemittances(run.id, remittances);
 
-      const reconciliationResult = await runClaimReconciliation(providerName, year, month);
+      const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
       await updateReconRunMetrics(run.id, {
         totalClaimRows: reconciliationResult.totalClaimsSearched,
@@ -464,6 +465,7 @@ router.post(
         autoMatched: reconciliationResult.summary.autoMatched,
         partialMatched: reconciliationResult.summary.partialMatched,
         manualReview: reconciliationResult.summary.manualReview,
+        unpaidCount: reconciliationResult.unpaidCount || 0,
       });
 
       res.json({
