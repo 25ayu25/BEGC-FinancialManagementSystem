@@ -635,7 +635,8 @@ export default function ClaimReconciliation() {
         setPeriodYearFilter(availableYears[0]);
       }
     }
-    // REMOVED: Auto-switch to table view - cards should remain the default
+    // REMOVED: Auto-switch to table view when periodYearFilter is null and periodsSummary.length > MAX_CARDS_DEFAULT
+    // This was causing the cards view to automatically switch to table view, preventing cards from being the default
   }, [availableYears, periodYearFilter]);
 
   const filteredPeriods = useMemo(() => {
