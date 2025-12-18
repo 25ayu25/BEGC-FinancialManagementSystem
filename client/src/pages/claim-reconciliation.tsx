@@ -1622,7 +1622,7 @@ export default function ClaimReconciliation() {
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </div>
 
-            {/* Claims Processed Card */}
+            {/* Total Claims Card */}
             <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-200/50">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 via-transparent to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-cyan-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
@@ -1635,10 +1635,10 @@ export default function ClaimReconciliation() {
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Claims Processed</p>
+                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Total Claims</p>
                   <div className="flex items-baseline gap-3">
                     <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.totalClaims.toLocaleString()}</span>
-                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">total rows</span>
+                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">uploaded</span>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">Across all uploads</p>
                 </div>
