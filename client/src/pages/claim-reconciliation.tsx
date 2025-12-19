@@ -1424,18 +1424,22 @@ export default function ClaimReconciliation() {
 
     // Requirement 3: Apply date range filter based on historyViewMode
     if (historyViewMode === "last_4_months") {
-      // Sort by year+month descending (newest → oldest)
-      filtered = [...filtered].sort((a, b) => {
+      // Sort by year+month descending (newest → oldest) to get the latest 4
+      const sortedDescending = [...filtered].sort((a, b) => {
         const aKey = a.periodYear * 100 + a.periodMonth;
         const bKey = b.periodYear * 100 + b.periodMonth;
         return bKey - aKey; // Descending order
       });
       // Take first 4 results (latest 4 months)
-      filtered = filtered.slice(0, 4);
+      const latest4 = sortedDescending.slice(0, 4);
+      // Reverse to display in ascending order (oldest of the 4 first, newest of the 4 last)
+      filtered = latest4.reverse();
     } else {
-      // "all_months" mode: show all runs, sorted by date descending (most recent first)
+      // "all_months" mode: show all runs, sorted by period ascending (oldest first)
       filtered = [...filtered].sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        const aKey = a.periodYear * 100 + a.periodMonth;
+        const bKey = b.periodYear * 100 + b.periodMonth;
+        return aKey - bKey; // Ascending order
       });
     }
 
