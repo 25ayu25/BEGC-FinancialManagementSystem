@@ -1413,7 +1413,7 @@ export default function ClaimReconciliation() {
     }
   };
 
-  // D) Updated filteredRuns with Requirement 3: Default to Jan-Apr of current year
+  // D) Updated filteredRuns: Show periods in ASCENDING order (oldest → newest)
   const filteredRuns = useMemo(() => {
     let filtered = actualReconciliationRuns;
 
@@ -1422,25 +1422,20 @@ export default function ClaimReconciliation() {
       filtered = filtered.filter((run) => runGroup(run) === statusFilter);
     }
 
-    // Requirement 3: Apply date range filter based on historyViewMode
+    // Sort all runs in ASCENDING order by period (year, then month)
+    const sortedAscending = [...filtered].sort((a, b) => {
+      const aKey = a.periodYear * 100 + a.periodMonth;
+      const bKey = b.periodYear * 100 + b.periodMonth;
+      return aKey - bKey; // Ascending: older periods first
+    });
+
+    // Apply date range filter based on historyViewMode
     if (historyViewMode === "last_4_months") {
-      // Sort by year+month descending (newest → oldest) to get the latest 4
-      const sortedDescending = [...filtered].sort((a, b) => {
-        const aKey = a.periodYear * 100 + a.periodMonth;
-        const bKey = b.periodYear * 100 + b.periodMonth;
-        return bKey - aKey; // Descending order
-      });
-      // Take first 4 results (latest 4 months)
-      const latest4 = sortedDescending.slice(0, 4);
-      // Reverse to display in ascending order (oldest of the 4 first, newest of the 4 last)
-      filtered = latest4.reverse();
+      // Take the LAST 4 periods (most recent), which are already in ascending order
+      filtered = sortedAscending.slice(-4);
     } else {
-      // "all_months" mode: show all runs, sorted by period ascending (oldest first)
-      filtered = [...filtered].sort((a, b) => {
-        const aKey = a.periodYear * 100 + a.periodMonth;
-        const bKey = b.periodYear * 100 + b.periodMonth;
-        return aKey - bKey; // Ascending order
-      });
+      // "all_months" mode: show all runs in ascending order
+      filtered = sortedAscending;
     }
 
     return filtered;
