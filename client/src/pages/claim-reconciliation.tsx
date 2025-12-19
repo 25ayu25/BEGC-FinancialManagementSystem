@@ -1238,7 +1238,8 @@ export default function ClaimReconciliation() {
     }
 
     const formData = new FormData();
-    formData.append("paymentStatementFile", paymentStatementFile);
+    // Backend expects 'remittanceFile' field name for API compatibility
+    formData.append("remittanceFile", paymentStatementFile);
     formData.append("providerName", providerName);
     formData.append("periodYear", periodYear);
     formData.append("periodMonth", periodMonth);
@@ -1266,7 +1267,8 @@ export default function ClaimReconciliation() {
 
     const formData = new FormData();
     formData.append("claimsFile", claimsFile);
-    formData.append("paymentStatementFile", paymentStatementFile);
+    // Backend expects 'remittanceFile' field name for API compatibility
+    formData.append("remittanceFile", paymentStatementFile);
     formData.append("providerName", providerName);
     formData.append("periodYear", periodYear);
     formData.append("periodMonth", periodMonth);
@@ -1606,7 +1608,8 @@ export default function ClaimReconciliation() {
       } else {
         setPaymentStatementFile(file);
         const formData = new FormData();
-        formData.append("paymentStatementFile", file);
+        // Backend expects 'remittanceFile' field name for API compatibility
+        formData.append("remittanceFile", file);
         formData.append("providerName", period.providerName);
         formData.append("periodYear", period.periodYear.toString());
         formData.append("periodMonth", period.periodMonth.toString());
