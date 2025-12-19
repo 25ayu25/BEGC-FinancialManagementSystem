@@ -101,24 +101,24 @@ export async function calculateRunMetricsFromDB(runId: number) {
   
   const totalRemittanceRows = remittancesCountResult?.count ?? 0;
 
-  // Get match type counts from the join table
-  const runClaimsData = await db
-    .select()
+  // Calculate match type and status counts using SQL aggregation for efficiency
+  const [countsResult] = await db
+    .select({
+      autoMatched: sql<number>`COUNT(*) FILTER (WHERE ${claimReconRunClaims.matchType} = 'exact')`,
+      partialMatched: sql<number>`COUNT(*) FILTER (WHERE ${claimReconRunClaims.matchType} = 'partial')`,
+      manualReview: sql<number>`COUNT(*) FILTER (WHERE ${claimReconRunClaims.statusAfterRun} = 'manual_review')`,
+      unpaidCount: sql<number>`COUNT(*) FILTER (WHERE ${claimReconRunClaims.statusAfterRun} = 'unpaid')`,
+    })
     .from(claimReconRunClaims)
     .where(eq(claimReconRunClaims.runId, runId));
-
-  const autoMatched = runClaimsData.filter(rc => rc.matchType === "exact").length;
-  const partialMatched = runClaimsData.filter(rc => rc.matchType === "partial").length;
-  const manualReview = runClaimsData.filter(rc => rc.statusAfterRun === "manual_review").length;
-  const unpaidCount = runClaimsData.filter(rc => rc.statusAfterRun === "unpaid").length;
 
   return {
     totalClaimRows,
     totalRemittanceRows,
-    autoMatched,
-    partialMatched,
-    manualReview,
-    unpaidCount,
+    autoMatched: Number(countsResult?.autoMatched ?? 0),
+    partialMatched: Number(countsResult?.partialMatched ?? 0),
+    manualReview: Number(countsResult?.manualReview ?? 0),
+    unpaidCount: Number(countsResult?.unpaidCount ?? 0),
   };
 }
 
