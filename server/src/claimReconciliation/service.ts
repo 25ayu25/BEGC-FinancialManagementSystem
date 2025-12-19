@@ -65,19 +65,27 @@ export async function createReconRun(
 
 /**
  * Get actual counts from persisted tables for audit-proof metrics
+ * @param runId - The ID of the reconciliation run
+ * @returns Object containing totalClaimRows and totalRemittanceRows counts
+ * @throws Error if runId is invalid or database query fails
  */
 export async function getActualRunCounts(runId: number) {
-  // Count claims actually processed in this run (from join table)
-  const [claimCountResult] = await db
-    .select({ count: sql<number>`cast(count(*) as integer)` })
-    .from(claimReconRunClaims)
-    .where(eq(claimReconRunClaims.runId, runId));
-  
-  // Count remittances for this run
-  const [remittanceCountResult] = await db
-    .select({ count: sql<number>`cast(count(*) as integer)` })
-    .from(claimReconRemittances)
-    .where(eq(claimReconRemittances.runId, runId));
+  // Execute queries in parallel for better performance
+  const [claimCountResult, remittanceCountResult] = await Promise.all([
+    // Count claims actually processed in this run (from join table)
+    db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(claimReconRunClaims)
+      .where(eq(claimReconRunClaims.runId, runId))
+      .then(result => result[0]),
+    
+    // Count remittances for this run
+    db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(claimReconRemittances)
+      .where(eq(claimReconRemittances.runId, runId))
+      .then(result => result[0]),
+  ]);
 
   return {
     totalClaimRows: claimCountResult.count,
