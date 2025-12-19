@@ -1667,26 +1667,58 @@ export default function ClaimReconciliation() {
 
   return (
     <TooltipProvider>
-      {/* Premium Clean Header */}
-      <div className="relative rounded-2xl bg-orange-50 border border-orange-200/50 p-8 shadow-md">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">Claim Reconciliation</h1>
-            <p className="text-slate-600 mt-1">
-              Upload claim and payment statement files, then review matches, underpayments, and outstanding balances
-            </p>
-          </div>
+      {/* PREMIUM HEADER - Bold gradient design with pattern */}
+      <div className="relative overflow-hidden rounded-3xl">
+        {/* Gradient Background Layer */}
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/50 via-white to-blue-50/50" />
+        
+        {/* Pattern Overlay */}
+        <div className="absolute inset-0 pattern-dots opacity-30" />
+        
+        {/* Subtle Glow Effect */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-200/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl" />
+        
+        {/* Content */}
+        <div className="relative px-8 py-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="space-y-3">
+              {/* Breadcrumb / Context Indicator */}
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <span className="text-slate-400">Dashboard</span>
+                <span className="text-slate-400">/</span>
+                <span className="font-medium text-slate-700">Claim Reconciliation</span>
+              </div>
+              
+              {/* Bold Title with Gradient Text */}
+              <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-900 bg-clip-text text-transparent leading-tight">
+                Claim Reconciliation
+              </h1>
+              
+              {/* Accent Underline */}
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full" />
+                <div className="w-8 h-1 bg-gradient-to-r from-orange-400 to-amber-400 rounded-full opacity-60" />
+                <div className="w-4 h-1 bg-gradient-to-r from-orange-300 to-amber-300 rounded-full opacity-40" />
+              </div>
+              
+              <p className="text-slate-600 text-base md:text-lg max-w-2xl leading-relaxed">
+                Match insurance payments to claims, identify discrepancies, and track outstanding balances — all in one place
+              </p>
+            </div>
 
-          {/* Issue 1 & 2: Help button triggers slide-over sheet */}
-          <Sheet open={showHelp} onOpenChange={setShowHelp}>
-            <SheetTrigger asChild>
-              <button
-                className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 transition-colors rounded-lg text-slate-700 font-medium text-sm"
-              >
-                <HelpCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Help & Guide</span>
-              </button>
-            </SheetTrigger>
+            {/* Integrated Help Button */}
+            <Sheet open={showHelp} onOpenChange={setShowHelp}>
+              <SheetTrigger asChild>
+                <button
+                  className="flex items-center gap-3 px-6 py-3 bg-white/90 hover:bg-white backdrop-blur-sm border-2 border-slate-200/60 hover:border-orange-300 transition-all duration-200 rounded-xl text-slate-700 font-semibold text-sm shadow-lg hover:shadow-xl hover:-translate-y-0.5 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                    <HelpCircle className="w-4 h-4 text-white" />
+                  </div>
+                  <span>Help & Guide</span>
+                </button>
+              </SheetTrigger>
             <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
               <SheetHeader>
                 <SheetTitle className="text-2xl font-bold text-slate-800">Reconciliation Help & Guide</SheetTitle>
@@ -1949,285 +1981,198 @@ export default function ClaimReconciliation() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
-        {/* KPI cards - Enhanced Premium Design */}
-        <section className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-3">
-            {/* Reconciliations Done Card */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-emerald-200/50">
-              {/* Animated gradient background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              
-              {/* Floating orb effect */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-emerald-400/20 to-teal-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
-              
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 flex items-center justify-center shadow-lg group-hover:shadow-emerald-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
-                    <CheckCircle className="w-7 h-7 text-white" />
-                  </div>
+      <div className="max-w-6xl mx-auto pb-12 pt-8">
+        {/* Section Spacing: Use consistent larger gaps between major sections */}
+        <div className="space-y-10">
+        {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
+        <section>
+          {/* Premium Card with Glass-morphism */}
+          <div className="premium-card relative overflow-hidden rounded-3xl border border-slate-200/60 shadow-2xl shadow-slate-300/50 bg-white/95 backdrop-blur-sm transition-all duration-300">
+            {/* Subtle gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-emerald-50/30 pointer-events-none" />
+            
+            {/* Content */}
+            <div className="relative p-8">
+              {/* Section Header */}
+              <div className="mb-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-full" />
+                  <h2 className="text-2xl font-bold text-slate-900">Key Metrics Overview</h2>
                 </div>
-                
-                <div className="space-y-1">
-                  {/* Requirement 5: Updated KPI title and explanation */}
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Payment Statement Uploads</p>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.paymentStatementUploads}</span>
-                    <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">files processed</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Latest: {stats.lastPeriodLabel}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    (Each file can cover multiple months)
-                  </p>
-                </div>
+                <p className="text-sm text-slate-600 ml-5">Consolidated view of claims, payments, and outstanding balances</p>
               </div>
-              
-              {/* Bottom accent line */}
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-            </div>
 
-            {/* Requirement 5: New KPI - Claim Months Uploaded */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 via-white to-indigo-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-purple-200/50">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-400/10 via-transparent to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-purple-400/20 to-indigo-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
-              
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-600 flex items-center justify-center shadow-lg group-hover:shadow-purple-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
-                    <Calculator className="w-7 h-7 text-white" />
+              {/* 2×3 Grid of KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                {/* Payment Statement Uploads */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (stats.latestRunId) {
+                      setSelectedRunId(stats.latestRunId);
+                      setTimeout(() => {
+                        document.getElementById("claims-details-section")?.scrollIntoView({ behavior: "smooth" });
+                      }, 100);
+                    }
+                  }}
+                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg group-hover:scale-110 transition-transform">
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
                   </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Claim Months Uploaded</p>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.claimMonthsUploaded}</span>
-                    <span className="text-xs font-medium text-purple-600 bg-purple-100 px-2 py-1 rounded-full">periods</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Unique provider+month combinations
-                  </p>
-                </div>
-              </div>
-              
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-            </div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Statement Uploads</p>
+                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.paymentStatementUploads}</p>
+                  <p className="text-xs text-slate-500">Latest: {stats.lastPeriodLabel}</p>
+                </button>
 
-            {/* Total Claims Card */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-200/50">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 via-transparent to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-cyan-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
-              
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
-                    <FileStack className="w-7 h-7 text-white" />
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Total Claims Uploaded</p>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-4xl font-bold text-slate-900 tracking-tight">{stats.totalClaims.toLocaleString()}</span>
-                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">all periods</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">Across all months</p>
-                </div>
-              </div>
-              
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-            </div>
-
-            {/* Claims to Follow Up Card - Clickable */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowInventory(true);
-                // Apply filters for follow-up items
-                setInventoryStatusFilter("partially_paid");
-                // Scroll to inventory after a brief delay to allow state update
-                setTimeout(() => {
-                  const inventorySection = document.getElementById("exceptions-section");
-                  if (inventorySection) {
-                    inventorySection.scrollIntoView({ behavior: "smooth", block: "start" });
-                    // Add highlight animation
-                    inventorySection.classList.add("ring-4", "ring-orange-400/50", "ring-offset-2");
+                {/* Claim Periods Uploaded */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInventory(true);
                     setTimeout(() => {
-                      inventorySection.classList.remove("ring-4", "ring-orange-400/50", "ring-offset-2");
-                    }, 2000);
-                  }
-                }, 100);
-              }}
-              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-orange-200/50 cursor-pointer text-left w-full"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-400/10 via-transparent to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-orange-400/20 to-red-500/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-500" />
-              
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 flex items-center justify-center shadow-lg group-hover:shadow-orange-500/50 transition-shadow duration-300 group-hover:scale-110 transform">
-                    <AlertTriangle className="w-7 h-7 text-white" />
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                  }}
+                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-110 transition-transform">
+                      <Calculator className="w-6 h-6 text-white" />
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
                   </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Claims to Follow Up</p>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-4xl font-bold text-orange-600 tracking-tight">{stats.problemClaims}</span>
-                    <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded-full">issues</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    {stats.awaitingPaymentStatement > 0
-                      ? `Plus ${stats.awaitingPaymentStatement} pending payment statement`
-                      : "Unpaid or partially paid"}
-                  </p>
-                  <p className="text-xs text-orange-600 font-medium mt-2 flex items-center gap-1.5">
-                    <span>Click to view details</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform duration-200" />
-                  </p>
-                </div>
-              </div>
-              
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-            </button>
-          </div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Claim Periods</p>
+                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.claimMonthsUploaded}</p>
+                  <p className="text-xs text-slate-500">Unique months uploaded</p>
+                </button>
 
-          {/* Requirement 2: New KPI card - Current claim status (all months) */}
-          <Card className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 mt-6">
-            <CardHeader className="pb-3 bg-gradient-to-r from-indigo-50/80 to-purple-50/80 backdrop-blur-sm border-b border-slate-200/50">
-              <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
-                Current Claim Status (All Months)
-              </CardTitle>
-              <CardDescription className="mt-1">Breakdown of all claims across all periods</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid gap-4 md:grid-cols-4">
-                {/* Total Claims - clickable */}
+                {/* Total Claims Uploaded */}
                 <button
                   type="button"
                   onClick={() => {
                     setShowInventory(true);
                     setInventoryStatusFilter("all");
                     setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 via-white to-slate-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-slate-200/50 cursor-pointer text-left w-full"
+                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <FileStack className="w-5 h-5 text-slate-600" />
-                      <p className="text-sm font-semibold text-slate-600">Total Claims</p>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg group-hover:scale-110 transition-transform">
+                      <FileStack className="w-6 h-6 text-white" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-slate-900">{stats.totalClaims.toLocaleString()}</span>
-                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1 transition-all" />
-                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
                   </div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Claims</p>
+                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.totalClaims.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Uploaded across all periods</p>
                 </button>
 
-                {/* Paid in Full - clickable */}
+                {/* Paid in Full */}
                 <button
                   type="button"
                   onClick={() => {
                     setShowInventory(true);
                     setInventoryStatusFilter("matched");
                     setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 via-white to-emerald-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-emerald-200/50 cursor-pointer text-left w-full"
+                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      <p className="text-sm font-semibold text-emerald-700">Paid in Full</p>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform">
+                      <CheckCircle2 className="w-6 h-6 text-white" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-emerald-600">{stats.paidInFull.toLocaleString()}</span>
-                      <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
-                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
                   </div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paid in Full</p>
+                  <p className="text-3xl font-bold text-emerald-600 mb-1">{stats.paidInFull.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Claims fully reconciled</p>
                 </button>
 
-                {/* Follow-up Needed - clickable (shows all claims, user can filter by tabs) */}
+                {/* Follow-up Needed */}
                 <button
                   type="button"
                   onClick={() => {
                     setShowInventory(true);
-                    setInventoryStatusFilter("all");
+                    setInventoryStatusFilter("partially_paid");
                     setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-orange-50 via-white to-orange-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-orange-200/50 cursor-pointer text-left w-full"
+                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-orange-600" />
-                      <p className="text-sm font-semibold text-orange-700">Follow-up Needed</p>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg group-hover:scale-110 transition-transform">
+                      <AlertTriangle className="w-6 h-6 text-white" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-orange-600">{stats.followUpNeeded.toLocaleString()}</span>
-                      <ArrowRight className="w-4 h-4 text-orange-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
-                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
                   </div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Follow-up Needed</p>
+                  <p className="text-3xl font-bold text-orange-600 mb-1">{stats.followUpNeeded.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Partial/unpaid claims</p>
                 </button>
 
-                {/* Waiting for Payment Statement - clickable */}
+                {/* Awaiting Statement */}
                 <button
                   type="button"
                   onClick={() => {
                     setShowInventory(true);
                     setInventoryStatusFilter("awaiting_remittance");
                     setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-sky-50 via-white to-sky-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-sky-200/50 cursor-pointer text-left w-full"
+                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-sky-600" />
-                      <p className="text-sm font-semibold text-sky-700">Waiting for Payment Statement</p>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform">
+                      <Clock className="w-6 h-6 text-white" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-sky-600">{stats.waitingForPaymentStatement.toLocaleString()}</span>
-                      <ArrowRight className="w-4 h-4 text-sky-400 group-hover:text-sky-600 group-hover:translate-x-1 transition-all" />
-                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-sky-600 group-hover:translate-x-1 transition-all" />
                   </div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Awaiting Statement</p>
+                  <p className="text-3xl font-bold text-sky-600 mb-1">{stats.waitingForPaymentStatement.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Pending payment data</p>
                 </button>
               </div>
 
-              {/* Outstanding total summary */}
-              <div className="mt-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+              {/* Outstanding Total - Subtle Summary Bar */}
+              <div className="mt-6 px-6 py-4 bg-gradient-to-r from-slate-50/80 via-slate-100/80 to-slate-50/80 rounded-2xl border border-slate-200/60 shadow-inner">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calculator className="w-5 h-5 text-slate-600" />
-                    <span className="text-sm font-semibold text-slate-700">Outstanding Total</span>
-                    <span className="text-xs text-slate-500">(Waiting + Follow-up)</span>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-white shadow-sm">
+                      <TrendingUp className="w-5 h-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-700">Outstanding Total</p>
+                      <p className="text-xs text-slate-500">Awaiting + Follow-up</p>
+                    </div>
                   </div>
-                  <span className="text-2xl font-bold text-slate-900">{stats.outstandingTotal.toLocaleString()}</span>
+                  <p className="text-3xl font-bold text-slate-900 tabular-nums">{stats.outstandingTotal.toLocaleString()}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </section>
 
-        {/* Period cards - Premium Glass-morphism Design */}
+        {/* Period cards - Premium Design */}
         {periodsSummary.length > 0 && (
-          <Card className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
+          <Card className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+            <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                  <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                  <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                     Your Claim Periods
                   </CardTitle>
-                  <CardDescription className="mt-1">Click a period card to set the active month/year.</CardDescription>
+                  <CardDescription className="mt-1 text-slate-600">Click a period card to set the active month/year.</CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -2372,15 +2317,14 @@ export default function ClaimReconciliation() {
                       key={`${period.periodYear}-${period.periodMonth}`}
                       onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
                       className={cn(
-                        "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 cursor-pointer backdrop-blur-sm",
-                        "hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02]",
+                        "premium-card interactive-card group relative overflow-hidden p-6 cursor-pointer",
                         isActive
-                          ? "border-2 border-orange-400/50 bg-gradient-to-br from-orange-50/90 via-white/90 to-amber-50/90 shadow-xl shadow-orange-500/20 ring-2 ring-orange-300/30"
-                          : "border border-slate-200/50 bg-white/80 hover:border-slate-300/70 hover:bg-white/95"
+                          ? "border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/80 shadow-2xl shadow-orange-200/50 ring-2 ring-orange-300/20"
+                          : "border-l-4 border-l-slate-200 hover:border-l-orange-400"
                       )}
                     >
-                      {/* Glass-morphism overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      {/* Subtle gradient overlay on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                       
                       {/* Floating gradient orb */}
                       <div
@@ -2397,18 +2341,13 @@ export default function ClaimReconciliation() {
                       />
 
                       <div className="relative space-y-4">
-                        {/* Header with title and actions */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 space-y-1">
-                            <h3 className="font-bold text-xl text-slate-800 group-hover:text-orange-600 transition-colors duration-200">
-                              {formatPeriodLabel(period.periodYear, period.periodMonth)}
-                            </h3>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Status Icon */}
+                        {/* Header - Month + Status Icon + Actions */}
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-2xl text-slate-800 group-hover:text-orange-600 transition-colors duration-200 flex items-center gap-2">
+                            {formatPeriodLabel(period.periodYear, period.periodMonth)}
+                            {/* Status Icon inline */}
                             <div className={cn(
-                              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110",
+                              "w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-all duration-300",
                               cardState === "complete"
                                 ? "bg-emerald-400"
                                 : cardState === "awaiting"
@@ -2418,213 +2357,151 @@ export default function ClaimReconciliation() {
                                 : "bg-slate-400"
                             )}>
                               {cardState === "complete" ? (
-                                <CheckCircle2 className="w-5 h-5 text-white" />
+                                <CheckCircle2 className="w-4 h-4 text-white" />
                               ) : cardState === "awaiting" ? (
-                                <Clock className="w-5 h-5 text-white" />
+                                <Clock className="w-4 h-4 text-white" />
                               ) : cardState === "needs_review" ? (
-                                <AlertTriangle className="w-5 h-5 text-white" />
+                                <AlertTriangle className="w-4 h-4 text-white" />
                               ) : (
-                                <FileText className="w-5 h-5 text-white" />
+                                <FileText className="w-4 h-4 text-white" />
                               )}
                             </div>
+                          </h3>
 
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
-                                  onClick={(e) => e.stopPropagation()}
-                                  disabled={isDeleting || isUploading}
-                                >
-                                  <MoreHorizontal className="w-5 h-5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleReplacePeriodFile(period, "claims");
-                                  }}
-                                  disabled={isUploading}
-                                  className="cursor-pointer"
-                                >
-                                  <Upload className="w-3 h-3 mr-2" />
-                                  Replace claims file
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePeriod(period, "claims");
-                                  }}
-                                  disabled={isDeleting}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                                >
-                                  <Trash2 className="w-3 h-3 mr-2" />
-                                  Clear all claims
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleReplacePeriodFile(period, "remittances");
-                                  }}
-                                  disabled={isUploading}
-                                  className="cursor-pointer"
-                                >
-                                  <Upload className="w-3 h-3 mr-2" />
-                                  Replace payment statement file
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePeriod(period, "remittances");
-                                  }}
-                                  disabled={isDeleting}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                                >
-                                  <Trash2 className="w-3 h-3 mr-2" />
-                                  Clear payment statements
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          {/* Actions Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-8 h-8 min-w-[32px] min-h-[32px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
+                                onClick={(e) => e.stopPropagation()}
+                                disabled={isDeleting || isUploading}
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReplacePeriodFile(period, "claims");
+                                }}
+                                disabled={isUploading}
+                                className="cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3 mr-2" />
+                                Replace claims file
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period, "claims");
+                                }}
+                                disabled={isDeleting}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Clear all claims
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReplacePeriodFile(period, "remittances");
+                                }}
+                                disabled={isUploading}
+                                className="cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3 mr-2" />
+                                Replace payment statement file
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period, "remittances");
+                                }}
+                                disabled={isDeleting}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Clear payment statements
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
 
-                        {/* Headline Metric: Paid in Full % */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Paid in Full</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <p className="text-xs">Percent of claims fully paid (paid amount equals billed amount).</p>
-                                <p className="text-xs font-semibold mt-1">Formula: (Paid in full ÷ Total claims) × 100</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <div className="text-4xl font-bold text-slate-900 tracking-tight">
-                            {paidInFullPercent}%
-                          </div>
-                        </div>
-
-                        {/* Supporting Metrics */}
-                        <div className="space-y-2 pt-3 border-t border-slate-200/50">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-600 font-medium">Seen in payment statement</span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  <p className="text-xs">Percent of claims that appear in a payment statement (matched by Member + Bill/Invoice).</p>
-                                  <p className="text-xs font-semibold mt-1">Formula: ((Total - Pending payment statement) ÷ Total claims) × 100</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                            <span className="font-bold text-slate-700">{seenInRemittancePercent}%</span>
-                          </div>
-                          
-                          {/* Stacked Progress Bar */}
-                          <div className="h-3 bg-slate-200/80 rounded-full overflow-hidden backdrop-blur-sm flex">
-                            {/* Paid in full segment */}
-                            {period.matched > 0 && (
-                              <div 
-                                className="bg-emerald-400 transition-all duration-500" 
-                                style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
-                                title={`Paid in full: ${period.matched}`}
-                              />
-                            )}
-                            {/* Paid partially segment */}
-                            {period.partiallyPaid > 0 && (
-                              <div 
-                                className="bg-amber-400 transition-all duration-500" 
-                                style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
-                                title={`Paid partially: ${period.partiallyPaid}`}
-                              />
-                            )}
-                            {/* Not paid (0 paid) segment */}
-                            {period.unpaid > 0 && (
-                              <div 
-                                className="bg-rose-400 transition-all duration-500" 
-                                style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
-                                title={`Not paid: ${period.unpaid}`}
-                              />
-                            )}
-                            {/* Pending payment statement segment */}
-                            {period.awaitingRemittance > 0 && (
-                              <div 
-                                className="bg-sky-300 transition-all duration-500" 
-                                style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
-                                title={`Pending payment statement: ${period.awaitingRemittance}`}
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Claims count and amount */}
-                        <div className="space-y-1 pt-2">
-                          <div className="text-lg font-semibold text-slate-700">
-                            {period.totalClaims.toLocaleString()} <span className="text-sm font-medium text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
-                          </div>
-                          <div className="text-xs text-slate-600">
-                            {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
-                            {parseFloat(period.totalBilled).toLocaleString()} billed
-                          </div>
-                        </div>
-
-                        {/* Status Badge */}
-                        <div className="flex items-center gap-2">
-                          {cardState === "complete" ? (
-                            <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Complete
-                            </Badge>
-                          ) : cardState === "needs_review" ? (
-                            <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
-                              <AlertTriangle className="w-3 h-3 mr-1" />
-                              Needs review
-                            </Badge>
-                          ) : cardState === "awaiting" ? (
-                            <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pending payment statement
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-slate-400 text-white hover:bg-slate-500 border-0">Processing</Badge>
-                          )}
-                        </div>
-
-                        {/* Breakdown stats */}
-                        <div className="pt-2 space-y-1.5 text-xs text-slate-600 border-t border-slate-200/50">
-                          {period.awaitingRemittance > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                              <span>{period.awaitingRemittance} pending payment statement</span>
-                            </div>
-                          )}
+                        {/* Progress Bar - Full width, prominent */}
+                        <div className="h-4 bg-slate-200/80 rounded-full overflow-hidden flex shadow-inner">
                           {period.matched > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              <span>{period.matched} paid in full</span>
-                            </div>
+                            <div 
+                              className="bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500" 
+                              style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
+                              title={`Paid in full: ${period.matched}`}
+                            />
                           )}
                           {period.partiallyPaid > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                              <span>{period.partiallyPaid} Paid partially</span>
-                            </div>
+                            <div 
+                              className="bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500" 
+                              style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
+                              title={`Paid partially: ${period.partiallyPaid}`}
+                            />
                           )}
                           {period.unpaid > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                              <span>{period.unpaid} Not paid (0 paid)</span>
-                            </div>
+                            <div 
+                              className="bg-gradient-to-r from-rose-400 to-rose-500 transition-all duration-500" 
+                              style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
+                              title={`Not paid: ${period.unpaid}`}
+                            />
+                          )}
+                          {period.awaitingRemittance > 0 && (
+                            <div 
+                              className="bg-gradient-to-r from-sky-300 to-sky-400 transition-all duration-500" 
+                              style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
+                              title={`Pending payment statement: ${period.awaitingRemittance}`}
+                            />
                           )}
                         </div>
+
+                        {/* Single-line Summary */}
+                        <div className="flex items-center gap-4 text-sm flex-wrap">
+                          <span className="font-bold text-slate-800">
+                            {paidInFullPercent}% paid
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-medium text-slate-600">
+                            {period.totalClaims.toLocaleString()} {pluralize(period.totalClaims, "claim")}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-medium text-slate-600">
+                            {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Status Badge - single status line */}
+                        {cardState === "awaiting" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-sky-400" />
+                            <span className="text-slate-600">{period.awaitingRemittance} pending payment statement</span>
+                          </div>
+                        ) : cardState === "needs_review" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                            <span className="text-slate-600">
+                              {(period.unpaid + period.partiallyPaid)} need follow-up
+                            </span>
+                          </div>
+                        ) : cardState === "complete" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                            <span className="text-emerald-700 font-medium">All claims reconciled</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="text-slate-600">Processing</span>
+                          </div>
+                        )}>
                       </div>
 
                       {/* Bottom gradient accent */}
@@ -2675,19 +2552,24 @@ export default function ClaimReconciliation() {
               })()}
                 </>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-200/50">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
-                      <TableRow className="hover:bg-slate-50/90">
-                        <TableHead className="font-bold text-slate-700">Period</TableHead>
-                        <TableHead className="font-bold text-slate-700">Claims</TableHead>
-                        <TableHead className="font-bold text-slate-700">Billed</TableHead>
-                        <TableHead className="font-bold text-slate-700">Metrics</TableHead>
-                        <TableHead className="font-bold text-slate-700">Status</TableHead>
-                        <TableHead className="font-bold text-slate-700 text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                {/* Table View with improved responsiveness */}
+                <div className="relative overflow-x-auto rounded-xl border border-slate-200/50 shadow-inner">
+                  {/* Scroll hint indicator */}
+                  <div className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-white/90 to-transparent pointer-events-none z-20 md:hidden" />
+                  
+                  <div className="min-w-full overflow-x-auto">
+                    <Table className="min-w-[900px]">
+                      <TableHeader className="sticky top-0 z-10 glass-header border-b border-slate-200">
+                        <TableRow className="hover:bg-slate-50/90">
+                          <TableHead className="font-bold text-slate-700 min-w-[140px] sticky left-0 bg-slate-50/95 z-20">Period</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[100px] sticky left-[140px] bg-slate-50/95 z-20">Claims</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[120px]">Billed</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[200px]">Metrics</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[140px]">Status</TableHead>
+                          <TableHead className="font-bold text-slate-700 text-right min-w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                       {filteredPeriods.map((period) => {
                         const isActive =
                           period.periodYear === parseInt(periodYear, 10) &&
@@ -2726,10 +2608,10 @@ export default function ClaimReconciliation() {
                                 : "hover:bg-slate-50/50"
                             )}
                           >
-                            <TableCell className="font-semibold">
+                            <TableCell className="font-semibold sticky left-0 bg-white z-10">
                               {formatPeriodLabel(period.periodYear, period.periodMonth)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="sticky left-[140px] bg-white z-10">
                               <div className="flex flex-col">
                                 <span className="font-semibold">{period.totalClaims}</span>
                                 <span className="text-xs text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
@@ -2869,6 +2751,7 @@ export default function ClaimReconciliation() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -2876,15 +2759,15 @@ export default function ClaimReconciliation() {
         )}
 
         {/* Workflow - Premium Card */}
-        <Card id="workflow-section" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-4 bg-gradient-to-r from-orange-50/80 to-amber-50/80 backdrop-blur-sm border-b border-slate-200/50">
+        <Card id="workflow-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+          <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
-                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                   Reconciliation Workflow
                 </CardTitle>
-                <CardDescription className="mt-1">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
+                <CardDescription className="mt-2 text-slate-600">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
               </div>
 
               <div className="flex flex-wrap items-end gap-2">
@@ -3071,21 +2954,21 @@ export default function ClaimReconciliation() {
         </Card>
 
         {/* Claims Inventory - Premium Card */}
-        <Card id="exceptions-section" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-3 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
+        <Card id="exceptions-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+          <CardHeader className="pb-3 glass-header border-b border-slate-200/50">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full" />
+                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full" />
                   Claims Inventory
                 </CardTitle>
-                <CardDescription className="mt-1">All claims submitted to {providerName} across all periods</CardDescription>
+                <CardDescription className="mt-2 text-slate-600">All claims submitted to {providerName} across all periods</CardDescription>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowInventory(!showInventory)}
-                className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all shadow-sm hover:shadow-md"
               >
                 <FileStack className="w-4 h-4" />
                 {showInventory ? "Hide" : "View All Claims"}
@@ -3357,15 +3240,15 @@ export default function ClaimReconciliation() {
         </Card>
 
         {/* Reconciliation history - Premium Card */}
-        <Card id="reconciliation-history" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-3 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
+        <Card id="reconciliation-history" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+          <CardHeader className="pb-3 glass-header border-b border-slate-200/50">
             <div className="flex items-center justify-between gap-2">
               <div className="flex-1">
-                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full" />
+                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full" />
                   Reconciliation History
                 </CardTitle>
-                <CardDescription className="mt-1">Previous reconciliation runs for all providers</CardDescription>
+                <CardDescription className="mt-2 text-slate-600">Previous reconciliation runs for all providers</CardDescription>
               </div>
               
               {/* Requirement 3: Toggle for Last 4 months vs All months */}
@@ -3726,16 +3609,16 @@ export default function ClaimReconciliation() {
         {selectedRunId && (
           <Card
             id="claims-details-section"
-            className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 border-l-4 border-l-orange-500"
+            className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 border-l-4 border-l-orange-500"
           >
-            <CardHeader className="pb-3 bg-gradient-to-r from-orange-50/80 to-amber-50/80 backdrop-blur-sm border-b border-slate-200/50">
+            <CardHeader className="pb-3 glass-header border-b border-slate-200/50">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                  <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                     Claims Details — Run #{selectedRunId}
                   </CardTitle>
-                  <CardDescription className="mt-1">Detailed view of claims for the selected run</CardDescription>
+                  <CardDescription className="mt-2 text-slate-600">Detailed view of claims for the selected run</CardDescription>
                 </div>
 
                 {selectedRun && (
@@ -3879,6 +3762,7 @@ export default function ClaimReconciliation() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
     </TooltipProvider>
   );
