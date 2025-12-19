@@ -63,6 +63,36 @@ export async function createReconRun(
   return run;
 }
 
+/**
+ * Get actual counts from persisted tables for audit-proof metrics
+ * @param runId - The ID of the reconciliation run
+ * @returns Object containing totalClaimRows and totalRemittanceRows counts
+ * @throws Error if runId is invalid or database query fails
+ */
+export async function getActualRunCounts(runId: number) {
+  // Execute queries in parallel for better performance
+  const [claimCountResult, remittanceCountResult] = await Promise.all([
+    // Count claims actually processed in this run (from join table)
+    db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(claimReconRunClaims)
+      .where(eq(claimReconRunClaims.runId, runId))
+      .then(result => result[0]),
+    
+    // Count remittances for this run
+    db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(claimReconRemittances)
+      .where(eq(claimReconRemittances.runId, runId))
+      .then(result => result[0]),
+  ]);
+
+  return {
+    totalClaimRows: claimCountResult.count,
+    totalRemittanceRows: remittanceCountResult.count,
+  };
+}
+
 export async function updateReconRunMetrics(
   runId: number,
   metrics: Partial<{
@@ -296,11 +326,14 @@ export async function performMatching(runId: number) {
     manualReview: matchedOnly.filter((m) => m.status === "manual_review").length,
   };
 
+  // Get actual counts from persisted rows (audit-proof)
+  const actualCounts = await getActualRunCounts(runId);
+
   await db
     .update(claimReconRuns)
     .set({
-      totalClaimRows: summary.totalClaims,
-      totalRemittanceRows: summary.totalRemittances,
+      totalClaimRows: actualCounts.totalClaimRows, // COUNT from claim_recon_run_claims
+      totalRemittanceRows: actualCounts.totalRemittanceRows, // COUNT from claim_recon_remittances
       autoMatched: summary.autoMatched,
       partialMatched: summary.partialMatched,
       manualReview: summary.manualReview,
