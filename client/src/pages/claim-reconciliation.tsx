@@ -2083,9 +2083,9 @@ export default function ClaimReconciliation() {
                       ? `Plus ${stats.awaitingPaymentStatement} pending payment statement`
                       : "Unpaid or partially paid"}
                   </p>
-                  <p className="text-xs text-orange-600 font-medium mt-2 flex items-center gap-1">
+                  <p className="text-xs text-orange-600 font-medium mt-2 flex items-center gap-1.5">
                     <span>Click to view details</span>
-                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform duration-200" />
                   </p>
                 </div>
               </div>
@@ -3045,11 +3045,11 @@ export default function ClaimReconciliation() {
               <Button
                 type="button"
                 className={cn(
-                  "w-full h-12 text-base font-semibold transition-all duration-200 shadow-lg",
+                  "w-full h-12 text-base font-semibold transition-all duration-200 shadow-lg active:scale-[0.98] active:shadow-md",
                   uploadAction.type === "disabled" && "bg-slate-400 hover:bg-slate-400 cursor-not-allowed text-white",
-                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/30",
-                  uploadAction.type === "remittance-only" && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30",
-                  uploadAction.type === "both" && "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30"
+                  uploadAction.type === "claims-only" && "bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white shadow-blue-500/30",
+                  uploadAction.type === "remittance-only" && "bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white shadow-emerald-500/30",
+                  uploadAction.type === "both" && "bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white shadow-amber-500/30"
                 )}
                 onClick={runSmartAction}
                 disabled={isUploading || isDeleting || uploadAction.disabled}
