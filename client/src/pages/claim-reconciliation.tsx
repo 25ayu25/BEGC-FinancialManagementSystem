@@ -2153,7 +2153,7 @@ export default function ClaimReconciliation() {
                   <p className="text-xs text-slate-500">Partial/unpaid claims</p>
                 </button>
 
-                {/* Awaiting Statement */}
+                {/* Pending Remittance */}
                 <button
                   type="button"
                   onClick={() => {
@@ -3648,9 +3648,9 @@ export default function ClaimReconciliation() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
-                                {/* Requirement 4: Add statement context info */}
+                                {/* Requirement 4: Add remittance context info */}
                                 <div className="px-3 py-2 text-xs border-b border-slate-200 bg-slate-50">
-                                  <p className="font-semibold text-slate-700">Statement Context</p>
+                                  <p className="font-semibold text-slate-700">Remittance Context</p>
                                   <p className="text-slate-600 mt-1">Uploaded: {new Date(run.createdAt).toLocaleString()}</p>
                                   <p className="text-slate-600">Lines: {run.totalRemittanceRows}</p>
                                 </div>
