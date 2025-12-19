@@ -365,7 +365,7 @@ router.post(
       const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
       await updateReconRunMetrics(run.id, {
-        totalClaimRows: reconciliationResult.totalClaimsSearched, // claims checked
+        totalClaimRows: reconciliationResult.totalClaimsSearched, // Overridden with COUNT(*) from claim_recon_run_claims (audit-proof)
         totalRemittanceRows: inserted.length,
         autoMatched: reconciliationResult.summary.autoMatched,
         partialMatched: reconciliationResult.summary.partialMatched,
@@ -460,7 +460,7 @@ router.post(
       const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
       await updateReconRunMetrics(run.id, {
-        totalClaimRows: reconciliationResult.totalClaimsSearched,
+        totalClaimRows: reconciliationResult.totalClaimsSearched, // Overridden with COUNT(*) from claim_recon_run_claims (audit-proof)
         totalRemittanceRows: inserted.length,
         autoMatched: reconciliationResult.summary.autoMatched,
         partialMatched: reconciliationResult.summary.partialMatched,
