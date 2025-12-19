@@ -289,7 +289,7 @@ router.post(
         provider: providerName,
         period: formatPeriod(parseInt(periodYear, 10), parseInt(periodMonth, 10)),
         claimsStored: inserted.length,
-        message: `${inserted.length} claims stored and pending payment statement`,
+        message: `${inserted.length} claims stored and pending remittance`,
       });
     } catch (error: any) {
       console.error("Error uploading claims:", error);
@@ -695,7 +695,7 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
     // Add message if no issues found
     if (problemCount === 0) {
       rows.push(["Note:", "No claims requiring follow-up found for this reconciliation run."]);
-      rows.push(["", "All claims were either fully paid or are still pending payment statement."]);
+      rows.push(["", "All claims were either fully paid or are still pending remittance."]);
       rows.push([]);
     }
     
