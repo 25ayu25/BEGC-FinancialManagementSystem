@@ -2501,7 +2501,7 @@ export default function ClaimReconciliation() {
                             <div className="w-2 h-2 rounded-full bg-slate-400" />
                             <span className="text-slate-600">Processing</span>
                           </div>
-                        )}>
+                        )}
                       </div>
 
                       {/* Bottom gradient accent */}
@@ -2552,8 +2552,8 @@ export default function ClaimReconciliation() {
               })()}
                 </>
               ) : (
-                {/* Table View with improved responsiveness */}
                 <div className="relative overflow-x-auto rounded-xl border border-slate-200/50 shadow-inner">
+                  {/* Table View with improved responsiveness */}
                   {/* Scroll hint indicator */}
                   <div className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-white/90 to-transparent pointer-events-none z-20 md:hidden" />
                   
@@ -3763,6 +3763,7 @@ export default function ClaimReconciliation() {
           </Card>
         )}
         </div>
+      </div>
       </div>
     </TooltipProvider>
   );
