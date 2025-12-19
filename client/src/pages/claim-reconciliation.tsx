@@ -501,6 +501,10 @@ export default function ClaimReconciliation() {
     return formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
   }, [periodYear, periodMonth]);
 
+  const activePeriodYear = useMemo(() => {
+    return parseInt(periodYear, 10);
+  }, [periodYear]);
+
   /* ------------------------------------------------------------------------ */
   /* UI State */
   /* ------------------------------------------------------------------------ */
@@ -2232,7 +2236,19 @@ export default function ClaimReconciliation() {
                     </Select>
                   </div>
 
-                  <Badge className="bg-orange-500 text-white">Active: {activePeriodLabel}</Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5">
+                          <Badge className="bg-orange-500 text-white">Active: {activePeriodLabel}</Badge>
+                          <Info className="w-4 h-4 text-slate-500 cursor-help" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Active period is used for uploads & runs. Browsing years does not change it.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
@@ -2306,6 +2322,17 @@ export default function ClaimReconciliation() {
                       <TableIcon className="w-4 h-4" />
                       Table
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Warning banner when browsing year differs from active period year */}
+              {periodYearFilter !== null && periodYearFilter !== activePeriodYear && (
+                <div className="flex items-start gap-2 px-4 py-3 mt-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-900">
+                    <span className="font-semibold">You're viewing {periodYearFilter}, but the active period is {activePeriodLabel}.</span>
+                    {" "}Uploads will apply to the active period.
                   </div>
                 </div>
               )}
@@ -3354,7 +3381,7 @@ export default function ClaimReconciliation() {
                     )}
                     onClick={() => setHistoryViewMode("last_4_months")}
                   >
-                    Last 4 months
+                    Latest 4 periods
                   </button>
                   <button
                     type="button"
