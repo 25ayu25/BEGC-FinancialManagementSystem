@@ -1981,7 +1981,9 @@ export default function ClaimReconciliation() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto space-y-8 pb-10 pt-6">
+      <div className="max-w-6xl mx-auto pb-12 pt-8">
+        {/* Section Spacing: Use consistent larger gaps between major sections */}
+        <div className="space-y-10">
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
         <section>
           {/* Premium Card with Glass-morphism */}
@@ -2757,15 +2759,15 @@ export default function ClaimReconciliation() {
         )}
 
         {/* Workflow - Premium Card */}
-        <Card id="workflow-section" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-4 bg-gradient-to-r from-orange-50/80 to-amber-50/80 backdrop-blur-sm border-b border-slate-200/50">
+        <Card id="workflow-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+          <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
-                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                   Reconciliation Workflow
                 </CardTitle>
-                <CardDescription className="mt-1">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
+                <CardDescription className="mt-2 text-slate-600">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
               </div>
 
               <div className="flex flex-wrap items-end gap-2">
@@ -2952,21 +2954,21 @@ export default function ClaimReconciliation() {
         </Card>
 
         {/* Claims Inventory - Premium Card */}
-        <Card id="exceptions-section" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-3 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
+        <Card id="exceptions-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+          <CardHeader className="pb-3 glass-header border-b border-slate-200/50">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full" />
+                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full" />
                   Claims Inventory
                 </CardTitle>
-                <CardDescription className="mt-1">All claims submitted to {providerName} across all periods</CardDescription>
+                <CardDescription className="mt-2 text-slate-600">All claims submitted to {providerName} across all periods</CardDescription>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowInventory(!showInventory)}
-                className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all shadow-sm hover:shadow-md"
               >
                 <FileStack className="w-4 h-4" />
                 {showInventory ? "Hide" : "View All Claims"}
@@ -3238,15 +3240,15 @@ export default function ClaimReconciliation() {
         </Card>
 
         {/* Reconciliation history - Premium Card */}
-        <Card id="reconciliation-history" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-3 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
+        <Card id="reconciliation-history" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+          <CardHeader className="pb-3 glass-header border-b border-slate-200/50">
             <div className="flex items-center justify-between gap-2">
               <div className="flex-1">
-                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full" />
+                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full" />
                   Reconciliation History
                 </CardTitle>
-                <CardDescription className="mt-1">Previous reconciliation runs for all providers</CardDescription>
+                <CardDescription className="mt-2 text-slate-600">Previous reconciliation runs for all providers</CardDescription>
               </div>
               
               {/* Requirement 3: Toggle for Last 4 months vs All months */}
@@ -3607,16 +3609,16 @@ export default function ClaimReconciliation() {
         {selectedRunId && (
           <Card
             id="claims-details-section"
-            className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 border-l-4 border-l-orange-500"
+            className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 border-l-4 border-l-orange-500"
           >
-            <CardHeader className="pb-3 bg-gradient-to-r from-orange-50/80 to-amber-50/80 backdrop-blur-sm border-b border-slate-200/50">
+            <CardHeader className="pb-3 glass-header border-b border-slate-200/50">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                  <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                     Claims Details — Run #{selectedRunId}
                   </CardTitle>
-                  <CardDescription className="mt-1">Detailed view of claims for the selected run</CardDescription>
+                  <CardDescription className="mt-2 text-slate-600">Detailed view of claims for the selected run</CardDescription>
                 </div>
 
                 {selectedRun && (
@@ -3760,6 +3762,7 @@ export default function ClaimReconciliation() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
     </TooltipProvider>
   );
