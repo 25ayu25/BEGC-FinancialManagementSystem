@@ -1347,14 +1347,14 @@ export default function ClaimReconciliation() {
     switch (status) {
       case "awaiting_remittance":
         return (
-          <Badge className="bg-sky-500 text-white hover:bg-sky-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
+          <Badge className="bg-sky-500 text-white hover:bg-sky-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
             <Clock className="w-3.5 h-3.5" />
             Pending payment
           </Badge>
         );
       case "pending_review":
         return (
-          <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
             <AlertTriangle className="w-3.5 h-3.5" />
             Pending Review
           </Badge>
@@ -1362,7 +1362,7 @@ export default function ClaimReconciliation() {
       case "reconciled":
       default:
         return (
-          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
+          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
             <CheckCircle className="w-3.5 h-3.5" />
             Reconciled
           </Badge>
@@ -1439,28 +1439,28 @@ export default function ClaimReconciliation() {
       case "paid":
       case "matched":
         return (
-          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
             <CheckCircle className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
       case "partially_paid":
         return (
-          <Badge className="bg-amber-500 text-white hover:bg-amber-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+          <Badge className="bg-amber-500 text-white hover:bg-amber-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
             <AlertCircle className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
       case "manual_review":
         return (
-          <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
             <AlertTriangle className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
       case "unpaid":
         return (
-          <Badge className="bg-rose-500 text-white hover:bg-rose-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+          <Badge className="bg-rose-500 text-white hover:bg-rose-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
             <X className="w-3.5 h-3.5" />
             {label}
           </Badge>
@@ -1469,7 +1469,7 @@ export default function ClaimReconciliation() {
       case "submitted":
       default:
         return (
-          <Badge className="bg-sky-500 text-white hover:bg-sky-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+          <Badge className="bg-sky-500 text-white hover:bg-sky-600 border-0 px-3 py-1.5 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
             <Clock className="w-3.5 h-3.5" />
             {label}
           </Badge>
@@ -1667,58 +1667,26 @@ export default function ClaimReconciliation() {
 
   return (
     <TooltipProvider>
-      {/* PREMIUM HEADER - Bold gradient design with pattern */}
-      <div className="relative overflow-hidden rounded-3xl">
-        {/* Gradient Background Layer */}
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/50 via-white to-blue-50/50" />
-        
-        {/* Pattern Overlay */}
-        <div className="absolute inset-0 pattern-dots opacity-30" />
-        
-        {/* Subtle Glow Effect */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-200/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl" />
+      {/* PREMIUM HEADER - Redesigned with gradient background */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-100/50 mb-6">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-5" />
         
         {/* Content */}
-        <div className="relative px-8 py-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="space-y-3">
-              {/* Breadcrumb / Context Indicator */}
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <span className="text-slate-400">Dashboard</span>
-                <span className="text-slate-400">/</span>
-                <span className="font-medium text-slate-700">Claim Reconciliation</span>
-              </div>
-              
-              {/* Bold Title with Gradient Text */}
-              <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-900 bg-clip-text text-transparent leading-tight">
-                Claim Reconciliation
-              </h1>
-              
-              {/* Accent Underline */}
-              <div className="flex items-center gap-2">
-                <div className="w-16 h-1 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full" />
-                <div className="w-8 h-1 bg-gradient-to-r from-orange-400 to-amber-400 rounded-full opacity-60" />
-                <div className="w-4 h-1 bg-gradient-to-r from-orange-300 to-amber-300 rounded-full opacity-40" />
-              </div>
-              
-              <p className="text-slate-600 text-base md:text-lg max-w-2xl leading-relaxed">
-                Match insurance payments to claims, identify discrepancies, and track outstanding balances — all in one place
-              </p>
-            </div>
-
-            {/* Integrated Help Button */}
-            <Sheet open={showHelp} onOpenChange={setShowHelp}>
-              <SheetTrigger asChild>
-                <button
-                  className="flex items-center gap-3 px-6 py-3 bg-white/90 hover:bg-white backdrop-blur-sm border-2 border-slate-200/60 hover:border-orange-300 transition-all duration-200 rounded-xl text-slate-700 font-semibold text-sm shadow-lg hover:shadow-xl hover:-translate-y-0.5 group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                    <HelpCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Help & Guide</span>
-                </button>
-              </SheetTrigger>
+        <div className="relative px-8 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Claim Reconciliation</h1>
+            <p className="text-slate-600 mt-1">Match payments to claims instantly</p>
+          </div>
+          
+          {/* Integrated Help Button */}
+          <Sheet open={showHelp} onOpenChange={setShowHelp}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="gap-2 bg-white/80 hover:bg-white">
+                <HelpCircle className="w-4 h-4" />
+                Help & Guide
+              </Button>
+            </SheetTrigger>
             <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
               <SheetHeader>
                 <SheetTitle className="text-2xl font-bold text-slate-800">Reconciliation Help & Guide</SheetTitle>
@@ -1981,7 +1949,7 @@ export default function ClaimReconciliation() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto pb-12 pt-8">
+      <div className="max-w-6xl mx-auto pb-12 pt-6">
         {/* Section Spacing: Use consistent larger gaps between major sections */}
         <div className="space-y-10">
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
@@ -2015,13 +1983,13 @@ export default function ClaimReconciliation() {
                       }, 100);
                     }
                   }}
-                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
                       <CheckCircle className="w-6 h-6 text-white" />
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Statement Uploads</p>
                   <p className="text-3xl font-bold text-slate-900 mb-1">{stats.paymentStatementUploads}</p>
@@ -2037,13 +2005,13 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
                       <Calculator className="w-6 h-6 text-white" />
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Claim Periods</p>
                   <p className="text-3xl font-bold text-slate-900 mb-1">{stats.claimMonthsUploaded}</p>
@@ -2060,13 +2028,13 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
                       <FileStack className="w-6 h-6 text-white" />
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Claims</p>
                   <p className="text-3xl font-bold text-slate-900 mb-1">{stats.totalClaims.toLocaleString()}</p>
@@ -2083,13 +2051,13 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
                       <CheckCircle2 className="w-6 h-6 text-white" />
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paid in Full</p>
                   <p className="text-3xl font-bold text-emerald-600 mb-1">{stats.paidInFull.toLocaleString()}</p>
@@ -2106,13 +2074,13 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
                       <AlertTriangle className="w-6 h-6 text-white" />
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Follow-up Needed</p>
                   <p className="text-3xl font-bold text-orange-600 mb-1">{stats.followUpNeeded.toLocaleString()}</p>
@@ -2129,13 +2097,13 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-2xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
                       <Clock className="w-6 h-6 text-white" />
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-sky-600 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Awaiting Statement</p>
                   <p className="text-3xl font-bold text-sky-600 mb-1">{stats.waitingForPaymentStatement.toLocaleString()}</p>
@@ -3763,7 +3731,6 @@ export default function ClaimReconciliation() {
           </Card>
         )}
         </div>
-      </div>
       </div>
     </TooltipProvider>
   );
