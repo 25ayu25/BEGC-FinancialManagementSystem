@@ -1347,23 +1347,23 @@ export default function ClaimReconciliation() {
     switch (status) {
       case "awaiting_remittance":
         return (
-          <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
-            <Clock className="w-3 h-3 mr-1" />
-            Pending payment statement
+          <Badge className="bg-sky-500 text-white hover:bg-sky-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
+            <Clock className="w-3.5 h-3.5" />
+            Pending payment
           </Badge>
         );
       case "pending_review":
         return (
-          <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Reconciled – pending review
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Pending Review
           </Badge>
         );
       case "reconciled":
       default:
         return (
-          <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
+          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 min-w-[140px] transition-all duration-200">
+            <CheckCircle className="w-3.5 h-3.5" />
             Reconciled
           </Badge>
         );
@@ -1439,29 +1439,29 @@ export default function ClaimReconciliation() {
       case "paid":
       case "matched":
         return (
-          <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
+          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+            <CheckCircle className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
       case "partially_paid":
         return (
-          <Badge className="bg-amber-400 text-white hover:bg-amber-500 border-0">
-            <Clock className="w-3 h-3 mr-1" />
+          <Badge className="bg-amber-500 text-white hover:bg-amber-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+            <AlertCircle className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
       case "manual_review":
         return (
-          <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
-            <AlertCircle className="w-3 h-3 mr-1" />
+          <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+            <AlertTriangle className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
       case "unpaid":
         return (
-          <Badge className="bg-rose-400 text-white hover:bg-rose-500 border-0">
-            <AlertCircle className="w-3 h-3 mr-1" />
+          <Badge className="bg-rose-500 text-white hover:bg-rose-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+            <X className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
@@ -1469,8 +1469,8 @@ export default function ClaimReconciliation() {
       case "submitted":
       default:
         return (
-          <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
-            <Clock className="w-3 h-3 mr-1" />
+          <Badge className="bg-sky-500 text-white hover:bg-sky-600 border-0 px-3 py-1 font-semibold shadow-md whitespace-nowrap inline-flex items-center gap-1.5 transition-all duration-200">
+            <Clock className="w-3.5 h-3.5" />
             {label}
           </Badge>
         );
@@ -2433,7 +2433,7 @@ export default function ClaimReconciliation() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="p-2 rounded-lg border-2 border-gray-400 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-md hover:shadow-lg"
+                                  className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
                                   onClick={(e) => e.stopPropagation()}
                                   disabled={isDeleting || isUploading}
                                 >
@@ -2679,12 +2679,12 @@ export default function ClaimReconciliation() {
                   <Table>
                     <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
                       <TableRow className="hover:bg-slate-50/90">
-                        <TableHead className="font-semibold">Period</TableHead>
-                        <TableHead className="font-semibold">Claims</TableHead>
-                        <TableHead className="font-semibold">Billed</TableHead>
-                        <TableHead className="font-semibold">Metrics</TableHead>
-                        <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="font-semibold text-right">Actions</TableHead>
+                        <TableHead className="font-bold text-slate-700">Period</TableHead>
+                        <TableHead className="font-bold text-slate-700">Claims</TableHead>
+                        <TableHead className="font-bold text-slate-700">Billed</TableHead>
+                        <TableHead className="font-bold text-slate-700">Metrics</TableHead>
+                        <TableHead className="font-bold text-slate-700">Status</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2808,7 +2808,7 @@ export default function ClaimReconciliation() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="p-2 rounded-lg border-2 border-gray-400 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors shadow-md hover:shadow-lg"
+                                    className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
                                     onClick={(e) => e.stopPropagation()}
                                     disabled={isDeleting || isUploading}
                                   >
@@ -3112,18 +3112,18 @@ export default function ClaimReconciliation() {
                         key={x.key}
                         type="button"
                         className={cn(
-                          "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap flex items-center gap-2",
+                          "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap flex items-center gap-2 hover:scale-[1.02]",
                           inventoryStatusFilter === x.key
                             ? x.key === "unpaid"
-                              ? "bg-rose-400 shadow-lg text-white scale-105"
+                              ? "bg-rose-500 shadow-lg shadow-rose-500/30 text-white scale-105"
                               : x.key === "matched"
-                              ? "bg-emerald-400 shadow-lg text-white scale-105"
+                              ? "bg-emerald-500 shadow-lg shadow-emerald-500/30 text-white scale-105"
                               : x.key === "awaiting_remittance"
-                              ? "bg-sky-400 shadow-lg text-white scale-105"
+                              ? "bg-sky-500 shadow-lg shadow-sky-500/30 text-white scale-105"
                               : x.key === "partially_paid"
-                              ? "bg-amber-400 shadow-lg text-white scale-105"
+                              ? "bg-amber-500 shadow-lg shadow-amber-500/30 text-white scale-105"
                               : "bg-white shadow-lg text-slate-900 scale-105"
-                            : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                         )}
                         onClick={() => {
                           setInventoryStatusFilter(x.key);
@@ -3282,13 +3282,13 @@ export default function ClaimReconciliation() {
                     <Table>
                       <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
                         <TableRow className="hover:bg-slate-50/90">
-                          <TableHead className="font-semibold">Member #</TableHead>
-                          <TableHead className="font-semibold">Patient Name</TableHead>
-                          <TableHead className="font-semibold">Service Date</TableHead>
-                          <TableHead className="font-semibold">Period</TableHead>
-                          <TableHead className="font-semibold">Billed Amount</TableHead>
-                          <TableHead className="font-semibold">Amount Paid</TableHead>
-                          <TableHead className="font-semibold">Status</TableHead>
+                          <TableHead className="font-bold text-slate-700">Member #</TableHead>
+                          <TableHead className="font-bold text-slate-700">Patient Name</TableHead>
+                          <TableHead className="font-bold text-slate-700">Service Date</TableHead>
+                          <TableHead className="font-bold text-slate-700">Period</TableHead>
+                          <TableHead className="font-bold text-slate-700">Billed Amount</TableHead>
+                          <TableHead className="font-bold text-slate-700">Amount Paid</TableHead>
+                          <TableHead className="font-bold text-slate-700">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -3425,10 +3425,10 @@ export default function ClaimReconciliation() {
                   <button
                     type="button"
                     className={cn(
-                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap",
+                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap hover:scale-[1.02]",
                       statusFilter === "all" 
-                        ? "bg-white shadow-lg text-slate-900 scale-105" 
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                        ? "bg-white shadow-lg shadow-slate-300/50 text-slate-900 scale-105" 
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                     )}
                     onClick={() => setStatusFilter("all")}
                   >
@@ -3438,10 +3438,10 @@ export default function ClaimReconciliation() {
                   <button
                     type="button"
                     className={cn(
-                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
+                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-[1.02]",
                       statusFilter === "needs_follow_up"
-                        ? "bg-orange-400 shadow-lg text-white scale-105"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                        ? "bg-orange-500 shadow-lg shadow-orange-500/30 text-white scale-105"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                     )}
                     onClick={() => setStatusFilter("needs_follow_up")}
                   >
@@ -3452,10 +3452,10 @@ export default function ClaimReconciliation() {
                   <button
                     type="button"
                     className={cn(
-                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
+                      "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-[1.02]",
                       statusFilter === "completed"
-                        ? "bg-emerald-400 shadow-lg text-white scale-105"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                        ? "bg-emerald-500 shadow-lg shadow-emerald-500/30 text-white scale-105"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                     )}
                     onClick={() => setStatusFilter("completed")}
                   >
@@ -3477,11 +3477,11 @@ export default function ClaimReconciliation() {
                 <Table>
                   <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
                     <TableRow className="hover:bg-slate-50/90">
-                      <TableHead className="font-semibold">Provider</TableHead>
-                      <TableHead className="font-semibold">Period</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-bold text-slate-700">Provider</TableHead>
+                      <TableHead className="font-bold text-slate-700">Period</TableHead>
+                      <TableHead className="font-bold text-slate-700">Status</TableHead>
                       {/* Issue 7: Period claims column */}
-                      <TableHead className="font-semibold">
+                      <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3497,7 +3497,7 @@ export default function ClaimReconciliation() {
                         </TooltipProvider>
                       </TableHead>
                       {/* Requirement 1: Renamed to "Outstanding checked" */}
-                      <TableHead className="font-semibold">
+                      <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3513,7 +3513,7 @@ export default function ClaimReconciliation() {
                         </TooltipProvider>
                       </TableHead>
                       {/* Requirement 2: Rename column to "Statement lines" */}
-                      <TableHead className="font-semibold">
+                      <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3529,7 +3529,7 @@ export default function ClaimReconciliation() {
                         </TooltipProvider>
                       </TableHead>
                       {/* Requirement 3: Add tooltips explaining cross-month matching */}
-                      <TableHead className="font-semibold">
+                      <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3544,7 +3544,7 @@ export default function ClaimReconciliation() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      <TableHead className="font-semibold">
+                      <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3559,7 +3559,7 @@ export default function ClaimReconciliation() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      <TableHead className="font-semibold">
+                      <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3574,8 +3574,8 @@ export default function ClaimReconciliation() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="text-right font-semibold">Actions</TableHead>
+                      <TableHead className="font-bold text-slate-700">Date</TableHead>
+                      <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -3634,22 +3634,22 @@ export default function ClaimReconciliation() {
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className="text-xs font-semibold border-emerald-400/50 bg-emerald-50 text-emerald-600"
+                              className="text-xs font-bold border-emerald-500/60 bg-emerald-50 text-emerald-700 px-2.5 py-1 shadow-sm inline-flex items-center gap-1.5 min-w-[52px] justify-center transition-all duration-200 hover:shadow-md"
                             >
-                              <CheckCircle className="w-3 h-3 mr-1" />
+                              <CheckCircle className="w-3.5 h-3.5" />
                               {run.autoMatched}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge className="bg-amber-400 text-white hover:bg-amber-500 text-xs font-semibold">
-                              <Clock className="w-3 h-3 mr-1" />
+                            <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs font-bold px-2.5 py-1 shadow-sm inline-flex items-center gap-1.5 min-w-[52px] justify-center transition-all duration-200 hover:shadow-md">
+                              <Clock className="w-3.5 h-3.5" />
                               {run.partialMatched}
                             </Badge>
                           </TableCell>
                           {/* Issue 4: Not paid (replaced Review) - shows unpaid claims with $0 paid */}
                           <TableCell>
-                            <Badge className="bg-rose-400 text-white hover:bg-rose-500 text-xs font-semibold">
-                              <X className="w-3 h-3 mr-1" />
+                            <Badge className="bg-rose-500 text-white hover:bg-rose-600 text-xs font-bold px-2.5 py-1 shadow-sm inline-flex items-center gap-1.5 min-w-[52px] justify-center transition-all duration-200 hover:shadow-md">
+                              <X className="w-3.5 h-3.5" />
                               {run.unpaidCount}
                             </Badge>
                           </TableCell>
@@ -3675,9 +3675,9 @@ export default function ClaimReconciliation() {
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg border-2 border-gray-400 bg-white hover:bg-gray-100 text-gray-700 hover:text-gray-900 shadow-md hover:shadow-lg transition-colors" disabled={isDeleting}>
+                                <Button variant="ghost" size="icon" className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400" disabled={isDeleting}>
                                   <span className="sr-only">Open menu</span>
-                                  <MoreHorizontal className="w-4 h-4" />
+                                  <MoreHorizontal className="w-5 h-5" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
@@ -3739,18 +3739,19 @@ export default function ClaimReconciliation() {
                 </div>
 
                 {selectedRun && (
-                  <div className="text-xs text-muted-foreground text-right">
-                    <div className="font-medium">
+                  <div className="text-right space-y-1">
+                    <div className="text-sm font-bold text-slate-800">
                       {selectedRun.providerName} ·{" "}
                       {new Date(selectedRun.periodYear, selectedRun.periodMonth - 1).toLocaleString("default", {
                         month: "short",
                         year: "numeric",
                       })}
                     </div>
-                    <div>
+                    <div className="text-base font-bold text-slate-900">
                       {selectedRun.totalClaimRows} claims
-                      {claims.length > 0 && claims.length !== selectedRun.totalClaimRows ? ` (${claims.length} shown)` : ""},{" "}
-                      {selectedRun.totalRemittanceRows} payment statement lines
+                      {claims.length > 0 && claims.length !== selectedRun.totalClaimRows ? ` (${claims.length} shown)` : ""}
+                      <span className="text-slate-400 font-normal mx-2">•</span>
+                      <span className="font-bold text-slate-900">{selectedRun.totalRemittanceRows}</span> <span className="text-sm font-medium text-slate-600">payment statement lines</span>
                     </div>
                   </div>
                 )}
@@ -3771,10 +3772,10 @@ export default function ClaimReconciliation() {
                         <button
                           type="button"
                           className={cn(
-                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap",
+                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm whitespace-nowrap hover:scale-[1.02]",
                             attentionFilter === "all"
-                              ? "bg-white shadow-lg text-slate-900 scale-105"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                              ? "bg-white shadow-lg shadow-slate-300/50 text-slate-900 scale-105"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                           )}
                           onClick={() => setAttentionFilter("all")}
                         >
@@ -3784,10 +3785,10 @@ export default function ClaimReconciliation() {
                         <button
                           type="button"
                           className={cn(
-                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
+                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-[1.02]",
                             attentionFilter === "waiting"
-                              ? "bg-sky-400 shadow-lg text-white scale-105"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                              ? "bg-sky-500 shadow-lg shadow-sky-500/30 text-white scale-105"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                           )}
                           onClick={() => setAttentionFilter("waiting")}
                         >
@@ -3798,10 +3799,10 @@ export default function ClaimReconciliation() {
                         <button
                           type="button"
                           className={cn(
-                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap",
+                            "px-5 py-2.5 rounded-xl transition-all duration-200 font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-[1.02]",
                             attentionFilter === "follow_up"
-                              ? "bg-orange-400 shadow-lg text-white scale-105"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                              ? "bg-orange-500 shadow-lg shadow-orange-500/30 text-white scale-105"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-white/60 hover:shadow-sm"
                           )}
                           onClick={() => setAttentionFilter("follow_up")}
                         >
@@ -3837,12 +3838,12 @@ export default function ClaimReconciliation() {
                       <Table>
                         <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
                           <TableRow className="hover:bg-slate-50/90">
-                            <TableHead className="font-semibold">Member #</TableHead>
-                            <TableHead className="font-semibold">Patient name</TableHead>
-                            <TableHead className="font-semibold">Service date</TableHead>
-                            <TableHead className="font-semibold">Billed amount</TableHead>
-                            <TableHead className="font-semibold">Amount paid</TableHead>
-                            <TableHead className="font-semibold">Status</TableHead>
+                            <TableHead className="font-bold text-slate-700">Member #</TableHead>
+                            <TableHead className="font-bold text-slate-700">Patient name</TableHead>
+                            <TableHead className="font-bold text-slate-700">Service date</TableHead>
+                            <TableHead className="font-bold text-slate-700">Billed amount</TableHead>
+                            <TableHead className="font-bold text-slate-700">Amount paid</TableHead>
+                            <TableHead className="font-bold text-slate-700">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
