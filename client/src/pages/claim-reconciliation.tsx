@@ -2310,22 +2310,45 @@ export default function ClaimReconciliation() {
 
                       <div className="relative space-y-4">
                         {/* Header - Month + Status Icon + Actions */}
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-xl font-semibold text-slate-900">{formatPeriodLabel(period.periodYear, period.periodMonth)}</h3>
-                          <div className="flex items-center gap-2">
-                            {(period.unpaid > 0 || period.partiallyPaid > 0) && <AlertTriangle className="w-4 h-4 text-orange-500" />}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  onClick={(e) => e.stopPropagation()}
-                                  disabled={isDeleting || isUploading}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-2xl text-slate-800 group-hover:text-orange-600 transition-colors duration-200 flex items-center gap-2">
+                            {formatPeriodLabel(period.periodYear, period.periodMonth)}
+                            {/* Status Icon inline */}
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-all duration-300",
+                              cardState === "complete"
+                                ? "bg-emerald-400"
+                                : cardState === "awaiting"
+                                ? "bg-sky-400"
+                                : cardState === "needs_review"
+                                ? "bg-orange-400"
+                                : "bg-slate-400"
+                            )}>
+                              {cardState === "complete" ? (
+                                <CheckCircle2 className="w-4 h-4 text-white" />
+                              ) : cardState === "awaiting" ? (
+                                <Clock className="w-4 h-4 text-white" />
+                              ) : cardState === "needs_review" ? (
+                                <AlertTriangle className="w-4 h-4 text-white" />
+                              ) : (
+                                <FileText className="w-4 h-4 text-white" />
+                              )}
+                            </div>
+                          </h3>
+
+                          {/* Actions Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-8 h-8 min-w-[32px] min-h-[32px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
+                                onClick={(e) => e.stopPropagation()}
+                                disabled={isDeleting || isUploading}
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
                               <DropdownMenuItem
                                 onClick={(e) => {
@@ -2376,35 +2399,77 @@ export default function ClaimReconciliation() {
                           </DropdownMenu>
                         </div>
 
-                        {/* Progress Bar - more prominent */}
-                        <div className="h-3 rounded-full bg-slate-100 overflow-hidden mb-4">
-                          <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500" style={{width: `${paidInFullPercent}%`}} />
-                        </div>
-                        
-                        {/* Single summary line */}
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-slate-900">{paidInFullPercent}% paid</span>
-                          <span className="text-slate-500">{period.totalClaims} claims • {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()}</span>
-                        </div>
-                        
-                        {/* Status indicator - subtle */}
-                        <div className="mt-3 text-xs text-slate-500 flex items-center gap-1.5">
-                          <span className={cn(
-                            "w-2 h-2 rounded-full",
-                            cardState === "complete" ? "bg-emerald-400" :
-                            cardState === "needs_review" ? "bg-orange-400" :
-                            cardState === "awaiting" ? "bg-sky-400" : "bg-slate-400"
-                          )} />
-                          {cardState === "awaiting" ? (
-                            <span>{period.awaitingRemittance} pending payment statement</span>
-                          ) : cardState === "needs_review" ? (
-                            <span>{(period.unpaid + period.partiallyPaid)} need follow-up</span>
-                          ) : cardState === "complete" ? (
-                            <span>All claims reconciled</span>
-                          ) : (
-                            <span>Processing</span>
+                        {/* Progress Bar - Full width, prominent */}
+                        <div className="h-4 bg-slate-200/80 rounded-full overflow-hidden flex shadow-inner">
+                          {period.matched > 0 && (
+                            <div 
+                              className="bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500" 
+                              style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
+                              title={`Paid in full: ${period.matched}`}
+                            />
+                          )}
+                          {period.partiallyPaid > 0 && (
+                            <div 
+                              className="bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500" 
+                              style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
+                              title={`Paid partially: ${period.partiallyPaid}`}
+                            />
+                          )}
+                          {period.unpaid > 0 && (
+                            <div 
+                              className="bg-gradient-to-r from-rose-400 to-rose-500 transition-all duration-500" 
+                              style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
+                              title={`Not paid: ${period.unpaid}`}
+                            />
+                          )}
+                          {period.awaitingRemittance > 0 && (
+                            <div 
+                              className="bg-gradient-to-r from-sky-300 to-sky-400 transition-all duration-500" 
+                              style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
+                              title={`Pending payment statement: ${period.awaitingRemittance}`}
+                            />
                           )}
                         </div>
+
+                        {/* Single-line Summary */}
+                        <div className="flex items-center gap-4 text-sm flex-wrap">
+                          <span className="font-bold text-slate-800">
+                            {paidInFullPercent}% paid
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-medium text-slate-600">
+                            {period.totalClaims.toLocaleString()} {pluralize(period.totalClaims, "claim")}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-medium text-slate-600">
+                            {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Status Badge - single status line */}
+                        {cardState === "awaiting" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-sky-400" />
+                            <span className="text-slate-600">{period.awaitingRemittance} pending payment statement</span>
+                          </div>
+                        ) : cardState === "needs_review" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                            <span className="text-slate-600">
+                              {(period.unpaid + period.partiallyPaid)} need follow-up
+                            </span>
+                          </div>
+                        ) : cardState === "complete" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                            <span className="text-emerald-700 font-medium">All claims reconciled</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="text-slate-600">Processing</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Bottom gradient accent */}
@@ -3666,7 +3731,6 @@ export default function ClaimReconciliation() {
           </Card>
         )}
         </div>
-      </div>
       </div>
     </TooltipProvider>
   );
