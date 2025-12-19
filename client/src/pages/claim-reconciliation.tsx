@@ -241,8 +241,8 @@ function getCurrencyForDisplay(providerName: string, currency?: string): string 
 }
 
 /**
- * Issue 6: Status label with correct terminology
- * CRITICAL: "Not paid (0 paid)" only for claims that WERE in a payment statement with $0 paid
+ * Status label with correct terminology
+ * CRITICAL: "Not paid (0 paid)" only for claims that WERE in a remittance with $0 paid
  */
 function claimStatusLabel(status: string): string {
   switch (status) {
@@ -258,25 +258,25 @@ function claimStatusLabel(status: string): string {
     case "awaiting_remittance":
     case "submitted":
     default:
-      return "Pending payment statement"; // Requirement 1: Updated terminology
+      return "Pending remittance";
   }
 }
 
 /**
- * Explains cross-period matching for providers - Issue 2: Updated terminology
+ * Explains cross-period matching for providers
  */
 function getWorkflowDescription(providerName: string, periodLabel: string): string {
-  return `Working on: ${providerName} – ${periodLabel} (claims for this month). Payment statement uploads will be matched against all outstanding ${providerName} claims across all months.`;
+  return `Working on: ${providerName} – ${periodLabel} (claims for this month). Remittance uploads will be matched against all outstanding ${providerName} claims across all months.`;
 }
 
 /**
- * Payment statement upload description - Requirement 1: Updated terminology
+ * Remittance upload description
  */
 function getRemittanceUploadDescription(providerName: string): string {
   if (providerName === "CIC") {
-    return "This payment statement will be matched against all CIC claims that are still awaiting a payment statement, not just this month";
+    return "This remittance will be matched against all CIC claims that are still awaiting remittance, not just this month";
   }
-  return "Upload payment statement file from insurance";
+  return "Upload remittance file from insurance";
 }
 
 function claimStatusGroup(status: string): "paid" | "waiting" | "follow_up" {
@@ -769,8 +769,8 @@ export default function ClaimReconciliation() {
     const claimMonthsUploaded = periodsSummary.filter(p => p.totalClaims > 0).length;
 
     const totalClaims = periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
-    // Claims to follow up: partially paid, unpaid (with payment statement), and manual review
-    // EXCLUDES awaiting_remittance (not yet in any payment statement)
+    // Claims to follow up: partially paid, unpaid (with remittance), and manual review
+    // EXCLUDES awaiting_remittance (not yet in any remittance)
     const problemClaims = periodsSummary.reduce(
       (sum, p) => sum + p.unpaid + p.partiallyPaid + (p.manualReview || 0), 
       0
@@ -783,7 +783,7 @@ export default function ClaimReconciliation() {
     const waitingForPaymentStatement = awaitingPaymentStatement;
     const outstandingTotal = followUpNeeded + waitingForPaymentStatement;
 
-    // Get the most recent reconciliation run (with payment statements) based on createdAt
+    // Get the most recent reconciliation run (with remittances) based on createdAt
     const runsWithPaymentStatements = runs.filter(run => run.totalRemittanceRows > 0);
     const sortedRuns = [...runsWithPaymentStatements].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -893,7 +893,7 @@ export default function ClaimReconciliation() {
     onSuccess: (data) => {
       toast({
         title: "Claims uploaded",
-        description: `${data.claimsStored} claims uploaded – pending payment statement`,
+        description: `${data.claimsStored} claims uploaded – pending remittance`,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
@@ -1129,16 +1129,16 @@ export default function ClaimReconciliation() {
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const error = await response.json();
-          throw new Error(error.error || "Failed to delete payment statements");
+          throw new Error(error.error || "Failed to delete remittances");
         }
         const text = await response.text();
-        throw new Error(`Failed to delete payment statements (${response.status}): ${text.substring(0, 120)}`);
+        throw new Error(`Failed to delete remittances (${response.status}): ${text.substring(0, 120)}`);
       }
 
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Payment statements deleted", description: "All payment statements for the period were removed." });
+      toast({ title: "Remittances deleted", description: "All remittances for the period were removed." });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/periods-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/claims"] });
@@ -1185,7 +1185,7 @@ export default function ClaimReconciliation() {
 
     const step2 = {
       completed: hasRemittance,
-      details: hasRemittance ? `${periodStatus.remittances.total} payment statements` : undefined,
+      details: hasRemittance ? `${periodStatus.remittances.total} remittance lines` : undefined,
     };
 
     const step3 = {
@@ -1208,7 +1208,7 @@ export default function ClaimReconciliation() {
       primaryDisabled = !claimsFile;
     } else if (!hasRemittance) {
       currentStep = 2;
-      primaryAction = "💰 Upload Payment Statement File";
+      primaryAction = "💰 Upload Remittance File";
       primaryDisabled = !paymentStatementFile;
     } else if (!isReconciled) {
       currentStep = 3;
@@ -1249,7 +1249,7 @@ export default function ClaimReconciliation() {
       return { type: "claims-only" as const, label: `Upload Claims`, disabled: false };
     }
     if (!hasClaims && hasRemittance) {
-      return { type: "remittance-only" as const, label: `Upload Payment Statement to ${periodLabel}`, disabled: false };
+      return { type: "remittance-only" as const, label: `Upload Remittance to ${periodLabel}`, disabled: false };
     }
     return { type: "both" as const, label: `Upload & Reconcile`, disabled: false };
   }, [claimsFile, paymentStatementFile, periodYear, periodMonth]);
@@ -1289,7 +1289,7 @@ export default function ClaimReconciliation() {
 
   const submitRemittance = useCallback(() => {
     if (!paymentStatementFile) {
-      toast({ title: "Missing file", description: "Please select a payment statement file.", variant: "destructive" });
+      toast({ title: "Missing file", description: "Please select a remittance file.", variant: "destructive" });
       return;
     }
 
@@ -1306,7 +1306,7 @@ export default function ClaimReconciliation() {
     if (!claimsFile || !paymentStatementFile) {
       toast({
         title: "Missing files",
-        description: "Please select both the claims and payment statement files.",
+        description: "Please select both the claims and remittance files.",
         variant: "destructive",
       });
       return;
@@ -1358,13 +1358,13 @@ export default function ClaimReconciliation() {
     const periodHasClaims = !!periodStatus && periodStatus.claims.total > 0;
 
     if (!hasClaims && !hasRemittance) {
-      if (periodHasClaims) return "Claims are ready! Upload the payment statement file to reconcile.";
-      return "Upload your claims file to store them while waiting for payment statement, or upload both files to reconcile immediately.";
+      if (periodHasClaims) return "Claims are ready! Upload the remittance file to reconcile.";
+      return "Upload your claims file to store them while waiting for remittance, or upload both files to reconcile immediately.";
     }
 
-    if (hasClaims && !hasRemittance) return "Upload your claims file to store them while waiting for payment statement.";
+    if (hasClaims && !hasRemittance) return "Upload your claims file to store them while waiting for remittance.";
     if (!hasClaims && hasRemittance) {
-      if (periodHasClaims) return "Upload payment statement to reconcile against stored claims for this period.";
+      if (periodHasClaims) return "Upload remittance to reconcile against stored claims for this period.";
       return "⚠️ No claims found for this period. Please upload claims first or select a different period.";
     }
 
@@ -1553,7 +1553,7 @@ export default function ClaimReconciliation() {
     } else if (!isReconciled) {
       toast({
         title: "Reconciliation Pending",
-        description: "Reconciliation will run automatically when you upload the payment statement file.",
+        description: "Reconciliation will run automatically when you upload the remittance file.",
       });
     } else {
       const exceptionsSection = document.getElementById("exceptions-section");
@@ -1654,7 +1654,7 @@ export default function ClaimReconciliation() {
         month: period.periodMonth,
       });
     } else {
-      const ok = window.confirm(`Delete all payment statements for ${periodLabel}?\n\nThis cannot be undone.`);
+      const ok = window.confirm(`Delete all remittances for ${periodLabel}?\n\nThis cannot be undone.`);
       if (!ok) return;
 
       deletePeriodRemittancesMutation.mutate({
@@ -1783,8 +1783,8 @@ export default function ClaimReconciliation() {
                         </div>
                         <div className="space-y-1">
                           <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Step 2</div>
-                          <div className="text-base font-bold text-slate-800">Upload Payment Statement</div>
-                          <div className="text-xs text-slate-600 leading-relaxed">Upload the payment statement file from insurance</div>
+                          <div className="text-base font-bold text-slate-800">Upload Remittance</div>
+                          <div className="text-xs text-slate-600 leading-relaxed">Upload the remittance file from insurance</div>
                         </div>
                       </div>
 
@@ -1830,9 +1830,9 @@ export default function ClaimReconciliation() {
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-sky-50/50 border border-sky-200/50">
                       <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0 px-3 py-1">
                         <Clock className="w-3 h-3 mr-1" />
-                        Pending payment statement
+                        Pending remittance
                       </Badge>
-                      <div className="text-sm text-slate-600">Claims uploaded, waiting for payment statement</div>
+                      <div className="text-sm text-slate-600">Claims uploaded, waiting for remittance</div>
                     </div>
                     
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/50">
@@ -1856,7 +1856,7 @@ export default function ClaimReconciliation() {
                         <AlertCircle className="w-3 h-3 mr-1" />
                         Not paid (0 paid)
                       </Badge>
-                      <div className="text-sm text-slate-600">Claim was in payment statement but $0 paid</div>
+                      <div className="text-sm text-slate-600">Claim was in remittance but $0 paid</div>
                     </div>
                     
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-50/50 border border-orange-200/50">
@@ -1895,9 +1895,9 @@ export default function ClaimReconciliation() {
                     <div className="rounded-xl bg-gradient-to-br from-sky-50 to-sky-100/50 border-2 border-sky-200/50 p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <TrendingUp className="w-5 h-5 text-sky-600" />
-                        <div className="font-bold text-slate-800">Seen in payment statement %</div>
+                        <div className="font-bold text-slate-800">Seen in remittance %</div>
                       </div>
-                      <div className="text-sm text-slate-600 mb-2">Percentage of claims appearing in payment statement</div>
+                      <div className="text-sm text-slate-600 mb-2">Percentage of claims appearing in remittance</div>
                       <div className="text-xs font-mono bg-white/80 rounded-lg px-3 py-2 text-slate-700 border border-sky-200">
                         ((Total - Pending) ÷ Total claims) × 100
                       </div>
@@ -1931,14 +1931,14 @@ export default function ClaimReconciliation() {
                     <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50/50 border border-amber-200/50">
                       <Lightbulb className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                       <div className="text-sm text-slate-700 leading-relaxed">
-                        Upload claims as soon as you submit them to insurance - don't wait for payment statement
+                        Upload claims as soon as you submit them to insurance - don't wait for remittance
                       </div>
                     </div>
 
                     <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50/50 border border-blue-200/50">
                       <Lightbulb className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                       <div className="text-sm text-slate-700 leading-relaxed">
-                        Payment statements are matched against ALL outstanding claims, not just the selected month
+                        Remittances are matched against ALL outstanding claims, not just the selected month
                       </div>
                     </div>
 
@@ -1972,10 +1972,10 @@ export default function ClaimReconciliation() {
                   <CardContent className="pt-6 space-y-4">
                     <div className="rounded-xl border border-slate-200 overflow-hidden">
                       <div className="bg-gradient-to-r from-slate-50 to-white px-4 py-3 border-b border-slate-200">
-                        <div className="font-semibold text-slate-800 text-sm">❓ Why do my claims show "Pending payment statement"?</div>
+                        <div className="font-semibold text-slate-800 text-sm">❓ Why do my claims show "Pending remittance"?</div>
                       </div>
                       <div className="px-4 py-3 text-sm text-slate-600 leading-relaxed">
-                        Claims show as "Pending payment statement" when they've been uploaded but no matching payment statement file has been processed yet. Once you upload a payment statement, the system will automatically match them.
+                        Claims show as "Pending remittance" when they've been uploaded but no matching remittance file has been processed yet. Once you upload a remittance, the system will automatically match them.
                       </div>
                     </div>
 
@@ -1993,7 +1993,7 @@ export default function ClaimReconciliation() {
                         <div className="font-semibold text-slate-800 text-sm">❓ How do I fix a claim that was matched incorrectly?</div>
                       </div>
                       <div className="px-4 py-3 text-sm text-slate-600 leading-relaxed">
-                        If a claim was matched incorrectly, you can delete the reconciliation run from the History section and re-upload the files. Make sure the member numbers and claim identifiers match exactly between your claims and payment statement files.
+                        If a claim was matched incorrectly, you can delete the reconciliation run from the History section and re-upload the files. Make sure the member numbers and claim identifiers match exactly between your claims and remittance files.
                       </div>
                     </div>
                   </CardContent>
@@ -2027,7 +2027,7 @@ export default function ClaimReconciliation() {
 
               {/* 2×3 Grid of KPI Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                {/* Payment Statement Uploads */}
+                {/* Remittance Uploads */}
                 <button
                   type="button"
                   onClick={() => {
@@ -2046,7 +2046,7 @@ export default function ClaimReconciliation() {
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Statement Uploads</p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Remittance Uploads</p>
                   <p className="text-3xl font-bold text-slate-900 mb-1">{stats.paymentStatementUploads}</p>
                   <p className="text-xs text-slate-500">Latest: {stats.lastPeriodLabel}</p>
                 </button>
@@ -2322,7 +2322,7 @@ export default function ClaimReconciliation() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded bg-sky-300 shadow-sm" />
-                    <span className="text-xs text-slate-700 font-medium">Pending payment statement</span>
+                    <span className="text-xs text-slate-700 font-medium">Pending remittance</span>
                   </div>
                 </div>
               </div>
@@ -2354,7 +2354,7 @@ export default function ClaimReconciliation() {
                     ? ((period.matched / period.totalClaims) * 100).toFixed(1) 
                     : "0";
                   
-                  // Seen in payment statement % = ((totalClaims - pendingRemittance) / totalClaims) * 100
+                  // Seen in remittance % = ((totalClaims - pendingRemittance) / totalClaims) * 100
                   // This includes matched, partially paid, and unpaid (excludes only awaiting_remittance)
                   const seenInRemittanceCount = period.totalClaims - period.awaitingRemittance;
                   const seenInRemittancePercent = period.totalClaims > 0
@@ -2463,7 +2463,7 @@ export default function ClaimReconciliation() {
                                 className="cursor-pointer"
                               >
                                 <Upload className="w-3 h-3 mr-2" />
-                                Replace payment statement file
+                                Replace remittance file
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={(e) => {
@@ -2474,7 +2474,7 @@ export default function ClaimReconciliation() {
                                 className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                               >
                                 <Trash2 className="w-3 h-3 mr-2" />
-                                Clear payment statements
+                                Clear remittances
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -2507,7 +2507,7 @@ export default function ClaimReconciliation() {
                             <div 
                               className="bg-gradient-to-r from-sky-300 to-sky-400 transition-all duration-500" 
                               style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
-                              title={`Pending payment statement: ${period.awaitingRemittance}`}
+                              title={`Pending remittance: ${period.awaitingRemittance}`}
                             />
                           )}
                         </div>
@@ -2536,7 +2536,7 @@ export default function ClaimReconciliation() {
                               </div>
                             )}
                             
-                            {/* Pending payment statement */}
+                            {/* Pending remittance */}
                             {period.awaitingRemittance > 0 && (
                               <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-sky-50 border border-sky-200">
                                 <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
@@ -2724,7 +2724,7 @@ export default function ClaimReconciliation() {
                                       <div 
                                         className="bg-sky-300 transition-all duration-500" 
                                         style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
-                                        title={`Pending payment statement: ${period.awaitingRemittance}`}
+                                        title={`Pending remittance: ${period.awaitingRemittance}`}
                                       />
                                     )}
                                   </div>
@@ -2751,7 +2751,7 @@ export default function ClaimReconciliation() {
                               ) : cardState === "awaiting" ? (
                                 <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
                                   <Clock className="w-3 h-3 mr-1" />
-                                  Pending payment statement
+                                  Pending remittance
                                 </Badge>
                               ) : (
                                 <Badge className="bg-slate-400 text-white hover:bg-slate-500 border-0">Processing</Badge>
@@ -2803,7 +2803,7 @@ export default function ClaimReconciliation() {
                                     className="cursor-pointer"
                                   >
                                     <Upload className="w-3 h-3 mr-2" />
-                                    Replace payment statement
+                                    Replace remittance
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={(e) => {
@@ -2814,7 +2814,7 @@ export default function ClaimReconciliation() {
                                     className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                                   >
                                     <Trash2 className="w-3 h-3 mr-2" />
-                                    Delete payment statements
+                                    Delete remittances
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -2925,7 +2925,7 @@ export default function ClaimReconciliation() {
                   <span className="text-xs text-muted-foreground">Loading status…</span>
                 ) : periodStatus ? (
                   <span className="text-xs text-muted-foreground">
-                    {periodStatus.claims.total} claims • {periodStatus.remittances.total} payment statements
+                    {periodStatus.claims.total} claims • {periodStatus.remittances.total} remittance lines
                   </span>
                 ) : null}
               </div>
@@ -2973,7 +2973,7 @@ export default function ClaimReconciliation() {
                 </div>
 
                 <FileDropzone
-                  label="Payment Statement File"
+                  label="Remittance File"
                   description={getRemittanceUploadDescription(providerName)}
                   file={paymentStatementFile}
                   onFileChange={setPaymentStatementFile}
@@ -3056,7 +3056,7 @@ export default function ClaimReconciliation() {
                   {(
                     [
                       { key: "all", label: "All", icon: null },
-                      { key: "awaiting_remittance", label: "Pending payment statement", icon: Clock },
+                      { key: "awaiting_remittance", label: "Pending remittance", icon: Clock },
                       { key: "matched", label: "Paid in full", icon: CheckCircle2 },
                       { key: "partially_paid", label: "Paid partially", icon: AlertCircle },
                       { key: "unpaid", label: "Not paid (0 paid)", icon: X },
@@ -3164,7 +3164,7 @@ export default function ClaimReconciliation() {
                         className="cursor-pointer px-3 py-2.5 hover:bg-sky-50 rounded-md transition-colors"
                       >
                         <Clock className="w-4 h-4 mr-2 text-sky-600" />
-                        <span className="flex-1">Pending payment statement</span>
+                        <span className="flex-1">Pending remittance</span>
                         <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.awaiting})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -3203,7 +3203,7 @@ export default function ClaimReconciliation() {
                     <div className="text-2xl font-bold text-slate-900">{inventorySummaryStats.total.toLocaleString()}</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending payment statement</div>
+                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
                     <div className="text-2xl font-bold text-sky-400">{inventorySummaryStats.awaiting.toLocaleString()}</div>
                   </div>
                   <div className="space-y-1">
@@ -3369,7 +3369,7 @@ export default function ClaimReconciliation() {
                 <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-blue-900">
-                    <strong>Note:</strong> A payment statement can include multiple months. Each upload is matched against all outstanding claims.
+                    <strong>Note:</strong> A remittance can include multiple months. Each upload is matched against all outstanding claims.
                   </p>
                 </div>
               </div>
@@ -3468,23 +3468,23 @@ export default function ClaimReconciliation() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      {/* Requirement 2: Rename column to "Statement lines" */}
+                      {/* Remittance lines column */}
                       <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1 cursor-help">
-                                <span>Statement lines</span>
+                                <span>Remittance lines</span>
                                 <Info className="w-3 h-3 text-slate-400" />
                               </div>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">Number of rows in the uploaded payment statement file</p>
+                              <p className="text-xs">Number of rows in the uploaded remittance file</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      {/* Requirement 3: Add tooltips explaining cross-month matching */}
+                      {/* Tooltips explaining cross-month matching */}
                       <TableHead className="font-bold text-slate-700">
                         <TooltipProvider>
                           <Tooltip>
@@ -3495,7 +3495,7 @@ export default function ClaimReconciliation() {
                               </div>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">Claims found in the uploaded payment statement with full payment. Can include claims from any month.</p>
+                              <p className="text-xs">Claims found in the uploaded remittance with full payment. Can include claims from any month.</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -3510,7 +3510,7 @@ export default function ClaimReconciliation() {
                               </div>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">Claims found in the uploaded payment statement with partial payment. Can include claims from any month.</p>
+                              <p className="text-xs">Claims found in the uploaded remittance with partial payment. Can include claims from any month.</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -3525,7 +3525,7 @@ export default function ClaimReconciliation() {
                               </div>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">Claims found in the uploaded payment statement with $0 paid. Can include claims from any month.</p>
+                              <p className="text-xs">Claims found in the uploaded remittance with $0 paid. Can include claims from any month.</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -3585,7 +3585,7 @@ export default function ClaimReconciliation() {
                           <TableCell>{periodClaimsCount}</TableCell>
                           {/* Issue 4: Claims checked (cross-period) */}
                           <TableCell>{run.totalClaimRows}</TableCell>
-                          {/* Issue 4: Payment statements (renamed from Remittances) */}
+                          {/* Remittances */}
                           <TableCell>{run.totalRemittanceRows}</TableCell>
                           <TableCell>
                             <Badge
@@ -3622,7 +3622,7 @@ export default function ClaimReconciliation() {
                                   <p className="text-xs font-semibold mb-1">Upload Context</p>
                                   <p className="text-xs">Date: {new Date(run.createdAt).toLocaleString()}</p>
                                   <p className="text-xs">Period: {periodLabel}</p>
-                                  <p className="text-xs">Statement lines: {run.totalRemittanceRows}</p>
+                                  <p className="text-xs">Remittance lines: {run.totalRemittanceRows}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -3707,7 +3707,7 @@ export default function ClaimReconciliation() {
                       {selectedRun.totalClaimRows} claims
                       {claims.length > 0 && claims.length !== selectedRun.totalClaimRows ? ` (${claims.length} shown)` : ""}
                       <span className="text-slate-400 font-normal mx-2">•</span>
-                      <span className="font-bold text-slate-900">{selectedRun.totalRemittanceRows}</span> <span className="text-sm font-medium text-slate-600">payment statement lines</span>
+                      <span className="font-bold text-slate-900">{selectedRun.totalRemittanceRows}</span> <span className="text-sm font-medium text-slate-600">remittance lines</span>
                     </div>
                   </div>
                 )}
