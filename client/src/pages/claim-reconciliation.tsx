@@ -1013,12 +1013,25 @@ export default function ClaimReconciliation() {
       }
 
       const contentType = response.headers.get("content-type") || "";
+      
+      // CRITICAL FIX: Check if we got JSON when we expected Excel (indicates an error)
       if (contentType.includes("application/json")) {
         const error = await response.json();
-        throw new Error(error.error || "Export failed");
+        throw new Error(error.error || "Export failed - received JSON instead of Excel file");
+      }
+      
+      // CRITICAL FIX: Validate we got an Excel file
+      if (!contentType.includes("spreadsheetml") && !contentType.includes("excel")) {
+        throw new Error(`Export failed - unexpected content type: ${contentType}`);
       }
 
       const blob = await response.blob();
+      
+      // CRITICAL FIX: Validate blob size
+      if (blob.size === 0) {
+        throw new Error("Export failed - received empty file");
+      }
+      
       const disposition = response.headers.get("content-disposition") || "";
       let fileName = "claim_issues.xlsx";
       const match = disposition.match(/filename="?([^"]+)"?/i);
@@ -1027,19 +1040,45 @@ export default function ClaimReconciliation() {
       return { blob, fileName };
     },
     onSuccess: ({ blob, fileName }) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
 
-      toast({ title: "Export ready", description: "Needs follow-up items were exported." });
+        toast({ 
+          title: "Export ready", 
+          description: "Follow-up items exported successfully. Check your downloads folder." 
+        });
+      } catch (error: any) {
+        toast({ 
+          title: "Download failed", 
+          description: "File was created but couldn't be downloaded. Please try again.", 
+          variant: "destructive" 
+        });
+      }
     },
     onError: (error: Error) => {
-      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+      // Enhanced error messages for better debugging
+      let errorMessage = error.message;
+      
+      if (errorMessage.includes("JSON instead of Excel")) {
+        errorMessage = "Export failed - the server returned an error. Please try again or contact support if the issue persists.";
+      } else if (errorMessage.includes("empty file")) {
+        errorMessage = "Export failed - no data to export. This might happen if there are no follow-up items.";
+      } else if (errorMessage.includes("content type")) {
+        errorMessage = "Export failed - received unexpected file format. Please try again.";
+      }
+      
+      toast({ 
+        title: "Export failed", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -1667,23 +1706,36 @@ export default function ClaimReconciliation() {
 
   return (
     <TooltipProvider>
-      {/* PREMIUM HEADER - Redesigned with gradient background */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-100/50 mb-6">
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-5" />
+      {/* PREMIUM HEADER - Elevated with strong gradient and sophisticated textures */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 border border-orange-400/30 mb-8 shadow-2xl shadow-orange-500/20">
+        {/* Multi-layer pattern overlays for depth and texture */}
+        <div className="absolute inset-0 reconciliation-header-pattern" />
+        <div className="absolute inset-0 pattern-tech-grid opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-orange-900/10 to-transparent" />
+        
+        {/* Animated shimmer overlay */}
+        <div className="absolute inset-0 shimmer" />
         
         {/* Content */}
-        <div className="relative px-8 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Claim Reconciliation</h1>
-            <p className="text-slate-600 mt-1">Match payments to claims instantly</p>
+        <div className="relative px-10 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">
+              Claim Reconciliation
+            </h1>
+            <p className="text-white/90 text-lg font-medium drop-shadow">
+              Match payments to claims instantly
+            </p>
           </div>
           
-          {/* Integrated Help Button */}
+          {/* Integrated Help Button - Premium styling */}
           <Sheet open={showHelp} onOpenChange={setShowHelp}>
             <SheetTrigger asChild>
-              <Button variant="outline" className="gap-2 bg-white/80 hover:bg-white">
-                <HelpCircle className="w-4 h-4" />
+              <Button 
+                variant="outline" 
+                size="lg"
+                className="gap-2 bg-white/95 hover:bg-white text-orange-600 hover:text-orange-700 border-white/50 shadow-lg hover:shadow-xl transition-all duration-200 font-semibold hover:scale-105"
+              >
+                <HelpCircle className="w-5 h-5" />
                 Help & Guide
               </Button>
             </SheetTrigger>
@@ -1949,7 +2001,7 @@ export default function ClaimReconciliation() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto pb-12 pt-6">
+      <div className="max-w-[1400px] mx-auto pb-12 pt-6 px-4 md:px-6 lg:px-8">{/* Widened from max-w-6xl (1152px) to max-w-[1400px] for better desktop space usage */}
         {/* Section Spacing: Use consistent larger gaps between major sections */}
         <div className="space-y-10">
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
@@ -2246,6 +2298,32 @@ export default function ClaimReconciliation() {
             </CardHeader>
 
             <CardContent className="pt-6">
+              {/* Visible Legend for Progress Bar Colors */}
+              <div className="mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-5 h-5 text-slate-600" />
+                  <h4 className="font-bold text-slate-800 text-sm">Progress Bar Legend</h4>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-emerald-400 shadow-sm" />
+                    <span className="text-xs text-slate-700 font-medium">Paid in full</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-amber-400 shadow-sm" />
+                    <span className="text-xs text-slate-700 font-medium">Paid partially</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-rose-400 shadow-sm" />
+                    <span className="text-xs text-slate-700 font-medium">Not paid (0 paid)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-sky-300 shadow-sm" />
+                    <span className="text-xs text-slate-700 font-medium">Pending payment statement</span>
+                  </div>
+                </div>
+              </div>
+
               {viewMode === "cards" ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -2446,30 +2524,42 @@ export default function ClaimReconciliation() {
                           </span>
                         </div>
 
-                        {/* Status Badge - single status line */}
-                        {cardState === "awaiting" ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="w-2 h-2 rounded-full bg-sky-400" />
-                            <span className="text-slate-600">{period.awaitingRemittance} pending payment statement</span>
-                          </div>
-                        ) : cardState === "needs_review" ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                            <span className="text-slate-600">
-                              {(period.unpaid + period.partiallyPaid)} need follow-up
-                            </span>
-                          </div>
-                        ) : cardState === "complete" ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                            <span className="text-emerald-700 font-medium">All claims reconciled</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="w-2 h-2 rounded-full bg-slate-400" />
-                            <span className="text-slate-600">Processing</span>
-                          </div>
-                        )}
+                        {/* Status Badges - show BOTH pending payment statement AND needs follow-up when applicable */}
+                        <div className="space-y-2">
+                          {/* Show pending payment statement count if > 0 */}
+                          {period.awaitingRemittance > 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="w-2 h-2 rounded-full bg-sky-400" />
+                              <span className="text-slate-600 font-medium">{period.awaitingRemittance} pending payment statement</span>
+                            </div>
+                          )}
+                          
+                          {/* Show needs follow-up count if > 0 */}
+                          {(period.unpaid + period.partiallyPaid) > 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                              <span className="text-slate-600 font-medium">
+                                {(period.unpaid + period.partiallyPaid)} need follow-up
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Show complete status only if no issues and no awaiting */}
+                          {cardState === "complete" && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                              <span className="text-emerald-700 font-medium">All claims reconciled</span>
+                            </div>
+                          )}
+                          
+                          {/* Show processing if no claims yet */}
+                          {period.totalClaims === 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="w-2 h-2 rounded-full bg-slate-400" />
+                              <span className="text-slate-600">No claims uploaded</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Bottom gradient accent */}

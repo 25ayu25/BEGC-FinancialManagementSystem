@@ -643,6 +643,12 @@ router.get("/runs/:runId/remittances", requireAuth, async (req, res) => {
 router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
   try {
     const runId = parseInt(req.params.runId, 10);
+    
+    // Validate runId
+    if (isNaN(runId) || runId <= 0) {
+      return res.status(400).json({ error: "Invalid run ID" });
+    }
+    
     const run = await getReconRun(runId);
 
     if (!run) {
@@ -651,6 +657,8 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
 
     const issueClaims = await getIssueClaimsForRun(runId);
 
+    // CRITICAL FIX: Allow export even if no issues - user might want to verify
+    // Don't block export for January or any other month with 0 issues
     const totalClaims = run.totalClaimRows ?? issueClaims.length;
     const totalRemits = run.totalRemittanceRows ?? 0;
 
@@ -683,6 +691,14 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
     rows.push(["Unpaid / no remittance", unpaidCount]);
     rows.push(["Total problem claims in this export", problemCount]);
     rows.push([]);
+    
+    // Add message if no issues found
+    if (problemCount === 0) {
+      rows.push(["Note:", "No claims requiring follow-up found for this reconciliation run."]);
+      rows.push(["", "All claims were either fully paid or are still pending payment statement."]);
+      rows.push([]);
+    }
+    
     rows.push([
       "Member #",
       "Patient name",
@@ -728,17 +744,24 @@ router.get("/runs/:runId/issues/export", requireAuth, async (req, res) => {
 
     const filename = `CIC-issues-${run.periodYear}-${String(run.periodMonth).padStart(2, "0")}.xlsx`;
 
+    // CRITICAL FIX: Set headers BEFORE sending buffer
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", buffer.length.toString());
+    
+    // Send buffer and explicitly end response
     res.send(buffer);
   } catch (error: any) {
     console.error("Error exporting issue claims:", error);
-    res.status(500).json({
-      error: error.message || "Failed to export issue claims",
-    });
+    // CRITICAL FIX: Only send JSON error if headers haven't been sent yet
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: error.message || "Failed to export issue claims",
+      });
+    }
   }
 });
 
