@@ -1706,36 +1706,39 @@ export default function ClaimReconciliation() {
 
   return (
     <TooltipProvider>
-      {/* PREMIUM HEADER - Elevated with strong gradient and sophisticated textures */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 border border-orange-400/30 mb-8 shadow-2xl shadow-orange-500/20">
-        {/* Multi-layer pattern overlays for depth and texture */}
-        <div className="absolute inset-0 reconciliation-header-pattern" />
-        <div className="absolute inset-0 pattern-tech-grid opacity-30" />
-        <div className="absolute inset-0 bg-gradient-to-t from-orange-900/10 to-transparent" />
+      {/* PREMIUM HEADER - Luxury SaaS design with refined elegance */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 border border-slate-600/30 mb-8 shadow-2xl shadow-slate-900/10">
+        {/* Subtle premium texture with noise and highlight */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(16,185,129,0.08),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_60%,rgba(59,130,246,0.08),transparent_50%)]" />
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E")`,
+          backgroundSize: '200px 200px'
+        }} />
         
-        {/* Animated shimmer overlay */}
-        <div className="absolute inset-0 shimmer" />
+        {/* Subtle highlight accent */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/20 to-transparent" />
         
-        {/* Content */}
-        <div className="relative px-10 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">
+        {/* Content with refined spacing */}
+        <div className="relative px-8 py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="space-y-1.5">
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
               Claim Reconciliation
             </h1>
-            <p className="text-white/90 text-lg font-medium drop-shadow">
+            <p className="text-slate-300 text-base font-medium">
               Match payments to claims instantly
             </p>
           </div>
           
-          {/* Integrated Help Button - Premium styling */}
+          {/* Elegant Help Button - Refined styling */}
           <Sheet open={showHelp} onOpenChange={setShowHelp}>
             <SheetTrigger asChild>
               <Button 
                 variant="outline" 
-                size="lg"
-                className="gap-2 bg-white/95 hover:bg-white text-orange-600 hover:text-orange-700 border-white/50 shadow-lg hover:shadow-xl transition-all duration-200 font-semibold hover:scale-105"
+                size="default"
+                className="gap-2 bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/30 shadow-lg hover:shadow-xl transition-all duration-200 font-medium backdrop-blur-sm"
               >
-                <HelpCircle className="w-5 h-5" />
+                <HelpCircle className="w-4 h-4" />
                 Help & Guide
               </Button>
             </SheetTrigger>
@@ -2509,12 +2512,8 @@ export default function ClaimReconciliation() {
                           )}
                         </div>
 
-                        {/* Single-line Summary */}
-                        <div className="flex items-center gap-4 text-sm flex-wrap">
-                          <span className="font-bold text-slate-800">
-                            {paidInFullPercent}% paid
-                          </span>
-                          <span className="text-slate-400">•</span>
+                        {/* Single-line Summary with Total & Billed */}
+                        <div className="flex items-center gap-3 text-sm flex-wrap">
                           <span className="font-medium text-slate-600">
                             {period.totalClaims.toLocaleString()} {pluralize(period.totalClaims, "claim")}
                           </span>
@@ -2524,42 +2523,58 @@ export default function ClaimReconciliation() {
                           </span>
                         </div>
 
-                        {/* Status Badges - show BOTH pending payment statement AND needs follow-up when applicable */}
-                        <div className="space-y-2">
-                          {/* Show pending payment statement count if > 0 */}
-                          {period.awaitingRemittance > 0 && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-2 h-2 rounded-full bg-sky-400" />
-                              <span className="text-slate-600 font-medium">{period.awaitingRemittance} pending payment statement</span>
-                            </div>
-                          )}
-                          
-                          {/* Show needs follow-up count if > 0 */}
-                          {(period.unpaid + period.partiallyPaid) > 0 && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                              <span className="text-slate-600 font-medium">
-                                {(period.unpaid + period.partiallyPaid)} need follow-up
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Show complete status only if no issues and no awaiting */}
-                          {cardState === "complete" && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                              <span className="text-emerald-700 font-medium">All claims reconciled</span>
-                            </div>
-                          )}
-                          
-                          {/* Show processing if no claims yet */}
-                          {period.totalClaims === 0 && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-2 h-2 rounded-full bg-slate-400" />
-                              <span className="text-slate-600">No claims uploaded</span>
-                            </div>
-                          )}
-                        </div>
+                        {/* Mini breakdown row with colored dots/pills - Premium & Compact */}
+                        {period.totalClaims > 0 && (
+                          <div className="flex items-center gap-3 flex-wrap text-xs">
+                            {/* Paid in full */}
+                            {period.matched > 0 && (
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span className="font-semibold text-emerald-700">
+                                  Paid in full: {period.matched}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Pending payment statement */}
+                            {period.awaitingRemittance > 0 && (
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-sky-50 border border-sky-200">
+                                <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                                <span className="font-semibold text-sky-700">
+                                  Pending: {period.awaitingRemittance}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Follow-up needed (partial + unpaid) */}
+                            {(period.unpaid + period.partiallyPaid) > 0 && (
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-orange-50 border border-orange-200">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                <span className="font-semibold text-orange-700">
+                                  Follow-up: {(period.unpaid + period.partiallyPaid)}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* All complete status when fully reconciled */}
+                            {cardState === "complete" && (
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span className="font-semibold text-emerald-700">
+                                  All reconciled
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Empty state message */}
+                        {period.totalClaims === 0 && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span className="text-slate-500">No claims uploaded</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Bottom gradient accent */}
