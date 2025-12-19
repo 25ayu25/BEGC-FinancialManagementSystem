@@ -216,6 +216,10 @@ const MONTHS = [
 
 const MAX_CARDS_DEFAULT = 6;  // Issue 3: Show max 6 cards by default
 
+// Requirement 3: Default history view shows Jan-Apr of current year
+const HISTORY_DEFAULT_MONTH_START = 1;  // January
+const HISTORY_DEFAULT_MONTH_END = 4;    // April
+
 function formatPeriodLabel(year: number, month: number): string {
   return new Date(year, month - 1).toLocaleString("default", {
     month: "long",
@@ -1378,9 +1382,9 @@ export default function ClaimReconciliation() {
     // Requirement 3: Apply date range filter based on historyViewMode
     if (historyViewMode === "last_4_months") {
       const currentYear = new Date().getFullYear();
-      // Show only Jan-Apr (months 1-4) of the currently selected year
+      // Show only Jan-Apr (months defined by constants) of the currently selected year
       filtered = filtered.filter((run) => {
-        return run.periodYear === currentYear && run.periodMonth >= 1 && run.periodMonth <= 4;
+        return run.periodYear === currentYear && run.periodMonth >= HISTORY_DEFAULT_MONTH_START && run.periodMonth <= HISTORY_DEFAULT_MONTH_END;
       });
       // Sort in ascending order (Jan → Apr)
       filtered = [...filtered].sort((a, b) => {
@@ -2149,12 +2153,12 @@ export default function ClaimReconciliation() {
                   </div>
                 </button>
 
-                {/* Follow-up Needed - clickable */}
+                {/* Follow-up Needed - clickable (shows all claims, user can filter by tabs) */}
                 <button
                   type="button"
                   onClick={() => {
                     setShowInventory(true);
-                    setInventoryStatusFilter("partially_paid");
+                    setInventoryStatusFilter("all");
                     setTimeout(() => {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }, 100);
