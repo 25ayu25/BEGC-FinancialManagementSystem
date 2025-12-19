@@ -38,6 +38,7 @@ import {
 
   // Metrics helper
   updateReconRunMetrics,
+  getActualRunCounts,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -364,9 +365,12 @@ router.post(
       // Cross-period reconciliation (service currently matches provider-wide outstanding claims)
       const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
+      // Get actual counts from persisted rows (audit-proof)
+      const actualCounts = await getActualRunCounts(run.id);
+
       await updateReconRunMetrics(run.id, {
-        totalClaimRows: reconciliationResult.totalClaimsSearched, // claims checked
-        totalRemittanceRows: inserted.length,
+        totalClaimRows: actualCounts.totalClaimRows, // COUNT from claim_recon_run_claims
+        totalRemittanceRows: actualCounts.totalRemittanceRows, // COUNT from claim_recon_remittances
         autoMatched: reconciliationResult.summary.autoMatched,
         partialMatched: reconciliationResult.summary.partialMatched,
         manualReview: reconciliationResult.summary.manualReview,
@@ -459,9 +463,12 @@ router.post(
 
       const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
+      // Get actual counts from persisted rows (audit-proof)
+      const actualCounts = await getActualRunCounts(run.id);
+
       await updateReconRunMetrics(run.id, {
-        totalClaimRows: reconciliationResult.totalClaimsSearched,
-        totalRemittanceRows: inserted.length,
+        totalClaimRows: actualCounts.totalClaimRows, // COUNT from claim_recon_run_claims
+        totalRemittanceRows: actualCounts.totalRemittanceRows, // COUNT from claim_recon_remittances
         autoMatched: reconciliationResult.summary.autoMatched,
         partialMatched: reconciliationResult.summary.partialMatched,
         manualReview: reconciliationResult.summary.manualReview,
