@@ -1420,16 +1420,14 @@ export default function ClaimReconciliation() {
 
     // Requirement 3: Apply date range filter based on historyViewMode
     if (historyViewMode === "last_4_months") {
-      const currentYear = new Date().getFullYear();
-      // Show only Jan-Apr (months defined by constants) of the currently selected year
-      filtered = filtered.filter((run) => {
-        return run.periodYear === currentYear && run.periodMonth >= HISTORY_DEFAULT_MONTH_START && run.periodMonth <= HISTORY_DEFAULT_MONTH_END;
-      });
-      // Sort in ascending order (Jan → Apr)
+      // Sort by year+month descending (newest → oldest)
       filtered = [...filtered].sort((a, b) => {
-        if (a.periodYear !== b.periodYear) return a.periodYear - b.periodYear;
-        return a.periodMonth - b.periodMonth;
+        const aKey = a.periodYear * 100 + a.periodMonth;
+        const bKey = b.periodYear * 100 + b.periodMonth;
+        return bKey - aKey; // Descending order
       });
+      // Take first 4 results (latest 4 months)
+      filtered = filtered.slice(0, 4);
     } else {
       // "all_months" mode: show all runs, sorted by date descending (most recent first)
       filtered = [...filtered].sort((a, b) => {
@@ -2038,7 +2036,7 @@ export default function ClaimReconciliation() {
                       }, 100);
                     }
                   }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
@@ -2060,7 +2058,7 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
@@ -2083,7 +2081,7 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
@@ -2106,7 +2104,7 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
@@ -2129,7 +2127,7 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
@@ -2137,7 +2135,20 @@ export default function ClaimReconciliation() {
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Follow-up Needed</p>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Follow-up Needed</p>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-xs font-semibold mb-1">What's included:</p>
+                          <p className="text-xs">Follow-up = Paid partially + Not paid (0 paid) + Manual review</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <p className="text-3xl font-bold text-orange-600 mb-1">{stats.followUpNeeded.toLocaleString()}</p>
                   <p className="text-xs text-slate-500">Partial/unpaid claims</p>
                 </button>
@@ -2152,7 +2163,7 @@ export default function ClaimReconciliation() {
                       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
@@ -2160,9 +2171,9 @@ export default function ClaimReconciliation() {
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Awaiting Statement</p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Pending Remittance</p>
                   <p className="text-3xl font-bold text-sky-600 mb-1">{stats.waitingForPaymentStatement.toLocaleString()}</p>
-                  <p className="text-xs text-slate-500">Pending payment data</p>
+                  <p className="text-xs text-slate-500">Awaiting remittance data</p>
                 </button>
               </div>
 
