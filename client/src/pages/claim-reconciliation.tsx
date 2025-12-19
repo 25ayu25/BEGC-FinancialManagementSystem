@@ -521,6 +521,9 @@ export default function ClaimReconciliation() {
     "all" | "needs_follow_up" | "completed"
   >("all");
 
+  // Requirement 3: History view toggle - "last_4_months" vs "all_months"
+  const [historyViewMode, setHistoryViewMode] = useState<"last_4_months" | "all_months">("last_4_months");
+
   // Claims Inventory (view-only filters)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<
     "all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid"
@@ -770,6 +773,12 @@ export default function ClaimReconciliation() {
     );
     const awaitingPaymentStatement = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0);
 
+    // Requirement 2: Add claim status breakdown for new KPI card
+    const paidInFull = periodsSummary.reduce((sum, p) => sum + p.matched, 0);
+    const followUpNeeded = periodsSummary.reduce((sum, p) => sum + p.unpaid + p.partiallyPaid, 0);
+    const waitingForPaymentStatement = awaitingPaymentStatement;
+    const outstandingTotal = followUpNeeded + waitingForPaymentStatement;
+
     // Get the most recent reconciliation run (with payment statements) based on createdAt
     const runsWithPaymentStatements = runs.filter(run => run.totalRemittanceRows > 0);
     const sortedRuns = [...runsWithPaymentStatements].sort(
@@ -789,6 +798,10 @@ export default function ClaimReconciliation() {
       totalClaims,
       problemClaims,
       awaitingPaymentStatement,
+      paidInFull,
+      followUpNeeded,
+      waitingForPaymentStatement,
+      outstandingTotal,
       lastPeriodLabel,
       latestRunId: latest?.id ?? null,
     };
@@ -1353,11 +1366,36 @@ export default function ClaimReconciliation() {
     }
   };
 
-  // D) Updated filteredRuns
+  // D) Updated filteredRuns with Requirement 3: Default to Jan-Apr of current year
   const filteredRuns = useMemo(() => {
-    if (statusFilter === "all") return actualReconciliationRuns;
-    return actualReconciliationRuns.filter((run) => runGroup(run) === statusFilter);
-  }, [actualReconciliationRuns, statusFilter]);
+    let filtered = actualReconciliationRuns;
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((run) => runGroup(run) === statusFilter);
+    }
+
+    // Requirement 3: Apply date range filter based on historyViewMode
+    if (historyViewMode === "last_4_months") {
+      const currentYear = new Date().getFullYear();
+      // Show only Jan-Apr (months 1-4) of the currently selected year
+      filtered = filtered.filter((run) => {
+        return run.periodYear === currentYear && run.periodMonth >= 1 && run.periodMonth <= 4;
+      });
+      // Sort in ascending order (Jan → Apr)
+      filtered = [...filtered].sort((a, b) => {
+        if (a.periodYear !== b.periodYear) return a.periodYear - b.periodYear;
+        return a.periodMonth - b.periodMonth;
+      });
+    } else {
+      // "all_months" mode: show all runs, sorted by date descending (most recent first)
+      filtered = [...filtered].sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+
+    return filtered;
+  }, [actualReconciliationRuns, statusFilter, historyViewMode]);
 
   // Issue 7: Create lookup map for period claims to avoid O(n²) complexity
   const periodClaimsLookup = useMemo(() => {
@@ -2051,6 +2089,128 @@ export default function ClaimReconciliation() {
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </button>
           </div>
+
+          {/* Requirement 2: New KPI card - Current claim status (all months) */}
+          <Card className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 mt-6">
+            <CardHeader className="pb-3 bg-gradient-to-r from-indigo-50/80 to-purple-50/80 backdrop-blur-sm border-b border-slate-200/50">
+              <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
+                Current Claim Status (All Months)
+              </CardTitle>
+              <CardDescription className="mt-1">Breakdown of all claims across all periods</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid gap-4 md:grid-cols-4">
+                {/* Total Claims - clickable */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInventory(true);
+                    setInventoryStatusFilter("all");
+                    setTimeout(() => {
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 100);
+                  }}
+                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 via-white to-slate-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-slate-200/50 cursor-pointer text-left w-full"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileStack className="w-5 h-5 text-slate-600" />
+                      <p className="text-sm font-semibold text-slate-600">Total Claims</p>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-slate-900">{stats.totalClaims.toLocaleString()}</span>
+                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Paid in Full - clickable */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInventory(true);
+                    setInventoryStatusFilter("matched");
+                    setTimeout(() => {
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 100);
+                  }}
+                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 via-white to-emerald-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-emerald-200/50 cursor-pointer text-left w-full"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <p className="text-sm font-semibold text-emerald-700">Paid in Full</p>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-emerald-600">{stats.paidInFull.toLocaleString()}</span>
+                      <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Follow-up Needed - clickable */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInventory(true);
+                    setInventoryStatusFilter("partially_paid");
+                    setTimeout(() => {
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 100);
+                  }}
+                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-orange-50 via-white to-orange-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-orange-200/50 cursor-pointer text-left w-full"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-orange-600" />
+                      <p className="text-sm font-semibold text-orange-700">Follow-up Needed</p>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-orange-600">{stats.followUpNeeded.toLocaleString()}</span>
+                      <ArrowRight className="w-4 h-4 text-orange-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Waiting for Payment Statement - clickable */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInventory(true);
+                    setInventoryStatusFilter("awaiting_remittance");
+                    setTimeout(() => {
+                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 100);
+                  }}
+                  className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-sky-50 via-white to-sky-100 p-5 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-sky-200/50 cursor-pointer text-left w-full"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-sky-600" />
+                      <p className="text-sm font-semibold text-sky-700">Waiting for Payment Statement</p>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-sky-600">{stats.waitingForPaymentStatement.toLocaleString()}</span>
+                      <ArrowRight className="w-4 h-4 text-sky-400 group-hover:text-sky-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Outstanding total summary */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="w-5 h-5 text-slate-600" />
+                    <span className="text-sm font-semibold text-slate-700">Outstanding Total</span>
+                    <span className="text-xs text-slate-500">(Waiting + Follow-up)</span>
+                  </div>
+                  <span className="text-2xl font-bold text-slate-900">{stats.outstandingTotal.toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         {/* Period cards - Premium Glass-morphism Design */}
@@ -2439,7 +2599,7 @@ export default function ClaimReconciliation() {
                           {period.awaitingRemittance > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                              <span>{period.awaitingRemittance} pending remittance</span>
+                              <span>{period.awaitingRemittance} pending payment statement</span>
                             </div>
                           )}
                           {period.matched > 0 && (
@@ -2853,7 +3013,7 @@ export default function ClaimReconciliation() {
                 </div>
 
                 <FileDropzone
-                  label="Remittance File"
+                  label="Payment Statement File"
                   description={getRemittanceUploadDescription(providerName)}
                   file={paymentStatementFile}
                   onFileChange={setPaymentStatementFile}
@@ -3196,19 +3356,49 @@ export default function ClaimReconciliation() {
         <Card id="reconciliation-history" className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
           <CardHeader className="pb-3 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
             <div className="flex items-center justify-between gap-2">
-              <div>
+              <div className="flex-1">
                 <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full" />
                   Reconciliation History
                 </CardTitle>
                 <CardDescription className="mt-1">Previous reconciliation runs for all providers</CardDescription>
               </div>
-              {runsFetching && (
-                <div className="flex items-center gap-2 text-xs text-slate-600">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Refreshing…</span>
+              
+              {/* Requirement 3: Toggle for Last 4 months vs All months */}
+              <div className="flex items-center gap-2">
+                {runsFetching && (
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Refreshing…</span>
+                  </div>
+                )}
+                <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-slate-100 border border-slate-200">
+                  <button
+                    type="button"
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                      historyViewMode === "last_4_months"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                    onClick={() => setHistoryViewMode("last_4_months")}
+                  >
+                    Last 4 months
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                      historyViewMode === "all_months"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                    onClick={() => setHistoryViewMode("all_months")}
+                  >
+                    All months
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </CardHeader>
 
@@ -3302,18 +3492,18 @@ export default function ClaimReconciliation() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      {/* Issue 4: Updated columns */}
+                      {/* Requirement 1: Renamed to "Outstanding checked" */}
                       <TableHead className="font-semibold">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1 cursor-help">
-                                <span>Claims checked</span>
+                                <span>Outstanding checked</span>
                                 <Info className="w-3 h-3 text-slate-400" />
                               </div>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">Number of claims processed during this reconciliation, including claims from previous periods</p>
+                              <p className="text-xs">Matched against all outstanding claims across all months (not just this period).</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -3459,7 +3649,24 @@ export default function ClaimReconciliation() {
                               {run.unpaidCount}
                             </Badge>
                           </TableCell>
-                          <TableCell>{new Date(run.createdAt).toLocaleDateString()}</TableCell>
+                          {/* Requirement 4: Enhanced Date column with tooltip showing full context */}
+                          <TableCell>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="cursor-help">
+                                    {new Date(run.createdAt).toLocaleDateString()}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-xs font-semibold mb-1">Upload Context</p>
+                                  <p className="text-xs">Date: {new Date(run.createdAt).toLocaleString()}</p>
+                                  <p className="text-xs">Period: {periodLabel}</p>
+                                  <p className="text-xs">Statement lines: {run.totalRemittanceRows}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
 
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
@@ -3470,6 +3677,12 @@ export default function ClaimReconciliation() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
+                                {/* Requirement 4: Add statement context info */}
+                                <div className="px-3 py-2 text-xs border-b border-slate-200 bg-slate-50">
+                                  <p className="font-semibold text-slate-700">Statement Context</p>
+                                  <p className="text-slate-600 mt-1">Uploaded: {new Date(run.createdAt).toLocaleString()}</p>
+                                  <p className="text-slate-600">Lines: {run.totalRemittanceRows}</p>
+                                </div>
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedRunId(run.id);
