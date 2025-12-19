@@ -501,6 +501,10 @@ export default function ClaimReconciliation() {
     return formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
   }, [periodYear, periodMonth]);
 
+  const activePeriodYear = useMemo(() => {
+    return parseInt(periodYear, 10);
+  }, [periodYear]);
+
   /* ------------------------------------------------------------------------ */
   /* UI State */
   /* ------------------------------------------------------------------------ */
@@ -2323,7 +2327,7 @@ export default function ClaimReconciliation() {
               )}
 
               {/* Warning banner when browsing year differs from active period year */}
-              {periodYearFilter !== null && periodYearFilter !== parseInt(periodYear, 10) && (
+              {periodYearFilter !== null && periodYearFilter !== activePeriodYear && (
                 <div className="flex items-start gap-2 px-4 py-3 mt-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-900">
