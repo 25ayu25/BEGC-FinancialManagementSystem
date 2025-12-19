@@ -2160,17 +2160,17 @@ export default function ClaimReconciliation() {
           </div>
         </section>
 
-        {/* Period cards - Premium Glass-morphism Design */}
+        {/* Period cards - Premium Design */}
         {periodsSummary.length > 0 && (
-          <Card className="border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border-b border-slate-200/50">
+          <Card className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
+            <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                  <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+                  <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
                     Your Claim Periods
                   </CardTitle>
-                  <CardDescription className="mt-1">Click a period card to set the active month/year.</CardDescription>
+                  <CardDescription className="mt-1 text-slate-600">Click a period card to set the active month/year.</CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -2315,15 +2315,14 @@ export default function ClaimReconciliation() {
                       key={`${period.periodYear}-${period.periodMonth}`}
                       onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
                       className={cn(
-                        "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 cursor-pointer backdrop-blur-sm",
-                        "hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02]",
+                        "premium-card interactive-card group relative overflow-hidden p-6 cursor-pointer",
                         isActive
-                          ? "border-2 border-orange-400/50 bg-gradient-to-br from-orange-50/90 via-white/90 to-amber-50/90 shadow-xl shadow-orange-500/20 ring-2 ring-orange-300/30"
-                          : "border border-slate-200/50 bg-white/80 hover:border-slate-300/70 hover:bg-white/95"
+                          ? "border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/80 shadow-2xl shadow-orange-200/50 ring-2 ring-orange-300/20"
+                          : "border-l-4 border-l-slate-200 hover:border-l-orange-400"
                       )}
                     >
-                      {/* Glass-morphism overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      {/* Subtle gradient overlay on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                       
                       {/* Floating gradient orb */}
                       <div
@@ -2340,18 +2339,13 @@ export default function ClaimReconciliation() {
                       />
 
                       <div className="relative space-y-4">
-                        {/* Header with title and actions */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 space-y-1">
-                            <h3 className="font-bold text-xl text-slate-800 group-hover:text-orange-600 transition-colors duration-200">
-                              {formatPeriodLabel(period.periodYear, period.periodMonth)}
-                            </h3>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Status Icon */}
+                        {/* Header - Month + Status Icon + Actions */}
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-2xl text-slate-800 group-hover:text-orange-600 transition-colors duration-200 flex items-center gap-2">
+                            {formatPeriodLabel(period.periodYear, period.periodMonth)}
+                            {/* Status Icon inline */}
                             <div className={cn(
-                              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110",
+                              "w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-all duration-300",
                               cardState === "complete"
                                 ? "bg-emerald-400"
                                 : cardState === "awaiting"
@@ -2361,213 +2355,151 @@ export default function ClaimReconciliation() {
                                 : "bg-slate-400"
                             )}>
                               {cardState === "complete" ? (
-                                <CheckCircle2 className="w-5 h-5 text-white" />
+                                <CheckCircle2 className="w-4 h-4 text-white" />
                               ) : cardState === "awaiting" ? (
-                                <Clock className="w-5 h-5 text-white" />
+                                <Clock className="w-4 h-4 text-white" />
                               ) : cardState === "needs_review" ? (
-                                <AlertTriangle className="w-5 h-5 text-white" />
+                                <AlertTriangle className="w-4 h-4 text-white" />
                               ) : (
-                                <FileText className="w-5 h-5 text-white" />
+                                <FileText className="w-4 h-4 text-white" />
                               )}
                             </div>
+                          </h3>
 
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
-                                  onClick={(e) => e.stopPropagation()}
-                                  disabled={isDeleting || isUploading}
-                                >
-                                  <MoreHorizontal className="w-5 h-5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleReplacePeriodFile(period, "claims");
-                                  }}
-                                  disabled={isUploading}
-                                  className="cursor-pointer"
-                                >
-                                  <Upload className="w-3 h-3 mr-2" />
-                                  Replace claims file
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePeriod(period, "claims");
-                                  }}
-                                  disabled={isDeleting}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                                >
-                                  <Trash2 className="w-3 h-3 mr-2" />
-                                  Clear all claims
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleReplacePeriodFile(period, "remittances");
-                                  }}
-                                  disabled={isUploading}
-                                  className="cursor-pointer"
-                                >
-                                  <Upload className="w-3 h-3 mr-2" />
-                                  Replace payment statement file
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePeriod(period, "remittances");
-                                  }}
-                                  disabled={isDeleting}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                                >
-                                  <Trash2 className="w-3 h-3 mr-2" />
-                                  Clear payment statements
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          {/* Actions Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-8 h-8 min-w-[32px] min-h-[32px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow hover:shadow-md transition-all duration-200 hover:border-slate-400"
+                                onClick={(e) => e.stopPropagation()}
+                                disabled={isDeleting || isUploading}
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-md z-50">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReplacePeriodFile(period, "claims");
+                                }}
+                                disabled={isUploading}
+                                className="cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3 mr-2" />
+                                Replace claims file
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period, "claims");
+                                }}
+                                disabled={isDeleting}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Clear all claims
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReplacePeriodFile(period, "remittances");
+                                }}
+                                disabled={isUploading}
+                                className="cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3 mr-2" />
+                                Replace payment statement file
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePeriod(period, "remittances");
+                                }}
+                                disabled={isDeleting}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Clear payment statements
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
 
-                        {/* Headline Metric: Paid in Full % */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Paid in Full</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <p className="text-xs">Percent of claims fully paid (paid amount equals billed amount).</p>
-                                <p className="text-xs font-semibold mt-1">Formula: (Paid in full ÷ Total claims) × 100</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <div className="text-4xl font-bold text-slate-900 tracking-tight">
-                            {paidInFullPercent}%
-                          </div>
-                        </div>
-
-                        {/* Supporting Metrics */}
-                        <div className="space-y-2 pt-3 border-t border-slate-200/50">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-600 font-medium">Seen in payment statement</span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  <p className="text-xs">Percent of claims that appear in a payment statement (matched by Member + Bill/Invoice).</p>
-                                  <p className="text-xs font-semibold mt-1">Formula: ((Total - Pending payment statement) ÷ Total claims) × 100</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                            <span className="font-bold text-slate-700">{seenInRemittancePercent}%</span>
-                          </div>
-                          
-                          {/* Stacked Progress Bar */}
-                          <div className="h-3 bg-slate-200/80 rounded-full overflow-hidden backdrop-blur-sm flex">
-                            {/* Paid in full segment */}
-                            {period.matched > 0 && (
-                              <div 
-                                className="bg-emerald-400 transition-all duration-500" 
-                                style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
-                                title={`Paid in full: ${period.matched}`}
-                              />
-                            )}
-                            {/* Paid partially segment */}
-                            {period.partiallyPaid > 0 && (
-                              <div 
-                                className="bg-amber-400 transition-all duration-500" 
-                                style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
-                                title={`Paid partially: ${period.partiallyPaid}`}
-                              />
-                            )}
-                            {/* Not paid (0 paid) segment */}
-                            {period.unpaid > 0 && (
-                              <div 
-                                className="bg-rose-400 transition-all duration-500" 
-                                style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
-                                title={`Not paid: ${period.unpaid}`}
-                              />
-                            )}
-                            {/* Pending payment statement segment */}
-                            {period.awaitingRemittance > 0 && (
-                              <div 
-                                className="bg-sky-300 transition-all duration-500" 
-                                style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
-                                title={`Pending payment statement: ${period.awaitingRemittance}`}
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Claims count and amount */}
-                        <div className="space-y-1 pt-2">
-                          <div className="text-lg font-semibold text-slate-700">
-                            {period.totalClaims.toLocaleString()} <span className="text-sm font-medium text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
-                          </div>
-                          <div className="text-xs text-slate-600">
-                            {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
-                            {parseFloat(period.totalBilled).toLocaleString()} billed
-                          </div>
-                        </div>
-
-                        {/* Status Badge */}
-                        <div className="flex items-center gap-2">
-                          {cardState === "complete" ? (
-                            <Badge className="bg-emerald-400 text-white hover:bg-emerald-500 border-0">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Complete
-                            </Badge>
-                          ) : cardState === "needs_review" ? (
-                            <Badge className="bg-orange-400 text-white hover:bg-orange-500 border-0">
-                              <AlertTriangle className="w-3 h-3 mr-1" />
-                              Needs review
-                            </Badge>
-                          ) : cardState === "awaiting" ? (
-                            <Badge className="bg-sky-400 text-white hover:bg-sky-500 border-0">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pending payment statement
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-slate-400 text-white hover:bg-slate-500 border-0">Processing</Badge>
-                          )}
-                        </div>
-
-                        {/* Breakdown stats */}
-                        <div className="pt-2 space-y-1.5 text-xs text-slate-600 border-t border-slate-200/50">
-                          {period.awaitingRemittance > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                              <span>{period.awaitingRemittance} pending payment statement</span>
-                            </div>
-                          )}
+                        {/* Progress Bar - Full width, prominent */}
+                        <div className="h-4 bg-slate-200/80 rounded-full overflow-hidden flex shadow-inner">
                           {period.matched > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              <span>{period.matched} paid in full</span>
-                            </div>
+                            <div 
+                              className="bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500" 
+                              style={{ width: `${(period.matched / period.totalClaims) * 100}%` }}
+                              title={`Paid in full: ${period.matched}`}
+                            />
                           )}
                           {period.partiallyPaid > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                              <span>{period.partiallyPaid} Paid partially</span>
-                            </div>
+                            <div 
+                              className="bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500" 
+                              style={{ width: `${(period.partiallyPaid / period.totalClaims) * 100}%` }}
+                              title={`Paid partially: ${period.partiallyPaid}`}
+                            />
                           )}
                           {period.unpaid > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                              <span>{period.unpaid} Not paid (0 paid)</span>
-                            </div>
+                            <div 
+                              className="bg-gradient-to-r from-rose-400 to-rose-500 transition-all duration-500" 
+                              style={{ width: `${(period.unpaid / period.totalClaims) * 100}%` }}
+                              title={`Not paid: ${period.unpaid}`}
+                            />
+                          )}
+                          {period.awaitingRemittance > 0 && (
+                            <div 
+                              className="bg-gradient-to-r from-sky-300 to-sky-400 transition-all duration-500" 
+                              style={{ width: `${(period.awaitingRemittance / period.totalClaims) * 100}%` }}
+                              title={`Pending payment statement: ${period.awaitingRemittance}`}
+                            />
                           )}
                         </div>
+
+                        {/* Single-line Summary */}
+                        <div className="flex items-center gap-4 text-sm flex-wrap">
+                          <span className="font-bold text-slate-800">
+                            {paidInFullPercent}% paid
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-medium text-slate-600">
+                            {period.totalClaims.toLocaleString()} {pluralize(period.totalClaims, "claim")}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-medium text-slate-600">
+                            {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Status Badge - single status line */}
+                        {cardState === "awaiting" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-sky-400" />
+                            <span className="text-slate-600">{period.awaitingRemittance} pending payment statement</span>
+                          </div>
+                        ) : cardState === "needs_review" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                            <span className="text-slate-600">
+                              {(period.unpaid + period.partiallyPaid)} need follow-up
+                            </span>
+                          </div>
+                        ) : cardState === "complete" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                            <span className="text-emerald-700 font-medium">All claims reconciled</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="text-slate-600">Processing</span>
+                          </div>
+                        )}>
                       </div>
 
                       {/* Bottom gradient accent */}
@@ -2618,19 +2550,24 @@ export default function ClaimReconciliation() {
               })()}
                 </>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-200/50">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/90 border-b border-slate-200">
-                      <TableRow className="hover:bg-slate-50/90">
-                        <TableHead className="font-bold text-slate-700">Period</TableHead>
-                        <TableHead className="font-bold text-slate-700">Claims</TableHead>
-                        <TableHead className="font-bold text-slate-700">Billed</TableHead>
-                        <TableHead className="font-bold text-slate-700">Metrics</TableHead>
-                        <TableHead className="font-bold text-slate-700">Status</TableHead>
-                        <TableHead className="font-bold text-slate-700 text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                {/* Table View with improved responsiveness */}
+                <div className="relative overflow-x-auto rounded-xl border border-slate-200/50 shadow-inner">
+                  {/* Scroll hint indicator */}
+                  <div className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-white/90 to-transparent pointer-events-none z-20 md:hidden" />
+                  
+                  <div className="min-w-full overflow-x-auto">
+                    <Table className="min-w-[900px]">
+                      <TableHeader className="sticky top-0 z-10 glass-header border-b border-slate-200">
+                        <TableRow className="hover:bg-slate-50/90">
+                          <TableHead className="font-bold text-slate-700 min-w-[140px] sticky left-0 bg-slate-50/95 z-20">Period</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[100px] sticky left-[140px] bg-slate-50/95 z-20">Claims</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[120px]">Billed</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[200px]">Metrics</TableHead>
+                          <TableHead className="font-bold text-slate-700 min-w-[140px]">Status</TableHead>
+                          <TableHead className="font-bold text-slate-700 text-right min-w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                       {filteredPeriods.map((period) => {
                         const isActive =
                           period.periodYear === parseInt(periodYear, 10) &&
@@ -2669,10 +2606,10 @@ export default function ClaimReconciliation() {
                                 : "hover:bg-slate-50/50"
                             )}
                           >
-                            <TableCell className="font-semibold">
+                            <TableCell className="font-semibold sticky left-0 bg-white z-10">
                               {formatPeriodLabel(period.periodYear, period.periodMonth)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="sticky left-[140px] bg-white z-10">
                               <div className="flex flex-col">
                                 <span className="font-semibold">{period.totalClaims}</span>
                                 <span className="text-xs text-slate-500">{pluralize(period.totalClaims, "claim")}</span>
@@ -2812,6 +2749,7 @@ export default function ClaimReconciliation() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               )}
             </CardContent>
