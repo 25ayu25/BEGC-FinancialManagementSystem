@@ -74,9 +74,22 @@ export async function updateReconRunMetrics(
     unpaidCount: number;
   }>
 ) {
+  // Audit-proof: Always compute totalClaimRows from actual DB records
+  // COUNT(*) FROM claim_recon_run_claims WHERE run_id = runId
+  const [{ count: actualClaimCount }] = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(claimReconRunClaims)
+    .where(eq(claimReconRunClaims.runId, runId));
+
+  // Override totalClaimRows with the audit-proof count from the database
+  const finalMetrics = {
+    ...metrics,
+    totalClaimRows: actualClaimCount,
+  };
+
   await db
     .update(claimReconRuns)
-    .set(metrics as any)
+    .set(finalMetrics as any)
     .where(eq(claimReconRuns.id, runId));
 }
 
@@ -296,17 +309,15 @@ export async function performMatching(runId: number) {
     manualReview: matchedOnly.filter((m) => m.status === "manual_review").length,
   };
 
-  await db
-    .update(claimReconRuns)
-    .set({
-      totalClaimRows: summary.totalClaims,
-      totalRemittanceRows: summary.totalRemittances,
-      autoMatched: summary.autoMatched,
-      partialMatched: summary.partialMatched,
-      manualReview: summary.manualReview,
-      unpaidCount,
-    })
-    .where(eq(claimReconRuns.id, runId));
+  // Use updateReconRunMetrics to ensure audit-proof totalClaimRows
+  await updateReconRunMetrics(runId, {
+    totalClaimRows: claims.length, // Will be overridden with COUNT(*) from claim_recon_run_claims
+    totalRemittanceRows: summary.totalRemittances,
+    autoMatched: summary.autoMatched,
+    partialMatched: summary.partialMatched,
+    manualReview: summary.manualReview,
+    unpaidCount,
+  });
 
   return summary;
 }
