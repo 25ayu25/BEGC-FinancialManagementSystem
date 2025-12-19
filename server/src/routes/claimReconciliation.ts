@@ -38,6 +38,7 @@ import {
 
   // Metrics helper
   updateReconRunMetrics,
+  calculateRunMetricsFromDB,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -364,14 +365,9 @@ router.post(
       // Cross-period reconciliation (service currently matches provider-wide outstanding claims)
       const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
-      await updateReconRunMetrics(run.id, {
-        totalClaimRows: reconciliationResult.totalClaimsSearched, // claims checked
-        totalRemittanceRows: inserted.length,
-        autoMatched: reconciliationResult.summary.autoMatched,
-        partialMatched: reconciliationResult.summary.partialMatched,
-        manualReview: reconciliationResult.summary.manualReview,
-        unpaidCount: reconciliationResult.unpaidCount || 0,
-      });
+      // Calculate metrics from actual persisted DB rows for audit-proof accuracy
+      const dbMetrics = await calculateRunMetricsFromDB(run.id);
+      await updateReconRunMetrics(run.id, dbMetrics);
 
       res.json({
         success: true,
@@ -459,14 +455,9 @@ router.post(
 
       const reconciliationResult = await runClaimReconciliation(providerName, year, month, { runId: run.id });
 
-      await updateReconRunMetrics(run.id, {
-        totalClaimRows: reconciliationResult.totalClaimsSearched,
-        totalRemittanceRows: inserted.length,
-        autoMatched: reconciliationResult.summary.autoMatched,
-        partialMatched: reconciliationResult.summary.partialMatched,
-        manualReview: reconciliationResult.summary.manualReview,
-        unpaidCount: reconciliationResult.unpaidCount || 0,
-      });
+      // Calculate metrics from actual persisted DB rows for audit-proof accuracy
+      const dbMetrics = await calculateRunMetricsFromDB(run.id);
+      await updateReconRunMetrics(run.id, dbMetrics);
 
       res.json({
         success: true,

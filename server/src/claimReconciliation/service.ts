@@ -81,6 +81,48 @@ export async function updateReconRunMetrics(
 }
 
 /**
+ * Calculate run metrics from actual persisted DB rows (audit-proof approach).
+ * Returns counts sourced directly from join tables for accuracy.
+ */
+export async function calculateRunMetricsFromDB(runId: number) {
+  // Count actual claims recorded in the join table for this run
+  const [claimsCountResult] = await db
+    .select({ count: count() })
+    .from(claimReconRunClaims)
+    .where(eq(claimReconRunClaims.runId, runId));
+  
+  const totalClaimRows = claimsCountResult?.count ?? 0;
+
+  // Count remittances for this run
+  const [remittancesCountResult] = await db
+    .select({ count: count() })
+    .from(claimReconRemittances)
+    .where(eq(claimReconRemittances.runId, runId));
+  
+  const totalRemittanceRows = remittancesCountResult?.count ?? 0;
+
+  // Get match type counts from the join table
+  const runClaimsData = await db
+    .select()
+    .from(claimReconRunClaims)
+    .where(eq(claimReconRunClaims.runId, runId));
+
+  const autoMatched = runClaimsData.filter(rc => rc.matchType === "exact").length;
+  const partialMatched = runClaimsData.filter(rc => rc.matchType === "partial").length;
+  const manualReview = runClaimsData.filter(rc => rc.statusAfterRun === "manual_review").length;
+  const unpaidCount = runClaimsData.filter(rc => rc.statusAfterRun === "unpaid").length;
+
+  return {
+    totalClaimRows,
+    totalRemittanceRows,
+    autoMatched,
+    partialMatched,
+    manualReview,
+    unpaidCount,
+  };
+}
+
+/**
  * Insert parsed claims (legacy - for backward compatibility)
  */
 export async function insertClaims(runId: number, claims: ClaimRow[]) {
@@ -286,6 +328,13 @@ export async function performMatching(runId: number) {
     await db.insert(claimReconRunClaims).values(runClaimsToInsert);
   }
 
+  // Calculate metrics from actual persisted DB rows for audit-proof accuracy
+  const dbMetrics = await calculateRunMetricsFromDB(runId);
+  await db
+    .update(claimReconRuns)
+    .set(dbMetrics)
+    .where(eq(claimReconRuns.id, runId));
+
   const matchedOnly = matches.filter((m) => m.remittanceId !== null);
 
   const summary: ReconciliationSummary = {
@@ -295,18 +344,6 @@ export async function performMatching(runId: number) {
     partialMatched: matchedOnly.filter((m) => m.matchType === "partial").length,
     manualReview: matchedOnly.filter((m) => m.status === "manual_review").length,
   };
-
-  await db
-    .update(claimReconRuns)
-    .set({
-      totalClaimRows: summary.totalClaims,
-      totalRemittanceRows: summary.totalRemittances,
-      autoMatched: summary.autoMatched,
-      partialMatched: summary.partialMatched,
-      manualReview: summary.manualReview,
-      unpaidCount,
-    })
-    .where(eq(claimReconRuns.id, runId));
 
   return summary;
 }
