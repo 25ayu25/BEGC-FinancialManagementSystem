@@ -423,6 +423,49 @@ body {
     }
   }
 
+  /* =========================
+     Premium Card Styles
+     ========================= */
+  
+  /* Base premium card with depth */
+  .premium-card {
+    @apply bg-white rounded-2xl border border-slate-200/60 
+           transition-all duration-300;
+    box-shadow: 
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 4px 8px rgba(0, 0, 0, 0.04),
+      0 16px 32px rgba(0, 0, 0, 0.04);
+  }
+  
+  .premium-card:hover {
+    box-shadow: 
+      0 1px 3px rgba(0, 0, 0, 0.06),
+      0 8px 16px rgba(0, 0, 0, 0.06),
+      0 24px 48px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Interactive cards with lift effect */
+  .interactive-card {
+    @apply transition-all duration-300;
+  }
+  
+  .interactive-card:hover {
+    @apply -translate-y-1;
+    box-shadow: 
+      0 4px 8px rgba(0, 0, 0, 0.06),
+      0 12px 24px rgba(0, 0, 0, 0.08),
+      0 32px 64px rgba(0, 0, 0, 0.06);
+  }
+  
+  .interactive-card:active {
+    @apply scale-[0.99] translate-y-0;
+  }
+
+  /* Glass-morphism for headers */
+  .glass-header {
+    @apply bg-white/80 backdrop-blur-md border-b border-slate-200/50;
+  }
+
   /* Expense Analytics Header Pattern */
   .expense-header-pattern {
     background-image: 
