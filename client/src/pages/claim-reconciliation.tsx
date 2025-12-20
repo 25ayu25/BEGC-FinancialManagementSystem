@@ -2598,11 +2598,11 @@ export default function ClaimReconciliation() {
                         {/* Single-line Summary with Total & Billed */}
                         <div className="flex items-center gap-3 text-sm flex-wrap">
                           <span className="font-medium text-slate-600">
-                            {period.totalClaims.toLocaleString()} {pluralize(period.totalClaims, "claim")}
+                            {formatNumber(period.totalClaims)} {pluralize(period.totalClaims, "claim")}
                           </span>
                           <span className="text-slate-400">•</span>
                           <span className="font-medium text-slate-600">
-                            {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()}
+                            {getCurrencyForDisplay(period.providerName, period.currency)} {formatNumber(parseFloat(period.totalBilled))}
                           </span>
                         </div>
 
@@ -2775,7 +2775,7 @@ export default function ClaimReconciliation() {
                             </TableCell>
                             <TableCell className="font-semibold">
                               {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
-                              {parseFloat(period.totalBilled).toLocaleString()}
+                              {formatNumber(parseFloat(period.totalBilled))}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -3263,7 +3263,7 @@ export default function ClaimReconciliation() {
                       >
                         <Download className="w-4 h-4 mr-2 text-slate-600" />
                         <span className="flex-1">Export all claims</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.total})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.total)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="my-1" />
                       <DropdownMenuItem
@@ -3272,7 +3272,7 @@ export default function ClaimReconciliation() {
                       >
                         <Clock className="w-4 h-4 mr-2 text-sky-600" />
                         <span className="flex-1">Pending remittance</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.awaiting})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.awaiting)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("matched")}
@@ -3280,7 +3280,7 @@ export default function ClaimReconciliation() {
                       >
                         <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />
                         <span className="flex-1">Paid in full</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.matched})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.matched)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("partially_paid")}
@@ -3288,7 +3288,7 @@ export default function ClaimReconciliation() {
                       >
                         <AlertCircle className="w-4 h-4 mr-2 text-amber-600" />
                         <span className="flex-1">Paid partially</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.partial})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.partial)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("unpaid")}
@@ -3296,7 +3296,7 @@ export default function ClaimReconciliation() {
                       >
                         <X className="w-4 h-4 mr-2 text-rose-600" />
                         <span className="flex-1">Not paid (0 paid)</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.unpaid})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.unpaid)})</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
