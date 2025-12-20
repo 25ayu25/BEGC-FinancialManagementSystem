@@ -3178,10 +3178,10 @@ export default function ClaimReconciliation() {
 
               {/* NEW: Year and Month filters with quick filter buttons */}
               {availablePeriods && availablePeriods.years.length > 0 && (
-                <div className="mb-4 space-y-4">
+                <div className="mb-6 space-y-3 p-4 rounded-xl bg-gradient-to-br from-slate-50/50 to-white border border-slate-200/50">
                   {/* Filter selectors */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Label className="text-sm font-medium text-slate-700">Filter by:</Label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Label className="text-sm font-semibold text-slate-700">Period:</Label>
                     
                     {/* Year selector */}
                     <Select
@@ -3191,7 +3191,7 @@ export default function ClaimReconciliation() {
                         setInventoryPage(1);
                       }}
                     >
-                      <SelectTrigger className="w-[140px] bg-white">
+                      <SelectTrigger className="w-[140px] bg-white border-slate-300 hover:border-slate-400 transition-colors">
                         <SelectValue placeholder="All years" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3212,7 +3212,7 @@ export default function ClaimReconciliation() {
                         setInventoryPage(1);
                       }}
                     >
-                      <SelectTrigger className="w-[160px] bg-white">
+                      <SelectTrigger className="w-[160px] bg-white border-slate-300 hover:border-slate-400 transition-colors">
                         <SelectValue placeholder="All months" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3230,7 +3230,7 @@ export default function ClaimReconciliation() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-2"
+                        className="gap-2 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-all"
                         onClick={() => {
                           setInventoryYearFilter(null);
                           setInventoryMonthFilter(null);
@@ -3302,13 +3302,17 @@ export default function ClaimReconciliation() {
                   </div>
 
                   {/* Quick filter buttons */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Label className="text-xs font-medium text-slate-600">Quick filters:</Label>
+                  <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-200/60">
+                    <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Quick filters:</Label>
                     
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02]",
+                        inventoryYearFilter === new Date().getFullYear() && inventoryMonthFilter === null
+                          ? "bg-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-blue-50 hover:shadow-sm"
+                      )}
                       onClick={() => {
                         // This year
                         const currentYear = new Date().getFullYear();
@@ -3319,12 +3323,16 @@ export default function ClaimReconciliation() {
                     >
                       <Zap className="w-3 h-3" />
                       This year
-                    </Button>
+                    </button>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02]",
+                        inventoryYearFilter === null && inventoryMonthFilter === null
+                          ? "bg-slate-500 shadow-lg shadow-slate-500/30 text-white scale-105"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:shadow-sm"
+                      )}
                       onClick={() => {
                         // All years - clear all filters
                         setInventoryYearFilter(null);
@@ -3334,7 +3342,7 @@ export default function ClaimReconciliation() {
                     >
                       <Zap className="w-3 h-3" />
                       All years
-                    </Button>
+                    </button>
                   </div>
                 </div>
               )}
