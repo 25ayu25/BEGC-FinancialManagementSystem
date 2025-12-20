@@ -851,6 +851,32 @@ export default function ClaimReconciliation() {
     };
   }, [claimsInventory, periodsSummary, inventoryYearFilter, inventoryMonthFilter]);
 
+  // Generate a human-readable label for the current inventory filter selection
+  const inventoryPeriodLabel = useMemo(() => {
+    // No label when showing all periods
+    if (inventoryYearFilter === null && inventoryMonthFilter === null) {
+      return null;
+    }
+    
+    // Both year and month selected: "January 2025"
+    if (inventoryYearFilter !== null && inventoryMonthFilter !== null) {
+      return formatPeriodLabel(inventoryYearFilter, inventoryMonthFilter);
+    }
+    
+    // Only year selected: "2025"
+    if (inventoryYearFilter !== null) {
+      return String(inventoryYearFilter);
+    }
+    
+    // Only month selected: "January"
+    if (inventoryMonthFilter !== null) {
+      const monthObj = MONTHS.find(m => m.value === String(inventoryMonthFilter));
+      return monthObj?.label || "";
+    }
+    
+    return null;
+  }, [inventoryYearFilter, inventoryMonthFilter]);
+
   /* ------------------------------------------------------------------------ */
   /* KPI strip stats */
   /* ------------------------------------------------------------------------ */
