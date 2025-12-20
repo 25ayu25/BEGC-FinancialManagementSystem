@@ -83,8 +83,6 @@ Server returns aggregated counts for filtered view:
 
 ### 4. Quick Filters
 Convenient preset filters for common use cases:
-- **Last 3 months**: Info message (suggests using Year + Month for best results)
-- **Last 12 months**: Clears all filters (shows all data)
 - **This year**: Sets year to current year, shows all months
 - **All years**: Clears all filters (shows all data)
 

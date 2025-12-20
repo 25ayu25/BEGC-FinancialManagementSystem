@@ -1153,10 +1153,12 @@ export async function getAvailablePeriods(providerName: string) {
   // Group months by year
   const monthsByYear = new Map<number, number[]>();
   for (const row of monthsResult) {
-    if (!monthsByYear.has(row.periodYear)) {
-      monthsByYear.set(row.periodYear, []);
+    const yearMonths = monthsByYear.get(row.periodYear);
+    if (yearMonths) {
+      yearMonths.push(row.periodMonth);
+    } else {
+      monthsByYear.set(row.periodYear, [row.periodMonth]);
     }
-    monthsByYear.get(row.periodYear)!.push(row.periodMonth);
   }
 
   return {
