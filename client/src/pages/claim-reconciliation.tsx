@@ -560,7 +560,8 @@ export default function ClaimReconciliation() {
   const [inventoryYearFilter, setInventoryYearFilter] = useState<number | null>(null);
   const [inventoryMonthFilter, setInventoryMonthFilter] = useState<number | null>(null);
   const [inventoryPage, setInventoryPage] = useState(1);
-  const [showInventory, setShowInventory] = useState(false);  /* ------------------------------------------------------------------------ */
+  const [showInventory, setShowInventory] = useState(false);
+  const didUserTouchInventoryFilters = useRef(false);  /* ------------------------------------------------------------------------ */
   /* Data loading */
   /* ------------------------------------------------------------------------ */
 
@@ -759,6 +760,52 @@ export default function ClaimReconciliation() {
     },
     enabled: showInventory,
   });
+
+  // Initialize inventory filters to current year/month when opening Claims Inventory
+  useEffect(() => {
+    // Don't override user's manual filter selections
+    if (didUserTouchInventoryFilters.current) return;
+    
+    // Only initialize when Claims Inventory is opened and we have available periods data
+    if (!showInventory || !availablePeriods) return;
+    
+    const currentMonth = now.getMonth() + 1; // 1-12
+    
+    // Try to set current year and month if available
+    if (availablePeriods.years.includes(currentYear)) {
+      const monthsForCurrentYear = availablePeriods.monthsByYear[currentYear] || [];
+      
+      if (monthsForCurrentYear.includes(currentMonth)) {
+        // Current year and month are available
+        setInventoryYearFilter(currentYear);
+        setInventoryMonthFilter(currentMonth);
+        setInventoryPage(1);
+        return;
+      }
+      
+      // Current year exists but not current month - use current year with newest month
+      if (monthsForCurrentYear.length > 0) {
+        const newestMonth = Math.max(...monthsForCurrentYear);
+        setInventoryYearFilter(currentYear);
+        setInventoryMonthFilter(newestMonth);
+        setInventoryPage(1);
+        return;
+      }
+    }
+    
+    // Current year not available - fallback to newest available year and month
+    if (availablePeriods.years.length > 0) {
+      const newestYear = Math.max(...availablePeriods.years);
+      const monthsForNewestYear = availablePeriods.monthsByYear[newestYear] || [];
+      
+      if (monthsForNewestYear.length > 0) {
+        const newestMonth = Math.max(...monthsForNewestYear);
+        setInventoryYearFilter(newestYear);
+        setInventoryMonthFilter(newestMonth);
+        setInventoryPage(1);
+      }
+    }
+  }, [showInventory, availablePeriods, currentYear, now]);
 
   const inventorySummaryStats = useMemo(() => {
     // Primary: Use summary from API response (server-side calculation)
@@ -3188,6 +3235,7 @@ export default function ClaimReconciliation() {
                     <Select
                       value={inventoryYearFilter?.toString() || "all"}
                       onValueChange={(value) => {
+                        didUserTouchInventoryFilters.current = true;
                         setInventoryYearFilter(value === "all" ? null : parseInt(value, 10));
                         setInventoryPage(1);
                       }}
@@ -3209,6 +3257,7 @@ export default function ClaimReconciliation() {
                     <Select
                       value={inventoryMonthFilter?.toString() || "all"}
                       onValueChange={(value) => {
+                        didUserTouchInventoryFilters.current = true;
                         setInventoryMonthFilter(value === "all" ? null : parseInt(value, 10));
                         setInventoryPage(1);
                       }}
@@ -3233,6 +3282,7 @@ export default function ClaimReconciliation() {
                         size="sm"
                         className="gap-2 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-all"
                         onClick={() => {
+                          didUserTouchInventoryFilters.current = true;
                           setInventoryYearFilter(null);
                           setInventoryMonthFilter(null);
                           setInventoryPage(1);
@@ -3316,6 +3366,7 @@ export default function ClaimReconciliation() {
                       )}
                       onClick={() => {
                         // This year
+                        didUserTouchInventoryFilters.current = true;
                         setInventoryYearFilter(currentYear);
                         setInventoryMonthFilter(null);
                         setInventoryPage(1);
@@ -3335,6 +3386,7 @@ export default function ClaimReconciliation() {
                       )}
                       onClick={() => {
                         // All years - clear all filters
+                        didUserTouchInventoryFilters.current = true;
                         setInventoryYearFilter(null);
                         setInventoryMonthFilter(null);
                         setInventoryPage(1);
