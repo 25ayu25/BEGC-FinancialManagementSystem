@@ -562,7 +562,9 @@ export default function ClaimReconciliation() {
   const [inventoryMonthFilter, setInventoryMonthFilter] = useState<number | null>(null);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);
-  const didUserTouchInventoryFilters = useRef(false);  /* ------------------------------------------------------------------------ */
+  const didUserTouchInventoryFilters = useRef(false);
+  
+  /* ------------------------------------------------------------------------ */
   /* Data loading */
   /* ------------------------------------------------------------------------ */
 
