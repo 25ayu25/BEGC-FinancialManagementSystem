@@ -497,8 +497,9 @@ export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const currentYear = useMemo(() => new Date().getFullYear(), []);
-  const currentMonth = useMemo(() => new Date().getMonth() + 1, []); // 1-12
+  // Capture current year and month at component mount (won't change during component lifecycle)
+  const [currentYear] = useState(() => new Date().getFullYear());
+  const [currentMonth] = useState(() => new Date().getMonth() + 1); // 1-12
   const didUserTouchPeriod = useRef(false);
 
   /* ------------------------------------------------------------------------ */
