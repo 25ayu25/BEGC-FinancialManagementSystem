@@ -39,6 +39,7 @@ import {
   // Metrics helper
   updateReconRunMetrics,
   getActualRunCounts,
+  getAvailablePeriods,
 } from "../claimReconciliation/service";
 
 const router = Router();
@@ -791,13 +792,15 @@ router.delete("/runs/:runId", requireAuth, async (req, res) => {
 
 router.get("/claims", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { providerName, status, periodYear, periodMonth, page, limit } = req.query;
+    const { providerName, status, periodYear, periodMonth, year, month, page, limit } = req.query;
 
     const options = {
       providerName: providerName as string | undefined,
       status: status as string | undefined,
       periodYear: periodYear ? parseInt(periodYear as string, 10) : undefined,
       periodMonth: periodMonth ? parseInt(periodMonth as string, 10) : undefined,
+      year: year ? parseInt(year as string, 10) : undefined,
+      month: month ? parseInt(month as string, 10) : undefined,
       page: page ? parseInt(page as string, 10) : undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
     };
@@ -818,13 +821,15 @@ router.get("/claims", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/export-claims", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { providerName, status, periodYear, periodMonth } = req.query;
+    const { providerName, status, periodYear, periodMonth, year, month } = req.query;
 
     const options = {
       providerName: providerName as string | undefined,
       status: status as string | undefined,
       periodYear: periodYear ? parseInt(periodYear as string, 10) : undefined,
       periodMonth: periodMonth ? parseInt(periodMonth as string, 10) : undefined,
+      year: year ? parseInt(year as string, 10) : undefined,
+      month: month ? parseInt(month as string, 10) : undefined,
       page: undefined,
       limit: MAX_EXPORT_LIMIT, // Use configurable constant for export limit
     };
@@ -852,8 +857,15 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
     };
 
     const statusName = statusLabels[status as string] || "All Claims";
-    const periodLabel = periodYear && periodMonth
-      ? `${new Date(parseInt(periodYear as string), parseInt(periodMonth as string) - 1).toLocaleString("default", { month: "long", year: "numeric" })}`
+    
+    // Support both old (periodYear/periodMonth) and new (year/month) parameters for period label
+    const finalYear = year ?? periodYear;
+    const finalMonth = month ?? periodMonth;
+    
+    const periodLabel = finalYear && finalMonth
+      ? `${new Date(parseInt(finalYear as string), parseInt(finalMonth as string) - 1).toLocaleString("default", { month: "long", year: "numeric" })}`
+      : finalYear
+      ? `${finalYear}`
       : "All Periods";
 
     // Calculate totals
@@ -1026,6 +1038,31 @@ router.get("/periods-summary", requireAuth, async (req: Request, res: Response) 
     console.error("Error fetching periods summary:", error);
     res.status(500).json({
       error: error.message || "Failed to fetch periods summary",
+    });
+  }
+});
+
+/**
+ * GET /api/claim-reconciliation/available-periods
+ * Get distinct available years and months for a provider
+ * Used to populate Year and Month filter dropdowns in Claims Inventory
+ */
+router.get("/available-periods", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { providerName } = req.query;
+    
+    if (!providerName) {
+      return res.status(400).json({
+        error: "providerName query parameter is required",
+      });
+    }
+
+    const periods = await getAvailablePeriods(providerName as string);
+    res.json(periods);
+  } catch (error: any) {
+    console.error("Error fetching available periods:", error);
+    res.status(500).json({
+      error: error.message || "Failed to fetch available periods",
     });
   }
 });

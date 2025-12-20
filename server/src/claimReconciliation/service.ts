@@ -933,37 +933,90 @@ export async function runClaimReconciliation(
 /* Claims inventory + periods summary                                         */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Get all claims with filtering and pagination support.
+ * 
+ * IMPORTANT: This function is for VIEW-ONLY purposes (Claims Inventory UI).
+ * Filters applied here DO NOT affect claim-remittance matching/reconciliation logic.
+ * Matching is always performed across ALL outstanding claims regardless of filters.
+ * 
+ * @param options - Filter and pagination options
+ * @param options.year - Filter by year (independent of month)
+ * @param options.month - Filter by month (independent of year)
+ * @param options.status - Filter by claim status
+ * @param options.providerName - Filter by provider
+ * @param options.page - Page number for pagination (default: 1)
+ * @param options.limit - Items per page (default: 50)
+ * @returns Claims with pagination info and summary counts for filtered view
+ */
 export async function getAllClaims(options?: {
   providerName?: string;
   status?: string;
   periodYear?: number;
   periodMonth?: number;
+  year?: number;
+  month?: number;
   page?: number;
   limit?: number;
 }) {
-  const { providerName, status, periodYear, periodMonth, page = 1, limit = 50 } = options || {};
+  const { 
+    providerName, 
+    status, 
+    periodYear, 
+    periodMonth,
+    year,
+    month,
+    page = 1, 
+    limit = 50,
+  } = options || {};
 
   let query = db.select().from(claimReconClaims);
 
   const filters: any[] = [];
   if (providerName) filters.push(eq(claimReconClaims.providerName, providerName));
   if (status) filters.push(eq(claimReconClaims.status, status));
-  if (periodYear !== undefined) filters.push(eq(claimReconClaims.periodYear, periodYear));
-  if (periodMonth !== undefined) filters.push(eq(claimReconClaims.periodMonth, periodMonth));
+  
+  // Support both old parameters (periodYear/periodMonth) and new ones (year/month)
+  // for backward compatibility
+  const finalYear = year ?? periodYear;
+  const finalMonth = month ?? periodMonth;
+  
+  if (finalYear !== undefined) filters.push(eq(claimReconClaims.periodYear, finalYear));
+  if (finalMonth !== undefined) filters.push(eq(claimReconClaims.periodMonth, finalMonth));
 
   if (filters.length > 0) query = (query.where(and(...filters)) as any);
+
+  // Add sorting (default: serviceDate DESC)
+  query = (query.orderBy(desc(claimReconClaims.serviceDate)) as any);
 
   const offset = (page - 1) * limit;
   const claims = await query.limit(limit).offset(offset);
 
-  // Use efficient COUNT(*) instead of loading all records
+  // Single query to get all counts using SQL CASE statements
   const whereClause = filters.length > 0 ? and(...filters) : undefined;
-  const [{ count }] = await db
-    .select({ count: sql<number>`cast(count(*) as integer)` })
+  
+  // Note: 'matched' and 'paid' are grouped together as they both represent fully paid claims
+  // This matches the existing UI behavior where both statuses are treated equivalently
+  const [countsResult] = await db
+    .select({
+      total: sql<number>`cast(count(*) as integer)`,
+      awaiting_remittance: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'awaiting_remittance' then 1 else 0 end) as integer)`,
+      matched: sql<number>`cast(sum(case when ${claimReconClaims.status} in ('matched', 'paid') then 1 else 0 end) as integer)`,
+      partially_paid: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'partially_paid' then 1 else 0 end) as integer)`,
+      unpaid: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'unpaid' then 1 else 0 end) as integer)`,
+    })
     .from(claimReconClaims)
     .where(whereClause);
 
-  const total = count;
+  const total = countsResult.total;
+
+  const summaryCounts = {
+    total,
+    awaiting_remittance: countsResult.awaiting_remittance,
+    matched: countsResult.matched,
+    partially_paid: countsResult.partially_paid,
+    unpaid: countsResult.unpaid,
+  };
 
   return {
     claims,
@@ -973,6 +1026,7 @@ export async function getAllClaims(options?: {
       total,
       totalPages: Math.ceil(total / limit),
     },
+    summary: summaryCounts,
   };
 }
 
@@ -1069,4 +1123,49 @@ export async function getPeriodsSummary(providerName?: string) {
   });
 
   return summaries;
+}
+
+/**
+ * Get distinct available years and months for a provider
+ * Used to populate Year and Month filter dropdowns in Claims Inventory
+ */
+export async function getAvailablePeriods(providerName: string) {
+  const filters = [eq(claimReconClaims.providerName, providerName)];
+  
+  // Get distinct years using SQL aggregation for efficiency
+  const yearsResult = await db
+    .selectDistinct({ periodYear: claimReconClaims.periodYear })
+    .from(claimReconClaims)
+    .where(and(...filters))
+    .orderBy(desc(claimReconClaims.periodYear));
+
+  const years = yearsResult.map(r => r.periodYear);
+
+  // Get distinct months for each year
+  const monthsResult = await db
+    .selectDistinct({ 
+      periodYear: claimReconClaims.periodYear,
+      periodMonth: claimReconClaims.periodMonth 
+    })
+    .from(claimReconClaims)
+    .where(and(...filters))
+    .orderBy(desc(claimReconClaims.periodYear), claimReconClaims.periodMonth);
+
+  // Group months by year
+  const monthsByYear = new Map<number, number[]>();
+  for (const row of monthsResult) {
+    const yearMonths = monthsByYear.get(row.periodYear);
+    if (yearMonths) {
+      yearMonths.push(row.periodMonth);
+    } else {
+      monthsByYear.set(row.periodYear, [row.periodMonth]);
+    }
+  }
+
+  return {
+    years,
+    // monthsByYear included for future UI enhancement (e.g., showing only available months per year in dropdown)
+    // Currently not used by frontend but provides flexibility for future improvements
+    monthsByYear: Object.fromEntries(monthsByYear),
+  };
 }

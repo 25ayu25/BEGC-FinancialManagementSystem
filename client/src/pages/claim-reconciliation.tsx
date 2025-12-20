@@ -164,6 +164,18 @@ interface ClaimsInventoryResponse {
     total: number;
     totalPages: number;
   };
+  summary: {
+    total: number;
+    awaiting_remittance: number;
+    matched: number;
+    partially_paid: number;
+    unpaid: number;
+  };
+}
+
+interface AvailablePeriodsResponse {
+  years: number[];
+  monthsByYear: { [year: number]: number[] };
 }
 
 interface PeriodSummary {
@@ -532,11 +544,22 @@ export default function ClaimReconciliation() {
   // Requirement 3: History view toggle - "last_4_months" vs "all_months"
   const [historyViewMode, setHistoryViewMode] = useState<"last_4_months" | "all_months">("last_4_months");
 
-  // Claims Inventory (view-only filters)
+  /* ------------------------------------------------------------------------ */
+  /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
+  /* ------------------------------------------------------------------------ */
+  // IMPORTANT: These filters are for the Claims Inventory VIEW ONLY.
+  // They do NOT affect claim-remittance matching/reconciliation logic.
+  // Matching always runs across ALL outstanding claims regardless of these filters.
+  // 
+  // Filter design:
+  // - Year filter: can be set independently (e.g., "2024 + All months" shows all 2024 claims)
+  // - Month filter: can be set independently (e.g., "All years + March" shows all March claims across years)
+  // - Both can be combined (e.g., "2024 + March" shows only March 2024 claims)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<
     "all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid"
   >("all");
-  const [inventoryPeriodFilter, setInventoryPeriodFilter] = useState<string | null>(null);
+  const [inventoryYearFilter, setInventoryYearFilter] = useState<number | null>(null);
+  const [inventoryMonthFilter, setInventoryMonthFilter] = useState<number | null>(null);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [showInventory, setShowInventory] = useState(false);  /* ------------------------------------------------------------------------ */
   /* Data loading */
@@ -685,7 +708,8 @@ export default function ClaimReconciliation() {
       "/api/claim-reconciliation/claims",
       providerName,
       inventoryStatusFilter === "all" ? undefined : inventoryStatusFilter,
-      inventoryPeriodFilter,
+      inventoryYearFilter,
+      inventoryMonthFilter,
       inventoryPage,
     ],
     queryFn: async () => {
@@ -697,16 +721,13 @@ export default function ClaimReconciliation() {
 
       if (inventoryStatusFilter !== "all") params.append("status", inventoryStatusFilter);
 
-      if (inventoryPeriodFilter) {
-        const parts = inventoryPeriodFilter.split("-");
-        if (parts.length === 2 && parts[0] && parts[1]) {
-          const year = parseInt(parts[0], 10);
-          const month = parseInt(parts[1], 10);
-          if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
-            params.append("periodYear", String(year));
-            params.append("periodMonth", String(month));
-          }
-        }
+      // Use new year/month parameters
+      if (inventoryYearFilter !== null) {
+        params.append("year", String(inventoryYearFilter));
+      }
+      
+      if (inventoryMonthFilter !== null) {
+        params.append("month", String(inventoryMonthFilter));
       }
 
       const url = new URL(`/api/claim-reconciliation/claims?${params.toString()}`, API_BASE_URL).toString();
@@ -722,43 +743,63 @@ export default function ClaimReconciliation() {
     enabled: showInventory,
   });
 
-  const inventoryPeriodLabel = useMemo(() => {
-    if (!inventoryPeriodFilter) return null;
-    const [y, m] = inventoryPeriodFilter.split("-");
-    const yy = parseInt(y, 10);
-    const mm = parseInt(m, 10);
-    if (!isNaN(yy) && !isNaN(mm)) return formatPeriodLabel(yy, mm);
-    return inventoryPeriodFilter;
-  }, [inventoryPeriodFilter]);
+  // Query for available years and months (for Year/Month filter dropdowns)
+  const { data: availablePeriods } = useQuery<AvailablePeriodsResponse>({
+    queryKey: ["/api/claim-reconciliation/available-periods", providerName],
+    queryFn: async () => {
+      const params = new URLSearchParams({ providerName });
+      const url = new URL(`/api/claim-reconciliation/available-periods?${params.toString()}`, API_BASE_URL).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) headers["x-session-token"] = backup;
+
+      const response = await fetch(url, { method: "GET", credentials: "include", headers });
+      if (!response.ok) throw new Error("Failed to fetch available periods");
+      return response.json();
+    },
+    enabled: showInventory,
+  });
 
   const inventorySummaryStats = useMemo(() => {
+    // Primary: Use summary from API response (server-side calculation)
+    if (claimsInventory?.summary) {
+      return {
+        total: claimsInventory.summary.total,
+        awaiting: claimsInventory.summary.awaiting_remittance,
+        matched: claimsInventory.summary.matched,
+        unpaid: claimsInventory.summary.unpaid,
+        partial: claimsInventory.summary.partially_paid,
+      };
+    }
+
+    // Fallback: Client-side calculation from periodsSummary
+    // This fallback ensures summary stats are always available even if:
+    // 1. Claims Inventory is collapsed (showInventory=false, so claimsInventory is undefined)
+    // 2. API request fails or is pending
     if (!periodsSummary || periodsSummary.length === 0) {
       return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
     }
 
-    if (inventoryPeriodFilter) {
-      const [y, m] = inventoryPeriodFilter.split("-");
-      const yy = parseInt(y, 10);
-      const mm = parseInt(m, 10);
-      const p = periodsSummary.find((x) => x.periodYear === yy && x.periodMonth === mm);
-      if (!p) return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
-      return {
-        total: p.totalClaims,
-        awaiting: p.awaitingRemittance,
-        matched: p.matched,
-        unpaid: p.unpaid,
-        partial: p.partiallyPaid,
-      };
+    // Filter periods based on year/month filters
+    let filteredPeriods = periodsSummary;
+    
+    if (inventoryYearFilter !== null) {
+      filteredPeriods = filteredPeriods.filter(p => p.periodYear === inventoryYearFilter);
+    }
+    
+    if (inventoryMonthFilter !== null) {
+      filteredPeriods = filteredPeriods.filter(p => p.periodMonth === inventoryMonthFilter);
     }
 
     return {
-      total: periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0),
-      awaiting: periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0),
-      matched: periodsSummary.reduce((sum, p) => sum + p.matched, 0),
-      unpaid: periodsSummary.reduce((sum, p) => sum + p.unpaid, 0),
-      partial: periodsSummary.reduce((sum, p) => sum + p.partiallyPaid, 0),
+      total: filteredPeriods.reduce((sum, p) => sum + p.totalClaims, 0),
+      awaiting: filteredPeriods.reduce((sum, p) => sum + p.awaitingRemittance, 0),
+      matched: filteredPeriods.reduce((sum, p) => sum + p.matched, 0),
+      unpaid: filteredPeriods.reduce((sum, p) => sum + p.unpaid, 0),
+      partial: filteredPeriods.reduce((sum, p) => sum + p.partiallyPaid, 0),
     };
-  }, [periodsSummary, inventoryPeriodFilter]);
+  }, [claimsInventory, periodsSummary, inventoryYearFilter, inventoryMonthFilter]);
 
   /* ------------------------------------------------------------------------ */
   /* KPI strip stats */
@@ -1594,10 +1635,12 @@ export default function ClaimReconciliation() {
     if (status !== "all") {
       params.append("status", status);
     }
-    if (inventoryPeriodFilter) {
-      const [year, month] = inventoryPeriodFilter.split("-");
-      params.append("periodYear", year);
-      params.append("periodMonth", month);
+    // Use new year/month filters
+    if (inventoryYearFilter !== null) {
+      params.append("year", String(inventoryYearFilter));
+    }
+    if (inventoryMonthFilter !== null) {
+      params.append("month", String(inventoryMonthFilter));
     }
 
     const url = `${API_BASE_URL}/api/claim-reconciliation/export-claims?${params.toString()}`;
@@ -3135,50 +3178,74 @@ export default function ClaimReconciliation() {
                 </div>
               </div>
 
-              {periodsSummary.length > 0 && (
-                <div className="mb-4 flex items-center gap-2">
-                  <Label className="text-sm font-medium text-slate-700">Period:</Label>
-                  <Select
-                    value={inventoryPeriodFilter || "all"}
-                    onValueChange={(value) => {
-                      setInventoryPeriodFilter(value === "all" ? null : value);
-                      setInventoryPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-[320px] bg-white">
-                      <SelectValue placeholder="All periods" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All periods</SelectItem>
-                      {periodsSummary.map((period) => {
-                        const periodKey = `${period.periodYear}-${period.periodMonth}`;
-                        return (
-                          <SelectItem key={periodKey} value={periodKey}>
-                            {formatPeriodLabel(period.periodYear, period.periodMonth)} ({period.totalClaims}{" "}
-                            {pluralize(period.totalClaims, "claim")})
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-
-                  {inventoryPeriodFilter && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => {
-                        setInventoryPeriodFilter(null);
+              {/* NEW: Year and Month filters with quick filter buttons */}
+              {availablePeriods && availablePeriods.years.length > 0 && (
+                <div className="mb-4 space-y-4">
+                  {/* Filter selectors */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label className="text-sm font-medium text-slate-700">Filter by:</Label>
+                    
+                    {/* Year selector */}
+                    <Select
+                      value={inventoryYearFilter?.toString() || "all"}
+                      onValueChange={(value) => {
+                        setInventoryYearFilter(value === "all" ? null : parseInt(value, 10));
                         setInventoryPage(1);
                       }}
                     >
-                      <X className="w-4 h-4" />
-                      Clear
-                    </Button>
-                  )}
+                      <SelectTrigger className="w-[140px] bg-white">
+                        <SelectValue placeholder="All years" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All years</SelectItem>
+                        {availablePeriods.years.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                  {/* Export Button */}
-                  <DropdownMenu>
+                    {/* Month selector */}
+                    <Select
+                      value={inventoryMonthFilter?.toString() || "all"}
+                      onValueChange={(value) => {
+                        setInventoryMonthFilter(value === "all" ? null : parseInt(value, 10));
+                        setInventoryPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-[160px] bg-white">
+                        <SelectValue placeholder="All months" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All months</SelectItem>
+                        {MONTHS.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Clear filters button */}
+                    {(inventoryYearFilter !== null || inventoryMonthFilter !== null) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                          setInventoryYearFilter(null);
+                          setInventoryMonthFilter(null);
+                          setInventoryPage(1);
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                        Clear filters
+                      </Button>
+                    )}
+
+                    {/* Export Button */}
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
@@ -3234,6 +3301,43 @@ export default function ClaimReconciliation() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  </div>
+
+                  {/* Quick filter buttons */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label className="text-xs font-medium text-slate-600">Quick filters:</Label>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                      onClick={() => {
+                        // This year
+                        const currentYear = new Date().getFullYear();
+                        setInventoryYearFilter(currentYear);
+                        setInventoryMonthFilter(null);
+                        setInventoryPage(1);
+                      }}
+                    >
+                      <Zap className="w-3 h-3" />
+                      This year
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                      onClick={() => {
+                        // All years - clear all filters
+                        setInventoryYearFilter(null);
+                        setInventoryMonthFilter(null);
+                        setInventoryPage(1);
+                      }}
+                    >
+                      <Zap className="w-3 h-3" />
+                      All years
+                    </Button>
+                  </div>
                 </div>
               )}
 
