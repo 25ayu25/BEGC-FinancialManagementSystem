@@ -41,11 +41,13 @@ export function formatDate(
  * 
  * @param year - Year value
  * @param month - Month value (1-indexed, 1 = January)
- * @returns Formatted period label (e.g., "Jan 2024") or "—" for invalid values
+ * @param monthFormat - Month format ('long' for 'January', 'short' for 'Jan')
+ * @returns Formatted period label (e.g., "January 2024") or "—" for invalid values
  */
 export function formatPeriod(
   year: number | null | undefined,
-  month: number | null | undefined
+  month: number | null | undefined,
+  monthFormat: "long" | "short" = "long"
 ): string {
   // Handle null or undefined values
   if (year == null || month == null) {
@@ -59,8 +61,8 @@ export function formatPeriod(
 
   try {
     const date = new Date(year, month - 1);
-    return date.toLocaleString("default", {
-      month: "short",
+    return date.toLocaleString("en-US", {
+      month: monthFormat,
       year: "numeric",
     });
   } catch {
