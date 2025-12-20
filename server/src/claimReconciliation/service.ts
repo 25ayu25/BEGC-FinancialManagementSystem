@@ -933,6 +933,22 @@ export async function runClaimReconciliation(
 /* Claims inventory + periods summary                                         */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Get all claims with filtering and pagination support.
+ * 
+ * IMPORTANT: This function is for VIEW-ONLY purposes (Claims Inventory UI).
+ * Filters applied here DO NOT affect claim-remittance matching/reconciliation logic.
+ * Matching is always performed across ALL outstanding claims regardless of filters.
+ * 
+ * @param options - Filter and pagination options
+ * @param options.year - Filter by year (independent of month)
+ * @param options.month - Filter by month (independent of year)
+ * @param options.status - Filter by claim status
+ * @param options.providerName - Filter by provider
+ * @param options.page - Page number for pagination (default: 1)
+ * @param options.limit - Items per page (default: 50)
+ * @returns Claims with pagination info and summary counts for filtered view
+ */
 export async function getAllClaims(options?: {
   providerName?: string;
   status?: string;
@@ -963,6 +979,7 @@ export async function getAllClaims(options?: {
   if (status) filters.push(eq(claimReconClaims.status, status));
   
   // Support both old parameters (periodYear/periodMonth) and new ones (year/month)
+  // for backward compatibility
   const finalYear = year ?? periodYear;
   const finalMonth = month ?? periodMonth;
   

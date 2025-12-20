@@ -544,7 +544,17 @@ export default function ClaimReconciliation() {
   // Requirement 3: History view toggle - "last_4_months" vs "all_months"
   const [historyViewMode, setHistoryViewMode] = useState<"last_4_months" | "all_months">("last_4_months");
 
-  // Claims Inventory (view-only filters) - UPDATED: Separate Year and Month filters
+  /* ------------------------------------------------------------------------ */
+  /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
+  /* ------------------------------------------------------------------------ */
+  // IMPORTANT: These filters are for the Claims Inventory VIEW ONLY.
+  // They do NOT affect claim-remittance matching/reconciliation logic.
+  // Matching always runs across ALL outstanding claims regardless of these filters.
+  // 
+  // Filter design:
+  // - Year filter: can be set independently (e.g., "2024 + All months" shows all 2024 claims)
+  // - Month filter: can be set independently (e.g., "All years + March" shows all March claims across years)
+  // - Both can be combined (e.g., "2024 + March" shows only March 2024 claims)
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<
     "all" | "awaiting_remittance" | "matched" | "partially_paid" | "unpaid"
   >("all");
