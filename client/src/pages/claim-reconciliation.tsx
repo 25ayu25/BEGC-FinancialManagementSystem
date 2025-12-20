@@ -1422,20 +1422,24 @@ export default function ClaimReconciliation() {
       filtered = filtered.filter((run) => runGroup(run) === statusFilter);
     }
 
-    // Sort all runs in ASCENDING order by period (year, then month)
-    const sortedAscending = [...filtered].sort((a, b) => {
-      const aKey = a.periodYear * 100 + a.periodMonth;
-      const bKey = b.periodYear * 100 + b.periodMonth;
-      return aKey - bKey; // Ascending: older periods first
-    });
-
     // Apply date range filter based on historyViewMode
     if (historyViewMode === "last_4_months") {
-      // Take the LAST 4 periods (most recent), which are already in ascending order
-      filtered = sortedAscending.slice(-4);
+      const currentYear = new Date().getFullYear();
+      // Show only Jan-Apr (months defined by constants) of the currently selected year
+      filtered = filtered.filter((run) => {
+        return run.periodYear === currentYear && run.periodMonth >= HISTORY_DEFAULT_MONTH_START && run.periodMonth <= HISTORY_DEFAULT_MONTH_END;
+      });
+      // Sort in ascending order (Jan → Apr)
+      filtered = [...filtered].sort((a, b) => {
+        if (a.periodYear !== b.periodYear) return a.periodYear - b.periodYear;
+        return a.periodMonth - b.periodMonth;
+      });
     } else {
       // "all_months" mode: show all runs in ascending order
-      filtered = sortedAscending;
+      filtered = [...filtered].sort((a, b) => {
+        if (a.periodYear !== b.periodYear) return a.periodYear - b.periodYear;
+        return a.periodMonth - b.periodMonth;
+      });
     }
 
     return filtered;
