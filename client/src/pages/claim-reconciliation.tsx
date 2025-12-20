@@ -497,17 +497,16 @@ export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const now = new Date();
-  const currentYear = useMemo(() => now.getFullYear(), []);
-  const currentMonth = useMemo(() => now.getMonth() + 1, []); // 1-12
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const currentMonth = useMemo(() => new Date().getMonth() + 1, []); // 1-12
   const didUserTouchPeriod = useRef(false);
 
   /* ------------------------------------------------------------------------ */
   /* Active Period Controls */
   /* ------------------------------------------------------------------------ */
   const [providerName, setProviderName] = useState("CIC");
-  const [periodYear, setPeriodYear] = useState(now.getFullYear().toString());
-  const [periodMonth, setPeriodMonth] = useState((now.getMonth() + 1).toString());
+  const [periodYear, setPeriodYear] = useState(currentYear.toString());
+  const [periodMonth, setPeriodMonth] = useState(currentMonth.toString());
 
   const activePeriodLabel = useMemo(() => {
     return formatPeriodLabel(parseInt(periodYear, 10), parseInt(periodMonth, 10));
@@ -772,24 +771,27 @@ export default function ClaimReconciliation() {
     // Only initialize when Claims Inventory is opened and we have available periods data
     if (!showInventory || !availablePeriods) return;
     
+    // Helper function to set filters and reset page
+    const setFilters = (year: number, month: number) => {
+      setInventoryYearFilter(year);
+      setInventoryMonthFilter(month);
+      setInventoryPage(1);
+    };
+    
     // Try to set current year and month if available
     if (availablePeriods.years.includes(currentYear)) {
       const monthsForCurrentYear = availablePeriods.monthsByYear[currentYear] || [];
       
       if (monthsForCurrentYear.includes(currentMonth)) {
         // Current year and month are available
-        setInventoryYearFilter(currentYear);
-        setInventoryMonthFilter(currentMonth);
-        setInventoryPage(1);
+        setFilters(currentYear, currentMonth);
         return;
       }
       
       // Current year exists but not current month - use current year with newest month
       if (monthsForCurrentYear.length > 0) {
         const newestMonth = Math.max(...monthsForCurrentYear);
-        setInventoryYearFilter(currentYear);
-        setInventoryMonthFilter(newestMonth);
-        setInventoryPage(1);
+        setFilters(currentYear, newestMonth);
         return;
       }
     }
@@ -801,9 +803,7 @@ export default function ClaimReconciliation() {
       
       if (monthsForNewestYear.length > 0) {
         const newestMonth = Math.max(...monthsForNewestYear);
-        setInventoryYearFilter(newestYear);
-        setInventoryMonthFilter(newestMonth);
-        setInventoryPage(1);
+        setFilters(newestYear, newestMonth);
       }
     }
   }, [showInventory, availablePeriods, currentYear, currentMonth]);
@@ -3005,7 +3005,7 @@ export default function ClaimReconciliation() {
                     </SelectTrigger>
                     <SelectContent>
                       {Array.from({ length: 7 }).map((_, i) => {
-                        const y = String(now.getFullYear() - 4 + i);
+                        const y = String(currentYear - 4 + i);
                         return (
                           <SelectItem key={y} value={y}>
                             {y}
