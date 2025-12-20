@@ -768,7 +768,7 @@ export default function ClaimReconciliation() {
 
   // Handle URL params for drill-down from Key Metrics Overview cards
   useEffect(() => {
-    // Parse URL params once on mount
+    // Parse URL params from current location
     const params = new URLSearchParams(window.location.search);
     const statusParam = params.get('inventoryStatus');
     const yearParam = params.get('inventoryYear');
@@ -812,7 +812,7 @@ export default function ClaimReconciliation() {
       // Reset page to 1
       setInventoryPage(1);
     }
-  }, []); // Run once on mount
+  }, [location]); // Re-run when location changes
 
   // Initialize inventory filters to current year/month when opening Claims Inventory
   useEffect(() => {
@@ -1829,14 +1829,16 @@ export default function ClaimReconciliation() {
     params.set('inventoryYear', String(year));
     params.set('inventoryMonth', String(month));
     
-    // Update URL with params (this will trigger the useEffect to apply filters)
-    const newLocation = `${location.split('?')[0]}?${params.toString()}`;
+    // Update URL with params using URL constructor for robustness
+    const url = new URL(window.location.href);
+    url.search = params.toString();
+    const newLocation = url.pathname + url.search;
     setLocation(newLocation);
     
-    // Scroll to Claims Inventory section
-    setTimeout(() => {
+    // Scroll to Claims Inventory section after DOM updates
+    requestAnimationFrame(() => {
       document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    });
   };
 
   const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
@@ -3369,9 +3371,11 @@ export default function ClaimReconciliation() {
                           setInventoryYearFilter(null);
                           setInventoryMonthFilter(null);
                           setInventoryPage(1);
-                          // Clear URL params
-                          const basePath = location.split('?')[0];
-                          setLocation(basePath);
+                          // Clear URL params using URL constructor for robustness
+                          const url = new URL(window.location.href);
+                          url.search = '';
+                          const newLocation = url.pathname;
+                          setLocation(newLocation);
                         }}
                       >
                         <X className="w-4 h-4" />
