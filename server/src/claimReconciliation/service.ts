@@ -997,13 +997,14 @@ export async function getAllClaims(options?: {
   
   // Note: 'matched' and 'paid' are grouped together as they both represent fully paid claims
   // This matches the existing UI behavior where both statuses are treated equivalently
+  // CRITICAL: Use COALESCE to ensure nulls become 0 when no rows match (prevents frontend crashes)
   const [countsResult] = await db
     .select({
       total: sql<number>`cast(count(*) as integer)`,
-      awaiting_remittance: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'awaiting_remittance' then 1 else 0 end) as integer)`,
-      matched: sql<number>`cast(sum(case when ${claimReconClaims.status} in ('matched', 'paid') then 1 else 0 end) as integer)`,
-      partially_paid: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'partially_paid' then 1 else 0 end) as integer)`,
-      unpaid: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'unpaid' then 1 else 0 end) as integer)`,
+      awaiting_remittance: sql<number>`cast(coalesce(sum(case when ${claimReconClaims.status} = 'awaiting_remittance' then 1 else 0 end), 0) as integer)`,
+      matched: sql<number>`cast(coalesce(sum(case when ${claimReconClaims.status} in ('matched', 'paid') then 1 else 0 end), 0) as integer)`,
+      partially_paid: sql<number>`cast(coalesce(sum(case when ${claimReconClaims.status} = 'partially_paid' then 1 else 0 end), 0) as integer)`,
+      unpaid: sql<number>`cast(coalesce(sum(case when ${claimReconClaims.status} = 'unpaid' then 1 else 0 end), 0) as integer)`,
     })
     .from(claimReconClaims)
     .where(whereClause);
@@ -1012,10 +1013,10 @@ export async function getAllClaims(options?: {
 
   const summaryCounts = {
     total,
-    awaiting_remittance: countsResult.awaiting_remittance,
-    matched: countsResult.matched,
-    partially_paid: countsResult.partially_paid,
-    unpaid: countsResult.unpaid,
+    awaiting_remittance: countsResult.awaiting_remittance ?? 0,
+    matched: countsResult.matched ?? 0,
+    partially_paid: countsResult.partially_paid ?? 0,
+    unpaid: countsResult.unpaid ?? 0,
   };
 
   return {

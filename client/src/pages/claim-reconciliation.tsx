@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
 /* Shadcn/UI Components */
@@ -2139,7 +2139,7 @@ export default function ClaimReconciliation() {
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Claims</p>
-                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.totalClaims.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.totalClaims)}</p>
                   <p className="text-xs text-slate-500">Uploaded across all periods</p>
                 </button>
 
@@ -2162,7 +2162,7 @@ export default function ClaimReconciliation() {
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paid in Full</p>
-                  <p className="text-3xl font-bold text-emerald-600 mb-1">{stats.paidInFull.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-emerald-600 mb-1">{formatNumber(stats.paidInFull)}</p>
                   <p className="text-xs text-slate-500">Claims fully reconciled</p>
                 </button>
 
@@ -2198,7 +2198,7 @@ export default function ClaimReconciliation() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <p className="text-3xl font-bold text-orange-600 mb-1">{stats.followUpNeeded.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-orange-600 mb-1">{formatNumber(stats.followUpNeeded)}</p>
                   <p className="text-xs text-slate-500">Partial/unpaid claims</p>
                 </button>
 
@@ -2221,7 +2221,7 @@ export default function ClaimReconciliation() {
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Pending Remittance</p>
-                  <p className="text-3xl font-bold text-sky-600 mb-1">{stats.waitingForPaymentStatement.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-sky-600 mb-1">{formatNumber(stats.waitingForPaymentStatement)}</p>
                   <p className="text-xs text-slate-500">Awaiting remittance data</p>
                 </button>
               </div>
@@ -2238,7 +2238,7 @@ export default function ClaimReconciliation() {
                       <p className="text-xs text-slate-500">Awaiting + Follow-up</p>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-slate-900 tabular-nums">{stats.outstandingTotal.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-slate-900 tabular-nums">{formatNumber(stats.outstandingTotal)}</p>
                 </div>
               </div>
             </div>
@@ -3351,23 +3351,23 @@ export default function ClaimReconciliation() {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Claims</div>
-                    <div className="text-2xl font-bold text-slate-900">{inventorySummaryStats.total.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-slate-900">{formatNumber(inventorySummaryStats.total)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
-                    <div className="text-2xl font-bold text-sky-400">{inventorySummaryStats.awaiting.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-sky-400">{formatNumber(inventorySummaryStats.awaiting)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid in full</div>
-                    <div className="text-2xl font-bold text-emerald-400">{inventorySummaryStats.matched.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-emerald-400">{formatNumber(inventorySummaryStats.matched)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid partially</div>
-                    <div className="text-2xl font-bold text-amber-400">{inventorySummaryStats.partial.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-amber-400">{formatNumber(inventorySummaryStats.partial)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Not paid (0 paid)</div>
-                    <div className="text-2xl font-bold text-rose-400">{inventorySummaryStats.unpaid.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-rose-400">{formatNumber(inventorySummaryStats.unpaid)}</div>
                   </div>
                 </div>
               )}
