@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
+import { useLocation } from "wouter";
 import { cn, formatNumber } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
@@ -496,6 +497,7 @@ function FileDropzone({
 export default function ClaimReconciliation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [location, setLocation] = useLocation();
 
   // Capture current year and month at component mount (won't change during component lifecycle)
   const [currentYear] = useState(() => new Date().getFullYear());
@@ -763,6 +765,54 @@ export default function ClaimReconciliation() {
     },
     enabled: showInventory,
   });
+
+  // Handle URL params for drill-down from Key Metrics Overview cards
+  useEffect(() => {
+    // Parse URL params once on mount
+    const params = new URLSearchParams(window.location.search);
+    const statusParam = params.get('inventoryStatus');
+    const yearParam = params.get('inventoryYear');
+    const monthParam = params.get('inventoryMonth');
+    
+    // If any drill-down params are present, apply them
+    if (statusParam || yearParam || monthParam) {
+      // Mark that filters were set via drill-down (prevent default override)
+      didUserTouchInventoryFilters.current = true;
+      
+      // Set status filter
+      if (statusParam === 'all' || statusParam === 'awaiting_remittance' || 
+          statusParam === 'matched' || statusParam === 'partially_paid' || 
+          statusParam === 'unpaid') {
+        setInventoryStatusFilter(statusParam);
+      }
+      
+      // Set year filter ('all' means null)
+      if (yearParam === 'all') {
+        setInventoryYearFilter(null);
+      } else if (yearParam) {
+        const year = parseInt(yearParam, 10);
+        if (!isNaN(year)) {
+          setInventoryYearFilter(year);
+        }
+      }
+      
+      // Set month filter ('all' means null)
+      if (monthParam === 'all') {
+        setInventoryMonthFilter(null);
+      } else if (monthParam) {
+        const month = parseInt(monthParam, 10);
+        if (!isNaN(month)) {
+          setInventoryMonthFilter(month);
+        }
+      }
+      
+      // Open the Claims Inventory section
+      setShowInventory(true);
+      
+      // Reset page to 1
+      setInventoryPage(1);
+    }
+  }, []); // Run once on mount
 
   // Initialize inventory filters to current year/month when opening Claims Inventory
   useEffect(() => {
@@ -1762,6 +1812,33 @@ export default function ClaimReconciliation() {
     }
   };
 
+  /**
+   * Navigate to Claims Inventory with drill-down filters from Key Metrics cards
+   * @param status - Status filter to apply ('all', 'matched', 'partially_paid', etc.)
+   * @param year - Year filter ('all' or specific year)
+   * @param month - Month filter ('all' or specific month)
+   */
+  const handleDrillDownToInventory = (
+    status: 'all' | 'awaiting_remittance' | 'matched' | 'partially_paid' | 'unpaid',
+    year: 'all' | number,
+    month: 'all' | number
+  ) => {
+    // Build URL params for drill-down intent
+    const params = new URLSearchParams();
+    params.set('inventoryStatus', status);
+    params.set('inventoryYear', String(year));
+    params.set('inventoryMonth', String(month));
+    
+    // Update URL with params (this will trigger the useEffect to apply filters)
+    const newLocation = `${location.split('?')[0]}?${params.toString()}`;
+    setLocation(newLocation);
+    
+    // Scroll to Claims Inventory section
+    setTimeout(() => {
+      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
   const handleDeletePeriod = (period: PeriodSummary, type: "claims" | "remittances") => {
     const periodLabel = formatPeriodLabel(period.periodYear, period.periodMonth);
 
@@ -2200,13 +2277,7 @@ export default function ClaimReconciliation() {
                 {/* Total Claims Uploaded */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowInventory(true);
-                    setInventoryStatusFilter("all");
-                    setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }}
+                  onClick={() => handleDrillDownToInventory('all', 'all', 'all')}
                   className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -2223,13 +2294,7 @@ export default function ClaimReconciliation() {
                 {/* Paid in Full */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowInventory(true);
-                    setInventoryStatusFilter("matched");
-                    setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }}
+                  onClick={() => handleDrillDownToInventory('matched', 'all', 'all')}
                   className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -2246,13 +2311,7 @@ export default function ClaimReconciliation() {
                 {/* Follow-up Needed */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowInventory(true);
-                    setInventoryStatusFilter("partially_paid");
-                    setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }}
+                  onClick={() => handleDrillDownToInventory('partially_paid', 'all', 'all')}
                   className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -2282,13 +2341,7 @@ export default function ClaimReconciliation() {
                 {/* Pending Remittance */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowInventory(true);
-                    setInventoryStatusFilter("awaiting_remittance");
-                    setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }}
+                  onClick={() => handleDrillDownToInventory('awaiting_remittance', 'all', 'all')}
                   className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -3316,6 +3369,9 @@ export default function ClaimReconciliation() {
                           setInventoryYearFilter(null);
                           setInventoryMonthFilter(null);
                           setInventoryPage(1);
+                          // Clear URL params
+                          const basePath = location.split('?')[0];
+                          setLocation(basePath);
                         }}
                       >
                         <X className="w-4 h-4" />
