@@ -762,7 +762,7 @@ export default function ClaimReconciliation() {
   });
 
   const inventorySummaryStats = useMemo(() => {
-    // Use summary from API response if available (server-side calculation)
+    // Primary: Use summary from API response (server-side calculation)
     if (claimsInventory?.summary) {
       return {
         total: claimsInventory.summary.total,
@@ -773,7 +773,10 @@ export default function ClaimReconciliation() {
       };
     }
 
-    // Fallback to client-side calculation from periodsSummary
+    // Fallback: Client-side calculation from periodsSummary
+    // This fallback ensures summary stats are always available even if:
+    // 1. Claims Inventory is collapsed (showInventory=false, so claimsInventory is undefined)
+    // 2. API request fails or is pending
     if (!periodsSummary || periodsSummary.length === 0) {
       return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
     }

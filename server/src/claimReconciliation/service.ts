@@ -992,10 +992,11 @@ export async function getAllClaims(options?: {
   const offset = (page - 1) * limit;
   const claims = await query.limit(limit).offset(offset);
 
-  // Use efficient SQL aggregation for both total count and summary counts
+  // Single query to get all counts using SQL CASE statements
   const whereClause = filters.length > 0 ? and(...filters) : undefined;
   
-  // Single query to get all counts using SQL CASE statements
+  // Note: 'matched' and 'paid' are grouped together as they both represent fully paid claims
+  // This matches the existing UI behavior where both statuses are treated equivalently
   const [countsResult] = await db
     .select({
       total: sql<number>`cast(count(*) as integer)`,
@@ -1163,6 +1164,8 @@ export async function getAvailablePeriods(providerName: string) {
 
   return {
     years,
+    // monthsByYear included for future UI enhancement (e.g., showing only available months per year in dropdown)
+    // Currently not used by frontend but provides flexibility for future improvements
     monthsByYear: Object.fromEntries(monthsByYear),
   };
 }
