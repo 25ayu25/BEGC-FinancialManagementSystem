@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
 /* Shadcn/UI Components */
@@ -2139,7 +2139,7 @@ export default function ClaimReconciliation() {
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Claims</p>
-                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.totalClaims.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.totalClaims)}</p>
                   <p className="text-xs text-slate-500">Uploaded across all periods</p>
                 </button>
 
@@ -2162,7 +2162,7 @@ export default function ClaimReconciliation() {
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paid in Full</p>
-                  <p className="text-3xl font-bold text-emerald-600 mb-1">{stats.paidInFull.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-emerald-600 mb-1">{formatNumber(stats.paidInFull)}</p>
                   <p className="text-xs text-slate-500">Claims fully reconciled</p>
                 </button>
 
@@ -2198,7 +2198,7 @@ export default function ClaimReconciliation() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <p className="text-3xl font-bold text-orange-600 mb-1">{stats.followUpNeeded.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-orange-600 mb-1">{formatNumber(stats.followUpNeeded)}</p>
                   <p className="text-xs text-slate-500">Partial/unpaid claims</p>
                 </button>
 
@@ -2221,7 +2221,7 @@ export default function ClaimReconciliation() {
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                   </div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Pending Remittance</p>
-                  <p className="text-3xl font-bold text-sky-600 mb-1">{stats.waitingForPaymentStatement.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-sky-600 mb-1">{formatNumber(stats.waitingForPaymentStatement)}</p>
                   <p className="text-xs text-slate-500">Awaiting remittance data</p>
                 </button>
               </div>
@@ -2238,7 +2238,7 @@ export default function ClaimReconciliation() {
                       <p className="text-xs text-slate-500">Awaiting + Follow-up</p>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-slate-900 tabular-nums">{stats.outstandingTotal.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-slate-900 tabular-nums">{formatNumber(stats.outstandingTotal)}</p>
                 </div>
               </div>
             </div>
@@ -2598,11 +2598,11 @@ export default function ClaimReconciliation() {
                         {/* Single-line Summary with Total & Billed */}
                         <div className="flex items-center gap-3 text-sm flex-wrap">
                           <span className="font-medium text-slate-600">
-                            {period.totalClaims.toLocaleString()} {pluralize(period.totalClaims, "claim")}
+                            {formatNumber(period.totalClaims)} {pluralize(period.totalClaims, "claim")}
                           </span>
                           <span className="text-slate-400">•</span>
                           <span className="font-medium text-slate-600">
-                            {getCurrencyForDisplay(period.providerName, period.currency)} {parseFloat(period.totalBilled).toLocaleString()}
+                            {getCurrencyForDisplay(period.providerName, period.currency)} {formatNumber(parseFloat(period.totalBilled))}
                           </span>
                         </div>
 
@@ -2775,7 +2775,7 @@ export default function ClaimReconciliation() {
                             </TableCell>
                             <TableCell className="font-semibold">
                               {getCurrencyForDisplay(period.providerName, period.currency)}{" "}
-                              {parseFloat(period.totalBilled).toLocaleString()}
+                              {formatNumber(parseFloat(period.totalBilled))}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -3263,7 +3263,7 @@ export default function ClaimReconciliation() {
                       >
                         <Download className="w-4 h-4 mr-2 text-slate-600" />
                         <span className="flex-1">Export all claims</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.total})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.total)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="my-1" />
                       <DropdownMenuItem
@@ -3272,7 +3272,7 @@ export default function ClaimReconciliation() {
                       >
                         <Clock className="w-4 h-4 mr-2 text-sky-600" />
                         <span className="flex-1">Pending remittance</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.awaiting})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.awaiting)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("matched")}
@@ -3280,7 +3280,7 @@ export default function ClaimReconciliation() {
                       >
                         <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />
                         <span className="flex-1">Paid in full</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.matched})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.matched)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("partially_paid")}
@@ -3288,7 +3288,7 @@ export default function ClaimReconciliation() {
                       >
                         <AlertCircle className="w-4 h-4 mr-2 text-amber-600" />
                         <span className="flex-1">Paid partially</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.partial})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.partial)})</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportClaims("unpaid")}
@@ -3296,7 +3296,7 @@ export default function ClaimReconciliation() {
                       >
                         <X className="w-4 h-4 mr-2 text-rose-600" />
                         <span className="flex-1">Not paid (0 paid)</span>
-                        <span className="text-xs text-slate-500 ml-2">({inventorySummaryStats.unpaid})</span>
+                        <span className="text-xs text-slate-500 ml-2">({formatNumber(inventorySummaryStats.unpaid)})</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -3351,23 +3351,23 @@ export default function ClaimReconciliation() {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Claims</div>
-                    <div className="text-2xl font-bold text-slate-900">{inventorySummaryStats.total.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-slate-900">{formatNumber(inventorySummaryStats.total)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
-                    <div className="text-2xl font-bold text-sky-400">{inventorySummaryStats.awaiting.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-sky-400">{formatNumber(inventorySummaryStats.awaiting)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid in full</div>
-                    <div className="text-2xl font-bold text-emerald-400">{inventorySummaryStats.matched.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-emerald-400">{formatNumber(inventorySummaryStats.matched)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid partially</div>
-                    <div className="text-2xl font-bold text-amber-400">{inventorySummaryStats.partial.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-amber-400">{formatNumber(inventorySummaryStats.partial)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Not paid (0 paid)</div>
-                    <div className="text-2xl font-bold text-rose-400">{inventorySummaryStats.unpaid.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-rose-400">{formatNumber(inventorySummaryStats.unpaid)}</div>
                   </div>
                 </div>
               )}
