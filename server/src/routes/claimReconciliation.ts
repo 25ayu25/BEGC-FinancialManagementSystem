@@ -3,6 +3,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { formatDate } from "../../utils/dateFormat";
 
 import {
   parseClaimsFile,
@@ -914,7 +915,7 @@ router.get("/export-claims", requireAuth, async (req: Request, res: Response) =>
       rows.push([
         c.memberNumber,
         c.patientName || "N/A",
-        new Date(c.serviceDate).toLocaleDateString(),
+        formatDate(c.serviceDate),
         periodStr,
         billed.toFixed(2),
         paid.toFixed(2),

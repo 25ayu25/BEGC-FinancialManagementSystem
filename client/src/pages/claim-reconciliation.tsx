@@ -100,6 +100,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 import { ReconciliationStepper } from "@/components/ui/reconciliation-stepper";
+import { formatDate, formatPeriod } from "@/lib/dateFormat";
 
 /* -------------------------------------------------------------------------- */
 /* Types */
@@ -233,10 +234,7 @@ const HISTORY_DEFAULT_MONTH_START = 1;  // January
 const HISTORY_DEFAULT_MONTH_END = 4;    // April
 
 function formatPeriodLabel(year: number, month: number): string {
-  return new Date(year, month - 1).toLocaleString("default", {
-    month: "long",
-    year: "numeric",
-  });
+  return formatPeriod(year, month);
 }
 
 function pluralize(count: number, singular: string, plural?: string): string {
@@ -3404,7 +3402,7 @@ export default function ClaimReconciliation() {
                           >
                             <TableCell className="font-mono text-sm font-medium">{claim.memberNumber}</TableCell>
                             <TableCell className="font-medium">{claim.patientName || "N/A"}</TableCell>
-                            <TableCell>{new Date(claim.serviceDate).toLocaleDateString()}</TableCell>
+                            <TableCell>{formatDate(claim.serviceDate)}</TableCell>
                             <TableCell className="text-sm">{formatPeriodLabel(claim.periodYear, claim.periodMonth)}</TableCell>
                             <TableCell className="font-semibold">
                               {getCurrencyForDisplay(claim.providerName, claim.currency)}{" "}
@@ -3959,7 +3957,7 @@ export default function ClaimReconciliation() {
                             >
                               <TableCell className="font-mono font-medium">{claim.memberNumber}</TableCell>
                               <TableCell className="font-medium">{claim.patientName || "N/A"}</TableCell>
-                              <TableCell>{new Date(claim.serviceDate).toLocaleDateString()}</TableCell>
+                              <TableCell>{formatDate(claim.serviceDate)}</TableCell>
                               <TableCell className="font-semibold">
                                 {selectedRun ? getCurrencyForDisplay(selectedRun.providerName, claim.currency) : "USD"}{" "}
                                 {parseFloat(claim.billedAmount).toFixed(2)}
