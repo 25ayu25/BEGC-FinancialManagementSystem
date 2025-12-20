@@ -498,6 +498,7 @@ export default function ClaimReconciliation() {
   const queryClient = useQueryClient();
 
   const now = new Date();
+  const currentYear = useMemo(() => now.getFullYear(), []);
   const didUserTouchPeriod = useRef(false);
 
   /* ------------------------------------------------------------------------ */
@@ -3309,13 +3310,12 @@ export default function ClaimReconciliation() {
                       type="button"
                       className={cn(
                         "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02]",
-                        inventoryYearFilter === new Date().getFullYear() && inventoryMonthFilter === null
+                        inventoryYearFilter === currentYear && inventoryMonthFilter === null
                           ? "bg-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105"
                           : "text-slate-600 hover:text-slate-900 hover:bg-blue-50 hover:shadow-sm"
                       )}
                       onClick={() => {
                         // This year
-                        const currentYear = new Date().getFullYear();
                         setInventoryYearFilter(currentYear);
                         setInventoryMonthFilter(null);
                         setInventoryPage(1);
