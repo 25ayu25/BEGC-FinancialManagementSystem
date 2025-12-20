@@ -807,6 +807,8 @@ export default function ClaimReconciliation() {
         setFilters(newestYear, newestMonth);
       }
     }
+    // Note: currentYear and currentMonth are stable values (captured at mount),
+    // but included in deps for ESLint exhaustive-deps rule compliance
   }, [showInventory, availablePeriods, currentYear, currentMonth]);
 
   const inventorySummaryStats = useMemo(() => {
