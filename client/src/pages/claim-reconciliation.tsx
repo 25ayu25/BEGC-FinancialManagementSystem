@@ -499,6 +499,7 @@ export default function ClaimReconciliation() {
 
   const now = new Date();
   const currentYear = useMemo(() => now.getFullYear(), []);
+  const currentMonth = useMemo(() => now.getMonth() + 1, []); // 1-12
   const didUserTouchPeriod = useRef(false);
 
   /* ------------------------------------------------------------------------ */
@@ -769,8 +770,6 @@ export default function ClaimReconciliation() {
     // Only initialize when Claims Inventory is opened and we have available periods data
     if (!showInventory || !availablePeriods) return;
     
-    const currentMonth = now.getMonth() + 1; // 1-12
-    
     // Try to set current year and month if available
     if (availablePeriods.years.includes(currentYear)) {
       const monthsForCurrentYear = availablePeriods.monthsByYear[currentYear] || [];
@@ -805,7 +804,7 @@ export default function ClaimReconciliation() {
         setInventoryPage(1);
       }
     }
-  }, [showInventory, availablePeriods, currentYear, now]);
+  }, [showInventory, availablePeriods, currentYear, currentMonth]);
 
   const inventorySummaryStats = useMemo(() => {
     // Primary: Use summary from API response (server-side calculation)
