@@ -3309,44 +3309,6 @@ export default function ClaimReconciliation() {
                       size="sm"
                       className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
                       onClick={() => {
-                        // Last 3 months
-                        const today = new Date();
-                        const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-                        setInventoryYearFilter(null); // All years to capture cross-year ranges
-                        setInventoryMonthFilter(null);
-                        // Note: This is a simplified version. For true "last 3 months" we'd need date range support.
-                        // For now, clear filters as a starting point
-                        setInventoryPage(1);
-                        toast({ 
-                          title: "Last 3 months filter", 
-                          description: "For best results, use Year + Month filters to select specific periods" 
-                        });
-                      }}
-                    >
-                      <Zap className="w-3 h-3" />
-                      Last 3 months
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
-                      onClick={() => {
-                        // Last 12 months - clear filters to show all
-                        setInventoryYearFilter(null);
-                        setInventoryMonthFilter(null);
-                        setInventoryPage(1);
-                      }}
-                    >
-                      <Zap className="w-3 h-3" />
-                      Last 12 months
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
-                      onClick={() => {
                         // This year
                         const currentYear = new Date().getFullYear();
                         setInventoryYearFilter(currentYear);
@@ -3363,7 +3325,7 @@ export default function ClaimReconciliation() {
                       size="sm"
                       className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all"
                       onClick={() => {
-                        // All years
+                        // All years - clear all filters
                         setInventoryYearFilter(null);
                         setInventoryMonthFilter(null);
                         setInventoryPage(1);

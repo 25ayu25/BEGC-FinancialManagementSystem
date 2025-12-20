@@ -958,7 +958,6 @@ export async function getAllClaims(options?: {
   month?: number;
   page?: number;
   limit?: number;
-  sort?: string;
 }) {
   const { 
     providerName, 
@@ -969,7 +968,6 @@ export async function getAllClaims(options?: {
     month,
     page = 1, 
     limit = 50,
-    sort = 'serviceDate',
   } = options || {};
 
   let query = db.select().from(claimReconClaims);
@@ -994,27 +992,29 @@ export async function getAllClaims(options?: {
   const offset = (page - 1) * limit;
   const claims = await query.limit(limit).offset(offset);
 
-  // Use efficient COUNT(*) instead of loading all records
+  // Use efficient SQL aggregation for both total count and summary counts
   const whereClause = filters.length > 0 ? and(...filters) : undefined;
-  const [{ count }] = await db
-    .select({ count: sql<number>`cast(count(*) as integer)` })
+  
+  // Single query to get all counts using SQL CASE statements
+  const [countsResult] = await db
+    .select({
+      total: sql<number>`cast(count(*) as integer)`,
+      awaiting_remittance: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'awaiting_remittance' then 1 else 0 end) as integer)`,
+      matched: sql<number>`cast(sum(case when ${claimReconClaims.status} in ('matched', 'paid') then 1 else 0 end) as integer)`,
+      partially_paid: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'partially_paid' then 1 else 0 end) as integer)`,
+      unpaid: sql<number>`cast(sum(case when ${claimReconClaims.status} = 'unpaid' then 1 else 0 end) as integer)`,
+    })
     .from(claimReconClaims)
     .where(whereClause);
 
-  const total = count;
-
-  // Get summary counts for filtered view
-  const allFilteredClaims = await db
-    .select({ status: claimReconClaims.status })
-    .from(claimReconClaims)
-    .where(whereClause);
+  const total = countsResult.total;
 
   const summaryCounts = {
     total,
-    awaiting_remittance: allFilteredClaims.filter(c => c.status === 'awaiting_remittance').length,
-    matched: allFilteredClaims.filter(c => c.status === 'matched' || c.status === 'paid').length,
-    partially_paid: allFilteredClaims.filter(c => c.status === 'partially_paid').length,
-    unpaid: allFilteredClaims.filter(c => c.status === 'unpaid').length,
+    awaiting_remittance: countsResult.awaiting_remittance,
+    matched: countsResult.matched,
+    partially_paid: countsResult.partially_paid,
+    unpaid: countsResult.unpaid,
   };
 
   return {
