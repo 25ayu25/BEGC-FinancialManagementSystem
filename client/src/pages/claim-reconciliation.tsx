@@ -241,6 +241,24 @@ const MAX_CARDS_DEFAULT = 6;  // Issue 3: Show max 6 cards by default
 const HISTORY_DEFAULT_MONTH_START = 1;  // January
 const HISTORY_DEFAULT_MONTH_END = 4;    // April
 
+// Animation configuration for card entrance animations
+const CARD_ANIMATION_CONFIG = {
+  duration: 0.3,
+  ease: [0.22, 1, 0.36, 1] as const,
+  staggerDelay: 0.05,
+} as const;
+
+/**
+ * Generate animation transition config with optional delay
+ */
+function getCardTransition(index: number = 0) {
+  return {
+    duration: CARD_ANIMATION_CONFIG.duration,
+    delay: index * CARD_ANIMATION_CONFIG.staggerDelay,
+    ease: CARD_ANIMATION_CONFIG.ease,
+  };
+}
+
 function formatPeriodLabel(year: number, month: number): string {
   return formatPeriod(year, month);
 }
@@ -2242,11 +2260,7 @@ export default function ClaimReconciliation() {
                       key={i}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: i * 0.05,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
+                      transition={getCardTransition(i)}
                     >
                       <MetricCardSkeleton />
                     </motion.div>
@@ -2258,11 +2272,7 @@ export default function ClaimReconciliation() {
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: 0,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={getCardTransition(0)}
                     type="button"
                     onClick={() => {
                       if (stats.latestRunId) {
@@ -2289,11 +2299,7 @@ export default function ClaimReconciliation() {
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: 0.05,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={getCardTransition(1)}
                     type="button"
                     onClick={() => {
                       setShowInventory(true);
@@ -2318,11 +2324,7 @@ export default function ClaimReconciliation() {
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: 0.10,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={getCardTransition(2)}
                     type="button"
                     onClick={() => handleDrillDownToInventory('all', 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
@@ -2342,11 +2344,7 @@ export default function ClaimReconciliation() {
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: 0.15,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={getCardTransition(3)}
                     type="button"
                     onClick={() => handleDrillDownToInventory('matched', 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
@@ -2366,11 +2364,7 @@ export default function ClaimReconciliation() {
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: 0.20,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={getCardTransition(4)}
                     type="button"
                     onClick={() => handleDrillDownToInventory('partially_paid', 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
@@ -2403,11 +2397,7 @@ export default function ClaimReconciliation() {
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: 0.25,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={getCardTransition(5)}
                     type="button"
                     onClick={() => handleDrillDownToInventory('awaiting_remittance', 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
@@ -2619,11 +2609,7 @@ export default function ClaimReconciliation() {
                           key={i}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{
-                            duration: 0.3,
-                            delay: i * 0.05,
-                            ease: [0.22, 1, 0.36, 1],
-                          }}
+                          transition={getCardTransition(i)}
                         >
                           <PeriodCardSkeleton />
                         </motion.div>
@@ -2667,11 +2653,7 @@ export default function ClaimReconciliation() {
                       key={`${period.periodYear}-${period.periodMonth}`}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: idx * 0.05,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
+                      transition={getCardTransition(idx)}
                     >
                       <div
                         onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}

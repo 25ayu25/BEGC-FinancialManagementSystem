@@ -525,6 +525,19 @@ body {
   }
 }
 
+/* Apply shimmer animation with accessibility support */
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-shimmer {
+    animation: skeleton-shimmer 2s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
+}
+
 /* Fade in and slide up animation */
 @keyframes fadeInUp {
   from {
