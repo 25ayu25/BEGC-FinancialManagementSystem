@@ -790,6 +790,45 @@ export default function ClaimReconciliation() {
     enabled: showInventory,
   });
 
+  // Query for unfiltered total (used when status filter is active to show "Showing X of Y")
+  // This query only runs when we need the unfiltered total for display
+  const { data: unfilteredInventory } = useQuery<ClaimsInventoryResponse>({
+    queryKey: [
+      "/api/claim-reconciliation/claims-unfiltered",
+      providerName,
+      inventoryYearFilter,
+      inventoryMonthFilter,
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        providerName,
+        page: "1",
+        limit: "1", // We only need the summary, not the actual claims
+      });
+
+      // Apply year/month filters but NOT status filter
+      if (inventoryYearFilter !== null) {
+        params.append("year", String(inventoryYearFilter));
+      }
+      
+      if (inventoryMonthFilter !== null) {
+        params.append("month", String(inventoryMonthFilter));
+      }
+
+      const url = new URL(`/api/claim-reconciliation/claims?${params.toString()}`, API_BASE_URL).toString();
+
+      const headers: HeadersInit = {};
+      const backup = readSessionBackup();
+      if (backup) headers["x-session-token"] = backup;
+
+      const response = await fetch(url, { method: "GET", credentials: "include", headers });
+      if (!response.ok) throw new Error("Failed to fetch unfiltered claims count");
+      return response.json();
+    },
+    enabled: showInventory && inventoryStatusFilter !== "all",
+    staleTime: 10000, // Cache for 10 seconds to reduce API calls
+  });
+
   // Query for available years and months (for Year/Month filter dropdowns)
   const { data: availablePeriods } = useQuery<AvailablePeriodsResponse>({
     queryKey: ["/api/claim-reconciliation/available-periods", providerName],
@@ -884,12 +923,33 @@ export default function ClaimReconciliation() {
   const inventorySummaryStats = useMemo(() => {
     // Primary: Use summary from API response (server-side calculation)
     if (claimsInventory?.summary) {
+      // When a status filter is active, use unfiltered total for "TOTAL CLAIMS"
+      // but keep individual category counts from the filtered result
+      const unfilteredTotal = inventoryStatusFilter !== "all" && unfilteredInventory?.summary
+        ? unfilteredInventory.summary.total
+        : claimsInventory.summary.total;
+
+      // For category counts, always use the unfiltered values
+      // to ensure they represent the actual distribution
+      const categoryStats = inventoryStatusFilter !== "all" && unfilteredInventory?.summary
+        ? {
+            awaiting: unfilteredInventory.summary.awaiting_remittance,
+            matched: unfilteredInventory.summary.matched,
+            unpaid: unfilteredInventory.summary.unpaid,
+            partial: unfilteredInventory.summary.partially_paid,
+          }
+        : {
+            awaiting: claimsInventory.summary.awaiting_remittance,
+            matched: claimsInventory.summary.matched,
+            unpaid: claimsInventory.summary.unpaid,
+            partial: claimsInventory.summary.partially_paid,
+          };
+
       return {
-        total: claimsInventory.summary.total,
-        awaiting: claimsInventory.summary.awaiting_remittance,
-        matched: claimsInventory.summary.matched,
-        unpaid: claimsInventory.summary.unpaid,
-        partial: claimsInventory.summary.partially_paid,
+        total: unfilteredTotal,
+        ...categoryStats,
+        // Track filtered count separately for "Showing X of Y" display
+        filteredTotal: inventoryStatusFilter !== "all" ? claimsInventory.summary.total : unfilteredTotal,
       };
     }
 
@@ -898,7 +958,7 @@ export default function ClaimReconciliation() {
     // 1. Claims Inventory is collapsed (showInventory=false, so claimsInventory is undefined)
     // 2. API request fails or is pending
     if (!periodsSummary || periodsSummary.length === 0) {
-      return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0 };
+      return { total: 0, awaiting: 0, matched: 0, unpaid: 0, partial: 0, filteredTotal: 0 };
     }
 
     // Filter periods based on year/month filters
@@ -912,14 +972,17 @@ export default function ClaimReconciliation() {
       filteredPeriods = filteredPeriods.filter(p => p.periodMonth === inventoryMonthFilter);
     }
 
+    const total = filteredPeriods.reduce((sum, p) => sum + p.totalClaims, 0);
+
     return {
-      total: filteredPeriods.reduce((sum, p) => sum + p.totalClaims, 0),
+      total,
       awaiting: filteredPeriods.reduce((sum, p) => sum + p.awaitingRemittance, 0),
       matched: filteredPeriods.reduce((sum, p) => sum + p.matched, 0),
       unpaid: filteredPeriods.reduce((sum, p) => sum + p.unpaid, 0),
       partial: filteredPeriods.reduce((sum, p) => sum + p.partiallyPaid, 0),
+      filteredTotal: total,
     };
-  }, [claimsInventory, periodsSummary, inventoryYearFilter, inventoryMonthFilter]);
+  }, [claimsInventory, unfilteredInventory, periodsSummary, inventoryYearFilter, inventoryMonthFilter, inventoryStatusFilter]);
 
   // Generate a human-readable label for the current inventory filter selection
   const inventoryPeriodLabel = useMemo(() => {
@@ -3583,28 +3646,72 @@ export default function ClaimReconciliation() {
               )}
 
               {!summaryLoading && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Claims</div>
-                    <div className="text-2xl font-bold text-slate-900">{formatNumber(inventorySummaryStats.total)}</div>
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
+                    <div 
+                      className="space-y-1 p-3 rounded-lg transition-all duration-200 hover:bg-slate-100 hover:scale-105 hover:shadow-md cursor-default"
+                      title="Total claims count (unfiltered)"
+                    >
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Claims</div>
+                      <div className="text-2xl font-bold text-slate-900">{formatNumber(inventorySummaryStats.total)}</div>
+                    </div>
+                    <div 
+                      className="space-y-1 p-3 rounded-lg transition-all duration-200 hover:bg-sky-100 hover:scale-105 hover:shadow-md cursor-pointer"
+                      onClick={() => {
+                        setInventoryStatusFilter("awaiting_remittance");
+                        setInventoryPage(1);
+                      }}
+                      title="Click to filter by Pending Remittance"
+                    >
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
+                      <div className="text-2xl font-bold text-sky-400">{formatNumber(inventorySummaryStats.awaiting)}</div>
+                    </div>
+                    <div 
+                      className="space-y-1 p-3 rounded-lg transition-all duration-200 hover:bg-emerald-100 hover:scale-105 hover:shadow-md cursor-pointer"
+                      onClick={() => {
+                        setInventoryStatusFilter("matched");
+                        setInventoryPage(1);
+                      }}
+                      title="Click to filter by Paid in Full"
+                    >
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid in full</div>
+                      <div className="text-2xl font-bold text-emerald-400">{formatNumber(inventorySummaryStats.matched)}</div>
+                    </div>
+                    <div 
+                      className="space-y-1 p-3 rounded-lg transition-all duration-200 hover:bg-amber-100 hover:scale-105 hover:shadow-md cursor-pointer"
+                      onClick={() => {
+                        setInventoryStatusFilter("partially_paid");
+                        setInventoryPage(1);
+                      }}
+                      title="Click to filter by Paid Partially"
+                    >
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid partially</div>
+                      <div className="text-2xl font-bold text-amber-400">{formatNumber(inventorySummaryStats.partial)}</div>
+                    </div>
+                    <div 
+                      className="space-y-1 p-3 rounded-lg transition-all duration-200 hover:bg-rose-100 hover:scale-105 hover:shadow-md cursor-pointer"
+                      onClick={() => {
+                        setInventoryStatusFilter("unpaid");
+                        setInventoryPage(1);
+                      }}
+                      title="Click to filter by Not Paid"
+                    >
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Not paid (0 paid)</div>
+                      <div className="text-2xl font-bold text-rose-400">{formatNumber(inventorySummaryStats.unpaid)}</div>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pending remittance</div>
-                    <div className="text-2xl font-bold text-sky-400">{formatNumber(inventorySummaryStats.awaiting)}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid in full</div>
-                    <div className="text-2xl font-bold text-emerald-400">{formatNumber(inventorySummaryStats.matched)}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Paid partially</div>
-                    <div className="text-2xl font-bold text-amber-400">{formatNumber(inventorySummaryStats.partial)}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Not paid (0 paid)</div>
-                    <div className="text-2xl font-bold text-rose-400">{formatNumber(inventorySummaryStats.unpaid)}</div>
-                  </div>
-                </div>
+
+                  {/* "Showing X of Y claims" indicator when status filter is active */}
+                  {inventoryStatusFilter !== "all" && inventorySummaryStats.filteredTotal !== inventorySummaryStats.total && (
+                    <div className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                      <p className="text-sm font-medium text-blue-900">
+                        Showing <span className="font-bold">{formatNumber(inventorySummaryStats.filteredTotal)}</span> of{" "}
+                        <span className="font-bold">{formatNumber(inventorySummaryStats.total)}</span> claims
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {inventoryLoading ? (
