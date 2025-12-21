@@ -96,8 +96,9 @@ export function UserProfileMenu({ userName, userRole }: UserProfileMenuProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent 
           align="end" 
-          className="w-56 bg-slate-800 border-slate-700 text-white"
+          side="top"
           sideOffset={8}
+          className="w-56 bg-slate-800 border-slate-700 text-white"
         >
           <div className="px-3 py-2">
             <p className="text-sm font-medium text-white">{displayName}</p>
