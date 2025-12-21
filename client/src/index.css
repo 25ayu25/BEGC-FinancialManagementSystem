@@ -514,3 +514,96 @@ body {
     background-color: rgba(34, 197, 94, 0.1); 
   }
 }
+
+/* Skeleton shimmer animation */
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Apply shimmer animation with accessibility support */
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-shimmer {
+    animation: skeleton-shimmer 2s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
+}
+
+/* Fade in and slide up animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Success checkmark draw animation */
+@keyframes checkmarkDraw {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Success celebration scale animation */
+@keyframes successScale {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Disable complex animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer,
+  *[class*="animate-"],
+  *[class*="transition-"] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  /* Completely disable specific animations */
+  @keyframes fadeInUp {
+    from, to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes checkmarkDraw {
+    from, to {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  @keyframes successScale {
+    from, to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+}
+
