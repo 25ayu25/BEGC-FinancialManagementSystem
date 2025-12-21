@@ -814,7 +814,7 @@ export default function ClaimReconciliation() {
     }
   }, [location]); // Re-run when location changes
 
-  // Initialize inventory filters to current year/month when opening Claims Inventory
+  // Initialize inventory filters to current year with "All months" when opening Claims Inventory
   useEffect(() => {
     // Don't override user's manual filter selections
     if (didUserTouchInventoryFilters.current) return;
@@ -822,44 +822,22 @@ export default function ClaimReconciliation() {
     // Only initialize when Claims Inventory is opened and we have available periods data
     if (!showInventory || !availablePeriods) return;
     
-    // Helper function to set filters and reset page
-    const setFilters = (year: number, month: number) => {
-      setInventoryYearFilter(year);
-      setInventoryMonthFilter(month);
-      setInventoryPage(1);
-    };
-    
-    // Try to set current year and month if available
+    // Set filters to current year and All months (null)
+    // If current year is available, use it; otherwise use the newest year
     if (availablePeriods.years.includes(currentYear)) {
-      const monthsForCurrentYear = availablePeriods.monthsByYear[currentYear] || [];
-      
-      if (monthsForCurrentYear.includes(currentMonth)) {
-        // Current year and month are available
-        setFilters(currentYear, currentMonth);
-        return;
-      }
-      
-      // Current year exists but not current month - use current year with newest month
-      if (monthsForCurrentYear.length > 0) {
-        const newestMonth = Math.max(...monthsForCurrentYear);
-        setFilters(currentYear, newestMonth);
-        return;
-      }
-    }
-    
-    // Current year not available - fallback to newest available year and month
-    if (availablePeriods.years.length > 0) {
+      setInventoryYearFilter(currentYear);
+      setInventoryMonthFilter(null); // All months
+      setInventoryPage(1);
+    } else if (availablePeriods.years.length > 0) {
+      // Fallback to newest available year with All months
       const newestYear = Math.max(...availablePeriods.years);
-      const monthsForNewestYear = availablePeriods.monthsByYear[newestYear] || [];
-      
-      if (monthsForNewestYear.length > 0) {
-        const newestMonth = Math.max(...monthsForNewestYear);
-        setFilters(newestYear, newestMonth);
-      }
+      setInventoryYearFilter(newestYear);
+      setInventoryMonthFilter(null); // All months
+      setInventoryPage(1);
     }
-    // Note: currentYear and currentMonth are stable values (captured at mount),
+    // Note: currentYear is a stable value (captured at mount),
     // but included in deps for ESLint exhaustive-deps rule compliance
-  }, [showInventory, availablePeriods, currentYear, currentMonth]);
+  }, [showInventory, availablePeriods, currentYear]);
 
   const inventorySummaryStats = useMemo(() => {
     // Primary: Use summary from API response (server-side calculation)
@@ -1823,7 +1801,21 @@ export default function ClaimReconciliation() {
     year: 'all' | number,
     month: 'all' | number
   ) => {
-    // Build URL params for drill-down intent
+    // Mark that user touched filters (prevent default override)
+    didUserTouchInventoryFilters.current = true;
+    
+    // Set filter states directly
+    setInventoryStatusFilter(status);
+    setInventoryYearFilter(year === 'all' ? null : year);
+    setInventoryMonthFilter(month === 'all' ? null : month);
+    
+    // Open Claims Inventory section
+    setShowInventory(true);
+    
+    // Reset to first page
+    setInventoryPage(1);
+    
+    // Build URL params for drill-down intent (deep-linking support)
     const params = new URLSearchParams();
     params.set('inventoryStatus', status);
     params.set('inventoryYear', String(year));
