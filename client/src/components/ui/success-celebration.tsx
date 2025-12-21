@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ export function SuccessCelebration({
   message = "Success!",
 }: SuccessCelebrationProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (show) {
@@ -51,14 +52,18 @@ export function SuccessCelebration({
 
           {/* Success card */}
           <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 25,
-            }}
+            initial={prefersReducedMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { scale: 1, opacity: 1 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { scale: 0.8, opacity: 0 }}
+            transition={
+              prefersReducedMotion
+                ? { duration: 0.2 }
+                : {
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 25,
+                  }
+            }
             className="relative z-10 bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-4"
             role="dialog"
             aria-modal="true"
@@ -123,8 +128,10 @@ export function SuccessCelebration({
               </motion.div>
 
               {/* Confetti particles (lightweight - reduced to 12 for performance) */}
-              <div className="absolute inset-0 pointer-events-none">
-                {Array.from({ length: 12 }).map((_, i) => (
+              {/* Only show confetti if user hasn't requested reduced motion */}
+              {!prefersReducedMotion && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {Array.from({ length: 12 }).map((_, i) => (
                   <motion.div
                     key={i}
                     initial={{
@@ -158,6 +165,7 @@ export function SuccessCelebration({
                   />
                 ))}
               </div>
+              )}
             </div>
           </motion.div>
         </motion.div>
@@ -176,6 +184,7 @@ export function SuccessToast({
   message = "Success!",
 }: SuccessCelebrationProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (show) {
@@ -192,9 +201,9 @@ export function SuccessToast({
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          initial={{ opacity: 0, y: -50, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -50, scale: 0.9 }}
+          animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.95 }}
           transition={{
             type: "spring",
             stiffness: 400,

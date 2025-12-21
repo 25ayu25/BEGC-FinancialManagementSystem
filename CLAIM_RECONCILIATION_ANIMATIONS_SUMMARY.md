@@ -87,10 +87,11 @@ Created two variants:
    - Animated white card with shadow
    - Large checkmark icon (12x12) with green gradient background
    - Pulsing glow effect behind checkmark
-   - 20 lightweight confetti particles with:
+   - 12 lightweight confetti particles with:
      - Random trajectories
      - Color variation (emerald, amber, orange)
      - Fade out animation
+     - Optimized count for performance on low-end devices
    - Success message with title and description
    - Auto-dismisses after 2 seconds
 
