@@ -95,7 +95,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 h-screen bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 h-dvh bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         data-testid="sidebar-navigation"
@@ -129,7 +129,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </div>
 
         {/* Scrollable menu area */}
-        <nav className="flex-1 overflow-y-auto px-4 pb-4 pt-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-4 pt-4 space-y-1" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 16px))' }}>
           {/* Navigation items before Insurance group */}
           {navigationBefore.map((item) => {
             const isActive = location === item.href;
