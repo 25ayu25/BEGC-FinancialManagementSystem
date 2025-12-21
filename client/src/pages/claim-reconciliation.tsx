@@ -2456,7 +2456,7 @@ export default function ClaimReconciliation() {
                 <div>
                   <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                     <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
-                    Your Claim Periods
+                    Claim Periods
                   </CardTitle>
                   <CardDescription className="mt-1 text-slate-600">Click a period card to set the active month/year.</CardDescription>
                 </div>
