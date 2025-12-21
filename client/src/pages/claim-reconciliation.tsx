@@ -794,10 +794,11 @@ export default function ClaimReconciliation() {
   // This query only runs when we need the unfiltered total for display
   const { data: unfilteredInventory } = useQuery<ClaimsInventoryResponse>({
     queryKey: [
-      "/api/claim-reconciliation/claims-unfiltered",
+      "/api/claim-reconciliation/claims",
       providerName,
       inventoryYearFilter,
       inventoryMonthFilter,
+      "unfiltered", // Add marker to distinguish from filtered query
     ],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -924,13 +925,13 @@ export default function ClaimReconciliation() {
     // Primary: Use summary from API response (server-side calculation)
     if (claimsInventory?.summary) {
       // When a status filter is active, use unfiltered total for "TOTAL CLAIMS"
-      // but keep individual category counts from the filtered result
+      // When no status filter, use the current summary (which is already unfiltered)
       const unfilteredTotal = inventoryStatusFilter !== "all" && unfilteredInventory?.summary
         ? unfilteredInventory.summary.total
         : claimsInventory.summary.total;
 
-      // For category counts, always use the unfiltered values
-      // to ensure they represent the actual distribution
+      // For category counts, always show the unfiltered distribution
+      // This ensures counts match reality regardless of which status filter is active
       const categoryStats = inventoryStatusFilter !== "all" && unfilteredInventory?.summary
         ? {
             awaiting: unfilteredInventory.summary.awaiting_remittance,
@@ -3649,7 +3650,7 @@ export default function ClaimReconciliation() {
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
                     <div 
-                      className="space-y-1 p-3 rounded-lg transition-all duration-200 hover:bg-slate-100 hover:scale-105 hover:shadow-md cursor-default"
+                      className="space-y-1 p-3 rounded-lg transition-all duration-200"
                       title="Total claims count (unfiltered)"
                     >
                       <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Claims</div>
