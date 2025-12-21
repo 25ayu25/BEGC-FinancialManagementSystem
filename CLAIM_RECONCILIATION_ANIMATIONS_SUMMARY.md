@@ -195,7 +195,8 @@ All animations disable or reduce motion when user has motion sensitivity prefere
 - ✅ 60fps animations using `transform` and `opacity`
 - ✅ No layout recalculations during animations
 - ✅ Spring animations use hardware acceleration
-- ✅ Confetti particles limited to 20 (lightweight)
+- ✅ Confetti particles optimized to 12 (lightweight, better performance)
+- ✅ Confetti disabled for users with reduced motion preference
 - ✅ Animations auto-cleanup after completion
 
 ## 🎨 Design Principles Applied
