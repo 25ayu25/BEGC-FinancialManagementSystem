@@ -60,6 +60,10 @@ export function SuccessCelebration({
               damping: 25,
             }}
             className="relative z-10 bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="success-title"
+            aria-describedby="success-description"
           >
             {/* Animated checkmark circle */}
             <div className="flex flex-col items-center gap-4">
@@ -110,17 +114,17 @@ export function SuccessCelebration({
                 transition={{ delay: 0.3 }}
                 className="text-center"
               >
-                <h3 className="text-xl font-bold text-slate-800 mb-1">
+                <h3 id="success-title" className="text-xl font-bold text-slate-800 mb-1">
                   {message}
                 </h3>
-                <p className="text-sm text-slate-600">
+                <p id="success-description" className="text-sm text-slate-600">
                   Reconciliation completed successfully
                 </p>
               </motion.div>
 
-              {/* Confetti particles (lightweight) */}
+              {/* Confetti particles (lightweight - reduced to 12 for performance) */}
               <div className="absolute inset-0 pointer-events-none">
-                {Array.from({ length: 20 }).map((_, i) => (
+                {Array.from({ length: 12 }).map((_, i) => (
                   <motion.div
                     key={i}
                     initial={{

@@ -23,6 +23,8 @@ export function SkeletonCard({ className }: SkeletonCardProps) {
         "premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90 p-6 space-y-4",
         className
       )}
+      role="status"
+      aria-label="Loading content"
     >
       {/* Card header skeleton */}
       <div className="space-y-2">
@@ -55,7 +57,11 @@ export function SkeletonCard({ className }: SkeletonCardProps) {
  */
 export function MetricCardSkeleton() {
   return (
-    <div className="premium-card border border-slate-200/30 shadow-xl backdrop-blur-sm bg-white/90 p-6 space-y-3">
+    <div 
+      className="premium-card border border-slate-200/30 shadow-xl backdrop-blur-sm bg-white/90 p-6 space-y-3"
+      role="status"
+      aria-label="Loading metric"
+    >
       {/* Icon placeholder */}
       <div className="h-12 w-12 bg-slate-200 rounded-xl relative overflow-hidden">
         <ShimmerEffect />
@@ -84,7 +90,11 @@ export function MetricCardSkeleton() {
  */
 export function PeriodCardSkeleton() {
   return (
-    <div className="premium-card border border-slate-200/30 shadow-xl backdrop-blur-sm bg-white/90 p-6 space-y-4">
+    <div 
+      className="premium-card border border-slate-200/30 shadow-xl backdrop-blur-sm bg-white/90 p-6 space-y-4"
+      role="status"
+      aria-label="Loading period"
+    >
       {/* Period label skeleton */}
       <div className="h-6 bg-slate-200 rounded-md w-2/5 relative overflow-hidden">
         <ShimmerEffect />
@@ -138,7 +148,11 @@ export function TableRowSkeleton({ columns = 6 }: { columns?: number }) {
  */
 export function TableSkeleton({ rows = 5, columns = 6 }: { rows?: number; columns?: number }) {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-200/50">
+    <div 
+      className="w-full overflow-x-auto rounded-xl border border-slate-200/50"
+      role="status"
+      aria-label="Loading table data"
+    >
       <table className="w-full">
         <thead className="bg-slate-50">
           <tr className="border-b border-slate-200">

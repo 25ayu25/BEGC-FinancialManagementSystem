@@ -249,7 +249,21 @@ const CARD_ANIMATION_CONFIG = {
 } as const;
 
 /**
- * Generate animation transition config with optional delay
+ * Generate animation transition config with stagger delay
+ * 
+ * Creates a consistent transition object for card entrance animations with
+ * a staggered delay based on the card's index in the list.
+ * 
+ * @param index - Zero-based index of the card (default: 0)
+ * @returns Transition config object compatible with Framer Motion
+ * 
+ * @example
+ * // First card (no delay)
+ * transition={getCardTransition(0)}
+ * 
+ * @example
+ * // Third card (100ms delay: 2 * 50ms)
+ * transition={getCardTransition(2)}
  */
 function getCardTransition(index: number = 0) {
   return {
