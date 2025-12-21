@@ -102,6 +102,13 @@ import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
 import { ReconciliationStepper } from "@/components/ui/reconciliation-stepper";
 import { formatDate, formatPeriod } from "@/lib/dateFormat";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  MetricCardSkeleton,
+  PeriodCardSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton-card";
+import { SuccessCelebration } from "@/components/ui/success-celebration";
 
 /* -------------------------------------------------------------------------- */
 /* Types */
@@ -545,6 +552,9 @@ export default function ClaimReconciliation() {
 
   // Requirement 3: History view toggle - "last_4_months" vs "all_months"
   const [historyViewMode, setHistoryViewMode] = useState<"last_4_months" | "all_months">("last_4_months");
+
+  // Success celebration state
+  const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
@@ -1091,6 +1101,9 @@ export default function ClaimReconciliation() {
       const summary = `${reconciliation.totalClaims} claims, ${reconciliation.autoMatched} matched, ${reconciliation.partialMatched} partial, ${unpaidCount} unpaid`;
 
       toast({ title: "Reconciliation complete", description: summary });
+
+      // Show success celebration animation
+      setShowSuccessCelebration(true);
 
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/runs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/claim-reconciliation/period"] });
@@ -2221,134 +2234,196 @@ export default function ClaimReconciliation() {
               </div>
 
               {/* 2×3 Grid of KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                {/* Remittance Uploads */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (stats.latestRunId) {
-                      setSelectedRunId(stats.latestRunId);
+              {summaryLoading ? (
+                // Skeleton loading state
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.3,
+                        delay: i * 0.05,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                    >
+                      <MetricCardSkeleton />
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                  {/* Remittance Uploads */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: 0,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    type="button"
+                    onClick={() => {
+                      if (stats.latestRunId) {
+                        setSelectedRunId(stats.latestRunId);
+                        setTimeout(() => {
+                          document.getElementById("claims-details-section")?.scrollIntoView({ behavior: "smooth" });
+                        }, 100);
+                      }
+                    }}
+                    className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
+                        <CheckCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Remittance Uploads</p>
+                    <p className="text-3xl font-bold text-slate-900 mb-1">{stats.paymentStatementUploads}</p>
+                    <p className="text-xs text-slate-500">Latest: {stats.lastPeriodLabel}</p>
+                  </motion.button>
+
+                  {/* Claim Periods Uploaded */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: 0.05,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    type="button"
+                    onClick={() => {
+                      setShowInventory(true);
                       setTimeout(() => {
-                        document.getElementById("claims-details-section")?.scrollIntoView({ behavior: "smooth" });
+                        document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
                       }, 100);
-                    }
-                  }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
-                      <CheckCircle className="w-6 h-6 text-white" />
+                    }}
+                    className="group relative overflow-hidden rounded-xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
+                        <Calculator className="w-6 h-6 text-white" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Remittance Uploads</p>
-                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.paymentStatementUploads}</p>
-                  <p className="text-xs text-slate-500">Latest: {stats.lastPeriodLabel}</p>
-                </button>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Claim Periods</p>
+                    <p className="text-3xl font-bold text-slate-900 mb-1">{stats.claimMonthsUploaded}</p>
+                    <p className="text-xs text-slate-500">Unique months uploaded</p>
+                  </motion.button>
 
-                {/* Claim Periods Uploaded */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowInventory(true);
-                    setTimeout(() => {
-                      document.getElementById("exceptions-section")?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-purple-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
-                      <Calculator className="w-6 h-6 text-white" />
+                  {/* Total Claims Uploaded */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: 0.10,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    type="button"
+                    onClick={() => handleDrillDownToInventory('all', 'all', 'all')}
+                    className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
+                        <FileStack className="w-6 h-6 text-white" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Claim Periods</p>
-                  <p className="text-3xl font-bold text-slate-900 mb-1">{stats.claimMonthsUploaded}</p>
-                  <p className="text-xs text-slate-500">Unique months uploaded</p>
-                </button>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Claims</p>
+                    <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.totalClaims)}</p>
+                    <p className="text-xs text-slate-500">Uploaded across all periods</p>
+                  </motion.button>
 
-                {/* Total Claims Uploaded */}
-                <button
-                  type="button"
-                  onClick={() => handleDrillDownToInventory('all', 'all', 'all')}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
-                      <FileStack className="w-6 h-6 text-white" />
+                  {/* Paid in Full */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: 0.15,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    type="button"
+                    onClick={() => handleDrillDownToInventory('matched', 'all', 'all')}
+                    className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
+                        <CheckCircle2 className="w-6 h-6 text-white" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Claims</p>
-                  <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.totalClaims)}</p>
-                  <p className="text-xs text-slate-500">Uploaded across all periods</p>
-                </button>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paid in Full</p>
+                    <p className="text-3xl font-bold text-emerald-600 mb-1">{formatNumber(stats.paidInFull)}</p>
+                    <p className="text-xs text-slate-500">Claims fully reconciled</p>
+                  </motion.button>
 
-                {/* Paid in Full */}
-                <button
-                  type="button"
-                  onClick={() => handleDrillDownToInventory('matched', 'all', 'all')}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
-                      <CheckCircle2 className="w-6 h-6 text-white" />
+                  {/* Follow-up Needed */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: 0.20,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    type="button"
+                    onClick={() => handleDrillDownToInventory('partially_paid', 'all', 'all')}
+                    className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
+                        <AlertTriangle className="w-6 h-6 text-white" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paid in Full</p>
-                  <p className="text-3xl font-bold text-emerald-600 mb-1">{formatNumber(stats.paidInFull)}</p>
-                  <p className="text-xs text-slate-500">Claims fully reconciled</p>
-                </button>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Follow-up Needed</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs font-semibold mb-1">What's included:</p>
+                            <p className="text-xs">Follow-up = Paid partially + Not paid (0 paid) + Manual review</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="text-3xl font-bold text-orange-600 mb-1">{formatNumber(stats.followUpNeeded)}</p>
+                    <p className="text-xs text-slate-500">Partial/unpaid claims</p>
+                  </motion.button>
 
-                {/* Follow-up Needed */}
-                <button
-                  type="button"
-                  onClick={() => handleDrillDownToInventory('partially_paid', 'all', 'all')}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
-                      <AlertTriangle className="w-6 h-6 text-white" />
+                  {/* Pending Remittance */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: 0.25,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    type="button"
+                    onClick={() => handleDrillDownToInventory('awaiting_remittance', 'all', 'all')}
+                    className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
+                        <Clock className="w-6 h-6 text-white" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
-                  </div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Follow-up Needed</p>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="text-xs font-semibold mb-1">What's included:</p>
-                          <p className="text-xs">Follow-up = Paid partially + Not paid (0 paid) + Manual review</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <p className="text-3xl font-bold text-orange-600 mb-1">{formatNumber(stats.followUpNeeded)}</p>
-                  <p className="text-xs text-slate-500">Partial/unpaid claims</p>
-                </button>
-
-                {/* Pending Remittance */}
-                <button
-                  type="button"
-                  onClick={() => handleDrillDownToInventory('awaiting_remittance', 'all', 'all')}
-                  className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform duration-200">
-                      <Clock className="w-6 h-6 text-white" />
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors duration-200" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Pending Remittance</p>
-                  <p className="text-3xl font-bold text-sky-600 mb-1">{formatNumber(stats.waitingForPaymentStatement)}</p>
-                  <p className="text-xs text-slate-500">Awaiting remittance data</p>
-                </button>
-              </div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Pending Remittance</p>
+                    <p className="text-3xl font-bold text-sky-600 mb-1">{formatNumber(stats.waitingForPaymentStatement)}</p>
+                    <p className="text-xs text-slate-500">Awaiting remittance data</p>
+                  </motion.button>
+                </div>
+              )}
 
               {/* Outstanding Total - Subtle Summary Bar */}
               <div className="mt-6 px-6 py-4 bg-gradient-to-r from-slate-50/80 via-slate-100/80 to-slate-50/80 rounded-2xl border border-slate-200/60 shadow-inner">
@@ -2536,8 +2611,27 @@ export default function ClaimReconciliation() {
 
               {viewMode === "cards" ? (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredPeriods.map((period) => {
+                  {summaryLoading ? (
+                    // Skeleton loading for period cards
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            duration: 0.3,
+                            delay: i * 0.05,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        >
+                          <PeriodCardSkeleton />
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredPeriods.map((period, idx) => {
                   const isActive =
                     period.periodYear === parseInt(periodYear, 10) &&
                     period.periodMonth === parseInt(periodMonth, 10);
@@ -2569,16 +2663,25 @@ export default function ClaimReconciliation() {
                     : "0";
 
                   return (
-                    <div
+                    <motion.div
                       key={`${period.periodYear}-${period.periodMonth}`}
-                      onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
-                      className={cn(
-                        "premium-card interactive-card group relative overflow-hidden p-6 cursor-pointer",
-                        isActive
-                          ? "border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/80 shadow-2xl shadow-orange-200/50 ring-2 ring-orange-300/20"
-                          : "border-l-4 border-l-slate-200 hover:border-l-orange-400"
-                      )}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.3,
+                        delay: idx * 0.05,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
                     >
+                      <div
+                        onClick={() => handleSelectPeriodCard(period.periodYear, period.periodMonth)}
+                        className={cn(
+                          "premium-card interactive-card group relative overflow-hidden p-6 cursor-pointer",
+                          isActive
+                            ? "border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/80 shadow-2xl shadow-orange-200/50 ring-2 ring-orange-300/20"
+                            : "border-l-4 border-l-slate-200 hover:border-l-orange-400"
+                        )}
+                      >
                       {/* Subtle gradient overlay on hover */}
                       <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                       
@@ -2792,9 +2895,11 @@ export default function ClaimReconciliation() {
                           : "bg-gradient-to-r from-transparent via-slate-300/50 to-transparent group-hover:via-orange-500/50"
                       )} />
                     </div>
-                  );
-                })}
-              </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
               
               {/* Show "View all X periods" button when more than 6 exist and not expanded */}
               {/* Show "Show less" button when expanded */}
@@ -3507,7 +3612,7 @@ export default function ClaimReconciliation() {
               )}
 
               {inventoryLoading ? (
-                <p className="text-muted-foreground py-6 text-sm">Loading claims inventory…</p>
+                <TableSkeleton rows={10} columns={7} />
               ) : !claimsInventory || claimsInventory.claims.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -3708,7 +3813,7 @@ export default function ClaimReconciliation() {
             )}
 
             {runsLoading ? (
-              <p className="text-muted-foreground py-6 text-sm">Loading reconciliation runs…</p>
+              <TableSkeleton rows={5} columns={10} />
             ) : actualReconciliationRuns.length === 0 ? (
               <p className="text-muted-foreground py-6 text-sm">No reconciliation runs yet.</p>
             ) : filteredRuns.length === 0 ? (
@@ -4122,6 +4227,13 @@ export default function ClaimReconciliation() {
         )}
         </div>
       </div>
+
+      {/* Success Celebration Animation */}
+      <SuccessCelebration
+        show={showSuccessCelebration}
+        onComplete={() => setShowSuccessCelebration(false)}
+        message="Reconciliation Complete!"
+      />
     </TooltipProvider>
   );
 }
