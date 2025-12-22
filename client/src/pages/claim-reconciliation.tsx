@@ -1129,8 +1129,8 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   const annualSummary = useMemo(() => {
-    // Filter periods to selected year
-    const yearPeriods = periodsSummary.filter(p => p.periodYear === annualSummaryYear);
+    // Filter periods to selected year and provider
+    const yearPeriods = periodsSummary.filter(p => p.periodYear === annualSummaryYear && p.providerName === providerName);
     
     if (yearPeriods.length === 0) {
       return {
