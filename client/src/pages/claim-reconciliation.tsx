@@ -99,6 +99,7 @@ import {
   HelpCircle,
   TrendingUp,
   Calculator,
+  UserCheck,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -1884,7 +1885,7 @@ export default function ClaimReconciliation() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-2.5 py-1 text-xs font-semibold shadow-sm whitespace-nowrap inline-flex items-center gap-1 transition-all duration-200">
-                  <HelpCircle className="w-3 h-3" />
+                  <UserCheck className="w-3 h-3" />
                   {label}
                 </Badge>
               </TooltipTrigger>

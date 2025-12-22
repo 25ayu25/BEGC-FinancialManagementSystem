@@ -253,10 +253,15 @@ export function matchClaimsToRemittances(
     const key = `${member}|DATE:${date}|AMT:${cents}`;
     const bucket = claimsByDateAmountKey.get(key);
     
+    if (!bucket) continue; // No claims for this key
+    
+    // Filter out already matched claims from bucket
+    const unmatchedClaimsInBucket = bucket.filter(c => !matchedClaims.has(c.id));
+    
     // CRITICAL: Only match if there's EXACTLY ONE unmatched claim for this key
     // This enforces 1-to-1 matching and prevents ambiguous matches
-    if (bucket && bucket.length === 1 && !matchedClaims.has(bucket[0].id)) {
-      const matchedClaim = bucket[0];
+    if (unmatchedClaimsInBucket.length === 1) {
+      const matchedClaim = unmatchedClaimsInBucket[0];
       matchedClaims.add(matchedClaim.id);
       matchedRemittances.add(rem.id);
       
@@ -274,8 +279,8 @@ export function matchClaimsToRemittances(
         matchMethod: "date_amount",
       });
     }
-    // If bucket.length > 1, it's ambiguous - leave unmatched for manual review
-    // If bucket.length === 0 or claim already matched, skip
+    // If unmatchedClaimsInBucket.length > 1, it's ambiguous - leave unmatched for manual review
+    // If unmatchedClaimsInBucket.length === 0, all claims already matched - skip
   }
 
   // PHASE 3: Handle unmatched claims
