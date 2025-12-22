@@ -225,6 +225,9 @@ export const claimReconClaims = pgTable("claim_recon_claims", {
   status: varchar("status", { length: 32 }).notNull().default("awaiting_remittance"),
   amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).notNull().default("0"),
   remittanceLineId: integer("remittance_line_id"),
+  
+  // Match method tracking: "invoice", "date_amount", "manual", or null (unmatched)
+  matchMethod: varchar("match_method", { length: 32 }),
 
   compositeKey: varchar("composite_key", { length: 128 }).notNull(),
 
@@ -277,6 +280,8 @@ export const claimReconRunClaims = pgTable("claim_recon_run_claims", {
   matchedRemittanceId: integer("matched_remittance_id").references(() => claimReconRemittances.id, { onDelete: "set null" }),
   matchType: varchar("match_type", { length: 50 }), // 'exact', 'partial', 'unmatched'
   amountPaidInRun: decimal("amount_paid_in_run", { precision: 12, scale: 2 }).default("0"),
+  // Match method tracking: "invoice", "date_amount", "manual", or null (unmatched)
+  matchMethod: varchar("match_method", { length: 32 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   uniqueRunClaimIdx: uniqueIndex("idx_claim_recon_run_claims_run_id_claim_id").on(table.runId, table.claimId),

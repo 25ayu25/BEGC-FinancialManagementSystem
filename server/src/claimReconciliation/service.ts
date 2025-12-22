@@ -279,6 +279,7 @@ export async function performMatching(runId: number) {
         status: match.status,
         amountPaid: match.amountPaid.toString(),
         remittanceLineId: match.remittanceId,
+        matchMethod: match.matchMethod || null,
       })
       .where(eq(claimReconClaims.id, match.claimId));
 
@@ -309,6 +310,7 @@ export async function performMatching(runId: number) {
       matchedRemittanceId: match.remittanceId || null,
       matchType: match.matchType || "unmatched",
       amountPaidInRun: match.amountPaid.toString(),
+      matchMethod: match.matchMethod || null,
     };
   });
 
@@ -378,6 +380,7 @@ export async function getClaimsForRun(runId: number) {
       status: claimReconClaims.status,
       amountPaid: claimReconClaims.amountPaid,
       remittanceLineId: claimReconClaims.remittanceLineId,
+      matchMethod: claimReconClaims.matchMethod,
       compositeKey: claimReconClaims.compositeKey,
       runId: claimReconClaims.runId,
       providerName: claimReconClaims.providerName,
