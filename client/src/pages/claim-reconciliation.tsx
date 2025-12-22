@@ -62,6 +62,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 /* -------------------------------------------------------------------------- */
 /* Icons (lucide-react) */
@@ -86,6 +91,7 @@ import {
   LayoutGrid,
   Table as TableIcon,
   ChevronDown,
+  ChevronUp,
   Lightbulb,
   ArrowRight,
   Search,
@@ -138,6 +144,7 @@ interface ClaimDetail {
   amountPaid: string;
   status: string;
   currency?: string;
+  matchMethod?: "invoice" | "date_amount" | "manual" | null;
 }
 
 interface PeriodStatus {
@@ -342,6 +349,38 @@ function claimStatusGroup(status: string): "paid" | "waiting" | "follow_up" {
     case "submitted":
     default:
       return "waiting";
+  }
+}
+
+/**
+ * Match method label - explains how the claim was matched
+ */
+function matchMethodLabel(matchMethod: "invoice" | "date_amount" | "manual" | null | undefined): string {
+  switch (matchMethod) {
+    case "invoice":
+      return "Invoice";
+    case "date_amount":
+      return "Date+Amount";
+    case "manual":
+      return "Manual";
+    default:
+      return "Unmatched";
+  }
+}
+
+/**
+ * Match method tooltip - detailed explanation
+ */
+function matchMethodTooltip(matchMethod: "invoice" | "date_amount" | "manual" | null | undefined): string {
+  switch (matchMethod) {
+    case "invoice":
+      return "Automatically matched using member number + invoice/bill number (highest confidence)";
+    case "date_amount":
+      return "Automatically matched using member number + exact service date + exact amount (verified 1-to-1 match)";
+    case "manual":
+      return "Manually matched by staff";
+    default:
+      return "Not yet matched to a payment statement";
   }
 }
 
@@ -587,6 +626,9 @@ export default function ClaimReconciliation() {
 
   // Success celebration state
   const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
+
+  // Match method info card state
+  const [isMatchInfoOpen, setIsMatchInfoOpen] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
@@ -1775,6 +1817,92 @@ export default function ClaimReconciliation() {
     }
   };
 
+  /**
+   * Render match method badge with tooltip
+   */
+  const getMatchMethodBadge = (matchMethod: "invoice" | "date_amount" | "manual" | null | undefined) => {
+    const label = matchMethodLabel(matchMethod);
+    const tooltip = matchMethodTooltip(matchMethod);
+
+    if (!matchMethod) {
+      // Unmatched - gray badge
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge className="bg-slate-300 text-slate-700 hover:bg-slate-400 border-0 px-2.5 py-1 text-xs font-medium shadow-sm whitespace-nowrap inline-flex items-center gap-1 transition-all duration-200">
+                {label}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    switch (matchMethod) {
+      case "invoice":
+        // Invoice match - green (highest confidence)
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 border-0 px-2.5 py-1 text-xs font-semibold shadow-sm whitespace-nowrap inline-flex items-center gap-1 transition-all duration-200">
+                  <CheckCircle2 className="w-3 h-3" />
+                  {label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      case "date_amount":
+        // Date+Amount match - blue (verified match)
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="bg-blue-500 text-white hover:bg-blue-600 border-0 px-2.5 py-1 text-xs font-semibold shadow-sm whitespace-nowrap inline-flex items-center gap-1 transition-all duration-200">
+                  <Calculator className="w-3 h-3" />
+                  {label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      case "manual":
+        // Manual match - orange (staff-verified)
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-2.5 py-1 text-xs font-semibold shadow-sm whitespace-nowrap inline-flex items-center gap-1 transition-all duration-200">
+                  <HelpCircle className="w-3 h-3" />
+                  {label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      default:
+        return (
+          <Badge className="bg-slate-300 text-slate-700 border-0 px-2.5 py-1 text-xs">
+            {label}
+          </Badge>
+        );
+    }
+  };
+
   /* ------------------------------------------------------------------------ */
   /* Handlers */
   /* ------------------------------------------------------------------------ */
@@ -2311,6 +2439,89 @@ export default function ClaimReconciliation() {
       <div className="max-w-[1400px] mx-auto pb-12 pt-6 px-4 md:px-6 lg:px-8">{/* Widened from max-w-6xl (1152px) to max-w-[1400px] for better desktop space usage */}
         {/* Section Spacing: Use consistent larger gaps between major sections */}
         <div className="space-y-10">
+        
+        {/* HOW MATCHING WORKS - Info Card */}
+        <Collapsible open={isMatchInfoOpen} onOpenChange={setIsMatchInfoOpen}>
+          <Card className="border border-blue-200/50 bg-blue-50/30 shadow-sm">
+            <CardHeader className="pb-3">
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center justify-between w-full group hover:bg-blue-50/50 -mx-6 px-6 -my-3 py-3 rounded-lg transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                      <Info className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg font-bold text-slate-900">How Matching Works</CardTitle>
+                      <CardDescription className="text-xs text-slate-600">
+                        Understanding automatic claim matching
+                      </CardDescription>
+                    </div>
+                  </div>
+                  {isMatchInfoOpen ? (
+                    <ChevronUp className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
+                  )}
+                </button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-2 pb-4">
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    Claims are matched automatically using two methods for maximum accuracy:
+                  </p>
+                  
+                  <div className="space-y-3">
+                    {/* Invoice Match */}
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-emerald-200/50">
+                      <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-slate-900">1. Invoice Match</span>
+                          <Badge className="bg-emerald-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
+                            Highest Confidence
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          Member number + Invoice/Bill number. This is the most reliable matching method.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Date & Amount Match */}
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-blue-200/50">
+                      <div className="w-8 h-8 rounded-md bg-blue-500 flex items-center justify-center shrink-0">
+                        <Calculator className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-slate-900">2. Date &amp; Amount Match</span>
+                          <Badge className="bg-blue-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
+                            Verified Match
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          Member number + exact service date + exact billed amount. Only matched when there's a unique 1-to-1 match (no ambiguity).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-blue-200/50">
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      <span className="font-semibold text-slate-700">Note:</span> Unmatched items require manual review. 
+                      If multiple claims could match the same payment (or vice versa), they are left unmatched to prevent errors.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
         <section>
           {/* Premium Card with Glass-morphism */}
@@ -3739,6 +3950,7 @@ export default function ClaimReconciliation() {
                           <TableHead className="font-bold text-slate-700">Billed Amount</TableHead>
                           <TableHead className="font-bold text-slate-700">Amount Paid</TableHead>
                           <TableHead className="font-bold text-slate-700">Status</TableHead>
+                          <TableHead className="font-bold text-slate-700">Match Method</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -3764,6 +3976,7 @@ export default function ClaimReconciliation() {
                               {parseFloat(claim.amountPaid || "0").toFixed(2)}
                             </TableCell>
                             <TableCell>{getStatusBadge(claim.status)}</TableCell>
+                            <TableCell>{getMatchMethodBadge(claim.matchMethod)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -4294,6 +4507,7 @@ export default function ClaimReconciliation() {
                             <TableHead className="font-bold text-slate-700">Billed amount</TableHead>
                             <TableHead className="font-bold text-slate-700">Amount paid</TableHead>
                             <TableHead className="font-bold text-slate-700">Status</TableHead>
+                            <TableHead className="font-bold text-slate-700">Match Method</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -4318,6 +4532,7 @@ export default function ClaimReconciliation() {
                                 {parseFloat(claim.amountPaid || "0").toFixed(2)}
                               </TableCell>
                               <TableCell>{getStatusBadge(claim.status)}</TableCell>
+                              <TableCell>{getMatchMethodBadge(claim.matchMethod)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
