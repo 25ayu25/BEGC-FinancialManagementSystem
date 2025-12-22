@@ -2453,7 +2453,7 @@ export default function ClaimReconciliation() {
                           Date+Amount
                         </Badge>
                         <div className="flex-1">
-                          <div className="font-bold text-slate-800 mb-1">Date &amp; Amount Match (Verified Match)</div>
+                          <div className="font-bold text-slate-800 mb-1">Date & Amount Match (Verified Match)</div>
                           <div className="text-sm text-slate-600 space-y-1">
                             <p><strong>Matches using:</strong> Member number + exact service date + exact billed amount</p>
                             <p>Only matched when there's a unique 1-to-1 match (no ambiguity)</p>
