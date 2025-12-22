@@ -2413,6 +2413,99 @@ export default function ClaimReconciliation() {
                   </CardContent>
                 </Card>
 
+                {/* How Matching Works - New Section */}
+                <Card className="border border-slate-200/50 shadow-lg">
+                  <CardHeader className="pb-4 border-b border-slate-200/50">
+                    <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center shadow-lg">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
+                      How Claim Matching Works
+                    </CardTitle>
+                    <CardDescription>Understanding automatic and manual matching methods</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      Claims are matched automatically using two methods for maximum accuracy:
+                    </p>
+
+                    {/* Invoice Match */}
+                    <div className="rounded-xl bg-gradient-to-br from-green-50 to-green-100/50 border-2 border-green-200/50 p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <Badge className="bg-green-500 text-white hover:bg-green-600 border-0 px-3 py-1 shrink-0">
+                          Invoice
+                        </Badge>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-800 mb-1">Invoice Match (Highest Confidence)</div>
+                          <div className="text-sm text-slate-600 space-y-1">
+                            <p><strong>Matches using:</strong> Member number + Invoice/Bill number</p>
+                            <p>This is the most reliable matching method</p>
+                            <p className="text-xs text-green-700 font-medium mt-2">✓ Shown as green "Invoice" badge in Match Method column</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Date & Amount Match */}
+                    <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-200/50 p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <Badge className="bg-blue-500 text-white hover:bg-blue-600 border-0 px-3 py-1 shrink-0">
+                          Date+Amount
+                        </Badge>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-800 mb-1">Date & Amount Match (Verified Match)</div>
+                          <div className="text-sm text-slate-600 space-y-1">
+                            <p><strong>Matches using:</strong> Member number + exact service date + exact billed amount</p>
+                            <p>Only matched when there's a unique 1-to-1 match (no ambiguity)</p>
+                            <p className="text-xs text-blue-700 font-medium mt-2">✓ Shown as blue "Date+Amount" badge in Match Method column</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Manual Matching */}
+                    <div className="rounded-xl bg-gradient-to-br from-orange-50 to-orange-100/50 border-2 border-orange-200/50 p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-0 px-3 py-1 shrink-0">
+                          Manual
+                        </Badge>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-800 mb-1">Manual Matching</div>
+                          <div className="text-sm text-slate-600 space-y-1">
+                            <p>Staff can manually match claims that couldn't be auto-matched</p>
+                            <p className="text-xs text-orange-700 font-medium mt-2">✓ Shown as orange "Manual" badge in Match Method column</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Unmatched Claims */}
+                    <div className="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/50 border-2 border-slate-200/50 p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <Badge variant="outline" className="bg-white text-slate-600 border-slate-300 px-3 py-1 shrink-0">
+                          Unmatched
+                        </Badge>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-800 mb-1">Unmatched Claims</div>
+                          <div className="text-sm text-slate-600 space-y-1">
+                            <p>Claims that couldn't be automatically matched require manual review</p>
+                            <p>This happens when invoice numbers don't align and date+amount matching is ambiguous</p>
+                            <p className="text-xs text-slate-700 font-medium mt-2">✓ Shown as gray "Unmatched" badge</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Important Note */}
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50/50 border border-amber-200/50">
+                      <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="text-sm text-slate-700 leading-relaxed">
+                        <strong className="text-amber-800">Note:</strong> If multiple claims could match the same payment (or vice versa), they are left unmatched to prevent errors. This ensures accuracy over automation.
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Pro Tips */}
                 <Card className="border border-slate-200/50 shadow-lg">
                   <CardHeader className="pb-4 border-b border-slate-200/50">
@@ -2504,6 +2597,116 @@ export default function ClaimReconciliation() {
       <div className="max-w-[1400px] mx-auto pb-12 pt-6 px-4 md:px-6 lg:px-8">{/* Widened from max-w-6xl (1152px) to max-w-[1400px] for better desktop space usage */}
         {/* Section Spacing: Use consistent larger gaps between major sections */}
         <div className="space-y-10">
+
+        {/* Compact Annual Summary Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200/60 shadow-lg bg-gradient-to-r from-blue-50 via-purple-50 to-emerald-50 hover:shadow-xl transition-all duration-300 cursor-help">
+                  {/* Subtle animated gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-emerald-500/5 pointer-events-none" />
+                  
+                  {summaryLoading ? (
+                    <div className="relative px-6 py-4 flex items-center justify-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                      <span className="text-sm text-slate-600">Loading annual summary...</span>
+                    </div>
+                  ) : (
+                    <div className="relative px-6 py-4">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        {/* Left: Year and Icon */}
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-500 flex items-center justify-center shadow-lg shrink-0">
+                            <TrendingUp className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-700">📊</span>
+                            <span className="text-base font-bold text-slate-800">{annualSummaryYear} Summary</span>
+                            <div className="h-4 w-px bg-slate-300 mx-1" />
+                          </div>
+                        </div>
+
+                        {/* Center: Key Metrics */}
+                        <div className="flex items-center gap-6 flex-wrap">
+                          {/* Claims Count */}
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-semibold text-slate-700">
+                              {formatNumber(annualSummary.totalClaims)} claims
+                            </span>
+                            <span className="text-sm text-slate-500">
+                              ({annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))})
+                            </span>
+                          </div>
+
+                          <div className="h-4 w-px bg-slate-300" />
+
+                          {/* Collection Progress */}
+                          <div className="flex items-center gap-3">
+                            <DollarSign className="w-4 h-4 text-emerald-600" />
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-emerald-700">
+                                {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))} collected
+                              </span>
+                              <span className="text-sm text-slate-500">
+                                ({annualSummary.collectionRate.toFixed(1)}%)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Inline Progress Bar */}
+                          <div className="flex items-center gap-2">
+                            <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                              <motion.div
+                                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
+                                transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Year Selector */}
+                        <Select
+                          value={annualSummaryYear.toString()}
+                          onValueChange={(value) => setAnnualSummaryYear(parseInt(value, 10))}
+                        >
+                          <SelectTrigger className="w-[100px] h-9 bg-white/80 border-slate-300 hover:border-slate-400 transition-colors shadow-sm text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableYears.map((year) => (
+                              <SelectItem key={year} value={year.toString()}>
+                                {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm p-4" side="bottom">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-800">Annual Financial Performance</p>
+                  <div className="space-y-1 text-xs text-slate-600">
+                    <p><strong>Total Billed:</strong> {annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))}</p>
+                    <p><strong>Amount Collected:</strong> {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))}</p>
+                    <p><strong>Collection Rate:</strong> {annualSummary.collectionRate.toFixed(1)}%</p>
+                    <p><strong>Awaiting Payment:</strong> {formatNumber(annualSummary.awaitingPayment)} claims ({annualSummary.currency} {formatNumber(annualSummary.awaitingPaymentAmount.toFixed(2))})</p>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </motion.div>
 
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
         <section>
@@ -2705,140 +2908,6 @@ export default function ClaimReconciliation() {
             </div>
           </div>
         </section>
-
-        {/* Annual Financial Summary Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <Card className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-gradient-to-br from-white/95 to-slate-50/90">
-            <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-500 flex items-center justify-center shadow-lg">
-                    <TrendingUp className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-2xl font-bold text-slate-800">
-                      {annualSummaryYear} Annual Summary
-                    </CardTitle>
-                    <CardDescription className="mt-1 text-slate-600">
-                      Year-to-date financial performance
-                    </CardDescription>
-                  </div>
-                </div>
-                {/* Year selector */}
-                <Select
-                  value={annualSummaryYear.toString()}
-                  onValueChange={(value) => setAnnualSummaryYear(parseInt(value, 10))}
-                >
-                  <SelectTrigger className="w-[120px] bg-white border-slate-300 hover:border-slate-400 transition-colors shadow-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableYears.map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-
-            <CardContent className="pt-6">
-              {summaryLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Top Row: Claims Submitted and Amount Collected */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Claims Submitted */}
-                    <div className="p-6 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50 shadow-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-white" />
-                        </div>
-                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Claims Submitted</h3>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-4xl font-bold text-slate-900 tabular-nums">
-                          {formatNumber(annualSummary.totalClaims)}
-                        </p>
-                        <p className="text-sm text-slate-600">
-                          {annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))} billed
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Amount Collected */}
-                    <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50 shadow-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
-                          <DollarSign className="w-4 h-4 text-white" />
-                        </div>
-                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Amount Collected</h3>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-4xl font-bold text-slate-900 tabular-nums">
-                          {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))}
-                        </p>
-                        <p className="text-sm text-emerald-700 font-semibold">
-                          {annualSummary.collectionRate.toFixed(1)}% collection rate
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="p-6 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-semibold text-slate-700">Collection Progress</span>
-                        <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                          {annualSummary.collectionRate.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="h-6 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                        <motion.div
-                          className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 shadow-md"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
-                          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>0%</span>
-                        <span>100%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Awaiting Payment */}
-                  <div className="p-6 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center shrink-0">
-                        <Clock className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-1">Awaiting Payment</h3>
-                        <p className="text-2xl font-bold text-slate-900 tabular-nums">
-                          {formatNumber(annualSummary.awaitingPayment)} claims
-                          <span className="text-base font-normal text-slate-600 ml-2">
-                            ({annualSummary.currency} {formatNumber(annualSummary.awaitingPaymentAmount.toFixed(2))})
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
 
         {/* Period cards - Premium Design */}
         {periodsSummary.length > 0 && (
