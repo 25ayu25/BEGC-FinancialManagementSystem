@@ -631,6 +631,9 @@ export default function ClaimReconciliation() {
   // Reconciliation Workflow collapse state
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(true);
 
+  // Annual Financial Summary year filter
+  const [annualSummaryYear, setAnnualSummaryYear] = useState(currentYear);
+
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
   /* ------------------------------------------------------------------------ */
@@ -1120,6 +1123,55 @@ export default function ClaimReconciliation() {
       latestRunId: latest?.id ?? null,
     };
   }, [runs, periodsSummary]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Annual Financial Summary calculations */
+  /* ------------------------------------------------------------------------ */
+
+  const annualSummary = useMemo(() => {
+    // Filter periods to selected year
+    const yearPeriods = periodsSummary.filter(p => p.periodYear === annualSummaryYear);
+    
+    if (yearPeriods.length === 0) {
+      return {
+        totalClaims: 0,
+        totalBilledAmount: 0,
+        totalPaidAmount: 0,
+        collectionRate: 0,
+        awaitingPayment: 0,
+        awaitingPaymentAmount: 0,
+        currency: "USD",
+      };
+    }
+
+    const totalClaims = yearPeriods.reduce((sum, p) => sum + p.totalClaims, 0);
+    const totalBilledAmount = yearPeriods.reduce((sum, p) => sum + parseFloat(p.totalBilled), 0);
+    const totalPaidAmount = yearPeriods.reduce((sum, p) => sum + parseFloat(p.totalPaid), 0);
+    const awaitingPayment = yearPeriods.reduce((sum, p) => sum + p.awaitingRemittance, 0);
+    
+    // Calculate awaiting payment amount (billed amount for claims awaiting remittance)
+    // Rough estimate: (awaiting / total) * totalBilled
+    const awaitingPaymentAmount = totalClaims > 0 
+      ? (awaitingPayment / totalClaims) * totalBilledAmount 
+      : 0;
+
+    const collectionRate = totalBilledAmount > 0 
+      ? (totalPaidAmount / totalBilledAmount) * 100 
+      : 0;
+
+    // Get currency from first period (they should all be the same provider)
+    const currency = getCurrencyForDisplay(yearPeriods[0]?.providerName || providerName, yearPeriods[0]?.currency);
+
+    return {
+      totalClaims,
+      totalBilledAmount,
+      totalPaidAmount,
+      collectionRate,
+      awaitingPayment,
+      awaitingPaymentAmount,
+      currency,
+    };
+  }, [periodsSummary, annualSummaryYear, providerName]);
 
   /* ------------------------------------------------------------------------ */
   /* Mutations */
@@ -2653,6 +2705,140 @@ export default function ClaimReconciliation() {
             </div>
           </div>
         </section>
+
+        {/* Annual Financial Summary Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Card className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-gradient-to-br from-white/95 to-slate-50/90">
+            <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-500 flex items-center justify-center shadow-lg">
+                    <TrendingUp className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-slate-800">
+                      {annualSummaryYear} Annual Summary
+                    </CardTitle>
+                    <CardDescription className="mt-1 text-slate-600">
+                      Year-to-date financial performance
+                    </CardDescription>
+                  </div>
+                </div>
+                {/* Year selector */}
+                <Select
+                  value={annualSummaryYear.toString()}
+                  onValueChange={(value) => setAnnualSummaryYear(parseInt(value, 10))}
+                >
+                  <SelectTrigger className="w-[120px] bg-white border-slate-300 hover:border-slate-400 transition-colors shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-6">
+              {summaryLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Top Row: Claims Submitted and Amount Collected */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Claims Submitted */}
+                    <div className="p-6 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50 shadow-sm">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Claims Submitted</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-4xl font-bold text-slate-900 tabular-nums">
+                          {formatNumber(annualSummary.totalClaims)}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))} billed
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Amount Collected */}
+                    <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50 shadow-sm">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Amount Collected</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-4xl font-bold text-slate-900 tabular-nums">
+                          {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))}
+                        </p>
+                        <p className="text-sm text-emerald-700 font-semibold">
+                          {annualSummary.collectionRate.toFixed(1)}% collection rate
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="p-6 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-slate-700">Collection Progress</span>
+                        <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                          {annualSummary.collectionRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="h-6 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 shadow-md"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
+                          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>0%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Awaiting Payment */}
+                  <div className="p-6 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center shrink-0">
+                        <Clock className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-1">Awaiting Payment</h3>
+                        <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                          {formatNumber(annualSummary.awaitingPayment)} claims
+                          <span className="text-base font-normal text-slate-600 ml-2">
+                            ({annualSummary.currency} {formatNumber(annualSummary.awaitingPaymentAmount.toFixed(2))})
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Period cards - Premium Design */}
         {periodsSummary.length > 0 && (
