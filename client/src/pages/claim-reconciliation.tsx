@@ -628,6 +628,9 @@ export default function ClaimReconciliation() {
   // Success celebration state
   const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
 
+  // Reconciliation Workflow collapse state
+  const [isWorkflowOpen, setIsWorkflowOpen] = useState(true);
+
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
   /* ------------------------------------------------------------------------ */
@@ -696,6 +699,18 @@ export default function ClaimReconciliation() {
     staleTime: 2000,
     enabled: !!(providerName && periodYear && periodMonth),
   });
+
+  // Smart defaults for workflow collapse state: 
+  // - Collapsed when period has claims (user likely reviewing existing data)
+  // - Expanded when period is empty (guide user to upload)
+  useEffect(() => {
+    if (!periodStatus) return;
+    
+    // If period has claims, default to collapsed (cleaner view)
+    // If period is empty, default to expanded (guide user to upload)
+    const hasClaims = periodStatus.claims.total > 0;
+    setIsWorkflowOpen(!hasClaims);
+  }, [periodStatus, providerName, periodYear, periodMonth]);
 
   /* ------------------------------------------------------------------------ */
   /* Periods summary (cards) */
@@ -3330,16 +3345,75 @@ export default function ClaimReconciliation() {
           </Card>
         )}
 
-        {/* Workflow - Premium Card */}
+        {/* Workflow - Premium Card with Collapsible */}
+        <Collapsible open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
         <Card id="workflow-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-4 glass-header border-b border-slate-200/50 cursor-pointer hover:bg-slate-50/50 transition-colors">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+                    <Upload className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-slate-800">
+                      Reconciliation Workflow
+                    </CardTitle>
+                    <CardDescription className="mt-1 text-slate-600">
+                      Upload claims and remittance files
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Status summary and action button when collapsed */}
+                  {!isWorkflowOpen && (
+                    <>
+                      {periodStatus && (
+                        <div className="text-right mr-2">
+                          {periodStatus.claims.total > 0 ? (
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              <span className="font-semibold text-slate-700">
+                                {periodStatus.claims.total} claims uploaded for {activePeriodLabel}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-sm">
+                              <AlertCircle className="w-4 h-4 text-slate-400" />
+                              <span className="text-slate-500">No files uploaded yet</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border-0 shadow-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsWorkflowOpen(true);
+                        }}
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload Files
+                      </Button>
+                    </>
+                  )}
+                  {isWorkflowOpen ? (
+                    <ChevronUp className="w-6 h-6 text-slate-500 transition-transform" />
+                  ) : (
+                    <ChevronDown className="w-6 h-6 text-slate-500 transition-transform" />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+          <CardHeader className="pb-4 pt-2 border-b border-slate-200/50">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
-                  Reconciliation Workflow
-                </CardTitle>
-                <CardDescription className="mt-2 text-slate-600">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
+                <CardDescription className="text-slate-600">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
               </div>
 
               <div className="flex flex-wrap items-end gap-2">
@@ -3523,7 +3597,9 @@ export default function ClaimReconciliation() {
               </Button>
             </div>
           </CardContent>
+          </CollapsibleContent>
         </Card>
+        </Collapsible>
 
         {/* Claims Inventory - Premium Card */}
         <Card id="exceptions-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
