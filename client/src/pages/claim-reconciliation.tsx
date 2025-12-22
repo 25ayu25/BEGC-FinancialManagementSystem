@@ -229,18 +229,18 @@ function readSessionBackup(): string | null {
 /* -------------------------------------------------------------------------- */
 
 const MONTHS = [
-  { value: "1", label: "January" },
-  { value: "2", label: "February" },
-  { value: "3", label: "March" },
-  { value: "4", label: "April" },
-  { value: "5", label: "May" },
-  { value: "6", label: "June" },
-  { value: "7", label: "July" },
-  { value: "8", label: "August" },
-  { value: "9", label: "September" },
-  { value: "10", label: "October" },
-  { value: "11", label: "November" },
-  { value: "12", label: "December" },
+  { value: "1", label: "January", short: "Jan" },
+  { value: "2", label: "February", short: "Feb" },
+  { value: "3", label: "March", short: "Mar" },
+  { value: "4", label: "April", short: "Apr" },
+  { value: "5", label: "May", short: "May" },
+  { value: "6", label: "June", short: "Jun" },
+  { value: "7", label: "July", short: "Jul" },
+  { value: "8", label: "August", short: "Aug" },
+  { value: "9", label: "September", short: "Sep" },
+  { value: "10", label: "October", short: "Oct" },
+  { value: "11", label: "November", short: "Nov" },
+  { value: "12", label: "December", short: "Dec" },
 ];
 
 const MAX_CARDS_DEFAULT = 6;  // Issue 3: Show max 6 cards by default
@@ -628,8 +628,11 @@ export default function ClaimReconciliation() {
   // Success celebration state
   const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
 
-  // Match method info card state
-  const [isMatchInfoOpen, setIsMatchInfoOpen] = useState(false);
+  // Reconciliation Workflow collapse state
+  const [isWorkflowOpen, setIsWorkflowOpen] = useState(true);
+
+  // Annual Financial Summary year filter
+  const [annualSummaryYear, setAnnualSummaryYear] = useState(currentYear);
 
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
@@ -699,6 +702,18 @@ export default function ClaimReconciliation() {
     staleTime: 2000,
     enabled: !!(providerName && periodYear && periodMonth),
   });
+
+  // Smart defaults for workflow collapse state: 
+  // - Collapsed when period has claims (user likely reviewing existing data)
+  // - Expanded when period is empty (guide user to upload)
+  useEffect(() => {
+    if (!periodStatus) return;
+    
+    // If period has claims, default to collapsed (cleaner view)
+    // If period is empty, default to expanded (guide user to upload)
+    const hasClaims = periodStatus.claims.total > 0;
+    setIsWorkflowOpen(!hasClaims);
+  }, [periodStatus, providerName, periodYear, periodMonth]);
 
   /* ------------------------------------------------------------------------ */
   /* Periods summary (cards) */
@@ -1108,6 +1123,55 @@ export default function ClaimReconciliation() {
       latestRunId: latest?.id ?? null,
     };
   }, [runs, periodsSummary]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Annual Financial Summary calculations */
+  /* ------------------------------------------------------------------------ */
+
+  const annualSummary = useMemo(() => {
+    // Filter periods to selected year
+    const yearPeriods = periodsSummary.filter(p => p.periodYear === annualSummaryYear);
+    
+    if (yearPeriods.length === 0) {
+      return {
+        totalClaims: 0,
+        totalBilledAmount: 0,
+        totalPaidAmount: 0,
+        collectionRate: 0,
+        awaitingPayment: 0,
+        awaitingPaymentAmount: 0,
+        currency: "USD",
+      };
+    }
+
+    const totalClaims = yearPeriods.reduce((sum, p) => sum + p.totalClaims, 0);
+    const totalBilledAmount = yearPeriods.reduce((sum, p) => sum + parseFloat(p.totalBilled), 0);
+    const totalPaidAmount = yearPeriods.reduce((sum, p) => sum + parseFloat(p.totalPaid), 0);
+    const awaitingPayment = yearPeriods.reduce((sum, p) => sum + p.awaitingRemittance, 0);
+    
+    // Calculate awaiting payment amount (billed amount for claims awaiting remittance)
+    // Rough estimate: (awaiting / total) * totalBilled
+    const awaitingPaymentAmount = totalClaims > 0 
+      ? (awaitingPayment / totalClaims) * totalBilledAmount 
+      : 0;
+
+    const collectionRate = totalBilledAmount > 0 
+      ? (totalPaidAmount / totalBilledAmount) * 100 
+      : 0;
+
+    // Get currency from first period (they should all be the same provider)
+    const currency = getCurrencyForDisplay(yearPeriods[0]?.providerName || providerName, yearPeriods[0]?.currency);
+
+    return {
+      totalClaims,
+      totalBilledAmount,
+      totalPaidAmount,
+      collectionRate,
+      awaitingPayment,
+      awaitingPaymentAmount,
+      currency,
+    };
+  }, [periodsSummary, annualSummaryYear, providerName]);
 
   /* ------------------------------------------------------------------------ */
   /* Mutations */
@@ -2440,88 +2504,6 @@ export default function ClaimReconciliation() {
       <div className="max-w-[1400px] mx-auto pb-12 pt-6 px-4 md:px-6 lg:px-8">{/* Widened from max-w-6xl (1152px) to max-w-[1400px] for better desktop space usage */}
         {/* Section Spacing: Use consistent larger gaps between major sections */}
         <div className="space-y-10">
-        
-        {/* HOW MATCHING WORKS - Info Card */}
-        <Collapsible open={isMatchInfoOpen} onOpenChange={setIsMatchInfoOpen}>
-          <Card className="border border-blue-200/50 bg-blue-50/30 shadow-sm">
-            <CardHeader className="pb-3">
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full group hover:bg-blue-50/50 -mx-6 px-6 -my-3 py-3 rounded-lg transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
-                      <Info className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="text-left">
-                      <CardTitle className="text-lg font-bold text-slate-900">How Matching Works</CardTitle>
-                      <CardDescription className="text-xs text-slate-600">
-                        Understanding automatic claim matching
-                      </CardDescription>
-                    </div>
-                  </div>
-                  {isMatchInfoOpen ? (
-                    <ChevronUp className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
-                  )}
-                </button>
-              </CollapsibleTrigger>
-            </CardHeader>
-            <CollapsibleContent>
-              <CardContent className="pt-2 pb-4">
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    Claims are matched automatically using two methods for maximum accuracy:
-                  </p>
-                  
-                  <div className="space-y-3">
-                    {/* Invoice Match */}
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-emerald-200/50">
-                      <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-slate-900">1. Invoice Match</span>
-                          <Badge className="bg-emerald-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
-                            Highest Confidence
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Member number + Invoice/Bill number. This is the most reliable matching method.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Date & Amount Match */}
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-blue-200/50">
-                      <div className="w-8 h-8 rounded-md bg-blue-500 flex items-center justify-center shrink-0">
-                        <Calculator className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-slate-900">2. Date &amp; Amount Match</span>
-                          <Badge className="bg-blue-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
-                            Verified Match
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Member number + exact service date + exact billed amount. Only matched when there's a unique 1-to-1 match (no ambiguity).
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-blue-200/50">
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      <span className="font-semibold text-slate-700">Note:</span> Unmatched items require manual review. 
-                      If multiple claims could match the same payment (or vice versa), they are left unmatched to prevent errors.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
 
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
         <section>
@@ -2723,6 +2705,140 @@ export default function ClaimReconciliation() {
             </div>
           </div>
         </section>
+
+        {/* Annual Financial Summary Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Card className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-gradient-to-br from-white/95 to-slate-50/90">
+            <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-500 flex items-center justify-center shadow-lg">
+                    <TrendingUp className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-slate-800">
+                      {annualSummaryYear} Annual Summary
+                    </CardTitle>
+                    <CardDescription className="mt-1 text-slate-600">
+                      Year-to-date financial performance
+                    </CardDescription>
+                  </div>
+                </div>
+                {/* Year selector */}
+                <Select
+                  value={annualSummaryYear.toString()}
+                  onValueChange={(value) => setAnnualSummaryYear(parseInt(value, 10))}
+                >
+                  <SelectTrigger className="w-[120px] bg-white border-slate-300 hover:border-slate-400 transition-colors shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-6">
+              {summaryLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Top Row: Claims Submitted and Amount Collected */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Claims Submitted */}
+                    <div className="p-6 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50 shadow-sm">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Claims Submitted</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-4xl font-bold text-slate-900 tabular-nums">
+                          {formatNumber(annualSummary.totalClaims)}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))} billed
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Amount Collected */}
+                    <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50 shadow-sm">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Amount Collected</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-4xl font-bold text-slate-900 tabular-nums">
+                          {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))}
+                        </p>
+                        <p className="text-sm text-emerald-700 font-semibold">
+                          {annualSummary.collectionRate.toFixed(1)}% collection rate
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="p-6 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200/50 shadow-sm">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-slate-700">Collection Progress</span>
+                        <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                          {annualSummary.collectionRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="h-6 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 shadow-md"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
+                          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>0%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Awaiting Payment */}
+                  <div className="p-6 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center shrink-0">
+                        <Clock className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-1">Awaiting Payment</h3>
+                        <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                          {formatNumber(annualSummary.awaitingPayment)} claims
+                          <span className="text-base font-normal text-slate-600 ml-2">
+                            ({annualSummary.currency} {formatNumber(annualSummary.awaitingPaymentAmount.toFixed(2))})
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Period cards - Premium Design */}
         {periodsSummary.length > 0 && (
@@ -3415,16 +3531,75 @@ export default function ClaimReconciliation() {
           </Card>
         )}
 
-        {/* Workflow - Premium Card */}
+        {/* Workflow - Premium Card with Collapsible */}
+        <Collapsible open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
         <Card id="workflow-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
-          <CardHeader className="pb-4 glass-header border-b border-slate-200/50">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-4 glass-header border-b border-slate-200/50 cursor-pointer hover:bg-slate-50/50 transition-colors">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+                    <Upload className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-slate-800">
+                      Reconciliation Workflow
+                    </CardTitle>
+                    <CardDescription className="mt-1 text-slate-600">
+                      Upload claims and remittance files
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Status summary and action button when collapsed */}
+                  {!isWorkflowOpen && (
+                    <>
+                      {periodStatus && (
+                        <div className="text-right mr-2">
+                          {periodStatus.claims.total > 0 ? (
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              <span className="font-semibold text-slate-700">
+                                {periodStatus.claims.total} claims uploaded for {activePeriodLabel}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-sm">
+                              <AlertCircle className="w-4 h-4 text-slate-400" />
+                              <span className="text-slate-500">No files uploaded yet</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border-0 shadow-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsWorkflowOpen(true);
+                        }}
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload Files
+                      </Button>
+                    </>
+                  )}
+                  {isWorkflowOpen ? (
+                    <ChevronUp className="w-6 h-6 text-slate-500 transition-transform" />
+                  ) : (
+                    <ChevronDown className="w-6 h-6 text-slate-500 transition-transform" />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+          <CardHeader className="pb-4 pt-2 border-b border-slate-200/50">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1.5 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
-                  Reconciliation Workflow
-                </CardTitle>
-                <CardDescription className="mt-2 text-slate-600">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
+                <CardDescription className="text-slate-600">{getWorkflowDescription(providerName, activePeriodLabel)}</CardDescription>
               </div>
 
               <div className="flex flex-wrap items-end gap-2">
@@ -3608,7 +3783,9 @@ export default function ClaimReconciliation() {
               </Button>
             </div>
           </CardContent>
+          </CollapsibleContent>
         </Card>
+        </Collapsible>
 
         {/* Claims Inventory - Premium Card */}
         <Card id="exceptions-section" className="premium-card border border-slate-200/30 shadow-2xl backdrop-blur-sm bg-white/90">
@@ -3678,63 +3855,84 @@ export default function ClaimReconciliation() {
                 </div>
               </div>
 
-              {/* NEW: Year and Month filters with quick filter buttons */}
+              {/* NEW: Year and Month filters with clickable pills */}
               {availablePeriods && availablePeriods.years.length > 0 && (
-                <div className="mb-6 space-y-3 p-4 rounded-xl bg-gradient-to-br from-slate-50/50 to-white border border-slate-200/50">
-                  {/* Filter selectors */}
-                  <div className="flex flex-wrap items-center gap-3">
+                <div className="mb-6 space-y-4 p-5 rounded-xl bg-gradient-to-br from-slate-50/50 to-white border border-slate-200/50 shadow-sm">
+                  {/* Year filter pills */}
+                  <div className="space-y-2">
                     <Label className="text-sm font-semibold text-slate-700">Period:</Label>
-                    
-                    {/* Year selector */}
-                    <Select
-                      value={inventoryYearFilter?.toString() || "all"}
-                      onValueChange={(value) => {
-                        didUserTouchInventoryFilters.current = true;
-                        setInventoryYearFilter(value === "all" ? null : parseInt(value, 10));
-                        setInventoryPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="w-[140px] bg-white border-slate-300 hover:border-slate-400 transition-colors">
-                        <SelectValue placeholder="All years" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All years</SelectItem>
-                        {availablePeriods.years.map((year) => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {availablePeriods.years.map((year) => (
+                        <button
+                          key={year}
+                          type="button"
+                          className={cn(
+                            "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-sm hover:scale-[1.02] shadow-sm",
+                            inventoryYearFilter === year
+                              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105"
+                              : "bg-white text-slate-700 hover:bg-slate-50 hover:shadow-md border border-slate-200"
+                          )}
+                          onClick={() => {
+                            didUserTouchInventoryFilters.current = true;
+                            setInventoryYearFilter(year);
+                            setInventoryPage(1);
+                          }}
+                        >
+                          {year}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                    {/* Month selector */}
-                    <Select
-                      value={inventoryMonthFilter?.toString() || "all"}
-                      onValueChange={(value) => {
-                        didUserTouchInventoryFilters.current = true;
-                        setInventoryMonthFilter(value === "all" ? null : parseInt(value, 10));
-                        setInventoryPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="w-[160px] bg-white border-slate-300 hover:border-slate-400 transition-colors">
-                        <SelectValue placeholder="All months" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All months</SelectItem>
-                        {MONTHS.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Month filter pills */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className={cn(
+                          "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-sm hover:scale-[1.02] shadow-sm",
+                          inventoryMonthFilter === null
+                            ? "bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-lg shadow-slate-500/30 scale-105"
+                            : "bg-white text-slate-700 hover:bg-slate-50 hover:shadow-md border border-slate-200"
+                        )}
+                        onClick={() => {
+                          didUserTouchInventoryFilters.current = true;
+                          setInventoryMonthFilter(null);
+                          setInventoryPage(1);
+                        }}
+                      >
+                        All
+                      </button>
+                      {MONTHS.map((m) => (
+                        <button
+                          key={m.value}
+                          type="button"
+                          className={cn(
+                            "px-3 py-2 rounded-lg transition-all duration-200 font-semibold text-sm hover:scale-[1.02] shadow-sm",
+                            inventoryMonthFilter === parseInt(m.value, 10)
+                              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105"
+                              : "bg-white text-slate-700 hover:bg-slate-50 hover:shadow-md border border-slate-200"
+                          )}
+                          onClick={() => {
+                            didUserTouchInventoryFilters.current = true;
+                            setInventoryMonthFilter(parseInt(m.value, 10));
+                            setInventoryPage(1);
+                          }}
+                        >
+                          {m.short}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
+                  {/* Action buttons row */}
+                  <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-200/60">
                     {/* Clear filters button */}
                     {(inventoryYearFilter !== null || inventoryMonthFilter !== null) && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-2 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-all"
+                        className="gap-2 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-all shadow-sm"
                         onClick={() => {
                           didUserTouchInventoryFilters.current = true;
                           setInventoryYearFilter(null);
@@ -3752,13 +3950,55 @@ export default function ClaimReconciliation() {
                       </Button>
                     )}
 
+                    {/* Quick filter: This year */}
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02] shadow-sm",
+                        inventoryYearFilter === currentYear && inventoryMonthFilter === null
+                          ? "bg-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105"
+                          : "bg-white text-slate-600 hover:text-slate-900 hover:bg-blue-50 hover:shadow-md border border-slate-200"
+                      )}
+                      onClick={() => {
+                        // This year
+                        didUserTouchInventoryFilters.current = true;
+                        setInventoryYearFilter(currentYear);
+                        setInventoryMonthFilter(null);
+                        setInventoryPage(1);
+                      }}
+                    >
+                      <Zap className="w-3 h-3" />
+                      This year
+                    </button>
+
+                    {/* Quick filter: All years */}
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02] shadow-sm",
+                        inventoryYearFilter === null && inventoryMonthFilter === null
+                          ? "bg-slate-500 shadow-lg shadow-slate-500/30 text-white scale-105"
+                          : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:shadow-md border border-slate-200"
+                      )}
+                      onClick={() => {
+                        // All years - clear all filters
+                        didUserTouchInventoryFilters.current = true;
+                        setInventoryYearFilter(null);
+                        setInventoryMonthFilter(null);
+                        setInventoryPage(1);
+                      }}
+                    >
+                      <Zap className="w-3 h-3" />
+                      All years
+                    </button>
+
                     {/* Export Button */}
                     <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-2 ml-auto hover:bg-green-50 hover:border-green-300 transition-all"
+                        className="gap-2 ml-auto hover:bg-green-50 hover:border-green-300 transition-all shadow-sm"
                       >
                         <Download className="w-4 h-4" />
                         Export
@@ -3809,51 +4049,6 @@ export default function ClaimReconciliation() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  </div>
-
-                  {/* Quick filter buttons */}
-                  <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-200/60">
-                    <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Quick filters:</Label>
-                    
-                    <button
-                      type="button"
-                      className={cn(
-                        "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02]",
-                        inventoryYearFilter === currentYear && inventoryMonthFilter === null
-                          ? "bg-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-blue-50 hover:shadow-sm"
-                      )}
-                      onClick={() => {
-                        // This year
-                        didUserTouchInventoryFilters.current = true;
-                        setInventoryYearFilter(currentYear);
-                        setInventoryMonthFilter(null);
-                        setInventoryPage(1);
-                      }}
-                    >
-                      <Zap className="w-3 h-3" />
-                      This year
-                    </button>
-
-                    <button
-                      type="button"
-                      className={cn(
-                        "px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-xs whitespace-nowrap flex items-center gap-1.5 hover:scale-[1.02]",
-                        inventoryYearFilter === null && inventoryMonthFilter === null
-                          ? "bg-slate-500 shadow-lg shadow-slate-500/30 text-white scale-105"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:shadow-sm"
-                      )}
-                      onClick={() => {
-                        // All years - clear all filters
-                        didUserTouchInventoryFilters.current = true;
-                        setInventoryYearFilter(null);
-                        setInventoryMonthFilter(null);
-                        setInventoryPage(1);
-                      }}
-                    >
-                      <Zap className="w-3 h-3" />
-                      All years
-                    </button>
                   </div>
                 </div>
               )}
@@ -3951,7 +4146,23 @@ export default function ClaimReconciliation() {
                           <TableHead className="font-bold text-slate-700">Billed Amount</TableHead>
                           <TableHead className="font-bold text-slate-700">Amount Paid</TableHead>
                           <TableHead className="font-bold text-slate-700">Status</TableHead>
-                          <TableHead className="font-bold text-slate-700">Match Method</TableHead>
+                          <TableHead className="font-bold text-slate-700">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1.5 cursor-help">
+                                    <span>Match Method</span>
+                                    <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-xs font-semibold mb-2">How claims are matched:</p>
+                                  <p className="text-xs mb-1"><strong>Invoice:</strong> Member # + Invoice/Bill # (highest confidence)</p>
+                                  <p className="text-xs"><strong>Date+Amount:</strong> Member # + exact service date + exact amount (verified 1-to-1 match)</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -4508,7 +4719,23 @@ export default function ClaimReconciliation() {
                             <TableHead className="font-bold text-slate-700">Billed amount</TableHead>
                             <TableHead className="font-bold text-slate-700">Amount paid</TableHead>
                             <TableHead className="font-bold text-slate-700">Status</TableHead>
-                            <TableHead className="font-bold text-slate-700">Match Method</TableHead>
+                            <TableHead className="font-bold text-slate-700">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1.5 cursor-help">
+                                      <span>Match Method</span>
+                                      <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs font-semibold mb-2">How claims are matched:</p>
+                                    <p className="text-xs mb-1"><strong>Invoice:</strong> Member # + Invoice/Bill # (highest confidence)</p>
+                                    <p className="text-xs"><strong>Date+Amount:</strong> Member # + exact service date + exact amount (verified 1-to-1 match)</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
