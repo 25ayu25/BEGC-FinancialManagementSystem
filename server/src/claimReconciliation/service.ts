@@ -1101,7 +1101,7 @@ export async function getPeriodsSummary(providerName?: string) {
       const manualReview = period.claims.filter((c) => c.status === "manual_review").length;
 
       const totalBilled = period.claims.reduce((sum, c) => sum + parseFloat(c.billedAmount), 0);
-      const totalPaid = period.claims.reduce((sum, c) => sum + parseFloat((c as any).amountPaid || "0"), 0);
+      const totalPaid = period.claims.reduce((sum, c) => sum + parseFloat(c.amountPaid || "0"), 0);
 
       const currency = period.claims[0]?.currency || "USD";
 
