@@ -66,6 +66,8 @@ export interface MatchResult {
     | "partially_paid"
     | "unpaid"
     | "manual_review";
+  // Track how the match was made
+  matchMethod?: "invoice" | "date_amount" | "manual" | null;
 }
 
 export interface ReconciliationSummary {

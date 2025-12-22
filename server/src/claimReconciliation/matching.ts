@@ -149,98 +149,141 @@ function normalizeAmount(amount: number): number {
 }
 
 /**
- * Match claims against remittances
+ * Match claims against remittances using hybrid matching strategy:
+ * 1. Primary: Invoice-based matching (memberNumber + invoice/bill number)
+ * 2. Secondary: Date+Amount matching (memberNumber + exact date + exact amount) with 1-to-1 enforcement
  */
 export function matchClaimsToRemittances(
   claims: Array<{ id: number; data: ClaimRow; compositeKey: string }>,
   remittances: Array<{ id: number; data: RemittanceRow; compositeKey: string }>
 ): MatchResult[] {
   const results: MatchResult[] = [];
+  const matchedClaims = new Set<number>();
+  const matchedRemittances = new Set<number>();
 
-  // ✅ Handle duplicates: map key -> queue of claims
-  const claimMap = new Map<string, Array<{ id: number; data: ClaimRow }>>();
+  // PHASE 1: PRIMARY INVOICE-BASED MATCHING
+  // Build claim lookup by invoice key: memberNumber + invoice number
+  const claimsByInvoiceKey = new Map<string, Array<{ id: number; data: ClaimRow }>>();
+  
   for (const claim of claims) {
-    const arr = claimMap.get(claim.compositeKey) ?? [];
-    arr.push({ id: claim.id, data: claim.data });
-    claimMap.set(claim.compositeKey, arr);
+    const member = normalizeMember((claim.data as any)?.memberNumber ?? "");
+    const inv = getClaimInvoice(claim.data as any);
+    
+    if (inv) {
+      const key = `${member}|INV:${inv}`;
+      const arr = claimsByInvoiceKey.get(key) ?? [];
+      arr.push({ id: claim.id, data: claim.data });
+      claimsByInvoiceKey.set(key, arr);
+    }
   }
 
-  const matchedClaims = new Set<number>();
-
+  // Match remittances using invoice/bill number
   for (const rem of remittances) {
-    const keyVariants = buildRemittanceKeyVariantsFromRow(rem.data as any);
-
+    if (matchedRemittances.has(rem.id)) continue;
+    
+    const member = normalizeMember((rem.data as any)?.memberNumber ?? "");
+    const bills = getRemittanceBillCandidates(rem.data as any);
+    
     let matchedClaim: { id: number; data: ClaimRow } | undefined;
-
-    for (const key of keyVariants) {
-      const bucket = claimMap.get(key);
+    
+    // Try each bill number candidate
+    for (const bill of bills) {
+      const key = `${member}|INV:${bill}`;
+      const bucket = claimsByInvoiceKey.get(key);
       if (!bucket || bucket.length === 0) continue;
-
-      // skip already matched in this bucket
+      
+      // Skip already matched claims in this bucket
       while (bucket.length > 0 && matchedClaims.has(bucket[0].id)) bucket.shift();
-
+      
       if (bucket.length > 0) {
-        matchedClaim = bucket.shift(); // ✅ consume one claim
+        matchedClaim = bucket.shift();
         break;
       }
     }
-
+    
     if (matchedClaim) {
       matchedClaims.add(matchedClaim.id);
-
+      matchedRemittances.add(rem.id);
+      
       const claimAmount = normalizeAmount((matchedClaim.data as any).billedAmount ?? 0);
       const paidAmount = normalizeAmount((rem.data as any).paidAmount ?? 0);
-
-      let status:
-        | "awaiting_remittance"
-        | "matched"
-        | "paid"
-        | "partially_paid"
-        | "unpaid"
-        | "manual_review";
-
-      let matchType: "exact" | "partial" | "none";
-
-      // STRICT STATUS RULES (Requirement 4):
-      // - matched AND paidAmount == billedAmount → "matched"/"paid"
-      // - matched AND 0 < paidAmount < billedAmount → "partially_paid"
-      // - matched AND paidAmount == 0 → "unpaid" (Not paid (0 paid))
-      if (paidAmount === claimAmount && claimAmount > 0) {
-        status = "matched";
-        matchType = "exact";
-      } else if (paidAmount > 0 && paidAmount < claimAmount && claimAmount > 0) {
-        status = "partially_paid";
-        matchType = "partial";
-      } else if (paidAmount === 0 && claimAmount > 0) {
-        // Claim is in the statement but with $0 paid
-        status = "unpaid";
-        matchType = "partial";
-      } else if (paidAmount > claimAmount && claimAmount > 0) {
-        // Overpayment - mark as matched but flag for review
-        status = "matched";
-        matchType = "partial";
-      } else {
-        status = "manual_review";
-        matchType = "partial";
-      }
-
+      
+      const { status, matchType } = determineMatchStatus(claimAmount, paidAmount);
+      
       results.push({
         claimId: matchedClaim.id,
         remittanceId: rem.id,
         matchType,
         amountPaid: Number((rem.data as any).paidAmount ?? 0),
         status,
+        matchMethod: "invoice",
       });
     }
   }
 
-  // CRITICAL (Requirement 4): Keep unmatched claims as "awaiting_remittance"
-  // If claim NOT matched to any statement line → status must remain "awaiting_remittance"
-  // DO NOT mark unmatched as "unpaid"
+  // PHASE 2: SECONDARY DATE+AMOUNT MATCHING (with 1-to-1 enforcement)
+  // Build claim lookup by date+amount key for unmatched claims
+  const claimsByDateAmountKey = new Map<string, Array<{ id: number; data: ClaimRow }>>();
+  
+  for (const claim of claims) {
+    if (matchedClaims.has(claim.id)) continue; // Skip already matched
+    
+    const member = normalizeMember((claim.data as any)?.memberNumber ?? "");
+    const date = normalizeDate((claim.data as any)?.serviceDate ?? "");
+    const cents = toCents(Number((claim.data as any)?.billedAmount ?? 0));
+    
+    if (date) {
+      const key = `${member}|DATE:${date}|AMT:${cents}`;
+      const arr = claimsByDateAmountKey.get(key) ?? [];
+      arr.push({ id: claim.id, data: claim.data });
+      claimsByDateAmountKey.set(key, arr);
+    }
+  }
+
+  // Match unmatched remittances using date+amount (exact match only)
+  for (const rem of remittances) {
+    if (matchedRemittances.has(rem.id)) continue; // Skip already matched
+    
+    const member = normalizeMember((rem.data as any)?.memberNumber ?? "");
+    const date = normalizeDate((rem.data as any)?.serviceDate ?? "");
+    const cents = toCents(Number((rem.data as any)?.claimAmount ?? 0));
+    
+    if (!date) continue; // Need valid date for this match method
+    
+    const key = `${member}|DATE:${date}|AMT:${cents}`;
+    const bucket = claimsByDateAmountKey.get(key);
+    
+    // CRITICAL: Only match if there's EXACTLY ONE unmatched claim for this key
+    // This enforces 1-to-1 matching and prevents ambiguous matches
+    if (bucket && bucket.length === 1 && !matchedClaims.has(bucket[0].id)) {
+      const matchedClaim = bucket[0];
+      matchedClaims.add(matchedClaim.id);
+      matchedRemittances.add(rem.id);
+      
+      const claimAmount = normalizeAmount((matchedClaim.data as any).billedAmount ?? 0);
+      const paidAmount = normalizeAmount((rem.data as any).paidAmount ?? 0);
+      
+      const { status, matchType } = determineMatchStatus(claimAmount, paidAmount);
+      
+      results.push({
+        claimId: matchedClaim.id,
+        remittanceId: rem.id,
+        matchType,
+        amountPaid: Number((rem.data as any).paidAmount ?? 0),
+        status,
+        matchMethod: "date_amount",
+      });
+    }
+    // If bucket.length > 1, it's ambiguous - leave unmatched for manual review
+    // If bucket.length === 0 or claim already matched, skip
+  }
+
+  // PHASE 3: Handle unmatched claims
+  // Keep unmatched claims as "awaiting_remittance"
   for (const claim of claims) {
     if (!matchedClaims.has(claim.id)) {
       const currentStatus = (claim.data as any)?.status;
-
+      
       results.push({
         claimId: claim.id,
         remittanceId: null,
@@ -248,9 +291,36 @@ export function matchClaimsToRemittances(
         amountPaid: 0,
         // Preserve existing status if it's already set, otherwise "awaiting_remittance"
         status: (currentStatus as any) ?? "awaiting_remittance",
+        matchMethod: null,
       });
     }
   }
 
   return results;
+}
+
+/**
+ * Determine match status based on claim and paid amounts
+ */
+function determineMatchStatus(
+  claimAmount: number,
+  paidAmount: number
+): { status: MatchResult["status"]; matchType: "exact" | "partial" | "none" } {
+  // STRICT STATUS RULES:
+  // - matched AND paidAmount == billedAmount → "matched"/"paid"
+  // - matched AND 0 < paidAmount < billedAmount → "partially_paid"
+  // - matched AND paidAmount == 0 → "unpaid" (Not paid (0 paid))
+  if (paidAmount === claimAmount && claimAmount > 0) {
+    return { status: "matched", matchType: "exact" };
+  } else if (paidAmount > 0 && paidAmount < claimAmount && claimAmount > 0) {
+    return { status: "partially_paid", matchType: "partial" };
+  } else if (paidAmount === 0 && claimAmount > 0) {
+    // Claim is in the statement but with $0 paid
+    return { status: "unpaid", matchType: "partial" };
+  } else if (paidAmount > claimAmount && claimAmount > 0) {
+    // Overpayment - mark as matched but flag for review
+    return { status: "matched", matchType: "partial" };
+  } else {
+    return { status: "manual_review", matchType: "partial" };
+  }
 }
