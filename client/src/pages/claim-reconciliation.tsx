@@ -2631,46 +2631,54 @@ export default function ClaimReconciliation() {
                           </div>
                         </div>
 
-                        {/* Center: Key Metrics */}
-                        <div className="flex items-center gap-6 flex-wrap">
-                          {/* Claims Count */}
+                        {/* Center: Key Metrics or No Data Message */}
+                        {annualSummary.totalClaims === 0 ? (
                           <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-semibold text-slate-700">
-                              {formatNumber(annualSummary.totalClaims)} claims
-                            </span>
-                            <span className="text-sm text-slate-500">
-                              ({annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))})
+                            <span className="text-sm text-slate-500 italic">
+                              No claims submitted for {annualSummaryYear}
                             </span>
                           </div>
-
-                          <div className="h-4 w-px bg-slate-300" />
-
-                          {/* Collection Progress */}
-                          <div className="flex items-center gap-3">
-                            <DollarSign className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <div className="flex items-center gap-6 flex-wrap">
+                            {/* Claims Count */}
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-emerald-700">
-                                {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))} collected
+                              <FileText className="w-4 h-4 text-blue-600" />
+                              <span className="text-sm font-semibold text-slate-700">
+                                {formatNumber(annualSummary.totalClaims)} claims
                               </span>
                               <span className="text-sm text-slate-500">
-                                ({annualSummary.collectionRate.toFixed(1)}%)
+                                ({annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))})
                               </span>
                             </div>
-                          </div>
 
-                          {/* Inline Progress Bar */}
-                          <div className="flex items-center gap-2">
-                            <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                              <motion.div
-                                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
-                                transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                              />
+                            <div className="h-4 w-px bg-slate-300" />
+
+                            {/* Collection Progress */}
+                            <div className="flex items-center gap-3">
+                              <DollarSign className="w-4 h-4 text-emerald-600" />
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-emerald-700">
+                                  {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))} collected
+                                </span>
+                                <span className="text-sm text-slate-500">
+                                  ({annualSummary.collectionRate.toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Inline Progress Bar */}
+                            <div className="flex items-center gap-2">
+                              <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                                <motion.div
+                                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
+                                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Right: Year Selector */}
                         <Select
