@@ -856,6 +856,7 @@ export async function runClaimReconciliation(
           status: match.status,
           amountPaid: match.amountPaid.toString(),
           remittanceLineId: match.remittanceId,
+          matchMethod: match.matchMethod || null,
         })
         .where(eq(claimReconClaims.id, match.claimId));
 
@@ -889,6 +890,7 @@ export async function runClaimReconciliation(
           matchedRemittanceId: match.remittanceId || null,
           matchType: match.matchType || "unmatched",
           amountPaidInRun: match.amountPaid.toString(),
+          matchMethod: match.matchMethod || null,
         };
       });
 
