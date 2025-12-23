@@ -631,8 +631,8 @@ export default function ClaimReconciliation() {
   // Reconciliation Workflow collapse state
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(true);
 
-  // Annual Financial Summary year filter
-  const [annualSummaryYear, setAnnualSummaryYear] = useState(currentYear);
+  // Key Metrics Overview year filter
+  const [metricsYearFilter, setMetricsYearFilter] = useState<number | null>(currentYear);
 
   /* ------------------------------------------------------------------------ */
   /* Claims Inventory Filters (VIEW-ONLY - Do NOT affect matching)           */
@@ -1074,25 +1074,30 @@ export default function ClaimReconciliation() {
   /* ------------------------------------------------------------------------ */
 
   const stats = useMemo(() => {
+    // Filter periods by metrics year filter
+    const filteredPeriods = metricsYearFilter !== null
+      ? periodsSummary.filter(p => p.periodYear === metricsYearFilter)
+      : periodsSummary;
+    
     // Requirement 5: Rename KPI to clarify it counts statement uploads
     const paymentStatementUploads = runs.filter(run => run.totalRemittanceRows > 0).length;
     
     // Requirement 5: Add new KPI for claim months uploaded
     // Count unique periods with claims (unique provider+year+month from periodsSummary where totalClaims > 0)
-    const claimMonthsUploaded = periodsSummary.filter(p => p.totalClaims > 0).length;
+    const claimMonthsUploaded = filteredPeriods.filter(p => p.totalClaims > 0).length;
 
-    const totalClaims = periodsSummary.reduce((sum, p) => sum + p.totalClaims, 0);
+    const totalClaims = filteredPeriods.reduce((sum, p) => sum + p.totalClaims, 0);
     // Claims to follow up: partially paid, unpaid (with remittance), and manual review
     // EXCLUDES awaiting_remittance (not yet in any remittance)
-    const problemClaims = periodsSummary.reduce(
+    const problemClaims = filteredPeriods.reduce(
       (sum, p) => sum + p.unpaid + p.partiallyPaid + (p.manualReview || 0), 
       0
     );
-    const awaitingPaymentStatement = periodsSummary.reduce((sum, p) => sum + p.awaitingRemittance, 0);
+    const awaitingPaymentStatement = filteredPeriods.reduce((sum, p) => sum + p.awaitingRemittance, 0);
 
     // Requirement 2: Add claim status breakdown for new KPI card
-    const paidInFull = periodsSummary.reduce((sum, p) => sum + p.matched, 0);
-    const followUpNeeded = periodsSummary.reduce((sum, p) => sum + p.unpaid + p.partiallyPaid, 0);
+    const paidInFull = filteredPeriods.reduce((sum, p) => sum + p.matched, 0);
+    const followUpNeeded = filteredPeriods.reduce((sum, p) => sum + p.unpaid + p.partiallyPaid, 0);
     const waitingForPaymentStatement = awaitingPaymentStatement;
     const outstandingTotal = followUpNeeded + waitingForPaymentStatement;
 
@@ -1122,56 +1127,7 @@ export default function ClaimReconciliation() {
       lastPeriodLabel,
       latestRunId: latest?.id ?? null,
     };
-  }, [runs, periodsSummary]);
-
-  /* ------------------------------------------------------------------------ */
-  /* Annual Financial Summary calculations */
-  /* ------------------------------------------------------------------------ */
-
-  const annualSummary = useMemo(() => {
-    // Filter periods to selected year and provider
-    const yearPeriods = periodsSummary.filter(p => p.periodYear === annualSummaryYear && p.providerName === providerName);
-    
-    if (yearPeriods.length === 0) {
-      return {
-        totalClaims: 0,
-        totalBilledAmount: 0,
-        totalPaidAmount: 0,
-        collectionRate: 0,
-        awaitingPayment: 0,
-        awaitingPaymentAmount: 0,
-        currency: "USD",
-      };
-    }
-
-    const totalClaims = yearPeriods.reduce((sum, p) => sum + p.totalClaims, 0);
-    const totalBilledAmount = yearPeriods.reduce((sum, p) => sum + parseFloat(p.totalBilled), 0);
-    const totalPaidAmount = yearPeriods.reduce((sum, p) => sum + parseFloat(p.totalPaid), 0);
-    const awaitingPayment = yearPeriods.reduce((sum, p) => sum + p.awaitingRemittance, 0);
-    
-    // Calculate awaiting payment amount (billed amount for claims awaiting remittance)
-    // Rough estimate: (awaiting / total) * totalBilled
-    const awaitingPaymentAmount = totalClaims > 0 
-      ? (awaitingPayment / totalClaims) * totalBilledAmount 
-      : 0;
-
-    const collectionRate = totalBilledAmount > 0 
-      ? (totalPaidAmount / totalBilledAmount) * 100 
-      : 0;
-
-    // Get currency from first period (they should all be the same provider)
-    const currency = getCurrencyForDisplay(yearPeriods[0]?.providerName || providerName, yearPeriods[0]?.currency);
-
-    return {
-      totalClaims,
-      totalBilledAmount,
-      totalPaidAmount,
-      collectionRate,
-      awaitingPayment,
-      awaitingPaymentAmount,
-      currency,
-    };
-  }, [periodsSummary, annualSummaryYear, providerName]);
+  }, [runs, periodsSummary, metricsYearFilter]);
 
   /* ------------------------------------------------------------------------ */
   /* Mutations */
@@ -2598,124 +2554,6 @@ export default function ClaimReconciliation() {
         {/* Section Spacing: Use consistent larger gaps between major sections */}
         <div className="space-y-10">
 
-        {/* Compact Annual Summary Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="relative overflow-hidden rounded-2xl border border-slate-200/60 shadow-lg bg-gradient-to-r from-blue-50 via-purple-50 to-emerald-50 hover:shadow-xl transition-all duration-300 cursor-help">
-                  {/* Subtle animated gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-emerald-500/5 pointer-events-none" />
-                  
-                  {summaryLoading ? (
-                    <div className="relative px-6 py-4 flex items-center justify-center gap-3">
-                      <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                      <span className="text-sm text-slate-600">Loading annual summary...</span>
-                    </div>
-                  ) : (
-                    <div className="relative px-6 py-4">
-                      <div className="flex items-center justify-between gap-4 flex-wrap">
-                        {/* Left: Year and Icon */}
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-500 flex items-center justify-center shadow-lg shrink-0">
-                            <TrendingUp className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-700">📊</span>
-                            <span className="text-base font-bold text-slate-800">{annualSummaryYear} Summary</span>
-                            <div className="h-4 w-px bg-slate-300 mx-1" />
-                          </div>
-                        </div>
-
-                        {/* Center: Key Metrics or No Data Message */}
-                        {annualSummary.totalClaims === 0 ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-slate-500 italic">
-                              No claims submitted for {annualSummaryYear}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-6 flex-wrap">
-                            {/* Claims Count */}
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-blue-600" />
-                              <span className="text-sm font-semibold text-slate-700">
-                                {formatNumber(annualSummary.totalClaims)} claims
-                              </span>
-                              <span className="text-sm text-slate-500">
-                                ({annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))})
-                              </span>
-                            </div>
-
-                            <div className="h-4 w-px bg-slate-300" />
-
-                            {/* Collection Progress */}
-                            <div className="flex items-center gap-3">
-                              <DollarSign className="w-4 h-4 text-emerald-600" />
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-emerald-700">
-                                  {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))} collected
-                                </span>
-                                <span className="text-sm text-slate-500">
-                                  ({annualSummary.collectionRate.toFixed(1)}%)
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Inline Progress Bar */}
-                            <div className="flex items-center gap-2">
-                              <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                                <motion.div
-                                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${Math.min(annualSummary.collectionRate, 100)}%` }}
-                                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Right: Year Selector */}
-                        <Select
-                          value={annualSummaryYear.toString()}
-                          onValueChange={(value) => setAnnualSummaryYear(parseInt(value, 10))}
-                        >
-                          <SelectTrigger className="w-[100px] h-9 bg-white/80 border-slate-300 hover:border-slate-400 transition-colors shadow-sm text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableYears.map((year) => (
-                              <SelectItem key={year} value={year.toString()}>
-                                {year}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-sm p-4" side="bottom">
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-slate-800">Annual Financial Performance</p>
-                  <div className="space-y-1 text-xs text-slate-600">
-                    <p><strong>Total Billed:</strong> {annualSummary.currency} {formatNumber(annualSummary.totalBilledAmount.toFixed(2))}</p>
-                    <p><strong>Amount Collected:</strong> {annualSummary.currency} {formatNumber(annualSummary.totalPaidAmount.toFixed(2))}</p>
-                    <p><strong>Collection Rate:</strong> {annualSummary.collectionRate.toFixed(1)}%</p>
-                    <p><strong>Awaiting Payment:</strong> {formatNumber(annualSummary.awaitingPayment)} claims ({annualSummary.currency} {formatNumber(annualSummary.awaitingPaymentAmount.toFixed(2))})</p>
-                  </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </motion.div>
-
         {/* UNIFIED KPI GRID - ONE cohesive section consolidating all metrics */}
         <section>
           {/* Premium Card with Glass-morphism */}
@@ -2727,9 +2565,27 @@ export default function ClaimReconciliation() {
             <div className="relative p-8">
               {/* Section Header */}
               <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-full" />
-                  <h2 className="text-2xl font-bold text-slate-900">Key Metrics Overview</h2>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-full" />
+                    <h2 className="text-2xl font-bold text-slate-900">Key Metrics Overview</h2>
+                  </div>
+                  <Select
+                    value={metricsYearFilter === null ? "all" : metricsYearFilter.toString()}
+                    onValueChange={(value) => setMetricsYearFilter(value === "all" ? null : parseInt(value, 10))}
+                  >
+                    <SelectTrigger className="w-[140px] h-9 bg-white border-slate-300 hover:border-slate-400 transition-colors shadow-sm text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {availableYears.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <p className="text-sm text-slate-600 ml-5">Consolidated view of claims, payments, and outstanding balances</p>
               </div>
@@ -3879,10 +3735,10 @@ export default function ClaimReconciliation() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowInventory(!showInventory)}
-                className="gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all shadow-sm hover:shadow-md"
+                className="gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border-0 shadow-lg"
               >
                 <FileStack className="w-4 h-4" />
-                {showInventory ? "Hide" : "View All Claims"}
+                {showInventory ? "Hide Claims" : "View All Claims"}
               </Button>
             </div>
           </CardHeader>
