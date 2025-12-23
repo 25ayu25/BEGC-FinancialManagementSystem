@@ -1067,8 +1067,8 @@ export async function deleteRemittancesForPeriod(providerName: string, periodYea
 
 export async function getPeriodsSummary(providerName?: string) {
   // Helper to safely parse decimal values from database
-  const parseDecimalValue = (value: any): number => {
-    const val = parseFloat(value || '0');
+  const parseDecimalValue = (value: string | number | null | undefined): number => {
+    const val = parseFloat(String(value || '0'));
     return isNaN(val) ? 0 : val;
   };
 
