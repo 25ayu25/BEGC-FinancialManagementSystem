@@ -2665,7 +2665,7 @@ export default function ClaimReconciliation() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={getCardTransition(2)}
                     type="button"
-                    onClick={() => handleDrillDownToInventory('all', 'all', 'all')}
+                    onClick={() => handleDrillDownToInventory('all', metricsYearFilter ?? 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-blue-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -2685,7 +2685,7 @@ export default function ClaimReconciliation() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={getCardTransition(3)}
                     type="button"
-                    onClick={() => handleDrillDownToInventory('matched', 'all', 'all')}
+                    onClick={() => handleDrillDownToInventory('matched', metricsYearFilter ?? 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -2705,7 +2705,7 @@ export default function ClaimReconciliation() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={getCardTransition(4)}
                     type="button"
-                    onClick={() => handleDrillDownToInventory('partially_paid', 'all', 'all')}
+                    onClick={() => handleDrillDownToInventory('partially_paid', metricsYearFilter ?? 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-orange-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -2738,7 +2738,7 @@ export default function ClaimReconciliation() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={getCardTransition(5)}
                     type="button"
-                    onClick={() => handleDrillDownToInventory('awaiting_remittance', 'all', 'all')}
+                    onClick={() => handleDrillDownToInventory('awaiting_remittance', metricsYearFilter ?? 'all', 'all')}
                     className="group relative overflow-hidden rounded-xl border-l-4 border-l-sky-500 bg-white p-6 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-left cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-4">
