@@ -1066,6 +1066,12 @@ export async function deleteRemittancesForPeriod(providerName: string, periodYea
 }
 
 export async function getPeriodsSummary(providerName?: string) {
+  // Helper to safely parse decimal values from database
+  const parseDecimalValue = (value: any): number => {
+    const val = parseFloat(value || '0');
+    return isNaN(val) ? 0 : val;
+  };
+
   const filters = providerName ? [eq(claimReconClaims.providerName, providerName)] : [];
 
   let query = db.select({
@@ -1108,12 +1114,6 @@ export async function getPeriodsSummary(providerName?: string) {
       const partiallyPaid = period.claims.filter((c) => c.status === "partially_paid").length;
       const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
       const manualReview = period.claims.filter((c) => c.status === "manual_review").length;
-
-      // Helper to safely parse decimal values from database
-      const parseDecimalValue = (value: any): number => {
-        const val = parseFloat(value || '0');
-        return isNaN(val) ? 0 : val;
-      };
 
       const totalBilled = period.claims.reduce((sum, c) => sum + parseDecimalValue(c.billedAmount), 0);
       const totalPaid = period.claims.reduce((sum, c) => sum + parseDecimalValue(c.amountPaid), 0);
