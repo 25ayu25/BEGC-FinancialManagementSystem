@@ -24,9 +24,9 @@ Located at the top of the Claim Reconciliation page, this collapsible card expla
 │ │    ambiguity).                                                   ││
 │ └─────────────────────────────────────────────────────────────────┘│
 │                                                                      │
-│ Note: Unmatched items require manual review. If multiple claims    │
-│ could match the same payment (or vice versa), they are left        │
-│ unmatched to prevent errors.                                        │
+│ Note: Not matched items require manual review. If multiple claims  │
+│ could match the same payment (or vice versa), no automatic match   │
+│ is made to prevent errors.                                          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,7 +53,7 @@ Claims Inventory Table
 │ CS012160 │ Jane Smith │ 2024-03-20   │ Mar 2024   │ USD 150.00   │ USD 150.00 │ ✓ Paid in   │ ≡ Date+Amount  │
 │          │            │              │            │              │            │   full      │   (tooltip)    │
 ├──────────┼────────────┼──────────────┼────────────┼──────────────┼────────────┼─────────────┼────────────────┤
-│ CS012161 │ Bob Wilson │ 2024-03-25   │ Mar 2024   │ USD 200.00   │ USD 0.00   │ ⏰ Pending  │ · Unmatched    │
+│ CS012161 │ Bob Wilson │ 2024-03-25   │ Mar 2024   │ USD 200.00   │ USD 0.00   │ ⏰ Pending  │ · Not Matched  │
 │          │            │              │            │              │            │   remittance│   (tooltip)    │
 └──────────┴────────────┴──────────────┴────────────┴──────────────┴────────────┴─────────────┴────────────────┘
 ```
@@ -89,14 +89,14 @@ Four badge types with distinct colors and icons:
 ```
 **Tooltip:** "Manually matched by staff"
 
-### Unmatched (Gray)
+### Not Matched (Gray)
 ```
 ┌─────────────────┐
-│ Unmatched       │  ← Gray background (#CBD5E1)
+│ Not Matched     │  ← Gray background (#CBD5E1)
 └─────────────────┘     Dark gray text (#334155)
                         No icon
 ```
-**Tooltip:** "Not yet matched to a payment statement"
+**Tooltip:** "This claim has not been matched to a payment statement yet"
 
 ## 4. Complete Page Layout
 
@@ -183,7 +183,7 @@ After (Expanded):
 | Invoice Badge    | Green     | #10B981   | Highest confidence match |
 | Date+Amt Badge   | Blue      | #3B82F6   | Verified secondary match |
 | Manual Badge     | Orange    | #F97316   | Staff intervention       |
-| Unmatched Badge  | Gray      | #CBD5E1   | No match found           |
+| Not Matched Badge| Gray      | #CBD5E1   | No match found           |
 | Info Card BG     | Light Blue| #EFF6FF   | Information display      |
 | Info Card Border | Blue      | #BFDBFE   | Visual boundary          |
 

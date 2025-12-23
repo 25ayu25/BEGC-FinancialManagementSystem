@@ -72,7 +72,7 @@ Implemented two-phase matching strategy:
   - **Green (Invoice)**: CheckCircle2 icon - "Highest confidence"
   - **Blue (Date+Amount)**: Calculator icon - "Verified match"
   - **Orange (Manual)**: UserCheck icon - "Staff-verified"
-  - **Gray (Unmatched)**: No icon - "Not yet matched"
+  - **Gray (Not Matched)**: No icon - "Not yet matched"
 - Implemented with Radix UI Tooltip for accessibility
 - Shows detailed explanation on hover
 

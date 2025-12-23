@@ -127,14 +127,14 @@ Added comprehensive new section to Help & Guide sheet explaining claim matching 
 - **Description:** Staff can manually match claims that couldn't be auto-matched
 - **Visual:** Orange gradient card
 
-#### 4. Unmatched Claims
-- **Badge:** Gray "Unmatched"
+#### 4. Not Matched Claims
+- **Badge:** Gray "Not Matched"
 - **Description:** Claims requiring manual review
 - **Reason:** Invoice numbers don't align or date+amount matching is ambiguous
 - **Visual:** Gray gradient card
 
 #### 5. Important Note
-- Explains why ambiguous matches are left unmatched
+- Explains why ambiguous matches are not automatically made
 - Emphasizes accuracy over automation
 - Styled with amber alert box and info icon
 
