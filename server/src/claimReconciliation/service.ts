@@ -1109,14 +1109,14 @@ export async function getPeriodsSummary(providerName?: string) {
       const unpaid = period.claims.filter((c) => c.status === "unpaid").length;
       const manualReview = period.claims.filter((c) => c.status === "manual_review").length;
 
-      const totalBilled = period.claims.reduce((sum, c) => {
-        const val = parseFloat(String(c.billedAmount || 0));
-        return sum + (isNaN(val) ? 0 : val);
-      }, 0);
-      const totalPaid = period.claims.reduce((sum, c) => {
-        const val = parseFloat(String(c.amountPaid || 0));
-        return sum + (isNaN(val) ? 0 : val);
-      }, 0);
+      // Helper to safely parse decimal values from database
+      const parseDecimalValue = (value: any): number => {
+        const val = parseFloat(value || '0');
+        return isNaN(val) ? 0 : val;
+      };
+
+      const totalBilled = period.claims.reduce((sum, c) => sum + parseDecimalValue(c.billedAmount), 0);
+      const totalPaid = period.claims.reduce((sum, c) => sum + parseDecimalValue(c.amountPaid), 0);
 
       const currency = period.claims[0]?.currency || "USD";
 
