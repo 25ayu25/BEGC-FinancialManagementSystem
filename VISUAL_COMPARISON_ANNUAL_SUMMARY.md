@@ -104,17 +104,17 @@ Hover Tooltip Shows:
 ║  └─────────────────────────────────────────────────────────────────────────┘ ║
 ║                                                                               ║
 ║  ┌─────────────────────────────────────────────────────────────────────────┐ ║
-║  │ [Unmatched] Unmatched Claims                                            │ ║
+║  │ [Not Matched] Not Matched Claims                                        │ ║
 ║  │                                                                          │ ║
 ║  │ Claims that couldn't be automatically matched require manual review     │ ║
 ║  │ This happens when invoice numbers don't align and date+amount           │ ║
 ║  │ matching is ambiguous                                                   │ ║
-║  │ ✓ Shown as gray "Unmatched" badge                                       │ ║
+║  │ ✓ Shown as gray "Not Matched" badge                                     │ ║
 ║  └─────────────────────────────────────────────────────────────────────────┘ ║
 ║                                                                               ║
 ║  ⚠️ Note: If multiple claims could match the same payment (or vice versa),   ║
-║     they are left unmatched to prevent errors. This ensures accuracy over    ║
-║     automation.                                                               ║
+║     no automatic match is made to prevent errors. This ensures accuracy      ║
+║     over automation.                                                          ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ```

@@ -365,7 +365,7 @@ function matchMethodLabel(matchMethod: "invoice" | "date_amount" | "manual" | nu
     case "manual":
       return "Manual";
     default:
-      return "Unmatched";
+      return "Not Matched";
   }
 }
 
@@ -381,7 +381,7 @@ function matchMethodTooltip(matchMethod: "invoice" | "date_amount" | "manual" | 
     case "manual":
       return "Manually matched by staff";
     default:
-      return "Not yet matched to a payment statement";
+      return "This claim has not been matched to a payment statement yet";
   }
 }
 
@@ -1846,7 +1846,7 @@ export default function ClaimReconciliation() {
     const tooltip = matchMethodTooltip(matchMethod);
 
     if (!matchMethod) {
-      // Unmatched - gray badge
+      // Not Matched - gray badge
       return (
         <TooltipProvider>
           <Tooltip>
@@ -2435,18 +2435,18 @@ export default function ClaimReconciliation() {
                       </div>
                     </div>
 
-                    {/* Unmatched Claims */}
+                    {/* Not Matched Claims */}
                     <div className="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/50 border-2 border-slate-200/50 p-4">
                       <div className="flex items-start gap-3 mb-3">
                         <Badge variant="outline" className="bg-white text-slate-600 border-slate-300 px-3 py-1 shrink-0">
-                          Unmatched
+                          Not Matched
                         </Badge>
                         <div className="flex-1">
-                          <div className="font-bold text-slate-800 mb-1">Unmatched Claims</div>
+                          <div className="font-bold text-slate-800 mb-1">Not Matched Claims</div>
                           <div className="text-sm text-slate-600 space-y-1">
                             <p>Claims that couldn't be automatically matched require manual review</p>
                             <p>This happens when invoice numbers don't align and date+amount matching is ambiguous</p>
-                            <p className="text-xs text-slate-700 font-medium mt-2">✓ Shown as gray "Unmatched" badge</p>
+                            <p className="text-xs text-slate-700 font-medium mt-2">✓ Shown as gray "Not Matched" badge</p>
                           </div>
                         </div>
                       </div>
@@ -2456,7 +2456,7 @@ export default function ClaimReconciliation() {
                     <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50/50 border border-amber-200/50">
                       <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                       <div className="text-sm text-slate-700 leading-relaxed">
-                        <strong className="text-amber-800">Note:</strong> If multiple claims could match the same payment (or vice versa), they are left unmatched to prevent errors. This ensures accuracy over automation.
+                        <strong className="text-amber-800">Note:</strong> If multiple claims could match the same payment (or vice versa), no automatic match is made to prevent errors. This ensures accuracy over automation.
                       </div>
                     </div>
                   </CardContent>
