@@ -43,7 +43,7 @@ export function CategoryDeepDiveModal({
       const parts = value.split('-');
       if (parts.length >= 2) {
         const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-        return format(date, 'MMM yy');
+        return format(date, 'MMM');
       }
       return value;
     } catch {

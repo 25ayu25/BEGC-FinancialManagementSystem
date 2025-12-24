@@ -35,7 +35,7 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
   if (!department) return null;
 
   const chartData = department.monthlyData.map(d => ({
-    month: d.fullMonth || formatMonthSafely(d, 'MMM'),
+    month: formatMonthSafely(d, 'MMM'),
     revenue: d.revenue,
   }));
 
@@ -176,7 +176,7 @@ export function DepartmentDeepDive({ department, onClose }: DepartmentDeepDivePr
                       >
                         <td className="py-2 px-3 text-sm text-gray-900">
                           <div className="flex items-center gap-2">
-                            {month.fullMonth || formatMonthSafely(month, 'MMM')}
+                            {formatMonthSafely(month, 'MMM')}
                             {isHighlight && (
                               <span className="text-xs bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded font-semibold">
                                 BEST

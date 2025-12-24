@@ -193,7 +193,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-500">
-          <p>© 2025 Bahr El Ghazal Clinic. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Bahr El Ghazal Clinic. All rights reserved.</p>
           <p className="mt-1">Secure financial management for healthcare operations</p>
         </div>
       </div>
