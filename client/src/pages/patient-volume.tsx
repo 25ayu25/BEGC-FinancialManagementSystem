@@ -94,7 +94,7 @@ type WeekdayDistributionRow = { day: string; count: number; percentage: number }
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
 // Bar label styling constant for consistency
-const BAR_LABEL_STYLE = { fontSize: 10, fill: '#64748b' } as const;
+const BAR_LABEL_STYLE = { fontSize: 12, fill: '#475569', fontWeight: 600 } as const;
 
 /** ---------- SAFETY HELPERS (prevents Recharts reduce() crash) ---------- */
 function asArray<T>(value: unknown): T[] {
@@ -1422,7 +1422,7 @@ export default function PatientVolumePage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
-                  className="h-72"
+                  className="h-[400px]"
                 >
                   {/* ✅ Heatmap is NOT a Recharts chart - don't wrap it in ResponsiveContainer */}
                   {chartType === "heatmap" ? (
@@ -1494,16 +1494,16 @@ export default function PatientVolumePage() {
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       {chartType === "bar" ? (
-                        <BarChart data={safeCombinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }} barCategoryGap="20%">
+                        <BarChart data={safeCombinedChartData} margin={{ top: 20, right: 16, left: 4, bottom: 8 }} barCategoryGap="20%">
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
+                            tick={{ fontSize: 12, fill: "#64748b" }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
-                            angle={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? -45 : 0}
-                            textAnchor={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? "end" : "middle"}
-                            height={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? 60 : 30}
+                            angle={0}
+                            textAnchor="middle"
+                            height={30}
                           />
                           <YAxis
                             tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1562,26 +1562,36 @@ export default function PatientVolumePage() {
                                 />
                               );
                             })()}
-                          <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26}>
-                            <LabelList dataKey="count" position="top" style={BAR_LABEL_STYLE} />
+                          <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={32}>
+                            <LabelList 
+                              dataKey="count" 
+                              position="top" 
+                              formatter={(value: number) => value > 0 ? value : ''}
+                              style={BAR_LABEL_STYLE} 
+                            />
                           </Bar>
                           {showComparison && (
-                            <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26}>
-                              <LabelList dataKey="comparisonCount" position="top" style={BAR_LABEL_STYLE} />
+                            <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={32}>
+                              <LabelList 
+                                dataKey="comparisonCount" 
+                                position="top" 
+                                formatter={(value: number) => value > 0 ? value : ''}
+                                style={BAR_LABEL_STYLE} 
+                              />
                             </Bar>
                           )}
                         </BarChart>
                       ) : chartType === "line" ? (
-                        <RechartsLineChart data={safeCombinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
+                        <RechartsLineChart data={safeCombinedChartData} margin={{ top: 20, right: 16, left: 4, bottom: 8 }}>
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
+                            tick={{ fontSize: 12, fill: "#64748b" }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
-                            angle={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? -45 : 0}
-                            textAnchor={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? "end" : "middle"}
-                            height={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? 60 : 30}
+                            angle={0}
+                            textAnchor="middle"
+                            height={30}
                           />
                           <YAxis
                             tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1629,7 +1639,7 @@ export default function PatientVolumePage() {
                           )}
                         </RechartsLineChart>
                       ) : (
-                        <RechartsAreaChart data={safeCombinedChartData} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
+                        <RechartsAreaChart data={safeCombinedChartData} margin={{ top: 20, right: 16, left: 4, bottom: 8 }}>
                           <defs>
                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8} />
@@ -1643,12 +1653,12 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
+                            tick={{ fontSize: 12, fill: "#64748b" }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
-                            angle={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? -45 : 0}
-                            textAnchor={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? "end" : "middle"}
-                            height={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? 60 : 30}
+                            angle={0}
+                            textAnchor="middle"
+                            height={30}
                           />
                           <YAxis
                             tick={{ fontSize: 11, fill: "#64748b" }}
