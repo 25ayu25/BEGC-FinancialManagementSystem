@@ -761,15 +761,17 @@ export default function PatientVolumePage() {
   }, [filteredVolumes]);
 
   // ✅ Pie safety: always pass an array to <Pie data={...}>
+  // Only include non-zero days in the pie chart visualization
   const weekdayPieData = useMemo(
     () => asArray<WeekdayDistributionRow>(weekdayDistribution).filter((d) => toFiniteNumber(d.count) > 0),
     [weekdayDistribution]
   );
 
-  // Sort legend by volume (highest to lowest), hide zero-patient days
+  // ✅ CRITICAL FIX: Display ALL 7 days in chronological order (Monday-Sunday)
+  // Do NOT hide zero-entry days, do NOT sort by volume
   const weekdayLegendData = useMemo(
-    () => weekdayPieData.slice().sort((a, b) => b.count - a.count),
-    [weekdayPieData]
+    () => asArray<WeekdayDistributionRow>(weekdayDistribution),
+    [weekdayDistribution]
   );
 
   // Heatmap data for calendar view
@@ -1817,60 +1819,103 @@ export default function PatientVolumePage() {
                 </div>
               </div>
 
-              {/* Legend - Sorted by Volume */}
+              {/* Legend - Chronological Order (Monday to Sunday) */}
               <div className="space-y-2.5">
                 {weekdayLegendData.map((day, legendIdx) => {
                   const dayIndex = WEEKDAYS.indexOf(day.day as any);
-                  const max = Math.max(...weekdayLegendData.map((d) => d.count));
-                  const min = Math.min(...weekdayLegendData.map((d) => d.count));
-                  const isMax = day.count === max && legendIdx === 0;
-                  const isMin = day.count === min && legendIdx === weekdayLegendData.length - 1;
+                  const hasData = day.count > 0;
+                  
+                  // Find busiest and slowest days (only among days with data)
+                  const daysWithData = weekdayLegendData.filter(d => d.count > 0);
+                  const max = Math.max(...daysWithData.map((d) => d.count), 0);
+                  const min = Math.min(...daysWithData.map((d) => d.count), Infinity);
+                  const isBusiest = hasData && day.count === max && max > 0;
+                  const isSlowest = hasData && day.count === min && min < Infinity && daysWithData.length > 1;
 
                   return (
                     <div
                       key={day.day}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 hover:bg-slate-50"
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
+                        hasData ? "hover:bg-slate-50" : "opacity-60"
+                      )}
                     >
                       <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        className={cn(
+                          "w-4 h-4 rounded-full flex-shrink-0",
+                          !hasData && "opacity-40"
+                        )}
                         style={{ backgroundColor: WEEKDAY_COLORS[dayIndex >= 0 ? dayIndex : 0] }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-slate-900">{day.day}</span>
-                            {isMax && (
-                              <span className="text-xs">🏆</span>
+                            <span className={cn(
+                              "text-sm font-medium",
+                              hasData ? "text-slate-900" : "text-slate-400"
+                            )}>
+                              {day.day}
+                            </span>
+                            {isBusiest && (
+                              <span className="text-xs" title="Busiest day">🏆</span>
                             )}
-                            {isMin && (
-                              <span className="text-xs">🔻</span>
+                            {isSlowest && (
+                              <span className="text-xs" title="Slowest day">🔻</span>
                             )}
                           </div>
-                          <span className="text-base font-semibold text-slate-900">
-                            {day.count}
-                          </span>
+                          {hasData ? (
+                            <span className="text-base font-semibold text-slate-900">
+                              {day.count}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-slate-400 italic">
+                              No Entries
+                            </span>
+                          )}
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div className={cn(
+                          "w-full rounded-full h-2 overflow-hidden",
+                          hasData ? "bg-slate-100" : "bg-slate-50"
+                        )}>
                           <div
-                            className="h-2 rounded-full transition-all duration-300 bg-teal-500"
+                            className={cn(
+                              "h-2 rounded-full transition-all duration-300",
+                              hasData ? "bg-teal-500" : "bg-slate-300"
+                            )}
                             style={{
                               width: `${day.percentage}%`,
                             }}
                           />
                         </div>
                       </div>
-                      <span className="text-xs text-slate-500 w-12 text-right tabular-nums">
-                        {day.percentage.toFixed(1)}%
+                      <span className={cn(
+                        "text-xs w-12 text-right tabular-nums",
+                        hasData ? "text-slate-500" : "text-slate-400"
+                      )}>
+                        {hasData ? `${day.percentage.toFixed(1)}%` : "—"}
                       </span>
                     </div>
                   );
                 })}
                 {weekdayLegendData.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-slate-200">
-                    <p className="text-xs text-slate-600">
-                      <span className="font-medium">Peak day:</span>{" "}
-                      {weekdayLegendData[0]?.day} ({weekdayLegendData[0]?.count} patients)
-                    </p>
+                    {(() => {
+                      const daysWithData = weekdayLegendData.filter(d => d.count > 0);
+                      if (daysWithData.length === 0) {
+                        return (
+                          <p className="text-xs text-slate-500 italic">
+                            No patient data available for this period
+                          </p>
+                        );
+                      }
+                      const peakDay = daysWithData.reduce((max, d) => d.count > max.count ? d : max);
+                      return (
+                        <p className="text-xs text-slate-600">
+                          <span className="font-medium">Peak day:</span>{" "}
+                          {peakDay.day} ({peakDay.count} patients)
+                        </p>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
