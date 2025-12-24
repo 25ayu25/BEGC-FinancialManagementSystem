@@ -75,6 +75,7 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
+  LabelList,
 } from "recharts";
 
 import AppContainer from "@/components/layout/AppContainer";
@@ -91,6 +92,9 @@ type PatientVolume = {
 type WeekdayDistributionRow = { day: string; count: number; percentage: number };
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+// Bar label styling constant for consistency
+const BAR_LABEL_STYLE = { fontSize: 10, fill: '#64748b' } as const;
 
 /** ---------- SAFETY HELPERS (prevents Recharts reduce() crash) ---------- */
 function asArray<T>(value: unknown): T[] {
@@ -974,18 +978,43 @@ export default function PatientVolumePage() {
     const diffFromAvg = toFiniteNumber(p.count) - avgPerActiveDay;
     const percentDiff = avgPerActiveDay > 0 ? ((diffFromAvg / avgPerActiveDay) * 100).toFixed(1) : "0";
 
+    // Create a clear header: "Day X" or full date depending on aggregation level
+    let header = "";
+    if (aggregationLevel === "daily") {
+      // For daily view, show "Day X" or full date
+      const dayNum = p.day;
+      if (typeof dayNum === "number") {
+        const fullDate = format(new Date(year, monthIndex, dayNum), "MMMM d");
+        header = fullDate;
+      } else {
+        header = p.label || "";
+      }
+    } else if (aggregationLevel === "weekly") {
+      header = `Week ${p.week || p.label}`;
+    } else {
+      header = p.label || "";
+    }
+
     return (
-      <div className="bg-white border border-slate-200 rounded-md shadow-md px-3 py-2">
-        <div className="font-medium text-slate-900 mb-1">{p.label}</div>
-        <div className="text-sm text-slate-700">
-          Patients: <span className="font-semibold">{toFiniteNumber(p.count)}</span>
+      <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 min-w-[180px]">
+        <div className="text-sm font-semibold text-slate-700 mb-2">{header}</div>
+        <div className="text-lg font-bold text-slate-900 mb-2">
+          {toFiniteNumber(p.count)} patient{toFiniteNumber(p.count) !== 1 ? "s" : ""}
         </div>
-        <div className="text-xs text-slate-500 mt-1">
-          {diffFromAvg >= 0 ? "+" : ""}
-          {diffFromAvg.toFixed(1)} ({percentDiff}%) vs avg
-        </div>
+        {avgPerActiveDay > 0 && (
+          <div className="text-xs text-slate-600">
+            <span className={cn(
+              "font-semibold",
+              diffFromAvg > 0 ? "text-emerald-600" : diffFromAvg < 0 ? "text-red-600" : "text-slate-500"
+            )}>
+              {diffFromAvg > 0 ? "+" : ""}{percentDiff}%
+            </span>
+            {" "}
+            {diffFromAvg >= 0 ? "above" : "below"} average
+          </div>
+        )}
         {targetValue && (
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-slate-600 mt-1">
             Target: {targetValue} {toFiniteNumber(p.count) >= targetValue ? "✓" : ""}
           </div>
         )}
@@ -1469,7 +1498,7 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
                             angle={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? -45 : 0}
@@ -1533,9 +1562,13 @@ export default function PatientVolumePage() {
                                 />
                               );
                             })()}
-                          <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
+                          <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26}>
+                            <LabelList dataKey="count" position="top" style={BAR_LABEL_STYLE} />
+                          </Bar>
                           {showComparison && (
-                            <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26} />
+                            <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26}>
+                              <LabelList dataKey="comparisonCount" position="top" style={BAR_LABEL_STYLE} />
+                            </Bar>
                           )}
                         </BarChart>
                       ) : chartType === "line" ? (
@@ -1543,7 +1576,7 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
                             angle={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? -45 : 0}
@@ -1610,7 +1643,7 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
                             angle={aggregationLevel === "daily" && safeCombinedChartData.length > 15 ? -45 : 0}

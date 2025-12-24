@@ -823,35 +823,6 @@ export default function RevenueAnalyticsDaily({
               </div>
             )}
           </div>
-
-          {/* Inline Stats Badges */}
-          {!hasNoData && (
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 font-semibold border border-teal-100">
-                TOTAL SSP {nf0.format(Math.round(totalSSP))}
-              </span>
-              <span className="text-slate-300">|</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-semibold border border-sky-100">
-                TOTAL USD {nf0.format(Math.round(totalUSD))}
-              </span>
-              {!wide && avgDaySSP > 0 && (
-                <>
-                  <span className="text-slate-300">|</span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
-                    AVG SSP / DAY {nf0.format(avgDaySSP)} ({activeDaysSSP} active days)
-                  </span>
-                </>
-              )}
-              {!wide && avgDayUSD > 0 && (
-                <>
-                  <span className="text-slate-300">|</span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">
-                    AVG USD / DAY {nf0.format(avgDayUSD)} ({activeDaysUSD} active days)
-                  </span>
-                </>
-              )}
-            </div>
-          )}
         </div>
       </CardHeader>
 
@@ -885,10 +856,27 @@ export default function RevenueAnalyticsDaily({
             {/* SSP Chart */}
             <section aria-label={`SSP ${wide ? "monthly" : "daily"}`}>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-teal-500 rounded-sm"></span>
-                  SSP ({wide ? "Monthly" : "Daily"})
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <span className="w-3 h-3 bg-teal-500 rounded-sm"></span>
+                    SSP ({wide ? "Monthly" : "Daily"})
+                  </p>
+                  {!hasNoData && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 font-semibold border border-teal-100">
+                        TOTAL SSP {nf0.format(Math.round(totalSSP))}
+                      </span>
+                      {!wide && avgDaySSP > 0 && (
+                        <>
+                          <span className="text-slate-300">|</span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
+                            AVG SSP / DAY {nf0.format(avgDaySSP)} ({activeDaysSSP} active days)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {!wide && avgDaySSP > 0 && (
                   <button
                     onClick={() => setShowAvgLine(!showAvgLine)}
@@ -1168,10 +1156,27 @@ export default function RevenueAnalyticsDaily({
             {/* USD Chart */}
             <section aria-label={`USD ${wide ? "monthly" : "daily"}`}>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-sky-500 rounded-sm"></span>
-                  USD ({wide ? "Monthly" : "Daily"})
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <span className="w-3 h-3 bg-sky-500 rounded-sm"></span>
+                    USD ({wide ? "Monthly" : "Daily"})
+                  </p>
+                  {!hasNoData && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-semibold border border-sky-100">
+                        TOTAL USD {nf0.format(Math.round(totalUSD))}
+                      </span>
+                      {!wide && avgDayUSD > 0 && (
+                        <>
+                          <span className="text-slate-300">|</span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                            AVG USD / DAY {nf0.format(avgDayUSD)} ({activeDaysUSD} active days)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {!wide && avgDayUSD > 0 && (
                   <button
                     onClick={() => setShowAvgLine(!showAvgLine)}
