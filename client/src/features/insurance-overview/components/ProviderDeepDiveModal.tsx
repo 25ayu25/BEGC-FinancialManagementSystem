@@ -123,7 +123,25 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="month" stroke="#6b7280" />
+                    <XAxis 
+                      dataKey="month" 
+                      stroke="#6b7280" 
+                      tickFormatter={(value) => {
+                        try {
+                          const parts = value.split('-');
+                          if (parts.length >= 2) {
+                            const monthNum = parseInt(parts[1], 10);
+                            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            if (monthNum >= 1 && monthNum <= 12) {
+                              return monthNames[monthNum - 1];
+                            }
+                          }
+                          return value;
+                        } catch {
+                          return value;
+                        }
+                      }}
+                    />
                     <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
                     <Tooltip 
                       formatter={(value: any) => formatUSD(value)}
@@ -151,15 +169,32 @@ export function ProviderDeepDiveModal({ provider, isOpen, onClose }: ProviderDee
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold mb-4">Month-by-Month Breakdown</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {provider.monthlyTrend.map((month) => (
-                  <div 
-                    key={month.month}
-                    className="p-3 border rounded-lg hover:border-violet-400 transition-colors"
-                  >
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{month.month}</p>
-                    <p className="text-sm font-bold">{formatUSD(month.revenue)}</p>
-                  </div>
-                ))}
+                {provider.monthlyTrend.map((month) => {
+                  // Format month from "2025-01" to "Jan"
+                  let displayMonth = month.month;
+                  try {
+                    const parts = month.month.split('-');
+                    if (parts.length >= 2) {
+                      const monthNum = parseInt(parts[1], 10);
+                      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      if (monthNum >= 1 && monthNum <= 12) {
+                        displayMonth = monthNames[monthNum - 1];
+                      }
+                    }
+                  } catch {
+                    // Keep original format if parsing fails
+                  }
+                  
+                  return (
+                    <div 
+                      key={month.month}
+                      className="p-3 border rounded-lg hover:border-violet-400 transition-colors"
+                    >
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{displayMonth}</p>
+                      <p className="text-sm font-bold">{formatUSD(month.revenue)}</p>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
