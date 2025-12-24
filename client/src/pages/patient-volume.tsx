@@ -94,6 +94,7 @@ type WeekdayDistributionRow = { day: string; count: number; percentage: number }
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
 // Bar label styling constant for consistency
+// Bolder (600) than axis labels for visual hierarchy
 const BAR_LABEL_STYLE = { fontSize: 12, fill: '#475569', fontWeight: 600 } as const;
 
 /** ---------- SAFETY HELPERS (prevents Recharts reduce() crash) ---------- */
@@ -1498,7 +1499,7 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#64748b" }}
+                            tick={{ fontSize: 12, fill: "#475569" }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
                             angle={0}
@@ -1586,7 +1587,7 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#64748b" }}
+                            tick={{ fontSize: 12, fill: "#475569" }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
                             angle={0}
@@ -1653,7 +1654,7 @@ export default function PatientVolumePage() {
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#64748b" }}
+                            tick={{ fontSize: 12, fill: "#475569" }}
                             axisLine={{ stroke: "#e5e7eb" }}
                             tickLine={false}
                             angle={0}
