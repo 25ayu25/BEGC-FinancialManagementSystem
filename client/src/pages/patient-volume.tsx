@@ -761,7 +761,7 @@ export default function PatientVolumePage() {
   }, [filteredVolumes]);
 
   // ✅ Pie safety: always pass an array to <Pie data={...}>
-  // Only include non-zero days in the pie chart visualization
+  // Filter to only include days with data - prevents empty pie slices in donut chart
   const weekdayPieData = useMemo(
     () => asArray<WeekdayDistributionRow>(weekdayDistribution).filter((d) => toFiniteNumber(d.count) > 0),
     [weekdayDistribution]
@@ -1827,10 +1827,10 @@ export default function PatientVolumePage() {
                   
                   // Find busiest and slowest days (only among days with data)
                   const daysWithData = weekdayLegendData.filter(d => d.count > 0);
-                  const max = Math.max(...daysWithData.map((d) => d.count), 0);
-                  const min = Math.min(...daysWithData.map((d) => d.count), Infinity);
-                  const isBusiest = hasData && day.count === max && max > 0;
-                  const isSlowest = hasData && day.count === min && min < Infinity && daysWithData.length > 1;
+                  const max = daysWithData.length > 0 ? Math.max(...daysWithData.map((d) => d.count)) : 0;
+                  const min = daysWithData.length > 0 ? Math.min(...daysWithData.map((d) => d.count)) : 0;
+                  const isBusiest = hasData && daysWithData.length > 0 && day.count === max;
+                  const isSlowest = hasData && daysWithData.length > 1 && day.count === min;
 
                   return (
                     <div
