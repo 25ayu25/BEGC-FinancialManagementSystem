@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -44,6 +45,8 @@ import {
   TestTubes,
   LucideIcon,
   Sparkles,
+  LineChart as LineChartIcon,
+  AreaChart as AreaChartIcon,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
@@ -52,6 +55,8 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -87,6 +92,23 @@ function compactUSD(n: number) {
   if (v >= MILLION) return `USD ${(n / MILLION).toFixed(v < TEN_MILLION ? 1 : 0)}M`;
   if (v >= THOUSAND) return `USD ${(n / THOUSAND).toFixed(v < (10 * THOUSAND) ? 1 : 0)}k`;
   return `USD ${nf0.format(Math.round(n))}`;
+}
+
+// Format X-axis dates from "YYYY-MM" to abbreviated month names
+function formatXAxisMonth(monthStr: string): string {
+  try {
+    const parts = monthStr.split('-');
+    if (parts.length >= 2) {
+      const monthNum = parseInt(parts[1], 10);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      if (monthNum >= 1 && monthNum <= 12) {
+        return monthNames[monthNum - 1];
+      }
+    }
+    return monthStr;
+  } catch {
+    return monthStr;
+  }
 }
 
 // Filter options for time period selection (import from centralized helper)
@@ -156,6 +178,7 @@ export default function Dashboard() {
   const now = new Date();
   const [selectedFilter, setSelectedFilter] = useState<FilterOption>("this-year");
   const [currencyTab, setCurrencyTab] = useState<"ssp" | "usd">("ssp");
+  const [chartType, setChartType] = useState<"line" | "area" | "bar">("line");
   
   // Month vs Month custom selection state
   // Handle year boundary: if current month is January (0), compare to December of previous year
@@ -687,17 +710,47 @@ export default function Dashboard() {
                 <CardDescription>{trendPeriodDescription}</CardDescription>
               </div>
               
-              {/* Currency Toggle Tabs */}
-              <Tabs value={currencyTab} onValueChange={(v) => setCurrencyTab(v as "ssp" | "usd")} className="w-auto">
-                <TabsList className="bg-slate-100">
-                  <TabsTrigger value="ssp" className="data-[state=active]:bg-white">
-                    SSP Revenue
-                  </TabsTrigger>
-                  <TabsTrigger value="usd" className="data-[state=active]:bg-white">
-                    USD Insurance
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              {/* Chart Type Toggle Buttons */}
+              <div className="flex items-center gap-3">
+                <div className="flex gap-2">
+                  <Button
+                    variant={chartType === 'line' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setChartType('line')}
+                  >
+                    <LineChartIcon className="w-4 h-4 mr-1" />
+                    Line
+                  </Button>
+                  <Button
+                    variant={chartType === 'area' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setChartType('area')}
+                  >
+                    <AreaChartIcon className="w-4 h-4 mr-1" />
+                    Area
+                  </Button>
+                  <Button
+                    variant={chartType === 'bar' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setChartType('bar')}
+                  >
+                    <BarChart3 className="w-4 h-4 mr-1" />
+                    Bar
+                  </Button>
+                </div>
+                
+                {/* Currency Toggle Tabs */}
+                <Tabs value={currencyTab} onValueChange={(v) => setCurrencyTab(v as "ssp" | "usd")} className="w-auto">
+                  <TabsList className="bg-slate-100">
+                    <TabsTrigger value="ssp" className="data-[state=active]:bg-white">
+                      SSP Revenue
+                    </TabsTrigger>
+                    <TabsTrigger value="usd" className="data-[state=active]:bg-white">
+                      USD Insurance
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -732,39 +785,98 @@ export default function Dashboard() {
                     ) : (
                       <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis 
-                              dataKey="month" 
-                              tick={{ fontSize: 12, fill: "#64748b" }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis 
-                              tick={{ fontSize: 11, fill: "#64748b" }}
-                              tickLine={false}
-                              axisLine={false}
-                              tickFormatter={(v) => {
-                                if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                return v.toString();
-                              }}
-                            />
-                            <Tooltip content={<CustomTooltipSSP />} />
-                            <Area 
-                              type="monotone" 
-                              dataKey="revenue" 
-                              stroke="#14b8a6" 
-                              strokeWidth={2}
-                              fill="url(#revenueGradient)" 
-                            />
-                          </AreaChart>
+                          {chartType === "area" ? (
+                            <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 12, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={formatXAxisMonth}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 11, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v) => {
+                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                  return v.toString();
+                                }}
+                              />
+                              <Tooltip content={<CustomTooltipSSP />} />
+                              <Area 
+                                type="monotone" 
+                                dataKey="revenue" 
+                                stroke="#14b8a6" 
+                                strokeWidth={2}
+                                fill="url(#revenueGradient)" 
+                              />
+                            </AreaChart>
+                          ) : chartType === "line" ? (
+                            <LineChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 12, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={formatXAxisMonth}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 11, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v) => {
+                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                  return v.toString();
+                                }}
+                              />
+                              <Tooltip content={<CustomTooltipSSP />} />
+                              <Line 
+                                type="monotone" 
+                                dataKey="revenue" 
+                                stroke="#14b8a6" 
+                                strokeWidth={2}
+                                dot={{ fill: "#14b8a6", r: 4 }}
+                              />
+                            </LineChart>
+                          ) : (
+                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 12, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={formatXAxisMonth}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 11, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v) => {
+                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                  return v.toString();
+                                }}
+                              />
+                              <Tooltip content={<CustomTooltipSSP />} />
+                              <Bar 
+                                dataKey="revenue" 
+                                fill="#14b8a6" 
+                                radius={[8, 8, 0, 0]}
+                              />
+                            </BarChart>
+                          )}
                         </ResponsiveContainer>
                       </div>
                     )}
@@ -823,39 +935,98 @@ export default function Dashboard() {
                     ) : (
                       <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="usdGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis 
-                              dataKey="month" 
-                              tick={{ fontSize: 12, fill: "#64748b" }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis 
-                              tick={{ fontSize: 11, fill: "#64748b" }}
-                              tickLine={false}
-                              axisLine={false}
-                              tickFormatter={(v) => {
-                                if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                return v.toString();
-                              }}
-                            />
-                            <Tooltip content={<CustomTooltipUSD />} />
-                            <Area 
-                              type="monotone" 
-                              dataKey="revenueUSD" 
-                              stroke="#3b82f6" 
-                              strokeWidth={2}
-                              fill="url(#usdGradient)" 
-                            />
-                          </AreaChart>
+                          {chartType === "area" ? (
+                            <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="usdGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 12, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={formatXAxisMonth}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 11, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v) => {
+                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                  return v.toString();
+                                }}
+                              />
+                              <Tooltip content={<CustomTooltipUSD />} />
+                              <Area 
+                                type="monotone" 
+                                dataKey="revenueUSD" 
+                                stroke="#3b82f6" 
+                                strokeWidth={2}
+                                fill="url(#usdGradient)" 
+                              />
+                            </AreaChart>
+                          ) : chartType === "line" ? (
+                            <LineChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 12, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={formatXAxisMonth}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 11, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v) => {
+                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                  return v.toString();
+                                }}
+                              />
+                              <Tooltip content={<CustomTooltipUSD />} />
+                              <Line 
+                                type="monotone" 
+                                dataKey="revenueUSD" 
+                                stroke="#3b82f6" 
+                                strokeWidth={2}
+                                dot={{ fill: "#3b82f6", r: 4 }}
+                              />
+                            </LineChart>
+                          ) : (
+                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 12, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={formatXAxisMonth}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 11, fill: "#64748b" }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v) => {
+                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
+                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                                  return v.toString();
+                                }}
+                              />
+                              <Tooltip content={<CustomTooltipUSD />} />
+                              <Bar 
+                                dataKey="revenueUSD" 
+                                fill="#3b82f6" 
+                                radius={[8, 8, 0, 0]}
+                              />
+                            </BarChart>
+                          )}
                         </ResponsiveContainer>
                       </div>
                     )}

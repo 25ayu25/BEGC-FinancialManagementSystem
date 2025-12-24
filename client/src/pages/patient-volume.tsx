@@ -123,7 +123,7 @@ export default function PatientVolumePage() {
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(initialMonthDate);
   const [mode, setMode] = useState<"chart" | "table">("chart");
-  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "heatmap">("line");
+  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "heatmap">("bar");
   const [showTrendLine, setShowTrendLine] = useState(false);
   const [targetValue, setTargetValue] = useState<number | null>(null);
 

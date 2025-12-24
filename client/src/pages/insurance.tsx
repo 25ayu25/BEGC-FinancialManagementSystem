@@ -175,40 +175,64 @@ function StatusChip({ status }: { status: ClaimStatus }) {
 function HelpPopover() {
   const [open, setOpen] = useState(false);
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="p-2 rounded-lg border hover:bg-slate-50 transition-colors"
-            title="What do these numbers mean?"
-          >
-            <HelpCircle className="h-4 w-4 text-slate-500" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Click for help</p>
-        </TooltipContent>
-      </Tooltip>
-      {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border bg-white p-3 text-sm shadow-lg">
-          <div className="font-medium mb-1">How to read this page</div>
-          <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Claims sent</strong>: Total claims submitted in the selected time window.</li>
-            <li><strong>Payments received</strong>: Total payments received from providers in the window.</li>
-            <li><strong>Still unpaid</strong>: Amount owed by providers (Claims - Payments). Shown when Claims &gt;= Payments.</li>
-            <li><strong>Overpaid</strong>: You've received more payments than claims submitted in this window. This can happen when providers pay claims from a previous period.</li>
-          </ul>
-          <div className="mt-3 p-2 bg-emerald-50 rounded-lg text-xs text-emerald-700">
-            <strong>Example:</strong> If you sent $10,000 in claims and received $12,000 in payments, the page shows "Overpaid: USD 2,000".
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="p-2 rounded-lg border hover:bg-slate-50 transition-colors"
+          title="What do these numbers mean?"
+        >
+          <HelpCircle className="h-4 w-4 text-slate-500" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-96 max-h-[500px] overflow-y-auto bg-white shadow-xl border-2 border-slate-200 rounded-xl p-4"
+        align="end"
+        sideOffset={5}
+      >
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-base text-slate-900 mb-2">How to read this page</h3>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div>
+                <strong className="text-slate-900">Claims sent:</strong> Total claims submitted in the selected time window.
+              </div>
+              <div>
+                <strong className="text-slate-900">Payments received:</strong> Total payments received from providers in the window.
+              </div>
+              <div>
+                <strong className="text-slate-900">Still unpaid:</strong> Amount owed by providers (Claims - Payments). Shown when Claims ≥ Payments.
+              </div>
+              <div>
+                <strong className="text-slate-900">Overpaid:</strong> You've received more payments than claims submitted in this window. This can happen when providers pay claims from a previous period.
+              </div>
+            </div>
           </div>
-          <div className="text-right mt-2">
-            <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen(false)}>Close</button>
+          
+          <div className="border-t border-slate-200 pt-3">
+            <h4 className="font-semibold text-sm text-slate-900 mb-2">How to use this page</h4>
+            <div className="space-y-2 text-sm text-slate-600">
+              <div>
+                <strong className="text-slate-900">Add claims:</strong> Click the "+ Add Claim" button to submit new insurance claims.
+              </div>
+              <div>
+                <strong className="text-slate-900">Record payments:</strong> Click "Record Payment" next to a claim to log payments received from insurance providers.
+              </div>
+              <div>
+                <strong className="text-slate-900">Filter data:</strong> Use the provider and status filters to view specific claims.
+              </div>
+              <div>
+                <strong className="text-slate-900">Export data:</strong> Click the "Export" button to download claim data for reporting.
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-emerald-50 rounded-lg p-3 text-xs text-emerald-700 border border-emerald-200">
+            <strong>Example:</strong> If you sent $10,000 in claims and received $12,000 in payments, the page shows "Overpaid: USD 2,000". This extra amount may be from older claims.
           </div>
         </div>
-      )}
-    </TooltipProvider>
+      </PopoverContent>
+    </Popover>
   );
 }
 
