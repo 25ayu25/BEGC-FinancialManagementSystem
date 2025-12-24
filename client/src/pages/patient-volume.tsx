@@ -435,7 +435,7 @@ export default function PatientVolumePage() {
       }
 
       const data = buckets.map((count, idx) => ({
-        label: format(addDays(dateRange.start, idx), "MMM d"),
+        label: format(addDays(dateRange.start, idx), "d"),
         day: idx + 1,
         count: count > 0 ? count : 0,
       }));
@@ -546,7 +546,7 @@ export default function PatientVolumePage() {
       }
 
       return buckets.map((count, idx) => ({
-        label: format(addDays(comparisonDateRange.start, idx), "MMM d"),
+        label: format(addDays(comparisonDateRange.start, idx), "d"),
         count,
       }));
     }
@@ -601,6 +601,22 @@ export default function PatientVolumePage() {
     if (!comparisonTotal || comparisonTotal === 0) return 0;
     return ((totalPatients - comparisonTotal) / comparisonTotal) * 100;
   }, [totalPatients, comparisonTotal]);
+
+  // Calculate dynamic legend name based on date range
+  const currentPeriodLegendName = useMemo(() => {
+    if (aggregationLevel === "daily") {
+      // For daily view, show the month name
+      return format(dateRange.start, "MMMM yyyy");
+    } else if (aggregationLevel === "weekly") {
+      // For weekly view, show date range
+      return `${format(dateRange.start, "MMM d")} - ${format(dateRange.end, "MMM d")}`;
+    } else {
+      // For monthly view, show year or year range
+      const startYear = dateRange.start.getFullYear();
+      const endYear = dateRange.end.getFullYear();
+      return startYear === endYear ? `${startYear}` : `${startYear} - ${endYear}`;
+    }
+  }, [dateRange, aggregationLevel]);
 
   // Combine main and comparison data for charts (MERGE BY LABEL, NOT INDEX)
   const combinedChartData = useMemo(() => {
@@ -1517,7 +1533,7 @@ export default function PatientVolumePage() {
                                 />
                               );
                             })()}
-                          <Bar dataKey="count" name="Current Period" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
+                          <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26} />
                           {showComparison && (
                             <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26} />
                           )}
@@ -1560,7 +1576,7 @@ export default function PatientVolumePage() {
                           <Line
                             type="monotone"
                             dataKey="count"
-                            name="Current Period"
+                            name={currentPeriodLegendName}
                             stroke="#14b8a6"
                             strokeWidth={2.5}
                             dot={{ fill: "#14b8a6", r: 3 }}
@@ -1624,7 +1640,7 @@ export default function PatientVolumePage() {
                               label={{ value: `Target: ${targetValue}`, position: "insideTopRight", fill: "#f59e0b", fontSize: 11 }}
                             />
                           )}
-                          <Area type="monotone" dataKey="count" name="Current Period" stroke="#14b8a6" strokeWidth={2} fill="url(#colorCount)" />
+                          <Area type="monotone" dataKey="count" name={currentPeriodLegendName} stroke="#14b8a6" strokeWidth={2} fill="url(#colorCount)" />
                           {showComparison && (
                             <Area
                               type="monotone"
