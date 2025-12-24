@@ -93,6 +93,9 @@ type WeekdayDistributionRow = { day: string; count: number; percentage: number }
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
+// Bar label styling constant for consistency
+const BAR_LABEL_STYLE = { fontSize: 10, fill: '#64748b' } as const;
+
 /** ---------- SAFETY HELPERS (prevents Recharts reduce() crash) ---------- */
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -1560,11 +1563,11 @@ export default function PatientVolumePage() {
                               );
                             })()}
                           <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={26}>
-                            <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
+                            <LabelList dataKey="count" position="top" style={BAR_LABEL_STYLE} />
                           </Bar>
                           {showComparison && (
                             <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={26}>
-                              <LabelList dataKey="comparisonCount" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
+                              <LabelList dataKey="comparisonCount" position="top" style={BAR_LABEL_STYLE} />
                             </Bar>
                           )}
                         </BarChart>
