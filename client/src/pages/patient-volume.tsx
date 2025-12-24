@@ -762,6 +762,7 @@ export default function PatientVolumePage() {
 
   // ✅ Pie safety: always pass an array to <Pie data={...}>
   // Filter to only include days with data - prevents empty pie slices in donut chart
+  // Note: This filtering is ONLY for the pie chart visualization, not the legend list
   const weekdayPieData = useMemo(
     () => asArray<WeekdayDistributionRow>(weekdayDistribution).filter((d) => toFiniteNumber(d.count) > 0),
     [weekdayDistribution]
@@ -778,8 +779,12 @@ export default function PatientVolumePage() {
   // ✅ Performance: Calculate busiest/slowest metrics once instead of per-item
   const weekdayMetrics = useMemo(() => {
     const daysWithData = weekdayLegendData.filter(d => d.count > 0);
-    const max = daysWithData.length > 0 ? Math.max(...daysWithData.map((d) => d.count)) : 0;
-    const min = daysWithData.length > 0 ? Math.min(...daysWithData.map((d) => d.count)) : 0;
+    if (daysWithData.length === 0) {
+      return { daysWithData, max: 0, min: 0 };
+    }
+    const counts = daysWithData.map(d => d.count);
+    const max = Math.max(...counts);
+    const min = Math.min(...counts);
     return { daysWithData, max, min };
   }, [weekdayLegendData]);
 
@@ -1914,6 +1919,7 @@ export default function PatientVolumePage() {
                           </p>
                         );
                       }
+                      // Safe to use reduce since we checked length > 0
                       const peakDay = weekdayMetrics.daysWithData.reduce((max, d) => d.count > max.count ? d : max);
                       return (
                         <p className="text-xs text-slate-600">
