@@ -1023,7 +1023,16 @@ export default function PatientVolumePage() {
     );
   };
 
-  const WEEKDAY_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#14b8a6", "#06b6d4", "#3b82f6", "#8b5cf6"];
+  // Harmonized color palette: gradient from teal/emerald to gray to amber
+  const WEEKDAY_COLORS = [
+    "#cbd5e1", // Sunday - light gray (muted)
+    "#059669", // Monday - emerald (busiest typically)
+    "#10b981", // Tuesday - emerald lighter
+    "#14b8a6", // Wednesday - teal
+    "#06b6d4", // Thursday - cyan
+    "#64748b", // Friday - slate
+    "#e2e8f0", // Saturday - very light gray (no data)
+  ];
 
   // Loading state
   if (isLoading) {
@@ -1756,8 +1765,9 @@ export default function PatientVolumePage() {
         <Card>
           <CardContent className="p-4">
             <h3 className="text-base font-semibold text-slate-900 mb-4">Weekday Distribution</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="h-64">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Donut Chart */}
+              <div className="h-64 relative flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -1766,11 +1776,11 @@ export default function PatientVolumePage() {
                       nameKey="day"
                       cx="50%"
                       cy="50%"
-                      outerRadius={80}
-                      label={({ day, percentage }: any) =>
-                        Number(percentage) > 0 ? `${String(day).slice(0, 3)}: ${Number(percentage).toFixed(1)}%` : ""
-                      }
-                      labelLine={true}
+                      innerRadius={60}
+                      outerRadius={100}
+                      label={false}
+                      labelLine={false}
+                      className="outline-none focus:outline-none [&_path]:transition-all [&_path]:duration-200 [&_path:hover]:opacity-80 [&_path:hover]:scale-105 [&_path]:cursor-pointer"
                     >
                       {weekdayPieData.map((entry) => {
                         const idx = WEEKDAYS.indexOf(entry.day as any);
@@ -1785,35 +1795,73 @@ export default function PatientVolumePage() {
                     />
                   </PieChart>
                 </ResponsiveContainer>
+                {/* Center Label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <div className="text-3xl font-bold text-slate-900">{totalPatients}</div>
+                  <div className="text-sm text-slate-600">patients</div>
+                </div>
               </div>
 
-              <div className="space-y-3">
+              {/* Legend */}
+              <div className="space-y-2">
                 {weekdayDistribution.map((day, idx) => {
                   const max = Math.max(...weekdayDistribution.map((d) => d.count));
                   const min = Math.min(...weekdayDistribution.filter((d) => d.count > 0).map((d) => d.count));
-                  const isMax = day.count === max;
+                  const isMax = day.count === max && day.count > 0;
                   const isMin = day.count > 0 && day.count === min;
+                  const isZero = day.count === 0;
 
                   return (
-                    <div key={day.day} className="flex items-center gap-3">
-                      <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: WEEKDAY_COLORS[idx] }} />
+                    <div
+                      key={day.day}
+                      className={cn(
+                        "flex items-center gap-3 px-2 py-1.5 rounded-md transition-all duration-200 cursor-pointer",
+                        isMax && "bg-emerald-50/50",
+                        isMin && "bg-amber-50/50",
+                        !isMax && !isMin && "hover:bg-slate-50",
+                        isZero && "opacity-60"
+                      )}
+                    >
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm"
+                        style={{ backgroundColor: WEEKDAY_COLORS[idx] }}
+                      />
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-slate-900">
+                          <span className={cn("text-sm font-medium", isZero ? "text-slate-500 italic" : "text-slate-900")}>
                             {day.day}
-                            {isMax && <span className="ml-2 text-xs text-green-600 font-semibold">BUSIEST</span>}
-                            {isMin && <span className="ml-2 text-xs text-orange-600 font-semibold">SLOWEST</span>}
+                            {isMax && (
+                              <span className="ml-2 text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">
+                                BUSIEST
+                              </span>
+                            )}
+                            {isMin && (
+                              <span className="ml-2 text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold">
+                                SLOWEST
+                              </span>
+                            )}
+                            {isZero && <span className="ml-2 text-xs text-slate-400">No entries</span>}
                           </span>
-                          <span className="text-sm text-slate-700 font-semibold">{day.count}</span>
+                          <span className={cn("text-sm font-semibold", isZero ? "text-slate-400" : "text-slate-700")}>
+                            {day.count}
+                          </span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 shadow-inner">
                           <div
-                            className="h-2 rounded-full transition-all"
-                            style={{ width: `${day.percentage}%`, backgroundColor: WEEKDAY_COLORS[idx] }}
+                            className="h-2.5 rounded-full transition-all duration-300 shadow-sm"
+                            style={{
+                              width: `${day.percentage}%`,
+                              backgroundColor: WEEKDAY_COLORS[idx],
+                              background: isZero
+                                ? WEEKDAY_COLORS[idx]
+                                : `linear-gradient(90deg, ${WEEKDAY_COLORS[idx]} 0%, ${WEEKDAY_COLORS[idx]}dd 100%)`,
+                            }}
                           />
                         </div>
                       </div>
-                      <span className="text-xs text-slate-500 w-12 text-right">{day.percentage.toFixed(1)}%</span>
+                      <span className={cn("text-xs w-12 text-right", isZero ? "text-slate-400" : "text-slate-500")}>
+                        {day.percentage.toFixed(1)}%
+                      </span>
                     </div>
                   );
                 })}
