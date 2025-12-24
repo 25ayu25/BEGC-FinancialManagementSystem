@@ -769,10 +769,19 @@ export default function PatientVolumePage() {
 
   // ✅ CRITICAL FIX: Display ALL 7 days in chronological order (Monday-Sunday)
   // Do NOT hide zero-entry days, do NOT sort by volume
+  // Note: weekdayDistribution already returns days in Monday-Sunday order via WEEKDAYS mapping
   const weekdayLegendData = useMemo(
     () => asArray<WeekdayDistributionRow>(weekdayDistribution),
     [weekdayDistribution]
   );
+
+  // ✅ Performance: Calculate busiest/slowest metrics once instead of per-item
+  const weekdayMetrics = useMemo(() => {
+    const daysWithData = weekdayLegendData.filter(d => d.count > 0);
+    const max = daysWithData.length > 0 ? Math.max(...daysWithData.map((d) => d.count)) : 0;
+    const min = daysWithData.length > 0 ? Math.min(...daysWithData.map((d) => d.count)) : 0;
+    return { daysWithData, max, min };
+  }, [weekdayLegendData]);
 
   // Heatmap data for calendar view
   const heatmapData = useMemo(() => {
@@ -1825,12 +1834,9 @@ export default function PatientVolumePage() {
                   const dayIndex = WEEKDAYS.indexOf(day.day as any);
                   const hasData = day.count > 0;
                   
-                  // Find busiest and slowest days (only among days with data)
-                  const daysWithData = weekdayLegendData.filter(d => d.count > 0);
-                  const max = daysWithData.length > 0 ? Math.max(...daysWithData.map((d) => d.count)) : 0;
-                  const min = daysWithData.length > 0 ? Math.min(...daysWithData.map((d) => d.count)) : 0;
-                  const isBusiest = hasData && daysWithData.length > 0 && day.count === max;
-                  const isSlowest = hasData && daysWithData.length > 1 && day.count === min;
+                  // Use pre-calculated metrics for performance
+                  const isBusiest = hasData && weekdayMetrics.daysWithData.length > 0 && day.count === weekdayMetrics.max;
+                  const isSlowest = hasData && weekdayMetrics.daysWithData.length > 1 && day.count === weekdayMetrics.min;
 
                   return (
                     <div
@@ -1900,15 +1906,15 @@ export default function PatientVolumePage() {
                 {weekdayLegendData.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-slate-200">
                     {(() => {
-                      const daysWithData = weekdayLegendData.filter(d => d.count > 0);
-                      if (daysWithData.length === 0) {
+                      // Use pre-calculated metrics to avoid duplicate computation
+                      if (weekdayMetrics.daysWithData.length === 0) {
                         return (
                           <p className="text-xs text-slate-500 italic">
                             No patient data available for this period
                           </p>
                         );
                       }
-                      const peakDay = daysWithData.reduce((max, d) => d.count > max.count ? d : max);
+                      const peakDay = weekdayMetrics.daysWithData.reduce((max, d) => d.count > max.count ? d : max);
                       return (
                         <p className="text-xs text-slate-600">
                           <span className="font-medium">Peak day:</span>{" "}
