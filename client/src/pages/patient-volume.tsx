@@ -780,12 +780,13 @@ export default function PatientVolumePage() {
   const weekdayMetrics = useMemo(() => {
     const daysWithData = weekdayLegendData.filter(d => d.count > 0);
     if (daysWithData.length === 0) {
-      return { daysWithData, max: 0, min: 0 };
+      return { daysWithData, max: 0, min: 0, peakDay: null };
     }
     const counts = daysWithData.map(d => d.count);
     const max = Math.max(...counts);
     const min = Math.min(...counts);
-    return { daysWithData, max, min };
+    const peakDay = daysWithData.reduce((maxDay, d) => d.count > maxDay.count ? d : maxDay);
+    return { daysWithData, max, min, peakDay };
   }, [weekdayLegendData]);
 
   // Heatmap data for calendar view
@@ -1868,10 +1869,10 @@ export default function PatientVolumePage() {
                               {day.day}
                             </span>
                             {isBusiest && (
-                              <span className="text-xs" title="Busiest day">🏆</span>
+                              <span className="text-xs" title="Busiest day" aria-label="Busiest day">🏆</span>
                             )}
                             {isSlowest && (
-                              <span className="text-xs" title="Slowest day">🔻</span>
+                              <span className="text-xs" title="Slowest day" aria-label="Slowest day">🔻</span>
                             )}
                           </div>
                           {hasData ? (
@@ -1902,8 +1903,8 @@ export default function PatientVolumePage() {
                       <span className={cn(
                         "text-xs w-12 text-right tabular-nums",
                         hasData ? "text-slate-500" : "text-slate-400"
-                      )}>
-                        {hasData ? `${day.percentage.toFixed(1)}%` : "—"}
+                      )} aria-label={hasData ? `${day.percentage.toFixed(1)} percent` : "No data"}>
+                        {hasData ? `${day.percentage.toFixed(1)}%` : "N/A"}
                       </span>
                     </div>
                   );
@@ -1919,8 +1920,8 @@ export default function PatientVolumePage() {
                           </p>
                         );
                       }
-                      // Safe to use reduce since we checked length > 0
-                      const peakDay = weekdayMetrics.daysWithData.reduce((max, d) => d.count > max.count ? d : max);
+                      // Use pre-calculated peakDay from metrics
+                      const peakDay = weekdayMetrics.peakDay!;
                       return (
                         <p className="text-xs text-slate-600">
                           <span className="font-medium">Peak day:</span>{" "}
