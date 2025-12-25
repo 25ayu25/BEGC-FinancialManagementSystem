@@ -235,3 +235,49 @@ export const skeletonShimmer = {
     }
   }
 };
+
+// Chart animation variants
+export const chartVariants: Variants = {
+  hidden: { 
+    opacity: 0, 
+    scale: 0.98
+  },
+  visible: { 
+    opacity: 1, 
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      ease: easings.easeOut
+    }
+  }
+};
+
+// KPI cards container with stagger
+export const kpiContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1
+    }
+  }
+};
+
+// Individual KPI card animation
+export const kpiCardVariants: Variants = {
+  hidden: { 
+    opacity: 0, 
+    y: 20,
+    scale: 0.95
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.5,
+      ease: easings.easeOut
+    }
+  }
+};

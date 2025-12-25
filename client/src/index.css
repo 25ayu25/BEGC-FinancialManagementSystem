@@ -599,11 +599,62 @@ body {
     }
   }
   
-  @keyframes successScale {
+   @keyframes successScale {
     from, to {
       transform: scale(1);
       opacity: 1;
     }
   }
 }
+
+/* =========================
+   Chart Hover Effects
+   ========================= */
+
+/* Revenue Analytics Chart (SSP Monthly) - Teal Glow */
+.dark .recharts-bar-rectangle.ssp-bar,
+.dark .chart-bar.ssp-bar {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.dark .recharts-bar-rectangle.ssp-bar:hover,
+.dark .chart-bar.ssp-bar:hover {
+  filter: brightness(1.2) drop-shadow(0 4px 12px rgba(74, 222, 125, 0.5));
+  transform: translateY(-2px);
+}
+
+/* USD (Monthly) Chart - Blue Glow */
+.dark .recharts-bar-rectangle.usd-bar,
+.dark .chart-bar.usd-bar {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.dark .recharts-bar-rectangle.usd-bar:hover,
+.dark .chart-bar.usd-bar:hover {
+  filter: brightness(1.2) drop-shadow(0 4px 12px rgba(96, 165, 250, 0.5));
+  transform: translateY(-2px);
+}
+
+/* General chart bars - works for all charts */
+.dark .recharts-bar-rectangle:hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .dark .recharts-bar-rectangle,
+  .dark .chart-bar {
+    transition: none !important;
+    transform: none !important;
+  }
+  
+  .dark .recharts-bar-rectangle:hover,
+  .dark .chart-bar:hover {
+    transform: none !important;
+  }
+}
+
 
