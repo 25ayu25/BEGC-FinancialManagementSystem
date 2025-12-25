@@ -1655,8 +1655,9 @@ export default function PatientVolumePage() {
               size="sm"
               className="h-7 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50"
               onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] });
-                toast({ title: "Refreshing data..." });
+                queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] })
+                  .then(() => toast({ title: "Data refreshed successfully" }))
+                  .catch(() => toast({ title: "Failed to refresh data", variant: "destructive" }));
               }}
             >
               Refresh
@@ -1776,7 +1777,7 @@ export default function PatientVolumePage() {
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex gap-2 flex-wrap">
-              <div className="flex gap-1 border border-slate-200 rounded-md p-1" role="group" aria-label="Chart type selector">
+              <div className="flex gap-1 border border-slate-200 rounded-md p-1" role="radiogroup" aria-label="Chart type selector">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1784,7 +1785,8 @@ export default function PatientVolumePage() {
                   onClick={() => setChartType("bar")}
                   title="Bar Chart"
                   aria-label="Bar Chart"
-                  aria-pressed={chartType === "bar"}
+                  role="radio"
+                  aria-checked={chartType === "bar"}
                 >
                   <BarChart3 className="w-4 h-4" />
                 </Button>
@@ -1795,7 +1797,8 @@ export default function PatientVolumePage() {
                   onClick={() => setChartType("line")}
                   title="Line Chart"
                   aria-label="Line Chart"
-                  aria-pressed={chartType === "line"}
+                  role="radio"
+                  aria-checked={chartType === "line"}
                 >
                   <LineChart className="w-4 h-4" />
                 </Button>
@@ -1806,7 +1809,8 @@ export default function PatientVolumePage() {
                   onClick={() => setChartType("area")}
                   title="Area Chart"
                   aria-label="Area Chart"
-                  aria-pressed={chartType === "area"}
+                  role="radio"
+                  aria-checked={chartType === "area"}
                 >
                   <AreaChart className="w-4 h-4" />
                 </Button>
@@ -1817,7 +1821,8 @@ export default function PatientVolumePage() {
                   onClick={() => setChartType("heatmap")}
                   title="Heatmap Calendar"
                   aria-label="Heatmap Calendar"
-                  aria-pressed={chartType === "heatmap"}
+                  role="radio"
+                  aria-checked={chartType === "heatmap"}
                 >
                   <Grid3x3 className="w-4 h-4" />
                 </Button>
@@ -2457,6 +2462,10 @@ export default function PatientVolumePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setAddOpen(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setAddOpen(false);
+            }}
+            tabIndex={-1}
           >
             <motion.div 
               className="mt-10 w-full max-w-lg rounded-2xl border border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl"
