@@ -882,19 +882,34 @@ export default function RevenueAnalyticsDaily({
             <section aria-label={`SSP ${wide ? "monthly" : "daily"}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <p className={cn(
+                    "text-sm font-semibold flex items-center gap-2",
+                    isDarkMode ? "text-white/90" : "text-slate-700"
+                  )}>
                     <span className="w-3 h-3 bg-teal-500 rounded-sm"></span>
                     SSP ({wide ? "Monthly" : "Daily"})
                   </p>
                   {!hasNoData && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 font-semibold border border-teal-100">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold border",
+                        isDarkMode
+                          ? "bg-teal-500/15 text-teal-300 border-teal-400/30"
+                          : "bg-teal-50 text-teal-700 border-teal-100"
+                      )}>
                         TOTAL SSP {nf0.format(Math.round(totalSSP))}
                       </span>
                       {!wide && avgDaySSP > 0 && (
                         <>
-                          <span className="text-slate-300">|</span>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
+                          <span className={cn(
+                            isDarkMode ? "text-white/30" : "text-slate-300"
+                          )}>|</span>
+                          <span className={cn(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium border",
+                            isDarkMode
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/30"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                          )}>
                             AVG SSP / DAY {nf0.format(avgDaySSP)} ({activeDaysSSP} active days)
                           </span>
                         </>
@@ -905,14 +920,24 @@ export default function RevenueAnalyticsDaily({
                 {!wide && avgDaySSP > 0 && (
                   <button
                     onClick={() => setShowAvgLine(!showAvgLine)}
-                    className="text-xs text-slate-500 hover:text-teal-600 transition-colors"
+                    className={cn(
+                      "text-xs transition-colors",
+                      isDarkMode
+                        ? "text-white/75 hover:text-teal-400"
+                        : "text-slate-500 hover:text-teal-600"
+                    )}
                   >
                     {showAvgLine ? "Hide" : "Show"} Average Line
                   </button>
                 )}
               </div>
               <div
-                className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-sm"
+                className={cn(
+                  "rounded-lg border shadow-sm",
+                  isDarkMode
+                    ? "border-white/10 bg-transparent"
+                    : "border-slate-200 bg-gradient-to-br from-slate-50 to-white"
+                )}
                 style={{ height: chartHeight }}
               >
                 <ResponsiveContainer width="100%" height="100%">
@@ -1182,19 +1207,34 @@ export default function RevenueAnalyticsDaily({
             <section aria-label={`USD ${wide ? "monthly" : "daily"}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <p className={cn(
+                    "text-sm font-semibold flex items-center gap-2",
+                    isDarkMode ? "text-white/90" : "text-slate-700"
+                  )}>
                     <span className="w-3 h-3 bg-sky-500 rounded-sm"></span>
                     USD ({wide ? "Monthly" : "Daily"})
                   </p>
                   {!hasNoData && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-semibold border border-sky-100">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold border",
+                        isDarkMode
+                          ? "bg-sky-500/15 text-sky-300 border-sky-400/30"
+                          : "bg-sky-50 text-sky-700 border-sky-100"
+                      )}>
                         TOTAL USD {nf0.format(Math.round(totalUSD))}
                       </span>
                       {!wide && avgDayUSD > 0 && (
                         <>
-                          <span className="text-slate-300">|</span>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                          <span className={cn(
+                            isDarkMode ? "text-white/30" : "text-slate-300"
+                          )}>|</span>
+                          <span className={cn(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium border",
+                            isDarkMode
+                              ? "bg-blue-500/15 text-blue-300 border-blue-400/30"
+                              : "bg-blue-50 text-blue-700 border-blue-100"
+                          )}>
                             AVG USD / DAY {nf0.format(avgDayUSD)} ({activeDaysUSD} active days)
                           </span>
                         </>
@@ -1205,14 +1245,24 @@ export default function RevenueAnalyticsDaily({
                 {!wide && avgDayUSD > 0 && (
                   <button
                     onClick={() => setShowAvgLine(!showAvgLine)}
-                    className="text-xs text-slate-500 hover:text-sky-600 transition-colors"
+                    className={cn(
+                      "text-xs transition-colors",
+                      isDarkMode
+                        ? "text-white/75 hover:text-sky-400"
+                        : "text-slate-500 hover:text-sky-600"
+                    )}
                   >
                     {showAvgLine ? "Hide" : "Show"} Average Line
                   </button>
                 )}
               </div>
               <div
-                className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-sm"
+                className={cn(
+                  "rounded-lg border shadow-sm",
+                  isDarkMode
+                    ? "border-white/10 bg-transparent"
+                    : "border-slate-200 bg-gradient-to-br from-slate-50 to-white"
+                )}
                 style={{ height: chartHeight }}
               >
                 <ResponsiveContainer width="100%" height="100%">

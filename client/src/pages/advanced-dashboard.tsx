@@ -1148,7 +1148,7 @@ export default function AdvancedDashboard() {
                       <div>
                         <p className={cn(
                           "text-xs font-medium uppercase tracking-wide",
-                          isDarkMode ? "text-white/70" : "text-slate-600"
+                          isDarkMode ? "text-white/75" : "text-slate-600"
                         )}>
                           Total Revenue
                         </p>
@@ -1172,7 +1172,7 @@ export default function AdvancedDashboard() {
                           {showNoDataYetRevenue ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No transactions yet
                             </span>
@@ -1185,22 +1185,31 @@ export default function AdvancedDashboard() {
                               hasPreviousPeriodSSP) ? (
                             <span
                               className={cn(
-                                "text-xs font-medium",
+                                "text-xs font-semibold",
                                 revenueChangePct > 0
-                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
+                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
                                   : revenueChangePct < 0
-                                  ? isDarkMode ? "#f87171" : "text-red-600"
-                                  : isDarkMode ? "text-white/60" : "text-slate-500"
+                                  ? isDarkMode ? "text-red-400" : "text-red-600"
+                                  : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
+                              style={isDarkMode ? { color: revenueChangePct > 0 ? "#4ade80" : revenueChangePct < 0 ? "#f87171" : undefined } : {}}
                             >
-                              {revenueChangePct > 0 ? "+" : ""}
-                              {revenueChangePct.toFixed(1)}%{" "}
-                              {comparisonLabel}
+                              <span className="font-bold">
+                                {revenueChangePct > 0 ? "+" : ""}
+                                {revenueChangePct.toFixed(1)}%
+                              </span>
+                              {" "}
+                              <span className={cn(
+                                "font-normal",
+                                isDarkMode ? "text-white/85" : "text-slate-600"
+                              )}>
+                                {comparisonLabel}
+                              </span>
                             </span>
                           ) : shouldShowNoComparisonSSP ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No data to compare
                             </span>
@@ -1252,7 +1261,7 @@ export default function AdvancedDashboard() {
                       <div>
                         <p className={cn(
                           "text-xs font-medium uppercase tracking-wide",
-                          isDarkMode ? "text-white/70" : "text-slate-600"
+                          isDarkMode ? "text-white/75" : "text-slate-600"
                         )}>
                           Total Expenses
                         </p>
@@ -1275,7 +1284,7 @@ export default function AdvancedDashboard() {
                           {showNoDataYetExpenses ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No expenses yet
                             </span>
@@ -1288,26 +1297,35 @@ export default function AdvancedDashboard() {
                               hasPreviousPeriodSSP) ? (
                             <span
                               className={cn(
-                                "text-xs font-medium",
+                                "text-xs font-semibold",
                                 dashboardData.changes.expenseChangeSSP > 0
-                                  ? isDarkMode ? "#f87171" : "text-red-600"
+                                  ? isDarkMode ? "text-red-400" : "text-red-600"
                                   : dashboardData.changes.expenseChangeSSP < 0
-                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
-                                  : isDarkMode ? "text-white/60" : "text-slate-500"
+                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
+                                  : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
+                              style={isDarkMode ? { color: dashboardData.changes.expenseChangeSSP > 0 ? "#f87171" : dashboardData.changes.expenseChangeSSP < 0 ? "#4ade80" : undefined } : {}}
                             >
-                              {dashboardData.changes.expenseChangeSSP > 0
-                                ? "+"
-                                : ""}
-                              {dashboardData.changes.expenseChangeSSP.toFixed(
-                                1
-                              )}{" "}
-                              {comparisonLabel}
+                              <span className="font-bold">
+                                {dashboardData.changes.expenseChangeSSP > 0
+                                  ? "+"
+                                  : ""}
+                                {dashboardData.changes.expenseChangeSSP.toFixed(
+                                  1
+                                )}%
+                              </span>
+                              {" "}
+                              <span className={cn(
+                                "font-normal",
+                                isDarkMode ? "text-white/85" : "text-slate-600"
+                              )}>
+                                {comparisonLabel}
+                              </span>
                             </span>
                           ) : shouldShowNoComparisonSSP ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No data to compare
                             </span>
@@ -1351,7 +1369,7 @@ export default function AdvancedDashboard() {
                       <div>
                         <p className={cn(
                           "text-xs font-semibold uppercase tracking-wide flex items-center gap-1",
-                          isDarkMode ? "text-white/80" : "text-blue-700"
+                          isDarkMode ? "text-white/85" : "text-blue-700"
                         )}>
                           <span className={isDarkMode ? "text-cyan-400" : "text-blue-500"}>★</span> Net Income
                         </p>
@@ -1369,11 +1387,12 @@ export default function AdvancedDashboard() {
                         {sspRevenue > 0 && (
                           <p
                             className={cn(
-                              "text-xs mt-0.5",
+                              "text-xs mt-0.5 font-medium",
                               sspNetIncome >= 0
                                 ? isDarkMode ? "text-cyan-400" : "text-blue-600"
-                                : isDarkMode ? "#f87171" : "text-red-600"
+                                : isDarkMode ? "text-red-400" : "text-red-600"
                             )}
+                            style={isDarkMode && sspNetIncome < 0 ? { color: "#f87171" } : {}}
                           >
                             {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin:{" "}
                             {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
@@ -1383,7 +1402,7 @@ export default function AdvancedDashboard() {
                           {showNoDataYetNetIncome ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No transactions yet
                             </span>
@@ -1396,26 +1415,35 @@ export default function AdvancedDashboard() {
                               hasPreviousPeriodSSP) ? (
                             <span
                               className={cn(
-                                "text-xs font-medium",
+                                "text-xs font-semibold",
                                 dashboardData.changes.netIncomeChangeSSP > 0
-                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
+                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
                                   : dashboardData.changes.netIncomeChangeSSP < 0
-                                  ? isDarkMode ? "#f87171" : "text-red-600"
-                                  : isDarkMode ? "text-white/60" : "text-slate-500"
+                                  ? isDarkMode ? "text-red-400" : "text-red-600"
+                                  : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
+                              style={isDarkMode ? { color: dashboardData.changes.netIncomeChangeSSP > 0 ? "#4ade80" : dashboardData.changes.netIncomeChangeSSP < 0 ? "#f87171" : undefined } : {}}
                             >
-                              {dashboardData.changes.netIncomeChangeSSP > 0
-                                ? "+"
-                                : ""}
-                              {dashboardData.changes.netIncomeChangeSSP.toFixed(
-                                1
-                              )}{" "}
-                              {comparisonLabel}
+                              <span className="font-bold">
+                                {dashboardData.changes.netIncomeChangeSSP > 0
+                                  ? "+"
+                                  : ""}
+                                {dashboardData.changes.netIncomeChangeSSP.toFixed(
+                                  1
+                                )}%
+                              </span>
+                              {" "}
+                              <span className={cn(
+                                "font-normal",
+                                isDarkMode ? "text-white/85" : "text-slate-600"
+                              )}>
+                                {comparisonLabel}
+                              </span>
                             </span>
                           ) : shouldShowNoComparisonSSP ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No data to compare
                             </span>
@@ -1446,7 +1474,7 @@ export default function AdvancedDashboard() {
                       <div>
                         <p className={cn(
                           "text-xs font-medium uppercase tracking-wide",
-                          isDarkMode ? "text-white/70" : "text-slate-600"
+                          isDarkMode ? "text-white/75" : "text-slate-600"
                         )}>
                           Insurance (USD)
                         </p>
@@ -1469,7 +1497,7 @@ export default function AdvancedDashboard() {
                           {showNoDataYetInsurance ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No insurance claims yet
                             </span>
@@ -1482,22 +1510,31 @@ export default function AdvancedDashboard() {
                               hasPreviousPeriodUSD) ? (
                             <span
                               className={cn(
-                                "text-xs font-medium",
+                                "text-xs font-semibold",
                                 insuranceChangePct > 0
-                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
+                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
                                   : insuranceChangePct < 0
-                                  ? isDarkMode ? "#f87171" : "text-red-600"
-                                  : isDarkMode ? "text-white/60" : "text-slate-500"
+                                  ? isDarkMode ? "text-red-400" : "text-red-600"
+                                  : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
+                              style={isDarkMode ? { color: insuranceChangePct > 0 ? "#4ade80" : insuranceChangePct < 0 ? "#f87171" : undefined } : {}}
                             >
-                              {insuranceChangePct > 0 ? "+" : ""}
-                              {insuranceChangePct.toFixed(1)}{" "}
-                              {comparisonLabel}
+                              <span className="font-bold">
+                                {insuranceChangePct > 0 ? "+" : ""}
+                                {insuranceChangePct.toFixed(1)}%
+                              </span>
+                              {" "}
+                              <span className={cn(
+                                "font-normal",
+                                isDarkMode ? "text-white/85" : "text-slate-600"
+                              )}>
+                                {comparisonLabel}
+                              </span>
                             </span>
                           ) : shouldShowNoComparisonUSD ? (
                             <span className={cn(
                               "text-xs font-medium",
-                              isDarkMode ? "text-white/60" : "text-slate-500"
+                              isDarkMode ? "text-white/75" : "text-slate-500"
                             )}>
                               No data to compare
                             </span>
@@ -1547,7 +1584,7 @@ export default function AdvancedDashboard() {
                         <div>
                           <p className={cn(
                             "text-xs font-medium uppercase tracking-wide",
-                            isDarkMode ? "text-white/70" : "text-slate-600"
+                            isDarkMode ? "text-white/75" : "text-slate-600"
                           )}>
                             Total Patients
                           </p>
@@ -1565,7 +1602,7 @@ export default function AdvancedDashboard() {
                             {showNoDataYetPatients ? (
                               <span className={cn(
                                 "text-xs font-medium",
-                                isDarkMode ? "text-white/60" : "text-slate-500"
+                                isDarkMode ? "text-white/75" : "text-slate-500"
                               )}>
                                 No patients recorded yet
                               </span>
