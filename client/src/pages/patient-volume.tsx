@@ -1850,7 +1850,12 @@ export default function PatientVolumePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.9 }}
         >
-          <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className={cn(
+            "backdrop-blur-xl border shadow-lg hover:shadow-xl transition-all duration-300",
+            isDarkMode 
+              ? "bg-white/5 border-white/20 dark:bg-white/5 dark:border-white/20" 
+              : "bg-white/70 border-white/20"
+          )}>
             <CardContent className="p-6">
             {mode === "chart" ? (
               <AnimatePresence mode="wait">
@@ -2233,9 +2238,19 @@ export default function PatientVolumePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 1.0 }}
         >
-          <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className={cn(
+            "backdrop-blur-xl border shadow-lg hover:shadow-xl transition-all duration-300",
+            isDarkMode 
+              ? "bg-white/5 border-white/20 dark:bg-white/5 dark:border-white/20" 
+              : "bg-white/70 border-white/20"
+          )}>
             <CardContent className="p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-6 bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
+              <h3 className={cn(
+                "text-lg font-bold mb-6",
+                isDarkMode 
+                  ? "text-white dark:text-white" 
+                  : "text-slate-900 bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent"
+              )}>
                 Weekday Distribution
               </h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
