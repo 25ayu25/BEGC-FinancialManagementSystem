@@ -770,11 +770,8 @@ body {
    ========================= */
 
 /* Ensure ALL percentages have consistent bold weight in dark mode */
-.dark .text-xs.font-semibold,
-.dark .kpi-change-percentage,
-.dark .kpi-percentage-change,
-.dark .kpi-change-value {
-  font-weight: 700 !important;
+.dark .text-xs.font-semibold {
+  font-weight: 700;
 }
 
 /* Ensure comparison text is clearly visible */
@@ -788,20 +785,18 @@ body {
    ========================= */
 
 /* Modal Positioning - Always Centered */
-.fixed.inset-0[role="dialog"],
-.transaction-modal-overlay,
-.modal-overlay {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  z-index: 999 !important;
-  background: rgba(0, 0, 0, 0.75) !important;
-  backdrop-filter: blur(6px) !important;
+.fixed.inset-0[role="dialog"] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -811,15 +806,13 @@ body {
 }
 
 /* Modal Content - Centered and Premium */
-.fixed.inset-0[role="dialog"] > div,
-.transaction-modal,
-.modal-content {
-  position: relative !important;
-  width: 90% !important;
-  max-width: 1100px !important;
-  max-height: 85vh !important;
-  margin: 0 !important;
-  overflow-y: auto !important;
+.fixed.inset-0[role="dialog"] > div {
+  position: relative;
+  width: 90%;
+  max-width: 1100px;
+  max-height: 85vh;
+  margin: 0;
+  overflow-y: auto;
   animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -836,8 +829,8 @@ body {
 
 /* Prevent body scroll when modal is open */
 body.modal-open {
-  overflow: hidden !important;
-  height: 100vh !important;
+  overflow: hidden;
+  height: 100vh;
 }
 
 /* =========================

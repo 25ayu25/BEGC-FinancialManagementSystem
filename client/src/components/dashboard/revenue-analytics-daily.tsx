@@ -287,18 +287,17 @@ function Modal({
   // Lock body scroll when modal is open
   useEffect(() => {
     if (open) {
+      // Store original overflow value
+      const originalOverflow = document.body.style.overflow;
       document.body.classList.add("modal-open");
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.classList.remove("modal-open");
-      document.body.style.overflow = "auto";
+      
+      // Cleanup: restore original overflow
+      return () => {
+        document.body.classList.remove("modal-open");
+        document.body.style.overflow = originalOverflow || "";
+      };
     }
-    
-    // Cleanup on unmount
-    return () => {
-      document.body.classList.remove("modal-open");
-      document.body.style.overflow = "auto";
-    };
   }, [open]);
 
   // Handle backdrop click to close modal
