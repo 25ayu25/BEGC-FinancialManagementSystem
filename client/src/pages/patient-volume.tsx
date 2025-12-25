@@ -2465,10 +2465,7 @@ export default function PatientVolumePage() {
                       // Use pre-calculated metrics to avoid duplicate computation
                       if (weekdayMetrics.daysWithData.length === 0) {
                         return (
-                          <p className={cn(
-                            "text-xs italic",
-                            isDarkMode ? "text-slate-500" : "text-slate-500"
-                          )}>
+                          <p className="text-xs italic text-slate-500">
                             No patient data available for this period
                           </p>
                         );
