@@ -11,6 +11,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -47,23 +48,17 @@ import {
   Sparkles,
   LineChart as LineChartIcon,
   AreaChart as AreaChartIcon,
+  Receipt,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
-import SimpleExpenseBreakdown from "@/components/dashboard/simple-expense-breakdown";
 import PageHeader from "@/components/layout/PageHeader";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  BarChart,
-  Bar,
-} from "recharts";
+import PremiumInsightBanner from "@/components/dashboard/PremiumInsightBanner";
+import PremiumRevenueTrendChart from "@/components/dashboard/PremiumRevenueTrendChart";
+import PremiumComparisonCards from "@/components/dashboard/PremiumComparisonCards";
+import PremiumDepartmentGrowth from "@/components/dashboard/PremiumDepartmentGrowth";
+import PremiumExpenseBreakdown from "@/components/dashboard/PremiumExpenseBreakdown";
+import { generateSmartInsights } from "@/lib/insightGenerator";
+import { containerVariants, cardVariants } from "@/lib/animations";
 
 // Constants for number formatting thresholds
 const BILLION = 1_000_000_000;
@@ -339,6 +334,71 @@ export default function Dashboard() {
   const netIncomeChange = prevNetIncome !== 0 ? ((currentNetIncome - prevNetIncome) / Math.abs(prevNetIncome)) * 100 : 0;
   const patientsChange = prevPatients > 0 ? ((currentPatients - prevPatients) / prevPatients) * 100 : 0;
 
+  // Prepare comparison metrics for Premium Comparison Cards
+  const comparisonMetrics = useMemo(() => [
+    {
+      id: "revenue",
+      label: "Revenue",
+      icon: DollarSign,
+      currentValue: currentRevenue,
+      prevValue: prevRevenue,
+      change: revenueChange,
+      formatter: compactSSP,
+      gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+      shadowColor: "rgba(16, 185, 129, 0.2)",
+      isPositiveGood: true,
+    },
+    {
+      id: "expenses",
+      label: "Expenses",
+      icon: CreditCard,
+      currentValue: currentExpenses,
+      prevValue: prevExpenses,
+      change: expensesChange,
+      formatter: compactSSP,
+      gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+      shadowColor: "rgba(239, 68, 68, 0.2)",
+      isPositiveGood: false, // Lower is better for expenses
+    },
+    {
+      id: "netIncome",
+      label: "Net Income",
+      icon: Wallet,
+      currentValue: currentNetIncome,
+      prevValue: prevNetIncome,
+      change: netIncomeChange,
+      formatter: compactSSP,
+      gradient: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+      shadowColor: "rgba(59, 130, 246, 0.2)",
+      isPositiveGood: true,
+    },
+    {
+      id: "patients",
+      label: "Patients",
+      icon: Users,
+      currentValue: currentPatients,
+      prevValue: prevPatients,
+      change: patientsChange,
+      formatter: (n: number) => nf0.format(n),
+      gradient: "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)",
+      shadowColor: "rgba(168, 85, 247, 0.2)",
+      isPositiveGood: true,
+    },
+  ], [
+    currentRevenue,
+    prevRevenue,
+    revenueChange,
+    currentExpenses,
+    prevExpenses,
+    expensesChange,
+    currentNetIncome,
+    prevNetIncome,
+    netIncomeChange,
+    currentPatients,
+    prevPatients,
+    patientsChange,
+  ]);
+
   // Labels for Month vs Month comparison - use comparison months, not current calendar month
   // Defined here before use in useMemo hooks
   const comparisonCurrentMonthLabel = format(comparisonCurrentDate, "MMMM yyyy");
@@ -425,6 +485,51 @@ export default function Dashboard() {
       periodLabel: canonicalRangeLabel,
     };
   }, [monthlyTrend, currentMonthData, currentExpenses, canonicalRangeLabel, comparisonCurrentMonthLabel]);
+
+  // Transform expenses for Premium Expense Breakdown component
+  const premiumExpenses = useMemo(() => {
+    const sortedExpenses = Object.entries(aggregatedExpenses.breakdown)
+      .map(([name, amount]) => ({
+        name,
+        amount: Number(amount) || 0,
+      }))
+      .filter(e => {
+        const isOther = e.name.toLowerCase().trim() === 'other' || 
+                       e.name.toLowerCase().trim() === 'others' ||
+                       e.name.toLowerCase().trim() === 'other expenses' ||
+                       e.name.toLowerCase().trim() === 'other expense';
+        return !isOther;
+      })
+      .sort((a, b) => b.amount - a.amount);
+
+    // Calculate "Other" total
+    const otherTotal = Object.entries(aggregatedExpenses.breakdown)
+      .filter(([name]) => {
+        const normalized = name.toLowerCase().trim();
+        return normalized === 'other' || normalized === 'others' || 
+               normalized === 'other expenses' || normalized === 'other expense';
+      })
+      .reduce((sum, [, amount]) => sum + (Number(amount) || 0), 0);
+
+    // Limit to top 6 categories, combine rest into "Other"
+    const maxCategories = 6;
+    let finalExpenses = sortedExpenses.slice(0, maxCategories);
+    
+    if (sortedExpenses.length > maxCategories) {
+      const remainingTotal = sortedExpenses.slice(maxCategories)
+        .reduce((sum, e) => sum + e.amount, 0) + otherTotal;
+      finalExpenses.push({ name: 'Other', amount: remainingTotal });
+    } else if (otherTotal > 0) {
+      finalExpenses.push({ name: 'Other', amount: otherTotal });
+    }
+
+    // Add percentages
+    const total = aggregatedExpenses.total || finalExpenses.reduce((s, e) => s + e.amount, 0);
+    return finalExpenses.map(e => ({
+      ...e,
+      percentage: total > 0 ? Math.round((e.amount / total) * 100) : 0,
+    }));
+  }, [aggregatedExpenses]);
 
   // Calculate trend stats for SSP with improved YoY calculation
   const trendStats = useMemo(() => {
@@ -514,77 +619,18 @@ export default function Dashboard() {
     };
   }, [monthlyTrend]);
 
-  // Calculate insights data with improved logic
-  const insights = useMemo(() => {
-    if (monthlyTrend.length === 0) return null;
+  // Generate smart AI-powered insights
+  const smartInsights = useMemo(() => {
+    if (monthlyTrend.length === 0) return [];
     
-    const yoyGrowth = trendStats.yoyGrowth;
-    const bestMonth = trendStats.bestMonth;
-    
-    // Format growth values with proper sign
-    const formatGrowth = (value: number) => {
-      const formatted = Math.abs(value).toFixed(0);
-      return value >= 0 ? `+${formatted}` : `-${formatted}`;
-    };
-    
-    // Find departments with positive growth or that are new
-    const newDepartments = departmentGrowth.filter(d => d.isNewDepartment);
-    const deptWithPositiveGrowth = departmentGrowth.filter(d => d.growth > 0 && !d.isNewDepartment);
-    
-    // Priority: new departments first, then positive growth, then smallest decline
-    const topDepartment = newDepartments.length > 0 
-      ? newDepartments[0]
-      : deptWithPositiveGrowth.length > 0 
-        ? deptWithPositiveGrowth[0] 
-        : departmentGrowth[0];
-    
-    // Check if all departments have negative growth (excluding new ones)
-    const nonNewDepts = departmentGrowth.filter(d => !d.isNewDepartment);
-    const allDepartmentsNegative = nonNewDepts.length > 0 && nonNewDepts.every(d => d.growth < 0);
-    const hasAnyDepartmentData = departmentGrowth.length > 0;
-    
-    // Build revenue part of the insight
-    const revenueDirection = yoyGrowth >= 0 ? 'grew' : 'declined';
-    const revenueMessage = `Revenue ${revenueDirection} ${formatGrowth(yoyGrowth)}% over this period`;
-    
-    // Build department part of the insight
-    let departmentMessage = '';
-    if (!hasAnyDepartmentData) {
-      departmentMessage = '';
-    } else if (newDepartments.length > 0) {
-      // Highlight new departments
-      if (newDepartments.length === 1) {
-        departmentMessage = `. ${newDepartments[0].name} is new this period`;
-      } else {
-        departmentMessage = `. ${newDepartments.length} departments are new this period`;
-      }
-    } else if (allDepartmentsNegative) {
-      departmentMessage = `, with ${topDepartment?.name} showing the smallest decline at ${formatGrowth(topDepartment?.growth || 0)}%`;
-    } else if (topDepartment && topDepartment.growth > 0) {
-      departmentMessage = `, with ${topDepartment?.name} leading at ${formatGrowth(topDepartment?.growth || 0)}% growth`;
-    } else if (topDepartment && topDepartment.growth === 0) {
-      departmentMessage = `, with ${topDepartment?.name} remaining stable`;
-    }
-    
-    // Build best month part of the insight
-    const bestMonthMessage = bestMonth ? ` ${bestMonth} was your best performing month.` : '';
-    
-    // Combine into full message
-    const fullMessage = `Key Insight: ${revenueMessage}${departmentMessage}.${bestMonthMessage}`;
-    
-    return {
-      fullMessage,
-      yoyGrowth: formatGrowth(yoyGrowth),
-      yoyGrowthPositive: yoyGrowth >= 0,
-      topDepartment: topDepartment?.name || 'N/A',
-      topDepartmentGrowth: topDepartment?.isNewDepartment ? 'New' : formatGrowth(topDepartment?.growth || 0),
-      topDepartmentGrowthPositive: (topDepartment?.growth || 0) >= 0 || topDepartment?.isNewDepartment,
-      allDepartmentsNegative,
-      departmentInsight: departmentMessage,
-      bestMonth,
-      hasNewDepartments: newDepartments.length > 0,
-    };
-  }, [monthlyTrend, departmentGrowth, trendStats]);
+    return generateSmartInsights(
+      monthlyTrend,
+      departmentGrowth,
+      trendStats,
+      aggregatedExpenses.breakdown,
+      aggregatedExpenses.total
+    );
+  }, [monthlyTrend, departmentGrowth, trendStats, aggregatedExpenses]);
 
   // Compute clear period description for the trend chart - use canonical label from helper
   const trendPeriodDescription = useMemo(() => {
@@ -682,391 +728,92 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto w-full">
         
-        {/* Insights Card */}
-        {insights && (
-          <Card className="bg-gradient-to-r from-teal-500 to-blue-500 text-white border-0 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <Sparkles className="h-5 w-5 flex-shrink-0" />
-                <p className="font-medium">
-                  {insights.fullMessage}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Premium AI Insights Banner */}
+        {smartInsights.length > 0 && (
+          <PremiumInsightBanner
+            insights={smartInsights}
+            autoRotate={true}
+            rotateInterval={8000}
+          />
         )}
         
-        {/* Revenue Trend Chart with Tabs */}
-        <Card className="border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-          <CardHeader className="pb-2">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-                  <div className="p-1.5 rounded-lg bg-teal-100">
-                    <TrendingUp className="h-5 w-5 text-teal-600" />
-                  </div>
-                  Revenue Trend
-                </CardTitle>
-                <CardDescription>{trendPeriodDescription}</CardDescription>
-              </div>
-              
-              {/* Chart Type Toggle Buttons */}
-              <div className="flex items-center gap-3">
-                <div className="flex gap-2">
-                  <Button
-                    variant={chartType === 'line' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setChartType('line')}
-                  >
-                    <LineChartIcon className="w-4 h-4 mr-1" />
-                    Line
-                  </Button>
-                  <Button
-                    variant={chartType === 'area' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setChartType('area')}
-                  >
-                    <AreaChartIcon className="w-4 h-4 mr-1" />
-                    Area
-                  </Button>
-                  <Button
-                    variant={chartType === 'bar' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setChartType('bar')}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-1" />
-                    Bar
-                  </Button>
+        {/* Premium Revenue Trend Chart */}
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-teal-100">
+                      <TrendingUp className="h-5 w-5 text-teal-600" />
+                    </div>
+                    Revenue Trend
+                  </CardTitle>
+                  <CardDescription>{trendPeriodDescription}</CardDescription>
                 </div>
                 
-                {/* Currency Toggle Tabs */}
-                <Tabs value={currencyTab} onValueChange={(v) => setCurrencyTab(v as "ssp" | "usd")} className="w-auto">
-                  <TabsList className="bg-slate-100">
-                    <TabsTrigger value="ssp" className="data-[state=active]:bg-white">
-                      SSP Revenue
-                    </TabsTrigger>
-                    <TabsTrigger value="usd" className="data-[state=active]:bg-white">
-                      USD Insurance
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                {/* Chart Type Toggle Buttons */}
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant={chartType === 'line' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setChartType('line')}
+                    >
+                      <LineChartIcon className="w-4 h-4 mr-1" />
+                      Line
+                    </Button>
+                    <Button
+                      variant={chartType === 'area' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setChartType('area')}
+                    >
+                      <AreaChartIcon className="w-4 h-4 mr-1" />
+                      Area
+                    </Button>
+                    <Button
+                      variant={chartType === 'bar' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setChartType('bar')}
+                    >
+                      <BarChart3 className="w-4 h-4 mr-1" />
+                      Bar
+                    </Button>
+                  </div>
+                  
+                  {/* Currency Toggle Tabs */}
+                  <Tabs value={currencyTab} onValueChange={(v) => setCurrencyTab(v as "ssp" | "usd")} className="w-auto">
+                    <TabsList className="bg-slate-100">
+                      <TabsTrigger value="ssp" className="data-[state=active]:bg-white">
+                        SSP Revenue
+                      </TabsTrigger>
+                      <TabsTrigger value="usd" className="data-[state=active]:bg-white">
+                        USD Insurance
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {monthlyTrend.length > 0 ? (
-              <>
-                {currencyTab === "ssp" ? (
-                  <>
-                    {/* For single month, show a prominent single bar/stat display */}
-                    {isFilterSingleMonth && monthlyTrend.length === 1 ? (
-                      <div className="h-[300px] w-full flex flex-col items-center justify-center">
-                        <div className="text-center mb-8">
-                          <div className="text-4xl font-bold text-teal-600 mb-2">
-                            {compactSSP(monthlyTrend[0]?.revenue || 0)}
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            Total Revenue for {monthlyTrend[0]?.fullMonth || 'Selected Month'}
-                          </div>
-                        </div>
-                        <div className="w-full max-w-md">
-                          <ResponsiveContainer width="100%" height={100}>
-                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                              <Bar 
-                                dataKey="revenue" 
-                                fill="#14b8a6" 
-                                radius={[8, 8, 0, 0]}
-                              />
-                              <Tooltip content={<CustomTooltipSSP />} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          {chartType === "area" ? (
-                            <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <defs>
-                                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
-                                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 12, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatXAxisMonth}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 11, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v) => {
-                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                  return v.toString();
-                                }}
-                              />
-                              <Tooltip content={<CustomTooltipSSP />} />
-                              <Area 
-                                type="monotone" 
-                                dataKey="revenue" 
-                                stroke="#14b8a6" 
-                                strokeWidth={2}
-                                fill="url(#revenueGradient)" 
-                              />
-                            </AreaChart>
-                          ) : chartType === "line" ? (
-                            <LineChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 12, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatXAxisMonth}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 11, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v) => {
-                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                  return v.toString();
-                                }}
-                              />
-                              <Tooltip content={<CustomTooltipSSP />} />
-                              <Line 
-                                type="monotone" 
-                                dataKey="revenue" 
-                                stroke="#14b8a6" 
-                                strokeWidth={2}
-                                dot={{ fill: "#14b8a6", r: 4 }}
-                              />
-                            </LineChart>
-                          ) : (
-                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 12, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatXAxisMonth}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 11, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v) => {
-                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                  return v.toString();
-                                }}
-                              />
-                              <Tooltip content={<CustomTooltipSSP />} />
-                              <Bar 
-                                dataKey="revenue" 
-                                fill="#14b8a6" 
-                                radius={[8, 8, 0, 0]}
-                              />
-                            </BarChart>
-                          )}
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-                    
-                    {/* SSP Summary stats below chart - show different stats for single month */}
-                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
-                      {!isFilterSingleMonth && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className={cn("h-4 w-4", trendStats.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
-                            <span className="text-sm text-slate-600">Period Growth:</span>
-                            <span className={cn("font-semibold", trendStats.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
-                              {trendStats.yoyGrowth >= 0 ? "+" : ""}{trendStats.yoyGrowth.toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Star className="h-4 w-4 text-amber-500" />
-                            <span className="text-sm text-slate-600">Best Month:</span>
-                            <span className="font-semibold text-slate-900">{trendStats.bestMonth}</span>
-                          </div>
-                        </>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm text-slate-600">{isFilterSingleMonth ? "Monthly Total:" : "Monthly Avg:"}</span>
-                        <span className="font-semibold text-slate-900">{compactSSP(isFilterSingleMonth ? (monthlyTrend[0]?.revenue || 0) : trendStats.monthlyAvg)}</span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* For single month USD, show a prominent single bar/stat display */}
-                    {isFilterSingleMonth && monthlyTrend.length === 1 ? (
-                      <div className="h-[300px] w-full flex flex-col items-center justify-center">
-                        <div className="text-center mb-8">
-                          <div className="text-4xl font-bold text-blue-600 mb-2">
-                            {compactUSD(monthlyTrend[0]?.revenueUSD || 0)}
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            Total Insurance Revenue for {monthlyTrend[0]?.fullMonth || 'Selected Month'}
-                          </div>
-                        </div>
-                        <div className="w-full max-w-md">
-                          <ResponsiveContainer width="100%" height={100}>
-                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                              <Bar 
-                                dataKey="revenueUSD" 
-                                fill="#3b82f6" 
-                                radius={[8, 8, 0, 0]}
-                              />
-                              <Tooltip content={<CustomTooltipUSD />} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          {chartType === "area" ? (
-                            <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <defs>
-                                <linearGradient id="usdGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 12, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatXAxisMonth}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 11, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v) => {
-                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                  return v.toString();
-                                }}
-                              />
-                              <Tooltip content={<CustomTooltipUSD />} />
-                              <Area 
-                                type="monotone" 
-                                dataKey="revenueUSD" 
-                                stroke="#3b82f6" 
-                                strokeWidth={2}
-                                fill="url(#usdGradient)" 
-                              />
-                            </AreaChart>
-                          ) : chartType === "line" ? (
-                            <LineChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 12, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatXAxisMonth}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 11, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v) => {
-                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                  return v.toString();
-                                }}
-                              />
-                              <Tooltip content={<CustomTooltipUSD />} />
-                              <Line 
-                                type="monotone" 
-                                dataKey="revenueUSD" 
-                                stroke="#3b82f6" 
-                                strokeWidth={2}
-                                dot={{ fill: "#3b82f6", r: 4 }}
-                              />
-                            </LineChart>
-                          ) : (
-                            <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 12, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatXAxisMonth}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 11, fill: "#64748b" }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v) => {
-                                  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-                                  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-                                  return v.toString();
-                                }}
-                              />
-                              <Tooltip content={<CustomTooltipUSD />} />
-                              <Bar 
-                                dataKey="revenueUSD" 
-                                fill="#3b82f6" 
-                                radius={[8, 8, 0, 0]}
-                              />
-                            </BarChart>
-                          )}
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-                    
-                    {/* USD Summary stats below chart */}
-                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-slate-200">
-                      {!isFilterSingleMonth && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className={cn("h-4 w-4", trendStatsUSD.yoyGrowth >= 0 ? "text-green-500" : "text-red-500")} />
-                            <span className="text-sm text-slate-600">Period Growth:</span>
-                            <span className={cn("font-semibold", trendStatsUSD.yoyGrowth >= 0 ? "text-green-600" : "text-red-600")}>
-                              {trendStatsUSD.yoyGrowth >= 0 ? "+" : ""}{trendStatsUSD.yoyGrowth.toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Star className="h-4 w-4 text-amber-500" />
-                            <span className="text-sm text-slate-600">Best Month:</span>
-                            <span className="font-semibold text-slate-900">{trendStatsUSD.bestMonth}</span>
-                          </div>
-                        </>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm text-slate-600">{isFilterSingleMonth ? "Monthly Total:" : "Monthly Avg:"}</span>
-                        <span className="font-semibold text-slate-900">{compactUSD(isFilterSingleMonth ? (monthlyTrend[0]?.revenueUSD || 0) : trendStatsUSD.monthlyAvg)}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <div className="h-[300px] flex flex-col items-center justify-center text-slate-500">
-                <BarChart3 className="h-12 w-12 text-slate-300 mb-3" />
-                <p className="text-sm font-medium">No revenue data available for {canonicalRangeLabel || 'the selected period'}</p>
-                <p className="text-xs text-slate-400 mt-1">Try selecting a different time period</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <PremiumRevenueTrendChart
+                data={monthlyTrend}
+                currency={currencyTab}
+                chartType={chartType}
+                onChartTypeChange={setChartType}
+                trendStats={currencyTab === "ssp" ? trendStats : trendStatsUSD}
+                isFilterSingleMonth={isFilterSingleMonth}
+                compactSSP={compactSSP}
+                compactUSD={compactUSD}
+                formatXAxisMonth={formatXAxisMonth}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Month vs Month and Department Growth Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1184,75 +931,11 @@ export default function Dashboard() {
                   <p className="text-xs text-slate-400 mt-1">Try selecting different months</p>
                 </div>
               ) : (
-              <div className="space-y-3">
-                {/* Revenue comparison */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/20">
-                      <DollarSign className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-500">Revenue</div>
-                      <div className="font-semibold text-slate-900">{compactSSP(currentRevenue)}</div>
-                    </div>
-                  </div>
-                  <div className={cn("flex items-center gap-1", revenueChange >= 0 ? "text-green-600" : "text-red-600")}>
-                    {revenueChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="font-semibold">{revenueChange >= 0 ? "+" : ""}{revenueChange.toFixed(1)}%</span>
-                  </div>
-                </div>
-                
-                {/* Expenses comparison */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
-                      <CreditCard className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-500">Expenses</div>
-                      <div className="font-semibold text-slate-900">{compactSSP(currentExpenses)}</div>
-                    </div>
-                  </div>
-                  <div className={cn("flex items-center gap-1", expensesChange <= 0 ? "text-green-600" : "text-red-600")}>
-                    {expensesChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="font-semibold">{expensesChange >= 0 ? "+" : ""}{expensesChange.toFixed(1)}%</span>
-                  </div>
-                </div>
-                
-                {/* Net Income comparison */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                      <Wallet className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-500">Net Income</div>
-                      <div className="font-semibold text-slate-900">{compactSSP(currentNetIncome)}</div>
-                    </div>
-                  </div>
-                  <div className={cn("flex items-center gap-1", netIncomeChange >= 0 ? "text-green-600" : "text-red-600")}>
-                    {netIncomeChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="font-semibold">{netIncomeChange >= 0 ? "+" : ""}{netIncomeChange.toFixed(1)}%</span>
-                  </div>
-                </div>
-                
-                {/* Patients comparison */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                      <Users className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-500">Patients</div>
-                      <div className="font-semibold text-slate-900">{nf0.format(currentPatients)}</div>
-                    </div>
-                  </div>
-                  <div className={cn("flex items-center gap-1", patientsChange >= 0 ? "text-green-600" : "text-red-600")}>
-                    {patientsChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="font-semibold">{patientsChange >= 0 ? "+" : ""}{patientsChange.toFixed(1)}%</span>
-                  </div>
-                </div>
-              </div>
+                <PremiumComparisonCards
+                  metrics={comparisonMetrics}
+                  currentLabel={comparisonCurrentMonthLabel}
+                  prevLabel={comparisonPrevMonthLabel}
+                />
               )}
             </CardContent>
           </Card>
@@ -1277,65 +960,50 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {departmentGrowth.length > 0 ? (
-                <div className="space-y-3">
-                  {departmentGrowth.slice(0, MAX_DEPARTMENTS_DISPLAYED).map((dept) => {
-                    const Icon = dept.icon;
-                    return (
-                      <div key={dept.id} className="flex items-center gap-3">
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", dept.bgColor)}>
-                          <Icon className={cn("h-4 w-4", dept.iconColor)} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-slate-700 truncate">{dept.name}</span>
-                            {/* Show "New this month" for departments that started this period */}
-                            {dept.isNewDepartment ? (
-                              <span className="text-sm font-semibold text-blue-600 flex items-center gap-1">
-                                <Star className="h-3 w-3" />
-                                New
-                              </span>
-                            ) : (
-                              <span className={cn("text-sm font-semibold flex items-center gap-1", dept.growth >= 0 ? "text-green-600" : "text-red-600")}>
-                                {dept.growth >= 0 ? "+" : ""}{dept.growth.toFixed(1)}%
-                                {dept.growth >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                              </span>
-                            )}
-                          </div>
-                          {/* Show progress bar or new department indicator */}
-                          {dept.isNewDepartment ? (
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <span className="font-mono">SSP 0 → {compactSSP(dept.currentValue)}</span>
-                            </div>
-                          ) : (
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div 
-                                className={cn("h-full rounded-full transition-all duration-500", dept.growth >= 0 ? "bg-green-500" : "bg-red-500")}
-                                style={{ width: `${Math.min(Math.abs(dept.growth) * GROWTH_SCALE_FACTOR, MAX_GROWTH_BAR_WIDTH)}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="h-40 flex items-center justify-center text-slate-500 text-sm">
-                  No department data available for comparison.
-                </div>
-              )}
+              <PremiumDepartmentGrowth
+                departments={departmentGrowth}
+                maxDisplay={MAX_DEPARTMENTS_DISPLAYED}
+                compactSSP={compactSSP}
+              />
             </CardContent>
           </Card>
         </div>
 
-        {/* Expenses Breakdown - Uses aggregated data based on filter */}
-        <SimpleExpenseBreakdown
-          breakdown={aggregatedExpenses.breakdown}
-          total={aggregatedExpenses.total}
-          title="Expenses Breakdown"
-          periodLabel={aggregatedExpenses.periodLabel}
-        />
+        {/* Premium Expenses Breakdown */}
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                    <Receipt className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold">Expenses Breakdown</CardTitle>
+                    {aggregatedExpenses.periodLabel && (
+                      <CardDescription>{aggregatedExpenses.periodLabel}</CardDescription>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-slate-100 px-4 py-2 rounded-xl">
+                  <span className="text-sm text-slate-500">Total</span>
+                  <span className="ml-2 text-lg font-bold text-slate-900">{compactSSP(aggregatedExpenses.total)}</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <PremiumExpenseBreakdown
+                expenses={premiumExpenses}
+                total={aggregatedExpenses.total}
+                periodLabel={aggregatedExpenses.periodLabel}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
       </main>
     </div>
   );
