@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, type KeyboardEvent } from "react";
+import { useState, useMemo, useEffect, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 
@@ -37,6 +37,8 @@ import {
   Settings,
   ArrowRight,
   CreditCard,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { api } from "@/lib/queryClient";
 
@@ -93,6 +95,7 @@ function computeRangeParams(
 function InsuranceProvidersUSD({
   breakdown,
   totalUSD,
+  isDarkMode = false,
 }: {
   breakdown?:
     | Record<string, number>
@@ -103,6 +106,7 @@ function InsuranceProvidersUSD({
         total?: number;
       }>;
   totalUSD: number;
+  isDarkMode?: boolean;
 }) {
   const rows = useMemo(() => {
     if (!breakdown) return [] as { name: string; amount: number }[];
@@ -135,16 +139,30 @@ function InsuranceProvidersUSD({
   ];
 
   return (
-    <Card className="border border-slate-200 shadow-sm">
+    <Card className={cn(
+      "shadow-sm",
+      isDarkMode
+        ? "bg-white/3 border border-white/10"
+        : "border border-slate-200"
+    )}>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+        <CardTitle className={cn(
+          "text-lg font-semibold flex items-center gap-2",
+          isDarkMode ? "text-white/95" : "text-slate-900"
+        )}>
           <div className="w-2 h-2 bg-purple-500 rounded-full" /> Insurance
           Providers
         </CardTitle>
         {displayTotal > 0 && (
-          <span className="text-xs text-slate-500">
+          <span className={cn(
+            "text-xs",
+            isDarkMode ? "text-white/70" : "text-slate-500"
+          )}>
             Total:{" "}
-            <span className="font-mono font-semibold text-slate-700">
+            <span className={cn(
+              "font-mono font-semibold",
+              isDarkMode ? "text-white/90" : "text-slate-700"
+            )}>
               ${fmtUSD(displayTotal)}
             </span>
           </span>
@@ -152,7 +170,10 @@ function InsuranceProvidersUSD({
       </CardHeader>
       <CardContent className="space-y-3">
         {sorted.length === 0 ? (
-          <div className="text-sm text-slate-500">
+          <div className={cn(
+            "text-sm",
+            isDarkMode ? "text-white/65" : "text-slate-500"
+          )}>
             No insurance receipts for this period.
           </div>
         ) : (
@@ -163,7 +184,12 @@ function InsuranceProvidersUSD({
               return (
                 <div
                   key={`${item.name}-${idx}`}
-                  className="p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4"
+                  className={cn(
+                    "p-3 rounded-lg transition-colors border-l-4",
+                    isDarkMode
+                      ? "bg-white/2 border border-white/8 hover:bg-white/5"
+                      : "hover:bg-slate-50"
+                  )}
                   style={{ borderLeftColor: color }}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -172,20 +198,34 @@ function InsuranceProvidersUSD({
                         className="inline-block w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-sm font-medium text-slate-700">
+                      <span className={cn(
+                        "text-sm font-medium",
+                        isDarkMode ? "text-white/90" : "text-slate-700"
+                      )}>
                         {item.name}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
+                      <span className={cn(
+                        "text-base font-bold font-mono tabular-nums",
+                        isDarkMode ? "text-white/95" : "text-slate-900"
+                      )}>
                         ${fmtUSD(item.amount)}
                       </span>
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      <span className={cn(
+                        "text-xs font-medium px-2 py-0.5 rounded-full",
+                        isDarkMode
+                          ? "text-white/65 bg-white/10"
+                          : "text-slate-500 bg-slate-100"
+                      )}>
                         {pct.toFixed(1)}%
                       </span>
                     </div>
                   </div>
-                  <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div className={cn(
+                    "h-2.5 rounded-full overflow-hidden",
+                    isDarkMode ? "bg-white/10" : "bg-slate-100"
+                  )}>
                     <div
                       className="h-2.5 rounded-full transition-all duration-500 ease-out"
                       style={{ width: `${pct}%`, backgroundColor: color }}
@@ -202,11 +242,19 @@ function InsuranceProvidersUSD({
 }
 
 /* ========= Quick Actions Card ========= */
-function QuickActionsCard() {
+function QuickActionsCard({ isDarkMode = false }: { isDarkMode?: boolean }) {
   return (
-    <Card className="border border-slate-200 shadow-sm">
+    <Card className={cn(
+      "shadow-sm",
+      isDarkMode
+        ? "bg-white/3 border border-white/10"
+        : "border border-slate-200"
+    )}>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+        <CardTitle className={cn(
+          "text-lg font-semibold flex items-center gap-2",
+          isDarkMode ? "text-white/95" : "text-slate-900"
+        )}>
           <div className="w-2 h-2 bg-green-500 rounded-full" /> Quick Actions
         </CardTitle>
       </CardHeader>
@@ -215,85 +263,161 @@ function QuickActionsCard() {
           <a href="/transactions" className="block group">
             <Button
               variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300 transition-all duration-200 group-hover:shadow-sm"
+              className={cn(
+                "w-full justify-between h-auto py-4 px-4 transition-all duration-200 group-hover:shadow-sm",
+                isDarkMode
+                  ? "bg-white/4 border-white/12 text-white/90 hover:bg-white/8 hover:border-white/25"
+                  : "hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50 hover:border-teal-300"
+              )}
             >
               <div className="flex items-center gap-3">
-                <div className="bg-teal-100 p-2 rounded-lg group-hover:bg-teal-200 transition-colors">
-                  <Plus className="h-4 w-4 text-teal-600" />
+                <div className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  isDarkMode
+                    ? "bg-teal-500/20 group-hover:bg-teal-500/30"
+                    : "bg-teal-100 group-hover:bg-teal-200"
+                )}>
+                  <Plus className={cn("h-4 w-4", isDarkMode ? "text-teal-400" : "text-teal-600")} />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
+                  <span className={cn(
+                    "font-medium",
+                    isDarkMode ? "text-white/95" : "text-slate-900"
+                  )}>
                     Add Transaction
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-white/65" : "text-slate-500"
+                  )}>
                     Record new income or expense
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className={cn(
+                "h-4 w-4 group-hover:translate-x-1 transition-all",
+                isDarkMode ? "text-white/50 group-hover:text-teal-400" : "text-slate-400 group-hover:text-teal-600"
+              )} />
             </Button>
           </a>
           <a href="/patient-volume" className="block group">
             <Button
               variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-200 group-hover:shadow-sm"
+              className={cn(
+                "w-full justify-between h-auto py-4 px-4 transition-all duration-200 group-hover:shadow-sm",
+                isDarkMode
+                  ? "bg-white/4 border-white/12 text-white/90 hover:bg-white/8 hover:border-white/25"
+                  : "hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300"
+              )}
             >
               <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
-                  <Users className="h-4 w-4 text-blue-600" />
+                <div className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  isDarkMode
+                    ? "bg-blue-500/20 group-hover:bg-blue-500/30"
+                    : "bg-blue-100 group-hover:bg-blue-200"
+                )}>
+                  <Users className={cn("h-4 w-4", isDarkMode ? "text-blue-400" : "text-blue-600")} />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
+                  <span className={cn(
+                    "font-medium",
+                    isDarkMode ? "text-white/95" : "text-slate-900"
+                  )}>
                     Patient Volume
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-white/65" : "text-slate-500"
+                  )}>
                     Update patient count
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className={cn(
+                "h-4 w-4 group-hover:translate-x-1 transition-all",
+                isDarkMode ? "text-white/50 group-hover:text-blue-400" : "text-slate-400 group-hover:text-blue-600"
+              )} />
             </Button>
           </a>
           <a href="/reports" className="block group">
             <Button
               variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300 transition-all duration-200 group-hover:shadow-sm"
+              className={cn(
+                "w-full justify-between h-auto py-4 px-4 transition-all duration-200 group-hover:shadow-sm",
+                isDarkMode
+                  ? "bg-white/4 border-white/12 text-white/90 hover:bg-white/8 hover:border-white/25"
+                  : "hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:border-purple-300"
+              )}
             >
               <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
-                  <FileText className="h-4 w-4 text-purple-600" />
+                <div className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  isDarkMode
+                    ? "bg-purple-500/20 group-hover:bg-purple-500/30"
+                    : "bg-purple-100 group-hover:bg-purple-200"
+                )}>
+                  <FileText className={cn("h-4 w-4", isDarkMode ? "text-purple-400" : "text-purple-600")} />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
+                  <span className={cn(
+                    "font-medium",
+                    isDarkMode ? "text-white/95" : "text-slate-900"
+                  )}>
                     Monthly Reports
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-white/65" : "text-slate-500"
+                  )}>
                     View generated reports
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className={cn(
+                "h-4 w-4 group-hover:translate-x-1 transition-all",
+                isDarkMode ? "text-white/50 group-hover:text-purple-400" : "text-slate-400 group-hover:text-purple-600"
+              )} />
             </Button>
           </a>
           <a href="/users" className="block group">
             <Button
               variant="outline"
-              className="w-full justify-between h-auto py-4 px-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 transition-all duration-200 group-hover:shadow-sm"
+              className={cn(
+                "w-full justify-between h-auto py-4 px-4 transition-all duration-200 group-hover:shadow-sm",
+                isDarkMode
+                  ? "bg-white/4 border-white/12 text-white/90 hover:bg-white/8 hover:border-white/25"
+                  : "hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:border-orange-300"
+              )}
             >
               <div className="flex items-center gap-3">
-                <div className="bg-orange-100 p-2 rounded-lg group-hover:bg-orange-200 transition-colors">
-                  <Settings className="h-4 w-4 text-orange-600" />
+                <div className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  isDarkMode
+                    ? "bg-orange-500/20 group-hover:bg-orange-500/30"
+                    : "bg-orange-100 group-hover:bg-orange-200"
+                )}>
+                  <Settings className={cn("h-4 w-4", isDarkMode ? "text-orange-400" : "text-orange-600")} />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium text-slate-900">
+                  <span className={cn(
+                    "font-medium",
+                    isDarkMode ? "text-white/95" : "text-slate-900"
+                  )}>
                     User Management
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-white/65" : "text-slate-500"
+                  )}>
                     Manage user accounts
                   </span>
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className={cn(
+                "h-4 w-4 group-hover:translate-x-1 transition-all",
+                isDarkMode ? "text-white/50 group-hover:text-orange-400" : "text-slate-400 group-hover:text-orange-600"
+              )} />
             </Button>
           </a>
         </div>
@@ -304,6 +428,17 @@ function QuickActionsCard() {
 
 /* ========= Page ========= */
 export default function AdvancedDashboard() {
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('executiveDashboard-darkMode');
+    return saved === 'true';
+  });
+
+  // Save dark mode preference
+  useEffect(() => {
+    localStorage.setItem('executiveDashboard-darkMode', isDarkMode.toString());
+  }, [isDarkMode]);
+
   const {
     timeRange,
     selectedYear,
@@ -704,25 +839,55 @@ export default function AdvancedDashboard() {
   /* ========= RENDER ========= */
 
   return (
-    <div className="grid h-screen grid-rows-[auto,1fr] overflow-hidden bg-slate-950">
+    <div className={cn("grid h-screen grid-rows-[auto,1fr] overflow-hidden transition-colors duration-300", isDarkMode ? "bg-[#0f172a] dark" : "bg-slate-950")}>
       {/* HEADER */}
       <header className="sticky top-0 z-40">
-        <div className="relative bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)] shadow-[0_20px_60px_rgba(15,23,42,0.9)]">
+        <div className={cn(
+          "relative shadow-[0_20px_60px_rgba(15,23,42,0.9)]",
+          isDarkMode 
+            ? "bg-[linear-gradient(135deg,#1a2332_0%,#2d3748_50%,#1e3a5f_100%)]"
+            : "bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)]"
+        )}>
           {/* header glow */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-semibold text-white tracking-tight">
+              <h1 className={cn(
+                "text-2xl font-semibold tracking-tight",
+                isDarkMode ? "text-white/95" : "text-white"
+              )}>
                 Executive Dashboard
               </h1>
-              <p className="mt-1 text-sm text-slate-300">
+              <p className={cn(
+                "mt-1 text-sm",
+                isDarkMode ? "text-white/70" : "text-slate-300"
+              )}>
                 Key financials · {periodLabel}
               </p>
             </div>
 
             {/* controls (no search bar) */}
             <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2 w-full md:w-auto justify-end">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110",
+                  isDarkMode
+                    ? "bg-white/10 border border-white/20 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+                    : "bg-white/90 border border-black/10 hover:bg-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+                )}
+                aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+                title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {isDarkMode ? (
+                  <Sun className="h-5 w-5 text-yellow-300" />
+                ) : (
+                  <Moon className="h-5 w-5 text-slate-700" />
+                )}
+              </button>
+
               <Select
                 value={timeRange}
                 onValueChange={handleTimeRangeChange}
@@ -730,7 +895,8 @@ export default function AdvancedDashboard() {
                 <SelectTrigger
                   className={cn(
                     headerControlStyles,
-                    "w-full sm:w-[170px] rounded-full px-3"
+                    "w-full sm:w-[170px] rounded-full px-3",
+                    isDarkMode && "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30"
                   )}
                   aria-label="Select time range"
                 >
@@ -757,7 +923,8 @@ export default function AdvancedDashboard() {
                     <SelectTrigger
                       className={cn(
                         headerControlStyles,
-                        "w-full sm:w-[110px] rounded-full px-3"
+                        "w-full sm:w-[110px] rounded-full px-3",
+                        isDarkMode && "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30"
                       )}
                     >
                       <SelectValue placeholder="Year" />
@@ -780,7 +947,8 @@ export default function AdvancedDashboard() {
                     <SelectTrigger
                       className={cn(
                         headerControlStyles,
-                        "w-full sm:w-[140px] rounded-full px-3"
+                        "w-full sm:w-[140px] rounded-full px-3",
+                        isDarkMode && "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30"
                       )}
                     >
                       <SelectValue placeholder="Month" />
@@ -804,7 +972,8 @@ export default function AdvancedDashboard() {
                         variant="outline"
                         className={cn(
                           headerControlStyles,
-                          "justify-start text-left font-normal px-3 rounded-full"
+                          "justify-start text-left font-normal px-3 rounded-full",
+                          isDarkMode && "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -814,7 +983,7 @@ export default function AdvancedDashboard() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-auto p-0 bg-white"
+                      className={cn("w-auto p-0", isDarkMode ? "bg-slate-800 border-white/20" : "bg-white")}
                       align="end"
                     >
                       <DatePicker
@@ -828,7 +997,7 @@ export default function AdvancedDashboard() {
                     </PopoverContent>
                   </Popover>
 
-                  <span className="text-slate-500">–</span>
+                  <span className={isDarkMode ? "text-white/50" : "text-slate-500"}>–</span>
 
                   <Popover>
                     <PopoverTrigger asChild>
@@ -836,7 +1005,8 @@ export default function AdvancedDashboard() {
                         variant="outline"
                         className={cn(
                           headerControlStyles,
-                          "justify-start text-left font-normal px-3 rounded-full"
+                          "justify-start text-left font-normal px-3 rounded-full",
+                          isDarkMode && "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -844,7 +1014,7 @@ export default function AdvancedDashboard() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-auto p-0 bg-white"
+                      className={cn("w-auto p-0", isDarkMode ? "bg-slate-800 border-white/20" : "bg-white")}
                       align="end"
                     >
                       <DatePicker
@@ -868,7 +1038,12 @@ export default function AdvancedDashboard() {
       </header>
 
       {/* MAIN: light background, slight sidebar-edge glow */}
-      <main className="relative min-h-0 overflow-y-auto bg-slate-50">
+      <main className={cn(
+        "relative min-h-0 overflow-y-auto transition-colors duration-300",
+        isDarkMode 
+          ? "bg-gradient-to-b from-[#0f172a] to-[#1e293b]"
+          : "bg-slate-50"
+      )}>
         {/* soft glow under header into content */}
         <div className="pointer-events-none absolute inset-x-0 -top-8 h-20 bg-gradient-to-b from-cyan-400/20 via-sky-400/10 to-transparent" />
 
@@ -877,7 +1052,12 @@ export default function AdvancedDashboard() {
 
         <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-8">
           {/* full-width main surface with slightly softer hover */}
-          <div className="relative rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 overflow-hidden transition-shadow duration-300 hover:shadow-[0_22px_72px_rgba(15,23,42,0.22)] hover:border-slate-200">
+          <div className={cn(
+            "relative rounded-3xl overflow-hidden transition-all duration-300",
+            isDarkMode 
+              ? "bg-white/5 backdrop-blur-lg shadow-[0_18px_55px_rgba(0,0,0,0.3)] border border-white/10 hover:shadow-[0_22px_72px_rgba(0,0,0,0.4)] hover:border-white/20"
+              : "bg-white shadow-[0_18px_55px_rgba(15,23,42,0.16)] border border-slate-100 hover:shadow-[0_22px_72px_rgba(15,23,42,0.22)] hover:border-slate-200"
+          )}>
             {/* inner top glow so KPI cards look lit */}
             <div className="pointer-events-none absolute -top-16 left-0 right-0 h-24 bg-gradient-to-b from-cyan-400/18 via-sky-400/8 to-transparent" />
 
@@ -885,14 +1065,25 @@ export default function AdvancedDashboard() {
               {/* KPI CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7">
                 {/* Total Revenue */}
-                <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                <Card className={cn(
+                  "border-0 shadow-md transition-all duration-200 hover:scale-[1.02]",
+                  isDarkMode
+                    ? "bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/8 hover:border-white/20 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                    : "bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-lg"
+                )}>
                   <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                        <p className={cn(
+                          "text-xs font-medium uppercase tracking-wide",
+                          isDarkMode ? "text-white/70" : "text-slate-600"
+                        )}>
                           Total Revenue
                         </p>
-                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                        <p className={cn(
+                          "text-xl font-bold font-mono tabular-nums",
+                          isDarkMode ? "text-white/95" : "text-slate-900"
+                        )}>
                           SSP{" "}
                           <AnimatedNumber
                             value={Math.round(
@@ -907,7 +1098,10 @@ export default function AdvancedDashboard() {
                         </p>
                         <div className="flex items-center mt-1">
                           {showNoDataYetRevenue ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No transactions yet
                             </span>
                           ) : revenueChangePct !== undefined &&
@@ -921,10 +1115,10 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-medium",
                                 revenueChangePct > 0
-                                  ? "text-emerald-600"
+                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
                                   : revenueChangePct < 0
-                                  ? "text-red-600"
-                                  : "text-slate-500"
+                                  ? isDarkMode ? "#f87171" : "text-red-600"
+                                  : isDarkMode ? "text-white/60" : "text-slate-500"
                               )}
                             >
                               {revenueChangePct > 0 ? "+" : ""}
@@ -932,7 +1126,10 @@ export default function AdvancedDashboard() {
                               {comparisonLabel}
                             </span>
                           ) : shouldShowNoComparisonSSP ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No data to compare
                             </span>
                           ) : null}
@@ -941,6 +1138,7 @@ export default function AdvancedDashboard() {
                       <div
                         className={cn(
                           "p-2.5 rounded-xl shadow-sm",
+                          isDarkMode && "opacity-80",
                           revenueChangePct !== undefined &&
                             revenueChangePct !== null &&
                             revenueChangePct < 0
@@ -962,7 +1160,12 @@ export default function AdvancedDashboard() {
 
                 {/* Total Expenses */}
                 <Card
-                  className="border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
+                  className={cn(
+                    "border-0 shadow-md transition-all duration-200 hover:scale-[1.02] cursor-pointer",
+                    isDarkMode
+                      ? "bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/8 hover:border-white/20 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                      : "bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-lg"
+                  )}
                   onClick={() => setOpenExpenses(true)}
                   onKeyDown={handleExpensesKeyDown}
                   role="button"
@@ -973,10 +1176,16 @@ export default function AdvancedDashboard() {
                   <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                        <p className={cn(
+                          "text-xs font-medium uppercase tracking-wide",
+                          isDarkMode ? "text-white/70" : "text-slate-600"
+                        )}>
                           Total Expenses
                         </p>
-                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                        <p className={cn(
+                          "text-xl font-bold font-mono tabular-nums",
+                          isDarkMode ? "text-white/95" : "text-slate-900"
+                        )}>
                           SSP{" "}
                           <AnimatedNumber
                             value={Math.round(
@@ -990,7 +1199,10 @@ export default function AdvancedDashboard() {
                         </p>
                         <div className="flex items-center mt-1">
                           {showNoDataYetExpenses ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No expenses yet
                             </span>
                           ) : dashboardData?.changes
@@ -1004,10 +1216,10 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-medium",
                                 dashboardData.changes.expenseChangeSSP > 0
-                                  ? "text-red-600"
+                                  ? isDarkMode ? "#f87171" : "text-red-600"
                                   : dashboardData.changes.expenseChangeSSP < 0
-                                  ? "text-emerald-600"
-                                  : "text-slate-500"
+                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
+                                  : isDarkMode ? "text-white/60" : "text-slate-500"
                               )}
                             >
                               {dashboardData.changes.expenseChangeSSP > 0
@@ -1019,7 +1231,10 @@ export default function AdvancedDashboard() {
                               {comparisonLabel}
                             </span>
                           ) : shouldShowNoComparisonSSP ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No data to compare
                             </span>
                           ) : null}
@@ -1028,6 +1243,7 @@ export default function AdvancedDashboard() {
                       <div
                         className={cn(
                           "p-2.5 rounded-xl shadow-sm",
+                          isDarkMode && "opacity-80",
                           dashboardData?.changes?.expenseChangeSSP !==
                             undefined &&
                             dashboardData.changes.expenseChangeSSP < 0
@@ -1048,14 +1264,25 @@ export default function AdvancedDashboard() {
                 </Card>
 
                 {/* Net Income */}
-                <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-100 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                <Card className={cn(
+                  "border-0 shadow-md transition-all duration-200 hover:scale-[1.02]",
+                  isDarkMode
+                    ? "bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/8 hover:border-white/20 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                    : "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-100 hover:shadow-lg"
+                )}>
                   <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
-                          <span className="text-blue-500">★</span> Net Income
+                        <p className={cn(
+                          "text-xs font-semibold uppercase tracking-wide flex items-center gap-1",
+                          isDarkMode ? "text-white/80" : "text-blue-700"
+                        )}>
+                          <span className={isDarkMode ? "text-cyan-400" : "text-blue-500"}>★</span> Net Income
                         </p>
-                        <p className="text-xl font-bold text-blue-900 font-mono tabular-nums">
+                        <p className={cn(
+                          "text-xl font-bold font-mono tabular-nums",
+                          isDarkMode ? "text-white/95" : "text-blue-900"
+                        )}>
                           SSP{" "}
                           <AnimatedNumber
                             value={Math.round(sspNetIncome)}
@@ -1068,8 +1295,8 @@ export default function AdvancedDashboard() {
                             className={cn(
                               "text-xs mt-0.5",
                               sspNetIncome >= 0
-                                ? "text-blue-600"
-                                : "text-red-600"
+                                ? isDarkMode ? "text-cyan-400" : "text-blue-600"
+                                : isDarkMode ? "#f87171" : "text-red-600"
                             )}
                           >
                             {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin:{" "}
@@ -1078,7 +1305,10 @@ export default function AdvancedDashboard() {
                         )}
                         <div className="flex items-center mt-1">
                           {showNoDataYetNetIncome ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No transactions yet
                             </span>
                           ) : dashboardData?.changes
@@ -1092,10 +1322,10 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-medium",
                                 dashboardData.changes.netIncomeChangeSSP > 0
-                                  ? "text-emerald-600"
+                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
                                   : dashboardData.changes.netIncomeChangeSSP < 0
-                                  ? "text-red-600"
-                                  : "text-slate-500"
+                                  ? isDarkMode ? "#f87171" : "text-red-600"
+                                  : isDarkMode ? "text-white/60" : "text-slate-500"
                               )}
                             >
                               {dashboardData.changes.netIncomeChangeSSP > 0
@@ -1107,28 +1337,45 @@ export default function AdvancedDashboard() {
                               {comparisonLabel}
                             </span>
                           ) : shouldShowNoComparisonSSP ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No data to compare
                             </span>
                           ) : null}
                         </div>
                       </div>
-                      <div className="bg-blue-100 p-2.5 rounded-xl shadow-sm">
-                        <DollarSign className="h-5 w-5 text-blue-600" />
+                      <div className={cn(
+                        "p-2.5 rounded-xl shadow-sm",
+                        isDarkMode && "opacity-80 bg-cyan-500/20"
+                      )}>
+                        <DollarSign className={cn("h-5 w-5", isDarkMode ? "text-cyan-400" : "text-blue-600")} />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Insurance (USD) */}
-                <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg transition-all duration-200">
+                <Card className={cn(
+                  "border-0 shadow-md transition-all duration-200",
+                  isDarkMode
+                    ? "bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/8 hover:border-white/20 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                    : "bg-gradient-to-br from-purple-50 to-violet-50 hover:shadow-lg"
+                )}>
                   <CardContent className="p-4 sm:p-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                        <p className={cn(
+                          "text-xs font-medium uppercase tracking-wide",
+                          isDarkMode ? "text-white/70" : "text-slate-600"
+                        )}>
                           Insurance (USD)
                         </p>
-                        <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                        <p className={cn(
+                          "text-xl font-bold font-mono tabular-nums",
+                          isDarkMode ? "text-white/95" : "text-slate-900"
+                        )}>
                           USD{" "}
                           <AnimatedNumber
                             value={Math.round(
@@ -1142,7 +1389,10 @@ export default function AdvancedDashboard() {
                         </p>
                         <div className="flex items-center mt-1">
                           {showNoDataYetInsurance ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No insurance claims yet
                             </span>
                           ) : insuranceChangePct !== undefined &&
@@ -1156,10 +1406,10 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-medium",
                                 insuranceChangePct > 0
-                                  ? "text-emerald-600"
+                                  ? isDarkMode ? "#4ade80" : "text-emerald-600"
                                   : insuranceChangePct < 0
-                                  ? "text-red-600"
-                                  : "text-slate-500"
+                                  ? isDarkMode ? "#f87171" : "text-red-600"
+                                  : isDarkMode ? "text-white/60" : "text-slate-500"
                               )}
                             >
                               {insuranceChangePct > 0 ? "+" : ""}
@@ -1167,11 +1417,17 @@ export default function AdvancedDashboard() {
                               {comparisonLabel}
                             </span>
                           ) : shouldShowNoComparisonUSD ? (
-                            <span className="text-xs font-medium text-slate-500">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-white/60" : "text-slate-500"
+                            )}>
                               No data to compare
                             </span>
                           ) : (
-                            <span className="text-xs font-medium text-purple-600">
+                            <span className={cn(
+                              "text-xs font-medium",
+                              isDarkMode ? "text-purple-400" : "text-purple-600"
+                            )}>
                               {Object.keys(
                                 dashboardData?.insuranceBreakdown || {}
                               ).length === 1
@@ -1185,8 +1441,11 @@ export default function AdvancedDashboard() {
                           )}
                         </div>
                       </div>
-                      <div className="bg-purple-100 p-2.5 rounded-xl shadow-sm">
-                        <Shield className="h-5 w-5 text-purple-600" />
+                      <div className={cn(
+                        "p-2.5 rounded-xl shadow-sm",
+                        isDarkMode && "opacity-80 bg-purple-500/20"
+                      )}>
+                        <Shield className={cn("h-5 w-5", isDarkMode ? "text-purple-400" : "text-purple-600")} />
                       </div>
                     </div>
                   </CardContent>
@@ -1197,14 +1456,25 @@ export default function AdvancedDashboard() {
                   href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
                   aria-label="View patient volume details"
                 >
-                  <Card className="border-0 shadow-md bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+                  <Card className={cn(
+                    "border-0 shadow-md transition-all duration-200 hover:scale-[1.02] cursor-pointer",
+                    isDarkMode
+                      ? "bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/8 hover:border-white/20 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                      : "bg-gradient-to-br from-teal-50 to-cyan-50 hover:shadow-lg"
+                  )}>
                     <CardContent className="p-4 sm:p-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-600 text-xs font-medium uppercase tracking-wide">
+                          <p className={cn(
+                            "text-xs font-medium uppercase tracking-wide",
+                            isDarkMode ? "text-white/70" : "text-slate-600"
+                          )}>
                             Total Patients
                           </p>
-                          <p className="text-xl font-bold text-slate-900 font-mono tabular-nums">
+                          <p className={cn(
+                            "text-xl font-bold font-mono tabular-nums",
+                            isDarkMode ? "text-white/95" : "text-slate-900"
+                          )}>
                             <AnimatedNumber
                               value={dashboardData?.totalPatients || 0}
                               duration={1500}
@@ -1213,18 +1483,27 @@ export default function AdvancedDashboard() {
                           </p>
                           <div className="flex items-center mt-1">
                             {showNoDataYetPatients ? (
-                              <span className="text-xs font-medium text-slate-500">
+                              <span className={cn(
+                                "text-xs font-medium",
+                                isDarkMode ? "text-white/60" : "text-slate-500"
+                              )}>
                                 No patients recorded yet
                               </span>
                             ) : (
-                              <span className="text-xs font-medium text-teal-600">
+                              <span className={cn(
+                                "text-xs font-medium",
+                                isDarkMode ? "text-teal-400" : "text-teal-600"
+                              )}>
                                 Current period
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="bg-teal-100 p-2.5 rounded-xl shadow-sm">
-                          <Users className="h-5 w-5 text-teal-600" />
+                        <div className={cn(
+                          "p-2.5 rounded-xl shadow-sm",
+                          isDarkMode && "opacity-80 bg-teal-500/20"
+                        )}>
+                          <Users className={cn("h-5 w-5", isDarkMode ? "text-teal-400" : "text-teal-600")} />
                         </div>
                       </div>
                     </CardContent>
@@ -1241,9 +1520,10 @@ export default function AdvancedDashboard() {
                     selectedMonth={monthToSend}
                     customStartDate={customStartDate ?? undefined}
                     customEndDate={customEndDate ?? undefined}
+                    isDarkMode={isDarkMode}
                   />
                   <div className="hidden lg:block">
-                    <QuickActionsCard />
+                    <QuickActionsCard isDarkMode={isDarkMode} />
                   </div>
                 </div>
 
@@ -1254,6 +1534,7 @@ export default function AdvancedDashboard() {
                     }
                     departmentBreakdown={dashboardData?.departmentBreakdown}
                     totalSSP={sspRevenue}
+                    isDarkMode={isDarkMode}
                   />
 
                   <InsuranceProvidersUSD
@@ -1261,11 +1542,20 @@ export default function AdvancedDashboard() {
                     totalUSD={parseFloat(
                       dashboardData?.totalIncomeUSD || "0"
                     )}
+                    isDarkMode={isDarkMode}
                   />
 
-                  <Card className="border border-slate-200 shadow-sm self-start">
+                  <Card className={cn(
+                    "shadow-sm self-start",
+                    isDarkMode
+                      ? "bg-white/3 border border-white/10"
+                      : "border border-slate-200"
+                  )}>
                     <CardHeader>
-                      <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      <CardTitle className={cn(
+                        "text-lg font-semibold flex items-center gap-2",
+                        isDarkMode ? "text-white/95" : "text-slate-900"
+                      )}>
                         <div className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
                         System Status
                       </CardTitle>
@@ -1273,34 +1563,58 @@ export default function AdvancedDashboard() {
                     <CardContent>
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">
+                          <span className={cn(
+                            "text-sm",
+                            isDarkMode ? "text-white/70" : "text-slate-600"
+                          )}>
                             Database
                           </span>
                           <Badge
                             variant="secondary"
-                            className="bg-green-100 text-green-700 border-green-200 rounded-full"
+                            className={cn(
+                              "rounded-full",
+                              isDarkMode
+                                ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                : "bg-green-100 text-green-700 border-green-200"
+                            )}
                           >
                             Connected
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">
+                          <span className={cn(
+                            "text-sm",
+                            isDarkMode ? "text-white/70" : "text-slate-600"
+                          )}>
                             Last Sync
                           </span>
                           <Badge
                             variant="outline"
-                            className="rounded-full border-slate-200 text-slate-600"
+                            className={cn(
+                              "rounded-full",
+                              isDarkMode
+                                ? "border-white/20 text-white/90"
+                                : "border-slate-200 text-slate-600"
+                            )}
                           >
                             {lastUpdatedLabel}
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">
+                          <span className={cn(
+                            "text-sm",
+                            isDarkMode ? "text-white/70" : "text-slate-600"
+                          )}>
                             Active Users
                           </span>
                           <Badge
                             variant="outline"
-                            className="bg-blue-50 text-blue-700 border-blue-200 rounded-full"
+                            className={cn(
+                              "rounded-full",
+                              isDarkMode
+                                ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            )}
                           >
                             1 online
                           </Badge>
@@ -1313,7 +1627,7 @@ export default function AdvancedDashboard() {
 
               {/* mobile quick actions */}
               <div className="lg:hidden mb-4">
-                <QuickActionsCard />
+                <QuickActionsCard isDarkMode={isDarkMode} />
               </div>
 
               <ExpensesDrawer

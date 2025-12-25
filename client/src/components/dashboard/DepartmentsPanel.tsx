@@ -24,6 +24,7 @@ type DepartmentsPanelProps = {
   maxVisible?: number;      // top N to show when collapsed
   collapsible?: boolean;    // show "Show all" / "Show less" toggle
   maxHeight?: number;       // px cap when expanded (scroll inside)
+  isDarkMode?: boolean;     // dark mode support
 };
 
 // --- Base keys we support visually ---
@@ -124,6 +125,7 @@ export default function DepartmentsPanel({
   maxVisible = 6,
   collapsible = true,
   maxHeight = 420,
+  isDarkMode = false,
 }: DepartmentsPanelProps) {
   // Filter out 'OTHER' department before processing
   const filtered = departments.filter(d => d.code !== 'OTHER');

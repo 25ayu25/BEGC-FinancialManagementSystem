@@ -41,6 +41,7 @@ type Props = {
   selectedMonth: number; // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
+  isDarkMode?: boolean;
 };
 
 /* ------------------------ Number Formatters ---------------------- */
@@ -426,6 +427,7 @@ export default function RevenueAnalyticsDaily({
   selectedMonth,
   customStartDate,
   customEndDate,
+  isDarkMode = false,
 }: Props) {
   const year = selectedYear;
   const month = selectedMonth;
