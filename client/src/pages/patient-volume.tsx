@@ -1029,29 +1029,46 @@ export default function PatientVolumePage() {
     }
 
     return (
-      <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 min-w-[180px]">
-        <div className="text-sm font-semibold text-slate-700 mb-2">{header}</div>
-        <div className="text-lg font-bold text-slate-900 mb-2">
-          {toFiniteNumber(p.count)} patient{toFiniteNumber(p.count) !== 1 ? "s" : ""}
-        </div>
-        {avgPerActiveDay > 0 && (
-          <div className="text-xs text-slate-600">
-            <span className={cn(
-              "font-semibold",
-              diffFromAvg > 0 ? "text-emerald-600" : diffFromAvg < 0 ? "text-red-600" : "text-slate-500"
-            )}>
-              {diffFromAvg > 0 ? "+" : ""}{percentDiff}%
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.15 }}
+        className="backdrop-blur-xl bg-white/95 border border-slate-200/60 rounded-xl shadow-2xl px-5 py-4 min-w-[220px]"
+      >
+        <div className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-100">{header}</div>
+        <div className="space-y-2.5">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-xs text-slate-600 font-medium">Patient Count</span>
+            <span className="text-2xl font-bold text-teal-600">
+              {toFiniteNumber(p.count).toLocaleString()}
             </span>
-            {" "}
-            {diffFromAvg >= 0 ? "above" : "below"} average
           </div>
-        )}
-        {targetValue && (
-          <div className="text-xs text-slate-600 mt-1">
-            Target: {targetValue} {toFiniteNumber(p.count) >= targetValue ? "✓" : ""}
-          </div>
-        )}
-      </div>
+          {avgPerActiveDay > 0 && (
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-600">vs Average</span>
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "text-sm font-semibold px-2 py-0.5 rounded-full",
+                  diffFromAvg > 0 ? "text-emerald-700 bg-emerald-50" : diffFromAvg < 0 ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-50"
+                )}>
+                  {diffFromAvg > 0 ? "+" : ""}{percentDiff}%
+                </span>
+              </div>
+            </div>
+          )}
+          {targetValue && (
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-600">Target</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-slate-700">{targetValue}</span>
+                {toFiniteNumber(p.count) >= targetValue && (
+                  <span className="text-emerald-600">✓</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
     );
   };
 
@@ -1069,7 +1086,7 @@ export default function PatientVolumePage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20">
         <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
           <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
             Add Volume
@@ -1079,8 +1096,11 @@ export default function PatientVolumePage() {
         <AppContainer className="space-y-6 py-6">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading patient volume data...</p>
+              <div className="relative w-16 h-16 mx-auto mb-6">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-400 to-blue-400 opacity-20 animate-ping"></div>
+                <div className="relative animate-spin rounded-full h-16 w-16 border-4 border-slate-200 border-t-teal-600"></div>
+              </div>
+              <p className="text-slate-600 font-medium">Loading patient volume data...</p>
             </div>
           </div>
         </AppContainer>
@@ -1091,7 +1111,7 @@ export default function PatientVolumePage() {
   // Error state
   if (isError) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20">
         <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
           <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
             Add Volume
@@ -1101,8 +1121,13 @@ export default function PatientVolumePage() {
         <AppContainer className="space-y-6 py-6">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <p className="text-red-600 mb-4">Failed to load patient volume data</p>
-              <Button onClick={() => window.location.reload()}>Retry</Button>
+              <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                <X className="w-8 h-8 text-red-600" />
+              </div>
+              <p className="text-red-600 font-medium mb-4">Failed to load patient volume data</p>
+              <Button onClick={() => window.location.reload()} className="bg-teal-600 hover:bg-teal-700">
+                Retry
+              </Button>
             </div>
           </div>
         </AppContainer>
@@ -1111,7 +1136,7 @@ export default function PatientVolumePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20">
       <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
         <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
           Add Volume
@@ -1120,119 +1145,424 @@ export default function PatientVolumePage() {
 
       <AppContainer className="space-y-6 py-6">
         {/* KPI cards - Row 1 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Total Patients</div>
-              <div className="text-2xl font-semibold">{totalPatients.toLocaleString()}</div>
-              {showComparison && comparisonTotal > 0 && (
-                <div className="text-xs mt-1 flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "font-medium",
-                      percentageChange > 0 ? "text-green-600" : percentageChange < 0 ? "text-red-600" : "text-slate-500"
-                    )}
-                  >
-                    {percentageChange > 0 ? "+" : ""}
-                    {percentageChange.toFixed(1)}%
-                  </span>
-                  <span className="text-slate-500">vs comparison</span>
+        <motion.div 
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, staggerChildren: 0.1 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-teal-200/50 group">
+              <CardContent className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-teal-500/10 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Total Patients</div>
+                  <div className="text-3xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent mb-1">
+                    {totalPatients.toLocaleString()}
+                  </div>
+                  {showComparison && comparisonTotal > 0 && (
+                    <div className="text-xs mt-2 flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "font-semibold px-2 py-0.5 rounded-full",
+                          percentageChange > 0 
+                            ? "text-emerald-700 bg-emerald-50" 
+                            : percentageChange < 0 
+                            ? "text-red-700 bg-red-50" 
+                            : "text-slate-600 bg-slate-50"
+                        )}
+                      >
+                        {percentageChange > 0 ? "+" : ""}
+                        {percentageChange.toFixed(1)}%
+                      </span>
+                      <span className="text-slate-500">vs comparison</span>
+                    </div>
+                  )}
+                  {!showComparison && <div className="text-sm text-slate-600 font-medium">{getPeriodLabel()}</div>}
                 </div>
-              )}
-              {!showComparison && <div className="text-xs text-slate-500">{getPeriodLabel()}</div>}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">
-                Average / Active {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}
-              </div>
-              <div className="text-2xl font-semibold">
-                {activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}
-              </div>
-              <div className="text-xs text-slate-500">
-                {activeDays} active {aggregationLevel === "daily" ? "days" : aggregationLevel === "weekly" ? "weeks" : "months"}
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-200/50 group">
+              <CardContent className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">
+                    Average / Active {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}
+                  </div>
+                  <div className="text-3xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent mb-1">
+                    {activeDays ? (Math.round(avgPerActiveDay * 10) / 10).toLocaleString() : 0}
+                  </div>
+                  <div className="text-sm text-slate-600 font-medium">
+                    {activeDays} active {aggregationLevel === "daily" ? "days" : aggregationLevel === "weekly" ? "weeks" : "months"}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">
-                Peak {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}
-              </div>
-              <div className="text-2xl font-semibold">{peakCount}</div>
-              <div className="text-xs text-slate-500">{peakLabel}</div>
-            </CardContent>
-          </Card>
-        </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-purple-200/50 group">
+              <CardContent className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">
+                    Peak {aggregationLevel === "daily" ? "Day" : aggregationLevel === "weekly" ? "Week" : "Month"}
+                  </div>
+                  <div className="text-3xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent mb-1">
+                    {peakCount}
+                  </div>
+                  <div className="text-sm text-slate-600 font-medium">{peakLabel}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
         {/* KPI cards - Row 2 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600 flex items-center gap-1">
-                <Activity className="w-3 h-3" />
-                Week-over-Week
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="text-2xl font-semibold">
-                  {weekOverWeekGrowth > 0 ? "+" : ""}
-                  {weekOverWeekGrowth.toFixed(1)}%
+        <motion.div 
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4, staggerChildren: 0.1 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-emerald-200/50 group">
+              <CardContent className="p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-emerald-600" />
+                    Week-over-Week
+                  </div>
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="text-2xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                      {weekOverWeekGrowth > 0 ? "+" : ""}
+                      {weekOverWeekGrowth.toFixed(1)}%
+                    </div>
+                    {weekOverWeekGrowth > 0 ? (
+                      <div className="rounded-full bg-emerald-50 p-1.5">
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                      </div>
+                    ) : weekOverWeekGrowth < 0 ? (
+                      <div className="rounded-full bg-red-50 p-1.5">
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-xs text-slate-600 font-medium">vs previous week</div>
                 </div>
-                {weekOverWeekGrowth > 0 ? (
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                ) : weekOverWeekGrowth < 0 ? (
-                  <TrendingDown className="w-5 h-5 text-red-600" />
-                ) : null}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">vs previous week</div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600 flex items-center gap-1">
-                <Activity className="w-3 h-3" />
-                Month-over-Month
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="text-2xl font-semibold">
-                  {monthOverMonthGrowth > 0 ? "+" : ""}
-                  {monthOverMonthGrowth.toFixed(1)}%
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-200/50 group">
+              <CardContent className="p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-blue-600" />
+                    Month-over-Month
+                  </div>
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="text-2xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                      {monthOverMonthGrowth > 0 ? "+" : ""}
+                      {monthOverMonthGrowth.toFixed(1)}%
+                    </div>
+                    {monthOverMonthGrowth > 0 ? (
+                      <div className="rounded-full bg-emerald-50 p-1.5">
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                      </div>
+                    ) : monthOverMonthGrowth < 0 ? (
+                      <div className="rounded-full bg-red-50 p-1.5">
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-xs text-slate-600 font-medium">vs {format(prevMonth, "MMM yyyy")}</div>
                 </div>
-                {monthOverMonthGrowth > 0 ? (
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                ) : monthOverMonthGrowth < 0 ? (
-                  <TrendingDown className="w-5 h-5 text-red-600" />
-                ) : null}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">vs {format(prevMonth, "MMM yyyy")}</div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600">Median Patients/Day</div>
-              <div className="text-2xl font-semibold">{medianPatients ? Math.round(medianPatients * 10) / 10 : 0}</div>
-              <div className="text-xs text-slate-500">More robust metric</div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.7 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-amber-200/50 group">
+              <CardContent className="p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Median Patients/Day</div>
+                  <div className="text-2xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent mb-1">
+                    {medianPatients ? Math.round(medianPatients * 10) / 10 : 0}
+                  </div>
+                  <div className="text-xs text-slate-600 font-medium">More robust metric</div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-600 flex items-center gap-1">
-                <Target className="w-3 h-3" />
-                Projected Monthly Total
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-violet-200/50 group">
+              <CardContent className="p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-violet-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative">
+                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-violet-600" />
+                    Projected Monthly Total
+                  </div>
+                  <div className="text-2xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent mb-1">
+                    {isCurrentPeriod ? Math.round(projectedTotal).toLocaleString() : totalPatients.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-slate-600 font-medium">
+                    {isCurrentPeriod ? "Based on current trend" : "Final total"}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+
+        {/* AI-Powered Insights Panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.9 }}
+        >
+          <Card className="backdrop-blur-xl bg-gradient-to-br from-violet-50/80 to-blue-50/80 border-violet-200/30 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold bg-gradient-to-r from-violet-700 to-purple-700 bg-clip-text text-transparent">
+                    AI-Powered Insights
+                  </h3>
+                  <p className="text-xs text-slate-600">Automated analysis and predictions</p>
+                </div>
               </div>
-              <div className="text-2xl font-semibold">
-                {isCurrentPeriod ? Math.round(projectedTotal).toLocaleString() : totalPatients.toLocaleString()}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Insight 1: Busiest Day Pattern */}
+                {(() => {
+                  const busiestDay = weekdayMetrics.peakDay;
+                  if (!busiestDay) return null;
+                  
+                  const avgCount = totalPatients / 7;
+                  const increasePercent = avgCount > 0 ? ((busiestDay.count - avgCount) / avgCount * 100).toFixed(1) : "0";
+                  
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                          <TrendingUp className="w-4 h-4 text-violet-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 mb-1">Peak Traffic Pattern</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            <span className="font-bold text-violet-700">{busiestDay.day}</span> sees{" "}
+                            <span className="font-bold">{increasePercent}%</span> more patients than average
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+
+                {/* Insight 2: Growth Trend */}
+                {weekOverWeekGrowth !== 0 && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                        weekOverWeekGrowth > 0 ? "bg-emerald-100" : "bg-red-100"
+                      )}>
+                        {weekOverWeekGrowth > 0 ? (
+                          <TrendingUp className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 mb-1">
+                          {weekOverWeekGrowth > 0 ? "Growth Detected" : "Decline Alert"}
+                        </p>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          Week-over-week volume {weekOverWeekGrowth > 0 ? "increased" : "decreased"} by{" "}
+                          <span className={cn(
+                            "font-bold",
+                            weekOverWeekGrowth > 0 ? "text-emerald-700" : "text-red-700"
+                          )}>
+                            {Math.abs(weekOverWeekGrowth).toFixed(1)}%
+                          </span>
+                          {Math.abs(weekOverWeekGrowth) > 20 && " - investigate cause"}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Insight 3: Projection */}
+                {isCurrentPeriod && projectedTotal > totalPatients && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <Target className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 mb-1">Projected Total</p>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          Expected to reach{" "}
+                          <span className="font-bold text-blue-700">{Math.round(projectedTotal).toLocaleString()}</span>{" "}
+                          patients by month end
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Insight 4: Average Performance */}
+                {avgPerActiveDay > 0 && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                        <Activity className="w-4 h-4 text-teal-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 mb-1">Daily Average</p>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          Averaging{" "}
+                          <span className="font-bold text-teal-700">{Math.round(avgPerActiveDay)}</span>{" "}
+                          patients per active day
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Insight 5: Consistency Score */}
+                {(() => {
+                  const variance = sortedCounts.length > 0 
+                    ? sortedCounts.reduce((sum, val) => sum + Math.pow(val - avgPerActiveDay, 2), 0) / sortedCounts.length
+                    : 0;
+                  const stdDev = Math.sqrt(variance);
+                  const coefficientOfVariation = avgPerActiveDay > 0 ? (stdDev / avgPerActiveDay) * 100 : 0;
+                  const isConsistent = coefficientOfVariation < 30;
+                  
+                  if (sortedCounts.length === 0) return null;
+                  
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                          isConsistent ? "bg-emerald-100" : "bg-amber-100"
+                        )}>
+                          <Activity className={cn(
+                            "w-4 h-4",
+                            isConsistent ? "text-emerald-600" : "text-amber-600"
+                          )} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 mb-1">Volume Consistency</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {isConsistent ? "Stable" : "Variable"} pattern detected{" "}
+                            <span className="font-bold">(CV: {coefficientOfVariation.toFixed(1)}%)</span>
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+
+                {/* Insight 6: Month Comparison */}
+                {monthOverMonthGrowth !== 0 && prevMonthTotal > 0 && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                        monthOverMonthGrowth > 0 ? "bg-emerald-100" : "bg-amber-100"
+                      )}>
+                        <LineChart className={cn(
+                          "w-4 h-4",
+                          monthOverMonthGrowth > 0 ? "text-emerald-600" : "text-amber-600"
+                        )} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 mb-1">Monthly Comparison</p>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          {monthOverMonthGrowth > 0 ? "Up" : "Down"}{" "}
+                          <span className={cn(
+                            "font-bold",
+                            monthOverMonthGrowth > 0 ? "text-emerald-700" : "text-amber-700"
+                          )}>
+                            {Math.abs(monthOverMonthGrowth).toFixed(1)}%
+                          </span>{" "}
+                          vs {format(prevMonth, "MMM")}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </div>
-              <div className="text-xs text-slate-500">{isCurrentPeriod ? "Based on current trend" : "Final total"}</div>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
 
         {/* Controls */}
         <div className="flex flex-col gap-3">
@@ -1454,8 +1784,13 @@ export default function PatientVolumePage() {
         </div>
 
         {/* Main Chart / Table */}
-        <Card>
-          <CardContent className="p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.9 }}
+        >
+          <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
             {mode === "chart" ? (
               <AnimatePresence mode="wait">
                 <motion.div
@@ -1537,6 +1872,27 @@ export default function PatientVolumePage() {
                     <ResponsiveContainer width="100%" height="100%">
                       {chartType === "bar" ? (
                         <BarChart data={safeCombinedChartData} margin={{ top: 20, right: 16, left: 4, bottom: 8 }} barCategoryGap="20%">
+                          <defs>
+                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#14b8a6" stopOpacity={1} />
+                              <stop offset="100%" stopColor="#0d9488" stopOpacity={0.9} />
+                            </linearGradient>
+                            <linearGradient id="comparisonBarGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#a78bfa" stopOpacity={1} />
+                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.9} />
+                            </linearGradient>
+                            <filter id="barShadow" x="-50%" y="-50%" width="200%" height="200%">
+                              <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                              <feOffset dx="0" dy="4" result="offsetblur"/>
+                              <feComponentTransfer>
+                                <feFuncA type="linear" slope="0.2"/>
+                              </feComponentTransfer>
+                              <feMerge>
+                                <feMergeNode/>
+                                <feMergeNode in="SourceGraphic"/>
+                              </feMerge>
+                            </filter>
+                          </defs>
                           <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
                           <XAxis
                             dataKey="label"
@@ -1604,7 +1960,15 @@ export default function PatientVolumePage() {
                                 />
                               );
                             })()}
-                          <Bar dataKey="count" name={currentPeriodLegendName} fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={32}>
+                          <Bar 
+                            dataKey="count" 
+                            name={currentPeriodLegendName} 
+                            fill="url(#barGradient)" 
+                            radius={[6, 6, 0, 0]} 
+                            barSize={32}
+                            animationDuration={800}
+                            animationBegin={0}
+                          >
                             <LabelList 
                               dataKey="count" 
                               position="top" 
@@ -1613,7 +1977,15 @@ export default function PatientVolumePage() {
                             />
                           </Bar>
                           {showComparison && (
-                            <Bar dataKey="comparisonCount" name="Comparison Period" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={32}>
+                            <Bar 
+                              dataKey="comparisonCount" 
+                              name="Comparison Period" 
+                              fill="url(#comparisonBarGradient)" 
+                              radius={[6, 6, 0, 0]} 
+                              barSize={32}
+                              animationDuration={800}
+                              animationBegin={200}
+                            >
                               <LabelList 
                                 dataKey="comparisonCount" 
                                 position="top" 
@@ -1792,11 +2164,19 @@ export default function PatientVolumePage() {
             )}
           </CardContent>
         </Card>
+        </motion.div>
 
         {/* Weekday Distribution - Premium Redesign */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-base font-semibold text-slate-900 mb-6">Weekday Distribution</h3>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 1.0 }}
+        >
+          <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
+                Weekday Distribution
+              </h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
               {/* Donut Chart */}
               <div className="h-72 relative flex items-center justify-center">
@@ -1935,30 +2315,51 @@ export default function PatientVolumePage() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
 
         {/* Add modal */}
         {addOpen && (
-          <div className="fixed inset-0 z-50 bg-black/20 flex items-start justify-center p-4">
-            <div className="mt-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-                <h3 className="text-base font-semibold text-slate-900">Add Patient Volume</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAddOpen(false)}>
-                  <X className="w-4 h-4" />
+          <motion.div 
+            className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setAddOpen(false)}
+          >
+            <motion.div 
+              className="mt-10 w-full max-w-lg rounded-2xl border border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl"
+              initial={{ opacity: 0, scale: 0.95, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/60">
+                <h3 className="text-lg font-bold text-slate-900 bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
+                  Add Patient Volume
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 rounded-full hover:bg-slate-100" 
+                  onClick={() => setAddOpen(false)}
+                >
+                  <X className="w-5 h-5" />
                 </Button>
               </div>
 
-              <div className="px-5 py-4">
-                <form onSubmit={handleSave} className="space-y-4">
+              <div className="px-6 py-5">
+                <form onSubmit={handleSave} className="space-y-5">
                   <div className="space-y-2">
-                    <Label>Date</Label>
+                    <Label className="text-sm font-medium text-slate-700">Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start">
-                          <CalendarIcon className="w-4 h-4 mr-2" />
+                        <Button variant="outline" className="w-full justify-start hover:border-teal-300 transition-colors">
+                          <CalendarIcon className="w-4 h-4 mr-2 text-teal-600" />
                           {format(newEntry.date, "PPP")}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-50 bg-white border border-slate-200 shadow-xl">
+                      <PopoverContent className="w-auto p-0 z-50 bg-white/95 backdrop-blur-xl border border-slate-200/60 shadow-2xl rounded-xl">
                         <Calendar
                           mode="single"
                           selected={newEntry.date}
@@ -1970,37 +2371,48 @@ export default function PatientVolumePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Patient Count</Label>
+                    <Label className="text-sm font-medium text-slate-700">Patient Count</Label>
                     <Input
                       type="number"
                       min={0}
                       value={newEntry.patientCount}
                       onChange={(e) => setNewEntry((p) => ({ ...p, patientCount: e.target.value }))}
+                      className="transition-all focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Notes (Optional)</Label>
+                    <Label className="text-sm font-medium text-slate-700">Notes (Optional)</Label>
                     <Textarea
                       value={newEntry.notes}
                       onChange={(e) => setNewEntry((p) => ({ ...p, notes: e.target.value }))}
                       placeholder="Enter any additional notes (optional)…"
+                      className="transition-all focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 min-h-[100px]"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                    <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
+                  <div className="flex items-center justify-between pt-5 border-t border-slate-200/60">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setAddOpen(false)}
+                      className="hover:bg-slate-50"
+                    >
                       Cancel
                     </Button>
-                    <Button type="submit" className="bg-teal-600 hover:bg-teal-700" disabled={createMutation.isPending}>
+                    <Button 
+                      type="submit" 
+                      className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 shadow-lg shadow-teal-500/30 transition-all" 
+                      disabled={createMutation.isPending}
+                    >
                       <Save className="w-4 h-4 mr-2" />
                       {createMutation.isPending ? "Saving…" : "Save"}
                     </Button>
                   </div>
                 </form>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
       </AppContainer>
     </div>
