@@ -270,13 +270,52 @@ function Modal({
   title: string;
   children: React.ReactNode;
 }) {
+  // Handle escape key to close modal
+  useEffect(() => {
+    if (!open) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [open, onClose]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (open) {
+      // Store original overflow value
+      const originalOverflow = document.body.style.overflow;
+      document.body.classList.add("modal-open");
+      document.body.style.overflow = "hidden";
+      
+      // Cleanup: restore original overflow
+      return () => {
+        document.body.classList.remove("modal-open");
+        document.body.style.overflow = originalOverflow || "";
+      };
+    }
+  }, [open]);
+
+  // Handle backdrop click to close modal
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   if (!open) return null;
+  
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      onClick={handleBackdropClick}
     >
       <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-6 mx-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
