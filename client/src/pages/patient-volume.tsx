@@ -115,10 +115,14 @@ function toLabel(value: unknown): string {
 }
 
 export default function PatientVolumePage() {
-  // Dark mode state
+  // Dark mode state - default to dark
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('patientVolume-darkMode');
-    return saved === 'true';
+    // If user has a saved preference, respect it; otherwise default to dark
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return true; // Default to dark mode
   });
 
   // Save dark mode preference
