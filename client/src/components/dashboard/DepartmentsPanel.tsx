@@ -144,19 +144,32 @@ export default function DepartmentsPanel({
 
   const visible = expanded ? rows : rows.slice(0, maxVisible);
 
-  const nameCls = compact ? "text-sm font-medium text-slate-700" : "text-base font-medium text-slate-700";
+  const nameCls = compact ? "text-sm font-medium" : "text-base font-medium";
 
   return (
-    <Card className={cn("border border-slate-200 shadow-sm", className)}>
+    <Card className={cn(
+      "shadow-sm",
+      isDarkMode
+        ? "bg-white/3 border border-white/10"
+        : "border border-slate-200",
+      className
+    )}>
       <CardHeader className={cn(compact ? "pb-2.5" : "pb-3")}>
-        <CardTitle className={cn("font-semibold text-slate-900", compact ? "text-lg" : "text-xl")}>
+        <CardTitle className={cn(
+          "font-semibold",
+          isDarkMode ? "text-white/95" : "text-slate-900",
+          compact ? "text-lg" : "text-xl"
+        )}>
           Departments
         </CardTitle>
       </CardHeader>
 
       <CardContent className={cn(compact ? "pt-0" : "pt-1")}>
         {rows.length === 0 && (
-          <div className="text-sm text-slate-500">No department data for this period.</div>
+          <div className={cn(
+            "text-sm",
+            isDarkMode ? "text-white/65" : "text-slate-500"
+          )}>No department data for this period.</div>
         )}
 
         {/* Enhanced department rows with visual hierarchy */}
@@ -169,28 +182,53 @@ export default function DepartmentsPanel({
               <div 
                 key={row.id} 
                 className={cn(
-                  "p-3 rounded-lg hover:bg-slate-50 transition-colors border-l-4",
-                  borderColor
+                  "p-3 rounded-lg transition-colors border-l-4",
+                  borderColor,
+                  isDarkMode
+                    ? "bg-white/2 border border-white/8 hover:bg-white/5"
+                    : "hover:bg-slate-50"
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-50 border border-slate-200">
-                      <Icon className="h-3.5 w-3.5 text-slate-500" />
+                    <span className={cn(
+                      "inline-flex h-6 w-6 items-center justify-center rounded-md",
+                      isDarkMode
+                        ? "bg-white/5 border border-white/10"
+                        : "bg-slate-50 border border-slate-200"
+                    )}>
+                      <Icon className={cn(
+                        "h-3.5 w-3.5",
+                        isDarkMode ? "text-white/70" : "text-slate-500"
+                      )} />
                     </span>
-                    <span className={nameCls}>{row.name}</span>
+                    <span className={cn(
+                      nameCls,
+                      isDarkMode ? "text-white/90" : "text-slate-700"
+                    )}>{row.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-slate-900 font-mono tabular-nums">
+                    <span className={cn(
+                      "text-base font-bold font-mono tabular-nums",
+                      isDarkMode ? "text-white/95" : "text-slate-900"
+                    )}>
                       SSP {row.ssp.toLocaleString()}
                     </span>
-                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    <span className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded-full",
+                      isDarkMode
+                        ? "text-white/65 bg-white/10"
+                        : "text-slate-500 bg-slate-100"
+                    )}>
                       {row.pct.toFixed(1)}%
                     </span>
                   </div>
                 </div>
                 {/* Thicker progress bar with animation */}
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className={cn(
+                  "h-2.5 rounded-full overflow-hidden",
+                  isDarkMode ? "bg-white/10" : "bg-slate-100"
+                )}>
                   <div
                     className={cn("h-2.5 rounded-full transition-all duration-500 ease-out", colorBar)}
                     style={{ width: `${Math.min(100, row.pct)}%` }}
@@ -204,7 +242,14 @@ export default function DepartmentsPanel({
         {/* Expand / collapse */}
         {collapsible && rows.length > maxVisible && (
           <div className="mt-3 flex justify-end">
-            <Button variant="outline" size="sm" onClick={() => setExpanded((v) => !v)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setExpanded((v) => !v)}
+              className={cn(
+                isDarkMode && "bg-white/4 border-white/12 text-white/90 hover:bg-white/8 hover:border-white/25"
+              )}
+            >
               {expanded ? "Show less" : `Show all (${rows.length})`}
             </Button>
           </div>
