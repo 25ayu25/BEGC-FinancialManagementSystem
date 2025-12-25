@@ -41,6 +41,7 @@ type Props = {
   selectedMonth: number; // 1..12
   customStartDate?: Date;
   customEndDate?: Date;
+  isDarkMode?: boolean;
 };
 
 /* ------------------------ Number Formatters ---------------------- */
@@ -426,6 +427,7 @@ export default function RevenueAnalyticsDaily({
   selectedMonth,
   customStartDate,
   customEndDate,
+  isDarkMode = false,
 }: Props) {
   const year = selectedYear;
   const month = selectedMonth;
@@ -761,27 +763,40 @@ export default function RevenueAnalyticsDaily({
   const hasNoData = totalSSP === 0 && totalUSD === 0;
 
   return (
-    <Card className="border border-slate-100 shadow-md bg-white hover:shadow-lg transition-all duration-300">
+    <Card className={cn(
+      "shadow-md transition-all duration-300",
+      isDarkMode
+        ? "bg-white/3 border border-white/10 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+        : "border border-slate-100 bg-white hover:shadow-lg"
+    )}>
       {/* HEADER WITH INTEGRATED METRICS */}
       <CardHeader className="pb-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
-            <CardTitle className="text-base md:text-lg font-semibold text-slate-900">
+            <CardTitle className={cn(
+              "text-base md:text-lg font-semibold",
+              isDarkMode ? "text-white/95" : "text-slate-900"
+            )}>
               Revenue Analytics
             </CardTitle>
           </div>
 
           {/* Chart Type Toggle */}
           <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+            <div className={cn(
+              "flex gap-1 p-1 rounded-lg",
+              isDarkMode ? "bg-white/5" : "bg-slate-100"
+            )}>
               <Button
                 variant={chartType === "bar" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setChartType("bar")}
                 className={cn(
                   "h-8 px-2 transition-all duration-200",
-                  chartType === "bar" && "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600"
+                  chartType === "bar" 
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600"
+                    : isDarkMode && "hover:bg-white/10 text-white/70"
                 )}
               >
                 <BarChart3 className="w-4 h-4" />
@@ -792,7 +807,9 @@ export default function RevenueAnalyticsDaily({
                 onClick={() => setChartType("line")}
                 className={cn(
                   "h-8 px-2 transition-all duration-200",
-                  chartType === "line" && "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600"
+                  chartType === "line" 
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600"
+                    : isDarkMode && "hover:bg-white/10 text-white/70"
                 )}
               >
                 <LineChartIcon className="w-4 h-4" />
@@ -803,7 +820,9 @@ export default function RevenueAnalyticsDaily({
                 onClick={() => setChartType("area")}
                 className={cn(
                   "h-8 px-2 transition-all duration-200",
-                  chartType === "area" && "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600"
+                  chartType === "area" 
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600"
+                    : isDarkMode && "hover:bg-white/10 text-white/70"
                 )}
               >
                 <AreaChartIcon className="w-4 h-4" />
@@ -815,9 +834,15 @@ export default function RevenueAnalyticsDaily({
         {/* Period Label and Inline Stats */}
         <div className="mt-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-700">{headerLabel}</span>
+            <span className={cn(
+              "text-sm font-medium",
+              isDarkMode ? "text-white/80" : "text-slate-700"
+            )}>{headerLabel}</span>
             {!hasNoData && (
-              <div className="flex items-center gap-1 text-xs text-slate-500">
+              <div className={cn(
+                "flex items-center gap-1 text-xs",
+                isDarkMode ? "text-white/65" : "text-slate-500"
+              )}>
                 <TrendingUp className="h-3 w-3 text-teal-500" />
                 <span>Trending</span>
               </div>
