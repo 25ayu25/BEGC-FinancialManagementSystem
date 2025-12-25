@@ -125,6 +125,9 @@ export default function PatientVolumePage() {
     localStorage.setItem('patientVolume-darkMode', isDarkMode.toString());
   }, [isDarkMode]);
 
+  // Last updated timestamp
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+
   // URL deep-link support from dashboards (optional)
   const params = new URLSearchParams(window.location.search);
   const viewParam = params.get("view"); // "monthly" or null
@@ -328,6 +331,7 @@ export default function PatientVolumePage() {
           // If the backend ever returns an object/string/html, don't let it hit charts
           throw new Error("Patient volume API returned non-array for current-month");
         }
+        setLastUpdated(new Date()); // Update timestamp
         return resp.data;
       }
 
@@ -342,6 +346,7 @@ export default function PatientVolumePage() {
           console.error(`Failed to fetch month ${y}-${m}:`, monthError);
         }
       }
+      setLastUpdated(new Date()); // Update timestamp
       return allData;
     },
     enabled: queryReady,
@@ -1186,6 +1191,7 @@ export default function PatientVolumePage() {
                 : "bg-white hover:bg-slate-50"
             )}
             title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
           >
             <motion.div
               initial={false}
@@ -1628,6 +1634,35 @@ export default function PatientVolumePage() {
 
         {/* Controls */}
         <div className="flex flex-col gap-3">
+          {/* Last Updated Indicator */}
+          <motion.div 
+            className="flex items-center justify-between gap-3 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-50/50 to-blue-50/50 border border-teal-100/50"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 1.1 }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                <div className="absolute inset-0 w-2 h-2 rounded-full bg-teal-500 animate-ping"></div>
+              </div>
+              <span className="text-xs font-medium text-slate-700">
+                Last updated: {format(lastUpdated, "MMM d, yyyy 'at' h:mm a")}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/patient-volume/period"] });
+                toast({ title: "Refreshing data..." });
+              }}
+            >
+              Refresh
+            </Button>
+          </motion.div>
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
               <Select
@@ -1741,13 +1776,15 @@ export default function PatientVolumePage() {
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex gap-2 flex-wrap">
-              <div className="flex gap-1 border border-slate-200 rounded-md p-1">
+              <div className="flex gap-1 border border-slate-200 rounded-md p-1" role="group" aria-label="Chart type selector">
                 <Button
                   variant="ghost"
                   size="sm"
                   className={cn("h-7 px-2", chartType === "bar" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
                   onClick={() => setChartType("bar")}
                   title="Bar Chart"
+                  aria-label="Bar Chart"
+                  aria-pressed={chartType === "bar"}
                 >
                   <BarChart3 className="w-4 h-4" />
                 </Button>
@@ -1757,6 +1794,8 @@ export default function PatientVolumePage() {
                   className={cn("h-7 px-2", chartType === "line" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
                   onClick={() => setChartType("line")}
                   title="Line Chart"
+                  aria-label="Line Chart"
+                  aria-pressed={chartType === "line"}
                 >
                   <LineChart className="w-4 h-4" />
                 </Button>
@@ -1766,6 +1805,8 @@ export default function PatientVolumePage() {
                   className={cn("h-7 px-2", chartType === "area" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
                   onClick={() => setChartType("area")}
                   title="Area Chart"
+                  aria-label="Area Chart"
+                  aria-pressed={chartType === "area"}
                 >
                   <AreaChart className="w-4 h-4" />
                 </Button>
@@ -1775,6 +1816,8 @@ export default function PatientVolumePage() {
                   className={cn("h-7 px-2", chartType === "heatmap" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
                   onClick={() => setChartType("heatmap")}
                   title="Heatmap Calendar"
+                  aria-label="Heatmap Calendar"
+                  aria-pressed={chartType === "heatmap"}
                 >
                   <Grid3x3 className="w-4 h-4" />
                 </Button>
@@ -2254,7 +2297,10 @@ export default function PatientVolumePage() {
                       outerRadius={110}
                       label={false}
                       labelLine={false}
-                      className="outline-none focus:outline-none [&_path]:transition-all [&_path]:duration-200 [&_path:hover]:opacity-80 [&_path]:cursor-pointer"
+                      className="outline-none focus:outline-none [&_path]:transition-all [&_path]:duration-300 [&_path:hover]:opacity-80 [&_path:hover]:scale-105 [&_path]:cursor-pointer [&_path]:drop-shadow-lg"
+                      animationBegin={0}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     >
                       {weekdayPieData.map((entry) => {
                         const idx = WEEKDAYS.indexOf(entry.day as any);
@@ -2262,18 +2308,42 @@ export default function PatientVolumePage() {
                       })}
                     </Pie>
                     <Tooltip
-                      formatter={(value: any, name: any) => [
-                        `${value} patients (${totalPatients > 0 ? ((value / totalPatients) * 100).toFixed(1) : "0"}%)`,
-                        name,
-                      ]}
+                      content={({ active, payload }: any) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0];
+                        return (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="backdrop-blur-xl bg-white/95 border border-slate-200/60 rounded-xl shadow-2xl px-4 py-3"
+                          >
+                            <div className="text-sm font-semibold text-slate-800 mb-2">{data.name}</div>
+                            <div className="space-y-1">
+                              <div className="text-2xl font-bold text-teal-600">
+                                {data.value.toLocaleString()}
+                              </div>
+                              <div className="text-xs text-slate-600">
+                                {totalPatients > 0 ? ((data.value / totalPatients) * 100).toFixed(1) : "0"}% of total
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Center Label - Total Patients */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <div className="text-4xl font-bold text-slate-900">{totalPatients}</div>
-                  <div className="text-sm text-slate-600 mt-1">patients</div>
-                </div>
+                {/* Center Label - Total Patients with animation */}
+                <motion.div 
+                  className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
+                  <div className="text-4xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                    {totalPatients}
+                  </div>
+                  <div className="text-sm text-slate-600 mt-1 font-medium">patients</div>
+                </motion.div>
               </div>
 
               {/* Legend - Chronological Order (Monday to Sunday) */}
