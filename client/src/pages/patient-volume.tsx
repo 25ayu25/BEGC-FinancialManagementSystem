@@ -1225,12 +1225,25 @@ export default function PatientVolumePage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
           >
-            <Card className="backdrop-blur-xl bg-white/70 border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-teal-200/50 group">
+            <Card className={cn(
+              "backdrop-blur-xl border shadow-lg hover:shadow-xl transition-all duration-300 hover:border-teal-200/50 group",
+              isDarkMode 
+                ? "bg-white/5 border-white/20 dark:bg-white/5 dark:border-white/20" 
+                : "bg-white/70 border-white/20"
+            )}>
               <CardContent className="p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-teal-500/10 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500" />
                 <div className="relative">
-                  <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Total Patients</div>
-                  <div className="text-3xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent mb-1">
+                  <div className={cn(
+                    "text-xs font-medium uppercase tracking-wider mb-2",
+                    isDarkMode ? "text-slate-400 dark:text-slate-400" : "text-slate-600"
+                  )}>Total Patients</div>
+                  <div className={cn(
+                    "text-3xl font-bold mb-1",
+                    isDarkMode 
+                      ? "text-white dark:text-white" 
+                      : "bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent"
+                  )}>
                     {totalPatients.toLocaleString()}
                   </div>
                   {showComparison && comparisonTotal > 0 && (
@@ -1427,211 +1440,6 @@ export default function PatientVolumePage() {
           </motion.div>
         </motion.div>
 
-        {/* AI-Powered Insights Panel */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.9 }}
-        >
-          <Card className="backdrop-blur-xl bg-gradient-to-br from-violet-50/80 to-blue-50/80 border-violet-200/30 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                  <Activity className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold bg-gradient-to-r from-violet-700 to-purple-700 bg-clip-text text-transparent">
-                    AI-Powered Insights
-                  </h3>
-                  <p className="text-xs text-slate-600">Automated analysis and predictions</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Insight 1: Busiest Day Pattern */}
-                {(() => {
-                  const busiestDay = weekdayMetrics.peakDay;
-                  if (!busiestDay) return null;
-                  
-                  const avgCount = totalPatients / 7;
-                  const increasePercent = avgCount > 0 ? ((busiestDay.count - avgCount) / avgCount * 100).toFixed(1) : "0";
-                  
-                  return (
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
-                          <TrendingUp className="w-4 h-4 text-violet-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 mb-1">Peak Traffic Pattern</p>
-                          <p className="text-xs text-slate-600 leading-relaxed">
-                            <span className="font-bold text-violet-700">{busiestDay.day}</span> sees{" "}
-                            <span className="font-bold">{increasePercent}%</span> more patients than average
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-
-                {/* Insight 2: Growth Trend */}
-                {weekOverWeekGrowth !== 0 && (
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-                        weekOverWeekGrowth > 0 ? "bg-emerald-100" : "bg-red-100"
-                      )}>
-                        {weekOverWeekGrowth > 0 ? (
-                          <TrendingUp className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 mb-1">
-                          {weekOverWeekGrowth > 0 ? "Growth Detected" : "Decline Alert"}
-                        </p>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Week-over-week volume {weekOverWeekGrowth > 0 ? "increased" : "decreased"} by{" "}
-                          <span className={cn(
-                            "font-bold",
-                            weekOverWeekGrowth > 0 ? "text-emerald-700" : "text-red-700"
-                          )}>
-                            {Math.abs(weekOverWeekGrowth).toFixed(1)}%
-                          </span>
-                          {Math.abs(weekOverWeekGrowth) > 20 && " - investigate cause"}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Insight 3: Projection */}
-                {isCurrentPeriod && projectedTotal > totalPatients && (
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <Target className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 mb-1">Projected Total</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Expected to reach{" "}
-                          <span className="font-bold text-blue-700">{Math.round(projectedTotal).toLocaleString()}</span>{" "}
-                          patients by month end
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Insight 4: Average Performance */}
-                {avgPerActiveDay > 0 && (
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-                        <Activity className="w-4 h-4 text-teal-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 mb-1">Daily Average</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Averaging{" "}
-                          <span className="font-bold text-teal-700">{Math.round(avgPerActiveDay)}</span>{" "}
-                          patients per active day
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Insight 5: Consistency Score */}
-                {(() => {
-                  const variance = sortedCounts.length > 0 
-                    ? sortedCounts.reduce((sum, val) => sum + Math.pow(val - avgPerActiveDay, 2), 0) / sortedCounts.length
-                    : 0;
-                  const stdDev = Math.sqrt(variance);
-                  const coefficientOfVariation = avgPerActiveDay > 0 ? (stdDev / avgPerActiveDay) * 100 : 0;
-                  const isConsistent = coefficientOfVariation < 30;
-                  
-                  if (sortedCounts.length === 0) return null;
-                  
-                  return (
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-                          isConsistent ? "bg-emerald-100" : "bg-amber-100"
-                        )}>
-                          <Activity className={cn(
-                            "w-4 h-4",
-                            isConsistent ? "text-emerald-600" : "text-amber-600"
-                          )} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 mb-1">Volume Consistency</p>
-                          <p className="text-xs text-slate-600 leading-relaxed">
-                            {isConsistent ? "Stable" : "Variable"} pattern detected{" "}
-                            <span className="font-bold">(CV: {coefficientOfVariation.toFixed(1)}%)</span>
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-
-                {/* Insight 6: Month Comparison */}
-                {monthOverMonthGrowth !== 0 && prevMonthTotal > 0 && (
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 shadow-sm hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-                        monthOverMonthGrowth > 0 ? "bg-emerald-100" : "bg-amber-100"
-                      )}>
-                        <LineChart className={cn(
-                          "w-4 h-4",
-                          monthOverMonthGrowth > 0 ? "text-emerald-600" : "text-amber-600"
-                        )} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 mb-1">Monthly Comparison</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          {monthOverMonthGrowth > 0 ? "Up" : "Down"}{" "}
-                          <span className={cn(
-                            "font-bold",
-                            monthOverMonthGrowth > 0 ? "text-emerald-700" : "text-amber-700"
-                          )}>
-                            {Math.abs(monthOverMonthGrowth).toFixed(1)}%
-                          </span>{" "}
-                          vs {format(prevMonth, "MMM")}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
         {/* Controls */}
         <div className="flex flex-col gap-3">
           {/* Last Updated Indicator */}
@@ -1678,10 +1486,17 @@ export default function PatientVolumePage() {
                   else if (value === "lastMonth") setSelectedMonth(lastMonthAnchor);
                 }}
               >
-                <SelectTrigger className="h-8 w-[180px]">
+                <SelectTrigger className={cn(
+                  "h-8 w-[180px] transition-all",
+                  isDarkMode 
+                    ? "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/90 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                    : ""
+                )}>
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={cn(
+                  isDarkMode && "dark:bg-slate-800 dark:border-white/20"
+                )}>
                   <SelectItem value="thisMonth">This Month</SelectItem>
                   <SelectItem value="lastMonth">Last Month</SelectItem>
                   <SelectItem value="last3Months">Last 3 Months</SelectItem>
@@ -1698,7 +1513,12 @@ export default function PatientVolumePage() {
                 <>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="h-8">
+                      <Button variant="outline" className={cn(
+                        "h-8 transition-all",
+                        isDarkMode 
+                          ? "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/90 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                          : ""
+                      )}>
                         <CalendarIcon className="w-4 h-4 mr-2" />
                         {customDateRange.start ? format(customDateRange.start, "MMM d, yyyy") : "Start Date"}
                       </Button>
@@ -1715,7 +1535,12 @@ export default function PatientVolumePage() {
 
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="h-8">
+                      <Button variant="outline" className={cn(
+                        "h-8 transition-all",
+                        isDarkMode 
+                          ? "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/90 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                          : ""
+                      )}>
                         <CalendarIcon className="w-4 h-4 mr-2" />
                         {customDateRange.end ? format(customDateRange.end, "MMM d, yyyy") : "End Date"}
                       </Button>
@@ -1734,21 +1559,50 @@ export default function PatientVolumePage() {
 
               {(timePeriod === "thisMonth" || timePeriod === "lastMonth") && (
                 <>
-                  <div className="mx-1 h-6 w-px bg-slate-200" />
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={goPrevMonth} title="Previous month">
+                  <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-white/20" />
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className={cn(
+                      "h-8 w-8 transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-white/20 text-white/80 hover:bg-white/12 hover:border-white/35 hover:shadow-[0_0_10px_rgba(255,255,255,0.15)] dark:bg-white/5 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/12 dark:hover:border-white/35" 
+                        : ""
+                    )} 
+                    onClick={goPrevMonth} 
+                    title="Previous month"
+                  >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={goNextMonth} title="Next month">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className={cn(
+                      "h-8 w-8 transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-white/20 text-white/80 hover:bg-white/12 hover:border-white/35 hover:shadow-[0_0_10px_rgba(255,255,255,0.15)] dark:bg-white/5 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/12 dark:hover:border-white/35" 
+                        : ""
+                    )} 
+                    onClick={goNextMonth} 
+                    title="Next month"
+                  >
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </>
               )}
 
-              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-white/20" />
               <Button
                 variant={showComparison ? "default" : "outline"}
                 size="sm"
-                className={cn("h-8", showComparison && "bg-purple-600 hover:bg-purple-700")}
+                className={cn(
+                  "h-8 transition-all",
+                  showComparison 
+                    ? "bg-purple-600 hover:bg-purple-700" 
+                    : isDarkMode 
+                      ? "bg-white/5 border-white/20 text-white/85 hover:bg-white/12 hover:border-white/35 dark:bg-white/5 dark:border-white/20 dark:text-white/85 dark:hover:bg-white/12 dark:hover:border-white/35" 
+                      : ""
+                )}
                 onClick={() => setShowComparison(!showComparison)}
               >
                 Compare
@@ -1756,10 +1610,17 @@ export default function PatientVolumePage() {
 
               {showComparison && (
                 <Select value={comparisonTimePeriod} onValueChange={setComparisonTimePeriod}>
-                  <SelectTrigger className="h-8 w-[160px]">
+                  <SelectTrigger className={cn(
+                    "h-8 w-[160px] transition-all",
+                    isDarkMode 
+                      ? "bg-white/5 border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/90 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                      : ""
+                  )}>
                     <SelectValue placeholder="Compare to..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className={cn(
+                    isDarkMode && "dark:bg-slate-800 dark:border-white/20"
+                  )}>
                     <SelectItem value="previousPeriod">Previous Period</SelectItem>
                     <SelectItem value="previousYear">Previous Year</SelectItem>
                   </SelectContent>
@@ -1768,11 +1629,32 @@ export default function PatientVolumePage() {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="h-8" onClick={exportToCSV}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "h-8 transition-all",
+                  isDarkMode 
+                    ? "bg-white/5 border-white/20 text-white/85 hover:bg-white/12 hover:border-white/35 dark:bg-white/5 dark:border-white/20 dark:text-white/85 dark:hover:bg-white/12 dark:hover:border-white/35" 
+                    : ""
+                )} 
+                onClick={exportToCSV}
+              >
                 <Download className="w-3.5 h-3.5 mr-1.5" />
                 CSV
               </Button>
-              <Button variant="outline" size="sm" className="h-8" onClick={exportToPDF} title="Print report">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "h-8 transition-all",
+                  isDarkMode 
+                    ? "bg-white/5 border-white/20 text-white/85 hover:bg-white/12 hover:border-white/35 dark:bg-white/5 dark:border-white/20 dark:text-white/85 dark:hover:bg-white/12 dark:hover:border-white/35" 
+                    : ""
+                )} 
+                onClick={exportToPDF} 
+                title="Print report"
+              >
                 <FileText className="w-3.5 h-3.5 mr-1.5" />
                 Print
               </Button>
@@ -1781,11 +1663,25 @@ export default function PatientVolumePage() {
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex gap-2 flex-wrap">
-              <div className="flex gap-1 border border-slate-200 rounded-md p-1" role="group" aria-label="Chart type selector">
+              <div className={cn(
+                "flex gap-1 border rounded-md p-1",
+                isDarkMode 
+                  ? "border-white/15 dark:border-white/15" 
+                  : "border-slate-200"
+              )} role="group" aria-label="Chart type selector">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn("h-7 px-2", chartType === "bar" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
+                  className={cn(
+                    "h-7 px-2 transition-all",
+                    chartType === "bar" 
+                      ? isDarkMode 
+                        ? "bg-white/15 text-white border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.2)] dark:bg-white/15 dark:text-white dark:border-white/40" 
+                        : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                      : isDarkMode 
+                        ? "text-white/60 border border-white/0 bg-white/3 hover:text-white/90 hover:bg-white/8 hover:border-white/30 dark:text-white/60 dark:bg-white/3 dark:hover:text-white/90 dark:hover:bg-white/8 dark:hover:border-white/30" 
+                        : ""
+                  )}
                   onClick={() => setChartType("bar")}
                   title="Bar Chart"
                   aria-label="Bar Chart"
@@ -1796,7 +1692,16 @@ export default function PatientVolumePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn("h-7 px-2", chartType === "line" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
+                  className={cn(
+                    "h-7 px-2 transition-all",
+                    chartType === "line" 
+                      ? isDarkMode 
+                        ? "bg-white/15 text-white border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.2)] dark:bg-white/15 dark:text-white dark:border-white/40" 
+                        : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                      : isDarkMode 
+                        ? "text-white/60 border border-white/0 bg-white/3 hover:text-white/90 hover:bg-white/8 hover:border-white/30 dark:text-white/60 dark:bg-white/3 dark:hover:text-white/90 dark:hover:bg-white/8 dark:hover:border-white/30" 
+                        : ""
+                  )}
                   onClick={() => setChartType("line")}
                   title="Line Chart"
                   aria-label="Line Chart"
@@ -1807,7 +1712,16 @@ export default function PatientVolumePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn("h-7 px-2", chartType === "area" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
+                  className={cn(
+                    "h-7 px-2 transition-all",
+                    chartType === "area" 
+                      ? isDarkMode 
+                        ? "bg-white/15 text-white border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.2)] dark:bg-white/15 dark:text-white dark:border-white/40" 
+                        : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                      : isDarkMode 
+                        ? "text-white/60 border border-white/0 bg-white/3 hover:text-white/90 hover:bg-white/8 hover:border-white/30 dark:text-white/60 dark:bg-white/3 dark:hover:text-white/90 dark:hover:bg-white/8 dark:hover:border-white/30" 
+                        : ""
+                  )}
                   onClick={() => setChartType("area")}
                   title="Area Chart"
                   aria-label="Area Chart"
@@ -1818,7 +1732,16 @@ export default function PatientVolumePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn("h-7 px-2", chartType === "heatmap" && "bg-teal-50 text-teal-700 hover:bg-teal-100")}
+                  className={cn(
+                    "h-7 px-2 transition-all",
+                    chartType === "heatmap" 
+                      ? isDarkMode 
+                        ? "bg-white/15 text-white border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.2)] dark:bg-white/15 dark:text-white dark:border-white/40" 
+                        : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                      : isDarkMode 
+                        ? "text-white/60 border border-white/0 bg-white/3 hover:text-white/90 hover:bg-white/8 hover:border-white/30 dark:text-white/60 dark:bg-white/3 dark:hover:text-white/90 dark:hover:bg-white/8 dark:hover:border-white/30" 
+                        : ""
+                  )}
                   onClick={() => setChartType("heatmap")}
                   title="Heatmap Calendar"
                   aria-label="Heatmap Calendar"
@@ -1831,7 +1754,14 @@ export default function PatientVolumePage() {
               <Button
                 variant="outline"
                 size="sm"
-                className={cn("h-8", showTrendLine && "bg-blue-50 text-blue-700 border-blue-200")}
+                className={cn(
+                  "h-8 transition-all",
+                  showTrendLine 
+                    ? "bg-blue-50 text-blue-700 border-blue-200" 
+                    : isDarkMode 
+                      ? "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                      : ""
+                )}
                 onClick={() => setShowTrendLine(!showTrendLine)}
               >
                 <Activity className="w-3.5 h-3.5 mr-1.5" />
@@ -1840,7 +1770,16 @@ export default function PatientVolumePage() {
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={cn(
+                      "h-8 transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                        : ""
+                    )}
+                  >
                     <Target className="w-3.5 h-3.5 mr-1.5" />
                     Target {targetValue ? `(${targetValue})` : ""}
                   </Button>
@@ -1870,8 +1809,14 @@ export default function PatientVolumePage() {
               <Button
                 variant={mode === "chart" ? "default" : "outline"}
                 className={cn(
-                  "h-8 px-3",
-                  mode === "chart" ? "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white" : "text-slate-700"
+                  "h-8 px-3 transition-all",
+                  mode === "chart" 
+                    ? isDarkMode 
+                      ? "bg-white/20 hover:bg-white/25 text-white border-white/40 font-semibold dark:bg-white/20 dark:hover:bg-white/25 dark:text-white dark:border-white/40" 
+                      : "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white"
+                    : isDarkMode 
+                      ? "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                      : "text-slate-700"
                 )}
                 onClick={() => setMode("chart")}
               >
@@ -1881,8 +1826,14 @@ export default function PatientVolumePage() {
               <Button
                 variant={mode === "table" ? "default" : "outline"}
                 className={cn(
-                  "h-8 px-3",
-                  mode === "table" ? "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white" : "text-slate-700"
+                  "h-8 px-3 transition-all",
+                  mode === "table" 
+                    ? isDarkMode 
+                      ? "bg-white/20 hover:bg-white/25 text-white border-white/40 font-semibold dark:bg-white/20 dark:hover:bg-white/25 dark:text-white dark:border-white/40" 
+                      : "bg-slate-900 hover:bg-slate-800 text-white [&>svg]:text-white"
+                    : isDarkMode 
+                      ? "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30 dark:bg-white/5 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/30" 
+                      : "text-slate-700"
                 )}
                 onClick={() => setMode("table")}
               >
@@ -2452,6 +2403,299 @@ export default function PatientVolumePage() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
+
+        {/* AI-Powered Insights Panel - Moved to end of page */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 1.1 }}
+        >
+          <Card className={cn(
+            "backdrop-blur-xl border shadow-lg hover:shadow-xl transition-all duration-300",
+            isDarkMode 
+              ? "bg-gradient-to-br from-violet-900/30 to-blue-900/30 border-violet-700/30 dark:bg-gradient-to-br dark:from-violet-900/30 dark:to-blue-900/30 dark:border-violet-700/30" 
+              : "bg-gradient-to-br from-violet-50/80 to-blue-50/80 border-violet-200/30"
+          )}>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold bg-gradient-to-r from-violet-700 to-purple-700 bg-clip-text text-transparent">
+                    AI-Powered Insights
+                  </h3>
+                  <p className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-slate-400 dark:text-slate-400" : "text-slate-600"
+                  )}>Automated analysis and predictions</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Insight 1: Busiest Day Pattern */}
+                {(() => {
+                  const busiestDay = weekdayMetrics.peakDay;
+                  if (!busiestDay) return null;
+                  
+                  const avgCount = totalPatients / 7;
+                  const increasePercent = avgCount > 0 ? ((busiestDay.count - avgCount) / avgCount * 100).toFixed(1) : "0";
+                  
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className={cn(
+                        "p-4 rounded-xl backdrop-blur-sm border shadow-sm hover:shadow-md transition-all",
+                        isDarkMode 
+                          ? "bg-white/5 border-violet-700/30 dark:bg-white/5 dark:border-violet-700/30" 
+                          : "bg-white/80 border-violet-100"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center flex-shrink-0">
+                          <TrendingUp className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "text-sm font-semibold mb-1",
+                            isDarkMode ? "text-slate-100 dark:text-slate-100" : "text-slate-900"
+                          )}>Peak Traffic Pattern</p>
+                          <p className={cn(
+                            "text-xs leading-relaxed",
+                            isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                          )}>
+                            <span className="font-bold text-violet-700 dark:text-violet-400">{busiestDay.day}</span> sees{" "}
+                            <span className="font-bold">{increasePercent}%</span> more patients than average
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+
+                {/* Insight 2: Growth Trend */}
+                {weekOverWeekGrowth !== 0 && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className={cn(
+                      "p-4 rounded-xl backdrop-blur-sm border shadow-sm hover:shadow-md transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-violet-700/30 dark:bg-white/5 dark:border-violet-700/30" 
+                        : "bg-white/80 border-violet-100"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                        weekOverWeekGrowth > 0 
+                          ? "bg-emerald-100 dark:bg-emerald-900/50" 
+                          : "bg-red-100 dark:bg-red-900/50"
+                      )}>
+                        {weekOverWeekGrowth > 0 ? (
+                          <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-semibold mb-1",
+                          isDarkMode ? "text-slate-100 dark:text-slate-100" : "text-slate-900"
+                        )}>
+                          {weekOverWeekGrowth > 0 ? "Growth Detected" : "Decline Alert"}
+                        </p>
+                        <p className={cn(
+                          "text-xs leading-relaxed",
+                          isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                        )}>
+                          Week-over-week volume {weekOverWeekGrowth > 0 ? "increased" : "decreased"} by{" "}
+                          <span className={cn(
+                            "font-bold",
+                            weekOverWeekGrowth > 0 
+                              ? "text-emerald-700 dark:text-emerald-400" 
+                              : "text-red-700 dark:text-red-400"
+                          )}>
+                            {Math.abs(weekOverWeekGrowth).toFixed(1)}%
+                          </span>
+                          {Math.abs(weekOverWeekGrowth) > 20 && " - investigate cause"}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Insight 3: Projection */}
+                {isCurrentPeriod && projectedTotal > totalPatients && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className={cn(
+                      "p-4 rounded-xl backdrop-blur-sm border shadow-sm hover:shadow-md transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-violet-700/30 dark:bg-white/5 dark:border-violet-700/30" 
+                        : "bg-white/80 border-violet-100"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0">
+                        <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-semibold mb-1",
+                          isDarkMode ? "text-slate-100 dark:text-slate-100" : "text-slate-900"
+                        )}>Projected Total</p>
+                        <p className={cn(
+                          "text-xs leading-relaxed",
+                          isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                        )}>
+                          Expected to reach{" "}
+                          <span className="font-bold text-blue-700 dark:text-blue-400">{Math.round(projectedTotal).toLocaleString()}</span>{" "}
+                          patients by month end
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Insight 4: Average Performance */}
+                {avgPerActiveDay > 0 && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className={cn(
+                      "p-4 rounded-xl backdrop-blur-sm border shadow-sm hover:shadow-md transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-violet-700/30 dark:bg-white/5 dark:border-violet-700/30" 
+                        : "bg-white/80 border-violet-100"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center flex-shrink-0">
+                        <Activity className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-semibold mb-1",
+                          isDarkMode ? "text-slate-100 dark:text-slate-100" : "text-slate-900"
+                        )}>Daily Average</p>
+                        <p className={cn(
+                          "text-xs leading-relaxed",
+                          isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                        )}>
+                          Averaging{" "}
+                          <span className="font-bold text-teal-700 dark:text-teal-400">{Math.round(avgPerActiveDay)}</span>{" "}
+                          patients per active day
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Insight 5: Consistency Score */}
+                {(() => {
+                  const variance = sortedCounts.length > 0 
+                    ? sortedCounts.reduce((sum, val) => sum + Math.pow(val - avgPerActiveDay, 2), 0) / sortedCounts.length
+                    : 0;
+                  const stdDev = Math.sqrt(variance);
+                  const coefficientOfVariation = avgPerActiveDay > 0 ? (stdDev / avgPerActiveDay) * 100 : 0;
+                  const isConsistent = coefficientOfVariation < 30;
+                  
+                  if (sortedCounts.length === 0) return null;
+                  
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className={cn(
+                        "p-4 rounded-xl backdrop-blur-sm border shadow-sm hover:shadow-md transition-all",
+                        isDarkMode 
+                          ? "bg-white/5 border-violet-700/30 dark:bg-white/5 dark:border-violet-700/30" 
+                          : "bg-white/80 border-violet-100"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                          isConsistent 
+                            ? "bg-emerald-100 dark:bg-emerald-900/50" 
+                            : "bg-amber-100 dark:bg-amber-900/50"
+                        )}>
+                          <Activity className={cn(
+                            "w-4 h-4",
+                            isConsistent 
+                              ? "text-emerald-600 dark:text-emerald-400" 
+                              : "text-amber-600 dark:text-amber-400"
+                          )} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "text-sm font-semibold mb-1",
+                            isDarkMode ? "text-slate-100 dark:text-slate-100" : "text-slate-900"
+                          )}>Volume Consistency</p>
+                          <p className={cn(
+                            "text-xs leading-relaxed",
+                            isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                          )}>
+                            {isConsistent ? "Stable" : "Variable"} pattern detected{" "}
+                            <span className="font-bold">(CV: {coefficientOfVariation.toFixed(1)}%)</span>
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+
+                {/* Insight 6: Month Comparison */}
+                {monthOverMonthGrowth !== 0 && prevMonthTotal > 0 && (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className={cn(
+                      "p-4 rounded-xl backdrop-blur-sm border shadow-sm hover:shadow-md transition-all",
+                      isDarkMode 
+                        ? "bg-white/5 border-violet-700/30 dark:bg-white/5 dark:border-violet-700/30" 
+                        : "bg-white/80 border-violet-100"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                        monthOverMonthGrowth > 0 
+                          ? "bg-emerald-100 dark:bg-emerald-900/50" 
+                          : "bg-amber-100 dark:bg-amber-900/50"
+                      )}>
+                        <LineChart className={cn(
+                          "w-4 h-4",
+                          monthOverMonthGrowth > 0 
+                            ? "text-emerald-600 dark:text-emerald-400" 
+                            : "text-amber-600 dark:text-amber-400"
+                        )} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-semibold mb-1",
+                          isDarkMode ? "text-slate-100 dark:text-slate-100" : "text-slate-900"
+                        )}>Monthly Comparison</p>
+                        <p className={cn(
+                          "text-xs leading-relaxed",
+                          isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                        )}>
+                          {monthOverMonthGrowth > 0 ? "Up" : "Down"}{" "}
+                          <span className={cn(
+                            "font-bold",
+                            monthOverMonthGrowth > 0 
+                              ? "text-emerald-700 dark:text-emerald-400" 
+                              : "text-amber-700 dark:text-amber-400"
+                          )}>
+                            {Math.abs(monthOverMonthGrowth).toFixed(1)}%
+                          </span>{" "}
+                          vs {format(prevMonth, "MMM")}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Add modal */}
