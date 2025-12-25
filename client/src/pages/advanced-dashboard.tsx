@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,8 @@ import { useDateFilter } from "@/context/date-filter-context";
 import ExpensesDrawer from "@/components/dashboard/ExpensesDrawer";
 import DepartmentsPanel from "@/components/dashboard/DepartmentsPanel";
 import RevenueAnalyticsDaily from "@/components/dashboard/revenue-analytics-daily";
+import { kpiContainerVariants, kpiCardVariants, chartVariants, containerVariants, cardVariants } from "@/lib/animations";
+import { SkeletonCard, SkeletonChart, SkeletonList } from "@/components/ui/skeletons";
 
 /* ========= number helpers ========= */
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -824,11 +827,70 @@ export default function AdvancedDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-950">
-        <div className="flex items-center space-x-2 text-slate-100">
-          <RefreshCw className="h-6 w-6 animate-spin text-cyan-400" />
-          <span className="text-lg">Loading dashboard...</span>
-        </div>
+      <div className={cn("grid h-screen grid-rows-[auto,1fr] overflow-hidden transition-colors duration-300", isDarkMode ? "bg-[#0f172a] dark" : "bg-slate-950")}>
+        {/* HEADER (same as normal render) */}
+        <header className="sticky top-0 z-40">
+          <div className={cn(
+            "relative shadow-[0_20px_60px_rgba(15,23,42,0.9)]",
+            isDarkMode 
+              ? "bg-[linear-gradient(135deg,#1a2332_0%,#2d3748_50%,#1e3a5f_100%)]"
+              : "bg-[linear-gradient(120deg,#020617_0%,#020617_20%,#0b1120_60%,#020617_100%)]"
+          )}>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.38),_transparent_70%)] opacity-90" />
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-6 py-4 gap-4">
+              <div className="flex-shrink-0">
+                <h1 className={cn("text-2xl font-semibold tracking-tight", isDarkMode ? "text-white/95" : "text-white")}>
+                  Executive Dashboard
+                </h1>
+                <p className={cn("mt-1 text-sm", isDarkMode ? "text-white/70" : "text-slate-300")}>
+                  Loading dashboard data...
+                </p>
+              </div>
+            </div>
+            <div className="relative z-10 h-[3px] bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 shadow-[0_0_26px_rgba(34,211,238,0.95),0_0_42px_rgba(59,130,246,0.8)]" />
+          </div>
+        </header>
+
+        {/* MAIN with skeleton loaders */}
+        <main className={cn(
+          "relative min-h-0 overflow-y-auto transition-colors duration-300",
+          isDarkMode 
+            ? "bg-gradient-to-b from-[#0f172a] to-[#1e293b]"
+            : "bg-slate-50"
+        )}>
+          <div className="relative z-10 px-4 md:px-6 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-8">
+            <div className={cn(
+              "relative rounded-3xl overflow-hidden p-6",
+              isDarkMode 
+                ? "bg-white/5 backdrop-blur-lg border border-white/10"
+                : "bg-white border border-slate-100"
+            )}>
+              {/* KPI Cards Skeletons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7">
+                {[...Array(5)].map((_, i) => (
+                  <SkeletonCard key={i} className="h-[120px]" />
+                ))}
+              </div>
+
+              {/* Charts Row Skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-7">
+                <SkeletonChart />
+                <SkeletonChart />
+              </div>
+
+              {/* Bottom Section Skeletons */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <SkeletonList count={6} />
+                </div>
+                <div className="space-y-6">
+                  <SkeletonList count={4} />
+                  <SkeletonList count={4} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -1067,8 +1129,14 @@ export default function AdvancedDashboard() {
 
             <div className="relative px-4 md:px-6 pt-6 pb-10">
               {/* KPI CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7">
+              <motion.div 
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-7"
+                variants={kpiContainerVariants}
+                initial="hidden"
+                animate="visible"
+              >
                 {/* Total Revenue */}
+                <motion.div variants={kpiCardVariants}>
                 <Card className={cn(
                   "border-0 shadow-md transition-all duration-200 hover:scale-[1.02]",
                   isDarkMode
@@ -1161,8 +1229,10 @@ export default function AdvancedDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
 
                 {/* Total Expenses */}
+                <motion.div variants={kpiCardVariants}>
                 <Card
                   className={cn(
                     "border-0 shadow-md transition-all duration-200 hover:scale-[1.02] cursor-pointer",
@@ -1266,8 +1336,10 @@ export default function AdvancedDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
 
                 {/* Net Income */}
+                <motion.div variants={kpiCardVariants}>
                 <Card className={cn(
                   "border-0 shadow-md transition-all duration-200 hover:scale-[1.02]",
                   isDarkMode
@@ -1359,8 +1431,10 @@ export default function AdvancedDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
 
                 {/* Insurance (USD) */}
+                <motion.div variants={kpiCardVariants}>
                 <Card className={cn(
                   "border-0 shadow-md transition-all duration-200",
                   isDarkMode
@@ -1454,8 +1528,10 @@ export default function AdvancedDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
 
                 {/* Patient Volume */}
+                <motion.div variants={kpiCardVariants}>
                 <Link
                   href={`/patient-volume?view=monthly&year=${yearToSend}&month=${monthToSend}&range=${rangeToSend}`}
                   aria-label="View patient volume details"
@@ -1513,11 +1589,17 @@ export default function AdvancedDashboard() {
                     </CardContent>
                   </Card>
                 </Link>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {/* MAIN GRID INSIDE SURFACE */}
               <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
-                <div className="space-y-6">
+                <motion.div 
+                  className="space-y-6"
+                  variants={chartVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   <RevenueAnalyticsDaily
                     timeRange={rangeToSend}
                     selectedYear={yearToSend}
@@ -1529,9 +1611,15 @@ export default function AdvancedDashboard() {
                   <div className="hidden lg:block">
                     <QuickActionsCard isDarkMode={isDarkMode} />
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="space-y-6">
+                <motion.div 
+                  className="space-y-6"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <motion.div variants={cardVariants}>
                   <DepartmentsPanel
                     departments={
                       Array.isArray(departments) ? (departments as any[]) : []
@@ -1540,7 +1628,9 @@ export default function AdvancedDashboard() {
                     totalSSP={sspRevenue}
                     isDarkMode={isDarkMode}
                   />
+                  </motion.div>
 
+                  <motion.div variants={cardVariants}>
                   <InsuranceProvidersUSD
                     breakdown={dashboardData?.insuranceBreakdown}
                     totalUSD={parseFloat(
@@ -1548,7 +1638,9 @@ export default function AdvancedDashboard() {
                     )}
                     isDarkMode={isDarkMode}
                   />
+                  </motion.div>
 
+                  <motion.div variants={cardVariants}>
                   <Card className={cn(
                     "shadow-sm self-start",
                     isDarkMode
@@ -1626,7 +1718,8 @@ export default function AdvancedDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                </div>
+                  </motion.div>
+                </motion.div>
               </div>
 
               {/* mobile quick actions */}
