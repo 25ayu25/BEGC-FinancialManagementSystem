@@ -530,18 +530,6 @@ export default function Dashboard() {
       percentage: total > 0 ? Math.round((e.amount / total) * 100) : 0,
     }));
   }, [aggregatedExpenses]);
-        }
-        combined[finalCategory] = (combined[finalCategory] || 0) + numAmount;
-      }
-    }
-    
-    // Use the canonical range label from the centralized helper
-    return {
-      breakdown: combined,
-      total: totalExpensesSum,
-      periodLabel: canonicalRangeLabel,
-    };
-  }, [monthlyTrend, currentMonthData, currentExpenses, canonicalRangeLabel, comparisonCurrentMonthLabel]);
 
   // Calculate trend stats for SSP with improved YoY calculation
   const trendStats = useMemo(() => {
