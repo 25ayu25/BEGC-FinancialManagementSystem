@@ -98,7 +98,8 @@ const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 
 // Bar label styling constant for consistency
 // Bolder (600) than axis labels for visual hierarchy
-const BAR_LABEL_STYLE = { fontSize: 12, fill: '#475569', fontWeight: 600 } as const;
+// Note: This will be overridden with conditional styling in the actual charts
+const BAR_LABEL_STYLE = { fontSize: 12, fontWeight: 600 } as const;
 
 /** ---------- SAFETY HELPERS (prevents Recharts reduce() crash) ---------- */
 function asArray<T>(value: unknown): T[] {
@@ -1051,19 +1052,38 @@ export default function PatientVolumePage() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.15 }}
-        className="backdrop-blur-xl bg-white/95 border border-slate-200/60 rounded-xl shadow-2xl px-5 py-4 min-w-[220px]"
+        className={cn(
+          "backdrop-blur-xl border rounded-xl shadow-2xl px-5 py-4 min-w-[220px]",
+          isDarkMode 
+            ? "bg-slate-800/95 border-slate-700/60" 
+            : "bg-white/95 border-slate-200/60"
+        )}
       >
-        <div className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-100">{header}</div>
+        <div className={cn(
+          "text-sm font-semibold mb-3 pb-2 border-b",
+          isDarkMode 
+            ? "text-white border-slate-700" 
+            : "text-slate-800 border-slate-100"
+        )}>{header}</div>
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-4">
-            <span className="text-xs text-slate-600 font-medium">Patient Count</span>
+            <span className={cn(
+              "text-xs font-medium",
+              isDarkMode ? "text-slate-300" : "text-slate-600"
+            )}>Patient Count</span>
             <span className="text-2xl font-bold text-teal-600">
               {toFiniteNumber(p.count).toLocaleString()}
             </span>
           </div>
           {avgPerActiveDay > 0 && (
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
-              <span className="text-xs text-slate-600">vs Average</span>
+            <div className={cn(
+              "flex items-center justify-between gap-3 pt-2 border-t",
+              isDarkMode ? "border-slate-700" : "border-slate-100"
+            )}>
+              <span className={cn(
+                "text-xs",
+                isDarkMode ? "text-slate-300" : "text-slate-600"
+              )}>vs Average</span>
               <div className="flex items-center gap-1.5">
                 <span className={cn(
                   "text-sm font-semibold px-2 py-0.5 rounded-full",
@@ -1075,10 +1095,19 @@ export default function PatientVolumePage() {
             </div>
           )}
           {targetValue && (
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
-              <span className="text-xs text-slate-600">Target</span>
+            <div className={cn(
+              "flex items-center justify-between gap-3 pt-2 border-t",
+              isDarkMode ? "border-slate-700" : "border-slate-100"
+            )}>
+              <span className={cn(
+                "text-xs",
+                isDarkMode ? "text-slate-300" : "text-slate-600"
+              )}>Target</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-slate-700">{targetValue}</span>
+                <span className={cn(
+                  "text-sm font-medium",
+                  isDarkMode ? "text-slate-200" : "text-slate-700"
+                )}>{targetValue}</span>
                 {toFiniteNumber(p.count) >= targetValue && (
                   <span className="text-emerald-600">✓</span>
                 )}
@@ -1959,18 +1988,23 @@ export default function PatientVolumePage() {
                               </feMerge>
                             </filter>
                           </defs>
-                          <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
+                          <CartesianGrid 
+                            strokeDasharray="4 4" 
+                            stroke={isDarkMode ? "rgba(255, 255, 255, 0.15)" : "#eef2f7"} 
+                            opacity={0.5} 
+                            vertical={false} 
+                          />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#475569" }}
-                            axisLine={{ stroke: "#e5e7eb" }}
+                            tick={{ fontSize: 12, fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#475569" }}
+                            axisLine={{ stroke: isDarkMode ? "rgba(255, 255, 255, 0.2)" : "#e5e7eb" }}
                             tickLine={false}
                             angle={0}
                             textAnchor="middle"
                             height={30}
                           />
                           <YAxis
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 11, fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#64748b" }}
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
@@ -1979,11 +2013,15 @@ export default function PatientVolumePage() {
                               angle: -90,
                               position: "insideLeft",
                               offset: 8,
-                              style: { fill: "#64748b", fontSize: 11 },
+                              style: { fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#64748b", fontSize: 11 },
                             }}
                           />
                           <Tooltip content={<TooltipBox />} />
-                          <Legend />
+                          <Legend 
+                            wrapperStyle={{
+                              color: isDarkMode ? "rgba(255, 255, 255, 0.8)" : "#64748b"
+                            }}
+                          />
                           {targetValue && (
                             <ReferenceLine
                               y={targetValue}
@@ -2039,7 +2077,7 @@ export default function PatientVolumePage() {
                               dataKey="count" 
                               position="top" 
                               formatter={(value: number) => value > 0 ? value : ''}
-                              style={BAR_LABEL_STYLE} 
+                              style={{ ...BAR_LABEL_STYLE, fill: isDarkMode ? "rgba(255, 255, 255, 0.9)" : "#475569" }} 
                             />
                           </Bar>
                           {showComparison && (
@@ -2056,25 +2094,30 @@ export default function PatientVolumePage() {
                                 dataKey="comparisonCount" 
                                 position="top" 
                                 formatter={(value: number) => value > 0 ? value : ''}
-                                style={BAR_LABEL_STYLE} 
+                                style={{ ...BAR_LABEL_STYLE, fill: isDarkMode ? "rgba(255, 255, 255, 0.9)" : "#475569" }} 
                               />
                             </Bar>
                           )}
                         </BarChart>
                       ) : chartType === "line" ? (
                         <RechartsLineChart data={safeCombinedChartData} margin={{ top: 20, right: 16, left: 4, bottom: 8 }}>
-                          <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
+                          <CartesianGrid 
+                            strokeDasharray="4 4" 
+                            stroke={isDarkMode ? "rgba(255, 255, 255, 0.15)" : "#eef2f7"} 
+                            opacity={0.5} 
+                            vertical={false} 
+                          />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#475569" }}
-                            axisLine={{ stroke: "#e5e7eb" }}
+                            tick={{ fontSize: 12, fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#475569" }}
+                            axisLine={{ stroke: isDarkMode ? "rgba(255, 255, 255, 0.2)" : "#e5e7eb" }}
                             tickLine={false}
                             angle={0}
                             textAnchor="middle"
                             height={30}
                           />
                           <YAxis
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 11, fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#64748b" }}
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
@@ -2083,11 +2126,15 @@ export default function PatientVolumePage() {
                               angle: -90,
                               position: "insideLeft",
                               offset: 8,
-                              style: { fill: "#64748b", fontSize: 11 },
+                              style: { fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#64748b", fontSize: 11 },
                             }}
                           />
                           <Tooltip content={<TooltipBox />} />
-                          <Legend />
+                          <Legend 
+                            wrapperStyle={{
+                              color: isDarkMode ? "rgba(255, 255, 255, 0.8)" : "#64748b"
+                            }}
+                          />
                           {targetValue && (
                             <ReferenceLine
                               y={targetValue}
@@ -2130,18 +2177,23 @@ export default function PatientVolumePage() {
                               <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.05} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="1 1" stroke="#eef2f7" opacity={0.5} vertical={false} />
+                          <CartesianGrid 
+                            strokeDasharray="4 4" 
+                            stroke={isDarkMode ? "rgba(255, 255, 255, 0.15)" : "#eef2f7"} 
+                            opacity={0.5} 
+                            vertical={false} 
+                          />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 12, fill: "#475569" }}
-                            axisLine={{ stroke: "#e5e7eb" }}
+                            tick={{ fontSize: 12, fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#475569" }}
+                            axisLine={{ stroke: isDarkMode ? "rgba(255, 255, 255, 0.2)" : "#e5e7eb" }}
                             tickLine={false}
                             angle={0}
                             textAnchor="middle"
                             height={30}
                           />
                           <YAxis
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 11, fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#64748b" }}
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
@@ -2150,11 +2202,15 @@ export default function PatientVolumePage() {
                               angle: -90,
                               position: "insideLeft",
                               offset: 8,
-                              style: { fill: "#64748b", fontSize: 11 },
+                              style: { fill: isDarkMode ? "rgba(255, 255, 255, 0.85)" : "#64748b", fontSize: 11 },
                             }}
                           />
                           <Tooltip content={<TooltipBox />} />
-                          <Legend />
+                          <Legend 
+                            wrapperStyle={{
+                              color: isDarkMode ? "rgba(255, 255, 255, 0.8)" : "#64748b"
+                            }}
+                          />
                           {targetValue && (
                             <ReferenceLine
                               y={targetValue}
@@ -2286,14 +2342,25 @@ export default function PatientVolumePage() {
                           <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="backdrop-blur-xl bg-white/95 border border-slate-200/60 rounded-xl shadow-2xl px-4 py-3"
+                            className={cn(
+                              "backdrop-blur-xl border rounded-xl shadow-2xl px-4 py-3",
+                              isDarkMode 
+                                ? "bg-slate-800/95 border-slate-700/60" 
+                                : "bg-white/95 border-slate-200/60"
+                            )}
                           >
-                            <div className="text-sm font-semibold text-slate-800 mb-2">{data.name}</div>
+                            <div className={cn(
+                              "text-sm font-semibold mb-2",
+                              isDarkMode ? "text-white" : "text-slate-800"
+                            )}>{data.name}</div>
                             <div className="space-y-1">
                               <div className="text-2xl font-bold text-teal-600">
                                 {data.value.toLocaleString()}
                               </div>
-                              <div className="text-xs text-slate-600">
+                              <div className={cn(
+                                "text-xs",
+                                isDarkMode ? "text-slate-300" : "text-slate-600"
+                              )}>
                                 {totalPatients > 0 ? ((data.value / totalPatients) * 100).toFixed(1) : "0"}% of total
                               </div>
                             </div>
@@ -2310,10 +2377,18 @@ export default function PatientVolumePage() {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
                 >
-                  <div className="text-4xl font-bold bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                  <div className={cn(
+                    "text-4xl font-bold",
+                    isDarkMode 
+                      ? "text-white" 
+                      : "bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent"
+                  )}>
                     {totalPatients}
                   </div>
-                  <div className="text-sm text-slate-600 mt-1 font-medium">patients</div>
+                  <div className={cn(
+                    "text-sm mt-1 font-medium",
+                    isDarkMode ? "text-slate-300" : "text-slate-600"
+                  )}>patients</div>
                 </motion.div>
               </div>
 
@@ -2332,7 +2407,11 @@ export default function PatientVolumePage() {
                       key={day.day}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
-                        hasData ? "hover:bg-slate-50" : "opacity-60"
+                        hasData 
+                          ? isDarkMode 
+                            ? "hover:bg-white/5" 
+                            : "hover:bg-slate-50" 
+                          : "opacity-60"
                       )}
                     >
                       <div
@@ -2347,7 +2426,13 @@ export default function PatientVolumePage() {
                           <div className="flex items-center gap-2">
                             <span className={cn(
                               "text-sm font-medium",
-                              hasData ? "text-slate-900" : "text-slate-400"
+                              hasData 
+                                ? isDarkMode 
+                                  ? "text-white" 
+                                  : "text-slate-900" 
+                                : isDarkMode 
+                                  ? "text-slate-500" 
+                                  : "text-slate-400"
                             )}>
                               {day.day}
                             </span>
@@ -2359,18 +2444,30 @@ export default function PatientVolumePage() {
                             )}
                           </div>
                           {hasData ? (
-                            <span className="text-base font-semibold text-slate-900">
+                            <span className={cn(
+                              "text-base font-semibold",
+                              isDarkMode ? "text-white" : "text-slate-900"
+                            )}>
                               {day.count}
                             </span>
                           ) : (
-                            <span className="text-sm text-slate-400 italic">
+                            <span className={cn(
+                              "text-sm italic",
+                              isDarkMode ? "text-slate-500" : "text-slate-400"
+                            )}>
                               No Entries
                             </span>
                           )}
                         </div>
                         <div className={cn(
                           "w-full rounded-full h-2 overflow-hidden",
-                          hasData ? "bg-slate-100" : "bg-slate-50"
+                          hasData 
+                            ? isDarkMode 
+                              ? "bg-white/10" 
+                              : "bg-slate-100" 
+                            : isDarkMode 
+                              ? "bg-white/5" 
+                              : "bg-slate-50"
                         )}>
                           <div
                             className={cn(
@@ -2385,7 +2482,13 @@ export default function PatientVolumePage() {
                       </div>
                       <span className={cn(
                         "text-xs w-12 text-right tabular-nums",
-                        hasData ? "text-slate-500" : "text-slate-400"
+                        hasData 
+                          ? isDarkMode 
+                            ? "text-slate-400" 
+                            : "text-slate-500" 
+                          : isDarkMode 
+                            ? "text-slate-600" 
+                            : "text-slate-400"
                       )} aria-label={hasData ? `${day.percentage.toFixed(1)} percent` : "No data"}>
                         {hasData ? `${day.percentage.toFixed(1)}%` : "N/A"}
                       </span>
@@ -2393,12 +2496,18 @@ export default function PatientVolumePage() {
                   );
                 })}
                 {weekdayLegendData.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-200">
+                  <div className={cn(
+                    "mt-4 pt-3 border-t",
+                    isDarkMode ? "border-white/20" : "border-slate-200"
+                  )}>
                     {(() => {
                       // Use pre-calculated metrics to avoid duplicate computation
                       if (weekdayMetrics.daysWithData.length === 0) {
                         return (
-                          <p className="text-xs text-slate-500 italic">
+                          <p className={cn(
+                            "text-xs italic",
+                            isDarkMode ? "text-slate-400" : "text-slate-500"
+                          )}>
                             No patient data available for this period
                           </p>
                         );
@@ -2406,7 +2515,10 @@ export default function PatientVolumePage() {
                       // Use pre-calculated peakDay from metrics
                       const peakDay = weekdayMetrics.peakDay!;
                       return (
-                        <p className="text-xs text-slate-600">
+                        <p className={cn(
+                          "text-xs",
+                          isDarkMode ? "text-slate-300" : "text-slate-600"
+                        )}>
                           <span className="font-medium">Peak day:</span>{" "}
                           {peakDay.day} ({peakDay.count} patients)
                         </p>
