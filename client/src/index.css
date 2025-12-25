@@ -657,4 +657,112 @@ body {
   }
 }
 
+/* =========================
+   Dark Mode Chart Fixes
+   ========================= */
+
+/* Issue 1: Chart Backgrounds - Make transparent/dark in dark mode */
+.dark .recharts-wrapper,
+.dark .recharts-surface {
+  background: transparent !important;
+}
+
+/* Chart containers should blend with dark theme */
+.dark .chart-container,
+.dark .chart-background {
+  background: transparent;
+}
+
+/* Issue 4: Chart Elements Visibility - All chart text elements */
+
+/* Axis labels - bright and readable */
+.dark .recharts-cartesian-axis-tick-value,
+.dark .chart-axis-tick {
+  fill: rgba(255, 255, 255, 0.85) !important;
+  font-size: 12px;
+}
+
+/* Grid lines - subtle but visible */
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Average/reference line - dashed line with good contrast */
+.dark .recharts-reference-line line,
+.dark .average-line {
+  stroke: rgba(255, 255, 255, 0.4) !important;
+  stroke-dasharray: 5 5;
+  stroke-width: 1.5;
+}
+
+/* Average line label - prominent with background */
+.dark .recharts-label,
+.dark .average-line-label {
+  fill: rgba(255, 255, 255, 0.95) !important;
+  font-weight: 600;
+}
+
+/* Value labels on bars - readable with drop shadow */
+.dark .recharts-text.recharts-label,
+.dark .chart-bar-value {
+  fill: rgba(255, 255, 255, 0.90) !important;
+  font-weight: 600;
+  font-size: 11px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}
+
+/* Legend text - clear and visible */
+.dark .recharts-legend-item-text,
+.dark .chart-legend-text {
+  color: rgba(255, 255, 255, 0.85) !important;
+  fill: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Tooltips - dark background with high contrast */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.dark .recharts-tooltip-wrapper .recharts-tooltip-label {
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item {
+  color: rgba(255, 255, 255, 0.90) !important;
+}
+
+/* Keep bars vibrant on dark background */
+.dark .recharts-bar-rectangle {
+  opacity: 0.95;
+}
+
+.dark .revenue-bar,
+.dark .recharts-bar-rectangle[fill*="teal"],
+.dark .recharts-bar-rectangle[fill*="#14b8a6"] {
+  filter: brightness(1.1);
+}
+
+.dark .usd-bar,
+.dark .recharts-bar-rectangle[fill*="sky"],
+.dark .recharts-bar-rectangle[fill*="#0ea5e9"] {
+  filter: brightness(1.1);
+}
+
+/* Line chart elements */
+.dark .recharts-line,
+.dark .recharts-area {
+  opacity: 0.95;
+}
+
+.dark .recharts-dot {
+  filter: brightness(1.1);
+}
+
 
