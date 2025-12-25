@@ -1052,19 +1052,38 @@ export default function PatientVolumePage() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.15 }}
-        className="backdrop-blur-xl bg-white/95 border border-slate-200/60 rounded-xl shadow-2xl px-5 py-4 min-w-[220px]"
+        className={cn(
+          "backdrop-blur-xl border rounded-xl shadow-2xl px-5 py-4 min-w-[220px]",
+          isDarkMode 
+            ? "bg-slate-800/95 border-slate-700/60" 
+            : "bg-white/95 border-slate-200/60"
+        )}
       >
-        <div className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-100">{header}</div>
+        <div className={cn(
+          "text-sm font-semibold mb-3 pb-2 border-b",
+          isDarkMode 
+            ? "text-white border-slate-700" 
+            : "text-slate-800 border-slate-100"
+        )}>{header}</div>
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-4">
-            <span className="text-xs text-slate-600 font-medium">Patient Count</span>
+            <span className={cn(
+              "text-xs font-medium",
+              isDarkMode ? "text-slate-300" : "text-slate-600"
+            )}>Patient Count</span>
             <span className="text-2xl font-bold text-teal-600">
               {toFiniteNumber(p.count).toLocaleString()}
             </span>
           </div>
           {avgPerActiveDay > 0 && (
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
-              <span className="text-xs text-slate-600">vs Average</span>
+            <div className={cn(
+              "flex items-center justify-between gap-3 pt-2 border-t",
+              isDarkMode ? "border-slate-700" : "border-slate-100"
+            )}>
+              <span className={cn(
+                "text-xs",
+                isDarkMode ? "text-slate-300" : "text-slate-600"
+              )}>vs Average</span>
               <div className="flex items-center gap-1.5">
                 <span className={cn(
                   "text-sm font-semibold px-2 py-0.5 rounded-full",
@@ -1076,10 +1095,19 @@ export default function PatientVolumePage() {
             </div>
           )}
           {targetValue && (
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
-              <span className="text-xs text-slate-600">Target</span>
+            <div className={cn(
+              "flex items-center justify-between gap-3 pt-2 border-t",
+              isDarkMode ? "border-slate-700" : "border-slate-100"
+            )}>
+              <span className={cn(
+                "text-xs",
+                isDarkMode ? "text-slate-300" : "text-slate-600"
+              )}>Target</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-slate-700">{targetValue}</span>
+                <span className={cn(
+                  "text-sm font-medium",
+                  isDarkMode ? "text-slate-200" : "text-slate-700"
+                )}>{targetValue}</span>
                 {toFiniteNumber(p.count) >= targetValue && (
                   <span className="text-emerald-600">✓</span>
                 )}
@@ -2314,14 +2342,25 @@ export default function PatientVolumePage() {
                           <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="backdrop-blur-xl bg-white/95 border border-slate-200/60 rounded-xl shadow-2xl px-4 py-3"
+                            className={cn(
+                              "backdrop-blur-xl border rounded-xl shadow-2xl px-4 py-3",
+                              isDarkMode 
+                                ? "bg-slate-800/95 border-slate-700/60" 
+                                : "bg-white/95 border-slate-200/60"
+                            )}
                           >
-                            <div className="text-sm font-semibold text-slate-800 mb-2">{data.name}</div>
+                            <div className={cn(
+                              "text-sm font-semibold mb-2",
+                              isDarkMode ? "text-white" : "text-slate-800"
+                            )}>{data.name}</div>
                             <div className="space-y-1">
                               <div className="text-2xl font-bold text-teal-600">
                                 {data.value.toLocaleString()}
                               </div>
-                              <div className="text-xs text-slate-600">
+                              <div className={cn(
+                                "text-xs",
+                                isDarkMode ? "text-slate-300" : "text-slate-600"
+                              )}>
                                 {totalPatients > 0 ? ((data.value / totalPatients) * 100).toFixed(1) : "0"}% of total
                               </div>
                             </div>
