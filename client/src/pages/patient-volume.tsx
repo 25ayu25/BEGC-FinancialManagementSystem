@@ -56,6 +56,8 @@ import {
   Target,
   Activity,
   Grid3x3,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 import {
@@ -112,6 +114,17 @@ function toLabel(value: unknown): string {
 }
 
 export default function PatientVolumePage() {
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('patientVolume-darkMode');
+    return saved === 'true';
+  });
+
+  // Save dark mode preference
+  useEffect(() => {
+    localStorage.setItem('patientVolume-darkMode', isDarkMode.toString());
+  }, [isDarkMode]);
+
   // URL deep-link support from dashboards (optional)
   const params = new URLSearchParams(window.location.search);
   const viewParam = params.get("view"); // "monthly" or null
@@ -1086,7 +1099,13 @@ export default function PatientVolumePage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20">
+      <div className={cn("min-h-screen transition-colors duration-500", isDarkMode && "dark")}>
+        <div className={cn(
+          "min-h-screen transition-colors duration-500",
+          isDarkMode 
+            ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" 
+            : "bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20"
+        )}>
         <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
           <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
             Add Volume
@@ -1104,6 +1123,7 @@ export default function PatientVolumePage() {
             </div>
           </div>
         </AppContainer>
+        </div>
       </div>
     );
   }
@@ -1111,7 +1131,13 @@ export default function PatientVolumePage() {
   // Error state
   if (isError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20">
+      <div className={cn("min-h-screen transition-colors duration-500", isDarkMode && "dark")}>
+        <div className={cn(
+          "min-h-screen transition-colors duration-500",
+          isDarkMode 
+            ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" 
+            : "bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20"
+        )}>
         <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
           <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
             Add Volume
@@ -1131,16 +1157,52 @@ export default function PatientVolumePage() {
             </div>
           </div>
         </AppContainer>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20">
+    <div className={cn(
+      "min-h-screen transition-colors duration-500",
+      isDarkMode && "dark"
+    )}>
+      <div className={cn(
+        "min-h-screen transition-colors duration-500",
+        isDarkMode 
+          ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" 
+          : "bg-gradient-to-br from-slate-50 via-teal-50/30 to-blue-50/20"
+      )}>
       <PageHeader variant="patientVolume" title="Patient Volume Tracking" subtitle="Monthly & multi-period summary">
-        <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
-          Add Volume
-        </HeaderAction>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={cn(
+              "h-9 w-9 rounded-full transition-all duration-300",
+              isDarkMode 
+                ? "bg-slate-800 hover:bg-slate-700 border-slate-600" 
+                : "bg-white hover:bg-slate-50"
+            )}
+            title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            <motion.div
+              initial={false}
+              animate={{ rotate: isDarkMode ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {isDarkMode ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-600" />
+              )}
+            </motion.div>
+          </Button>
+          <HeaderAction variant="light" icon={<Plus className="w-4 h-4" />} onClick={() => setAddOpen(true)}>
+            Add Volume
+          </HeaderAction>
+        </div>
       </PageHeader>
 
       <AppContainer className="space-y-6 py-6">
@@ -2415,6 +2477,7 @@ export default function PatientVolumePage() {
           </motion.div>
         )}
       </AppContainer>
+      </div>
     </div>
   );
 }
