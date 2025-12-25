@@ -2341,14 +2341,14 @@ export default function PatientVolumePage() {
                   <div className={cn(
                     "text-4xl font-bold",
                     isDarkMode 
-                      ? "text-white dark:text-white" 
+                      ? "text-white" 
                       : "bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent"
                   )}>
                     {totalPatients}
                   </div>
                   <div className={cn(
                     "text-sm mt-1 font-medium",
-                    isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                    isDarkMode ? "text-slate-300" : "text-slate-600"
                   )}>patients</div>
                 </motion.div>
               </div>
@@ -2370,7 +2370,7 @@ export default function PatientVolumePage() {
                         "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
                         hasData 
                           ? isDarkMode 
-                            ? "hover:bg-white/5 dark:hover:bg-white/5" 
+                            ? "hover:bg-white/5" 
                             : "hover:bg-slate-50" 
                           : "opacity-60"
                       )}
@@ -2389,10 +2389,10 @@ export default function PatientVolumePage() {
                               "text-sm font-medium",
                               hasData 
                                 ? isDarkMode 
-                                  ? "text-white dark:text-white" 
+                                  ? "text-white" 
                                   : "text-slate-900" 
                                 : isDarkMode 
-                                  ? "text-slate-500 dark:text-slate-500" 
+                                  ? "text-slate-500" 
                                   : "text-slate-400"
                             )}>
                               {day.day}
@@ -2407,14 +2407,14 @@ export default function PatientVolumePage() {
                           {hasData ? (
                             <span className={cn(
                               "text-base font-semibold",
-                              isDarkMode ? "text-white dark:text-white" : "text-slate-900"
+                              isDarkMode ? "text-white" : "text-slate-900"
                             )}>
                               {day.count}
                             </span>
                           ) : (
                             <span className={cn(
                               "text-sm italic",
-                              isDarkMode ? "text-slate-500 dark:text-slate-500" : "text-slate-400"
+                              isDarkMode ? "text-slate-500" : "text-slate-400"
                             )}>
                               No Entries
                             </span>
@@ -2424,10 +2424,10 @@ export default function PatientVolumePage() {
                           "w-full rounded-full h-2 overflow-hidden",
                           hasData 
                             ? isDarkMode 
-                              ? "bg-white/10 dark:bg-white/10" 
+                              ? "bg-white/10" 
                               : "bg-slate-100" 
                             : isDarkMode 
-                              ? "bg-white/5 dark:bg-white/5" 
+                              ? "bg-white/5" 
                               : "bg-slate-50"
                         )}>
                           <div
@@ -2445,10 +2445,10 @@ export default function PatientVolumePage() {
                         "text-xs w-12 text-right tabular-nums",
                         hasData 
                           ? isDarkMode 
-                            ? "text-slate-400 dark:text-slate-400" 
+                            ? "text-slate-400" 
                             : "text-slate-500" 
                           : isDarkMode 
-                            ? "text-slate-600 dark:text-slate-600" 
+                            ? "text-slate-600" 
                             : "text-slate-400"
                       )} aria-label={hasData ? `${day.percentage.toFixed(1)} percent` : "No data"}>
                         {hasData ? `${day.percentage.toFixed(1)}%` : "N/A"}
@@ -2459,7 +2459,7 @@ export default function PatientVolumePage() {
                 {weekdayLegendData.length > 0 && (
                   <div className={cn(
                     "mt-4 pt-3 border-t",
-                    isDarkMode ? "border-white/20 dark:border-white/20" : "border-slate-200"
+                    isDarkMode ? "border-white/20" : "border-slate-200"
                   )}>
                     {(() => {
                       // Use pre-calculated metrics to avoid duplicate computation
@@ -2467,7 +2467,7 @@ export default function PatientVolumePage() {
                         return (
                           <p className={cn(
                             "text-xs italic",
-                            isDarkMode ? "text-slate-500 dark:text-slate-500" : "text-slate-500"
+                            isDarkMode ? "text-slate-500" : "text-slate-500"
                           )}>
                             No patient data available for this period
                           </p>
@@ -2478,7 +2478,7 @@ export default function PatientVolumePage() {
                       return (
                         <p className={cn(
                           "text-xs",
-                          isDarkMode ? "text-slate-300 dark:text-slate-300" : "text-slate-600"
+                          isDarkMode ? "text-slate-300" : "text-slate-600"
                         )}>
                           <span className="font-medium">Peak day:</span>{" "}
                           {peakDay.day} ({peakDay.count} patients)
