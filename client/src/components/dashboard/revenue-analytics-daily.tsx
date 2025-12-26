@@ -191,9 +191,10 @@ type RTProps = {
   avgDayUSD?: number;
   totalSSP?: number;
   totalUSD?: number;
+  isDarkMode?: boolean;
 };
 
-function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySSP, avgDayUSD, totalSSP, totalUSD }: RTProps) {
+function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySSP, avgDayUSD, totalSSP, totalUSD, isDarkMode = false }: RTProps) {
   if (!active || !payload || !payload.length) return null;
   const p = payload[0]?.payload ?? {};
   let title = "";
@@ -226,32 +227,60 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
   const diffFromAvg = avg > 0 ? ((value - avg) / avg) * 100 : 0;
 
   return (
-    <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg min-w-[220px]">
-      <div className="font-semibold text-slate-900 mb-2">{title}</div>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600">Amount:</span>
-          <span className="font-mono font-semibold text-slate-900">
-            {currency} {formatValue}
-          </span>
-        </div>
-        {total > 0 && (
+    <div className={cn(
+      "rounded-xl shadow-2xl min-w-[220px] backdrop-blur-xl border",
+      isDarkMode 
+        ? "bg-slate-900/95 border-white/20" 
+        : "bg-white/98 border-slate-200"
+    )}>
+      <div className="p-4">
+        <div className={cn(
+          "font-semibold mb-3 pb-2 border-b",
+          isDarkMode ? "text-white/95 border-white/10" : "text-slate-900 border-slate-200"
+        )}>{title}</div>
+        <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">% of Total:</span>
-            <span className="font-mono text-teal-600">{percentOfTotal}%</span>
-          </div>
-        )}
-        {mode === "daily" && avg > 0 && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">vs Average:</span>
             <span className={cn(
-              "font-mono font-medium",
-              diffFromAvg > 0 ? "text-emerald-600" : diffFromAvg < 0 ? "text-red-600" : "text-slate-500"
+              isDarkMode ? "text-white/70" : "text-slate-600"
+            )}>Amount:</span>
+            <span className={cn(
+              "font-mono font-bold text-base",
+              currency === "SSP" 
+                ? (isDarkMode ? "text-teal-400" : "text-teal-600")
+                : (isDarkMode ? "text-sky-400" : "text-sky-600")
             )}>
-              {diffFromAvg > 0 ? "+" : ""}{diffFromAvg.toFixed(1)}%
+              {currency} {formatValue}
             </span>
           </div>
-        )}
+          {total > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className={cn(
+                isDarkMode ? "text-white/70" : "text-slate-600"
+              )}>% of Total:</span>
+              <span className={cn(
+                "font-mono font-semibold",
+                isDarkMode ? "text-emerald-400" : "text-teal-600"
+              )}>{percentOfTotal}%</span>
+            </div>
+          )}
+          {mode === "daily" && avg > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className={cn(
+                isDarkMode ? "text-white/70" : "text-slate-600"
+              )}>vs Average:</span>
+              <span className={cn(
+                "font-mono font-semibold",
+                diffFromAvg > 0 
+                  ? (isDarkMode ? "text-emerald-400" : "text-emerald-600")
+                  : diffFromAvg < 0 
+                  ? (isDarkMode ? "text-red-400" : "text-red-600")
+                  : (isDarkMode ? "text-white/70" : "text-slate-500")
+              )}>
+                {diffFromAvg > 0 ? "+" : ""}{diffFromAvg.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -517,7 +546,7 @@ export default function RevenueAnalyticsDaily({
   const days = daysInMonth(year, month);
   const isMobile = useIsMobile(768);
 
-  const chartHeight = isMobile ? 260 : 340;
+  const chartHeight = isMobile ? 260 : 420;
 
   const desiredXTicks = isMobile ? 12 : days;
   const xInterval = Math.max(0, Math.ceil(days / desiredXTicks) - 1);
@@ -1078,6 +1107,7 @@ export default function RevenueAnalyticsDaily({
                             mode={wide ? "monthly" : "daily"}
                             avgDaySSP={avgDaySSP}
                             totalSSP={totalSSP}
+                            isDarkMode={isDarkMode}
                           />
                         )}
                       />
@@ -1089,8 +1119,8 @@ export default function RevenueAnalyticsDaily({
                       <Bar
                         dataKey="value"
                         fill={`url(#barGradientSSP-${componentId})`}
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={28}
+                        radius={[8, 8, 0, 0]}
+                        maxBarSize={40}
                         onClick={(p: any) =>
                           wide
                             ? onClickMonthlySSP(p?.payload)
@@ -1165,6 +1195,7 @@ export default function RevenueAnalyticsDaily({
                             mode={wide ? "monthly" : "daily"}
                             avgDaySSP={avgDaySSP}
                             totalSSP={totalSSP}
+                            isDarkMode={isDarkMode}
                           />
                         )}
                       />
@@ -1250,6 +1281,7 @@ export default function RevenueAnalyticsDaily({
                             mode={wide ? "monthly" : "daily"}
                             avgDaySSP={avgDaySSP}
                             totalSSP={totalSSP}
+                            isDarkMode={isDarkMode}
                           />
                         )}
                       />
@@ -1407,6 +1439,7 @@ export default function RevenueAnalyticsDaily({
                             mode={wide ? "monthly" : "daily"}
                             avgDayUSD={avgDayUSD}
                             totalUSD={totalUSD}
+                            isDarkMode={isDarkMode}
                           />
                         )}
                       />
@@ -1418,8 +1451,8 @@ export default function RevenueAnalyticsDaily({
                       <Bar
                         dataKey="value"
                         fill={`url(#barGradientUSD-${componentId})`}
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={28}
+                        radius={[8, 8, 0, 0]}
+                        maxBarSize={40}
                         onClick={(p: any) =>
                           wide
                             ? onClickMonthlyUSD(p?.payload)
@@ -1494,6 +1527,7 @@ export default function RevenueAnalyticsDaily({
                             mode={wide ? "monthly" : "daily"}
                             avgDayUSD={avgDayUSD}
                             totalUSD={totalUSD}
+                            isDarkMode={isDarkMode}
                           />
                         )}
                       />
@@ -1579,6 +1613,7 @@ export default function RevenueAnalyticsDaily({
                             mode={wide ? "monthly" : "daily"}
                             avgDayUSD={avgDayUSD}
                             totalUSD={totalUSD}
+                            isDarkMode={isDarkMode}
                           />
                         )}
                       />
