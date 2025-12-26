@@ -771,7 +771,7 @@ body {
 
 /* Ensure ALL percentages have consistent bold weight in dark mode */
 .dark .text-xs.font-semibold {
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 /* Ensure comparison text is clearly visible */

@@ -1192,7 +1192,11 @@ export default function AdvancedDashboard() {
                                   ? isDarkMode ? "text-red-400" : "text-red-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
-                              style={isDarkMode ? { color: revenueChangePct > 0 ? "#4ade80" : revenueChangePct < 0 ? "#f87171" : undefined } : {}}
+                              style={isDarkMode ? { 
+                                color: revenueChangePct > 0 ? "#4ade80" : revenueChangePct < 0 ? "#fca5a5" : undefined,
+                                fontWeight: 700,
+                                textShadow: revenueChangePct < 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                              } : {}}
                             >
                               <span className="font-bold">
                                 {revenueChangePct > 0 ? "+" : ""}
@@ -1304,7 +1308,11 @@ export default function AdvancedDashboard() {
                                   ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
-                              style={isDarkMode ? { color: dashboardData.changes.expenseChangeSSP > 0 ? "#f87171" : dashboardData.changes.expenseChangeSSP < 0 ? "#4ade80" : undefined } : {}}
+                              style={isDarkMode ? { 
+                                color: dashboardData.changes.expenseChangeSSP > 0 ? "#fca5a5" : dashboardData.changes.expenseChangeSSP < 0 ? "#4ade80" : undefined,
+                                fontWeight: 700,
+                                textShadow: dashboardData.changes.expenseChangeSSP > 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                              } : {}}
                             >
                               <span className="font-bold">
                                 {dashboardData.changes.expenseChangeSSP > 0
@@ -1392,7 +1400,10 @@ export default function AdvancedDashboard() {
                                 ? isDarkMode ? "text-cyan-400" : "text-blue-600"
                                 : isDarkMode ? "text-red-400" : "text-red-600"
                             )}
-                            style={isDarkMode && sspNetIncome < 0 ? { color: "#f87171" } : {}}
+                            style={isDarkMode && sspNetIncome < 0 ? { 
+                              color: "#fca5a5",
+                              textShadow: "0 0 8px rgba(252, 165, 165, 0.3)"
+                            } : {}}
                           >
                             {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin:{" "}
                             {((sspNetIncome / sspRevenue) * 100).toFixed(1)}%
@@ -1422,7 +1433,11 @@ export default function AdvancedDashboard() {
                                   ? isDarkMode ? "text-red-400" : "text-red-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
-                              style={isDarkMode ? { color: dashboardData.changes.netIncomeChangeSSP > 0 ? "#4ade80" : dashboardData.changes.netIncomeChangeSSP < 0 ? "#f87171" : undefined } : {}}
+                              style={isDarkMode ? { 
+                                color: dashboardData.changes.netIncomeChangeSSP > 0 ? "#4ade80" : dashboardData.changes.netIncomeChangeSSP < 0 ? "#fca5a5" : undefined,
+                                fontWeight: 700,
+                                textShadow: dashboardData.changes.netIncomeChangeSSP < 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                              } : {}}
                             >
                               <span className="font-bold">
                                 {dashboardData.changes.netIncomeChangeSSP > 0
@@ -1450,11 +1465,30 @@ export default function AdvancedDashboard() {
                           ) : null}
                         </div>
                       </div>
-                      <div className={cn(
-                        "p-2.5 rounded-xl shadow-sm",
-                        isDarkMode && "opacity-80 bg-cyan-500/20"
-                      )}>
-                        <DollarSign className={cn("h-5 w-5", isDarkMode ? "text-cyan-400" : "text-blue-600")} />
+                      <div
+                        className={cn(
+                          "p-2.5 rounded-xl shadow-sm",
+                          isDarkMode && "opacity-80",
+                          dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
+                            dashboardData.changes.netIncomeChangeSSP > 0
+                            ? "bg-emerald-100"
+                            : dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
+                              dashboardData.changes.netIncomeChangeSSP < 0
+                            ? "bg-red-100"
+                            : isDarkMode
+                            ? "bg-cyan-500/20"
+                            : "bg-blue-100"
+                        )}
+                      >
+                        {dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
+                        dashboardData?.changes?.netIncomeChangeSSP > 0 ? (
+                          <TrendingUp className={cn("h-5 w-5", isDarkMode ? "text-emerald-400" : "text-emerald-600")} />
+                        ) : dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
+                          dashboardData?.changes?.netIncomeChangeSSP < 0 ? (
+                          <TrendingDown className={cn("h-5 w-5", isDarkMode ? "text-red-400" : "text-red-600")} />
+                        ) : (
+                          <DollarSign className={cn("h-5 w-5", isDarkMode ? "text-cyan-400" : "text-blue-600")} />
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1517,7 +1551,11 @@ export default function AdvancedDashboard() {
                                   ? isDarkMode ? "text-red-400" : "text-red-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
-                              style={isDarkMode ? { color: insuranceChangePct > 0 ? "#4ade80" : insuranceChangePct < 0 ? "#f87171" : undefined } : {}}
+                              style={isDarkMode ? { 
+                                color: insuranceChangePct > 0 ? "#4ade80" : insuranceChangePct < 0 ? "#fca5a5" : undefined,
+                                fontWeight: 700,
+                                textShadow: insuranceChangePct < 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                              } : {}}
                             >
                               <span className="font-bold">
                                 {insuranceChangePct > 0 ? "+" : ""}
@@ -1556,11 +1594,26 @@ export default function AdvancedDashboard() {
                           )}
                         </div>
                       </div>
-                      <div className={cn(
-                        "p-2.5 rounded-xl shadow-sm",
-                        isDarkMode && "opacity-80 bg-purple-500/20"
-                      )}>
-                        <Shield className={cn("h-5 w-5", isDarkMode ? "text-purple-400" : "text-purple-600")} />
+                      <div
+                        className={cn(
+                          "p-2.5 rounded-xl shadow-sm",
+                          isDarkMode && "opacity-80",
+                          insuranceChangePct !== undefined && insuranceChangePct > 0
+                            ? "bg-emerald-100"
+                            : insuranceChangePct !== undefined && insuranceChangePct < 0
+                            ? "bg-red-100"
+                            : isDarkMode
+                            ? "bg-purple-500/20"
+                            : "bg-purple-100"
+                        )}
+                      >
+                        {insuranceChangePct !== undefined && insuranceChangePct > 0 ? (
+                          <TrendingUp className={cn("h-5 w-5", isDarkMode ? "text-emerald-400" : "text-emerald-600")} />
+                        ) : insuranceChangePct !== undefined && insuranceChangePct < 0 ? (
+                          <TrendingDown className={cn("h-5 w-5", isDarkMode ? "text-red-400" : "text-red-600")} />
+                        ) : (
+                          <DollarSign className={cn("h-5 w-5", isDarkMode ? "text-purple-400" : "text-purple-600")} />
+                        )}
                       </div>
                     </div>
                   </CardContent>
