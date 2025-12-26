@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from "react";
+import ReactDOM from 'react-dom'; // Added for Portal support
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -21,7 +22,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/queryClient";
-import { BarChart3, Plus, AreaChartIcon, LineChartIcon, TrendingUp, TrendingDown, Maximize2 } from "lucide-react";
+import { BarChart3, Plus, AreaChartIcon, LineChartIcon, TrendingUp, Maximize2 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
@@ -37,8 +38,8 @@ type TimeRange =
 
 type Props = {
   timeRange: TimeRange;
-  selectedYear: number; // e.g. 2025
-  selectedMonth: number; // 1..12
+  selectedYear: number;
+  selectedMonth: number;
   customStartDate?: Date;
   customEndDate?: Date;
   isDarkMode?: boolean;
@@ -47,7 +48,6 @@ type Props = {
 /* ------------------------ Number Formatters ---------------------- */
 
 const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-// for SSP labels in millions
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -56,7 +56,7 @@ const compact = new Intl.NumberFormat("en-US", {
 /* ----------------------------- Utils ----------------------------- */
 
 function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate(); // month is 1..12
+  return new Date(year, month, 0).getDate();
 }
 function normalizedRange(range: TimeRange) {
   return range === "month-select" ? "current-month" : range;
@@ -184,7 +184,7 @@ type RTProps = {
   active?: boolean;
   payload?: any[];
   year?: number;
-  month?: number; // for daily
+  month?: number;
   currency: "SSP" | "USD";
   mode: "daily" | "monthly";
   avgDaySSP?: number;
@@ -206,7 +206,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
         ? format(new Date(year, month - 1, d), "MMM d, yyyy")
         : p.dateISO ?? "";
   } else {
-    const key = p.label as string | undefined; // "YYYY-MM"
+    const key = p.label as string | undefined;
     if (key && /^\d{4}-\d{2}$/.test(key)) {
       const [y, m] = key.split("-").map((x: string) => parseInt(x, 10));
       title = format(new Date(y, m - 1, 1), "MMM yyyy");
@@ -218,15 +218,12 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
   const value = Number(p.value ?? 0);
   const formatValue = nf0.format(Math.round(value));
   
-  // Calculate percentage of total
   const total = currency === "SSP" ? (totalSSP ?? 0) : (totalUSD ?? 0);
   const percentOfTotal = total > 0 ? ((value / total) * 100).toFixed(1) : "0";
   
-  // Compare to average
   const avg = currency === "SSP" ? (avgDaySSP ?? 0) : (avgDayUSD ?? 0);
   const diffFromAvg = avg > 0 ? ((value - avg) / avg) * 100 : 0;
 
-  // Helper to get color classes for currency-specific values
   const getCurrencyColor = (curr: string) => {
     if (curr === "SSP") {
       return isDarkMode ? "text-teal-400" : "text-teal-600";
@@ -234,14 +231,9 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
     return isDarkMode ? "text-sky-400" : "text-sky-600";
   };
 
-  // Helper to get color classes for variance indicators
   const getVarianceColor = (variance: number) => {
-    if (variance > 0) {
-      return isDarkMode ? "text-emerald-400" : "text-emerald-600";
-    }
-    if (variance < 0) {
-      return isDarkMode ? "text-red-400" : "text-red-600";
-    }
+    if (variance > 0) return isDarkMode ? "text-emerald-400" : "text-emerald-600";
+    if (variance < 0) return isDarkMode ? "text-red-400" : "text-red-600";
     return isDarkMode ? "text-white/70" : "text-slate-500";
   };
 
@@ -259,36 +251,21 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
         )}>{title}</div>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className={cn(
-              isDarkMode ? "text-white/70" : "text-slate-600"
-            )}>Amount:</span>
-            <span className={cn(
-              "font-mono font-bold text-base",
-              getCurrencyColor(currency)
-            )}>
+            <span className={cn(isDarkMode ? "text-white/70" : "text-slate-600")}>Amount:</span>
+            <span className={cn("font-mono font-bold text-base", getCurrencyColor(currency))}>
               {currency} {formatValue}
             </span>
           </div>
           {total > 0 && (
             <div className="flex items-center justify-between text-sm">
-              <span className={cn(
-                isDarkMode ? "text-white/70" : "text-slate-600"
-              )}>% of Total:</span>
-              <span className={cn(
-                "font-mono font-semibold",
-                isDarkMode ? "text-emerald-400" : "text-teal-600"
-              )}>{percentOfTotal}%</span>
+              <span className={cn(isDarkMode ? "text-white/70" : "text-slate-600")}>% of Total:</span>
+              <span className={cn("font-mono font-semibold", isDarkMode ? "text-emerald-400" : "text-teal-600")}>{percentOfTotal}%</span>
             </div>
           )}
           {mode === "daily" && avg > 0 && (
             <div className="flex items-center justify-between text-sm">
-              <span className={cn(
-                isDarkMode ? "text-white/70" : "text-slate-600"
-              )}>vs Average:</span>
-              <span className={cn(
-                "font-mono font-semibold",
-                getVarianceColor(diffFromAvg)
-              )}>
+              <span className={cn(isDarkMode ? "text-white/70" : "text-slate-600")}>vs Average:</span>
+              <span className={cn("font-mono font-semibold", getVarianceColor(diffFromAvg))}>
                 {diffFromAvg > 0 ? "+" : ""}{diffFromAvg.toFixed(1)}%
               </span>
             </div>
@@ -300,7 +277,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
 }
 
 /* ------------------------------ Modal ---------------------------- */
-
+// REPLACED: Updated Modal to use ReactDOM.createPortal and proper scroll locking
 function Modal({
   open,
   onClose,
@@ -314,100 +291,80 @@ function Modal({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
-  // Handle escape key to close modal
+  const [mounted, setMounted] = useState(false);
+
+  // 1. Safety: Only enable on client
   useEffect(() => {
-    if (!open) return;
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  // 2. Handle escape key
+  useEffect(() => {
+    if (!open || !mounted) return;
     
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
     
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [open, onClose]);
+  }, [open, onClose, mounted]);
 
-  // Lock body scroll when modal is open and ensure modal is visible
-  // This implementation scrolls to top immediately and locks body scroll
+  // 3. Scroll locking (Fixed position / Negative top pattern)
   useEffect(() => {
-    if (open) {
-      // CRITICAL: Store scroll position FIRST before any DOM changes
+    if (open && mounted) {
       const scrollY = window.scrollY;
-      const scrollX = window.scrollX;
       
-      // Store original style values
-      const originalOverflow = document.body.style.overflow;
-      const originalPosition = document.body.style.position;
-      const originalTop = document.body.style.top;
-      const originalWidth = document.body.style.width;
-      const originalHtmlOverflow = document.documentElement.style.overflow;
-      
-      // Scroll to top AFTER storing position
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: 'instant' // Instant, not smooth - immediate
-      });
-      
-      // Lock body scroll - use fixed position to prevent scrolling
-      document.body.classList.add("modal-open");
-      document.documentElement.classList.add("modal-open");
-      document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.top = "0";
-      document.body.style.left = "0";
-      document.body.style.right = "0";
-      document.body.style.width = "100%";
-      document.documentElement.style.overflow = "hidden";
-      
-      // Cleanup: restore original values and scroll position
+      const originalStyle = {
+        position: document.body.style.position,
+        top: document.body.style.top,
+        width: document.body.style.width,
+        overflow: document.body.style.overflow,
+      };
+
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+
       return () => {
-        document.body.classList.remove("modal-open");
-        document.documentElement.classList.remove("modal-open");
-        document.body.style.overflow = originalOverflow || "";
-        document.body.style.position = originalPosition || "";
-        document.body.style.top = originalTop || "";
-        document.body.style.left = "";
-        document.body.style.right = "";
-        document.body.style.width = originalWidth || "";
-        document.documentElement.style.overflow = originalHtmlOverflow || "";
+        document.body.style.position = originalStyle.position;
+        document.body.style.top = originalStyle.top;
+        document.body.style.width = originalStyle.width;
+        document.body.style.overflow = originalStyle.overflow;
         
-        // Restore scroll position
-        window.scrollTo({
-          top: scrollY,
-          left: scrollX,
-          behavior: 'instant'
-        });
+        window.scrollTo(0, scrollY);
       };
     }
-  }, [open]);
+  }, [open, mounted]);
 
-  // Handle backdrop click to close modal
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
   
-  return (
+  // 4. Portal Content
+  const content = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      data-modal-backdrop="true"
-      onClick={handleBackdropClick}
     >
       <div 
-        className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl p-6 my-8 flex flex-col animate-in zoom-in-95 duration-200"
-        style={{ maxHeight: 'calc(100vh - 4rem)' }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={handleBackdropClick}
+      />
+      
+      <div 
+        className="relative z-10 w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
-        data-modal-content="true"
       >
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <h4 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Maximize2 className="h-5 w-5 text-teal-500" />
             {title}
@@ -417,31 +374,22 @@ function Modal({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
-        <div className="flex-1 overflow-auto">{children}</div>
+        
+        <div className="flex-1 overflow-auto p-6">{children}</div>
+        
         {footer && (
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4 bg-white dark:bg-slate-900">
+          <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
             {footer}
           </div>
         )}
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(content, document.body);
 }
 
 /* ----------------------- Chart Type State ----------------------- */
@@ -507,24 +455,16 @@ function asUTCWindow(fromISO: string, toISO: string) {
 
 /* ------------------------- Bar Label renderers ------------------- */
 
-// Render small text above bars; skip zeros and very tiny bars
 const renderSSPLabel = (props: any) => {
   const { x, y, width, value } = props;
   const v = Number(value ?? 0);
   if (!isFinite(v) || v <= 0 || !isFinite(x) || !isFinite(y) || !isFinite(width))
     return null;
   const cx = x + width / 2;
-  const cy = y - 4; // 4px above bar
-  const text = compact.format(v); // e.g., 40M, 50.2M
+  const cy = y - 4; 
+  const text = compact.format(v); 
   return (
-    <text
-      x={cx}
-      y={cy}
-      fill="#64748b"
-      fontSize={11}
-      textAnchor="middle"
-      pointerEvents="none"
-    >
+    <text x={cx} y={cy} fill="#64748b" fontSize={11} textAnchor="middle" pointerEvents="none">
       {text}
     </text>
   );
@@ -537,16 +477,9 @@ const renderUSDLabel = (props: any) => {
     return null;
   const cx = x + width / 2;
   const cy = y - 4;
-  const text = nf0.format(Math.round(v)); // e.g., 15,450
+  const text = nf0.format(Math.round(v));
   return (
-    <text
-      x={cx}
-      y={cy}
-      fill="#64748b"
-      fontSize={11}
-      textAnchor="middle"
-      pointerEvents="none"
-    >
+    <text x={cx} y={cy} fill="#64748b" fontSize={11} textAnchor="middle" pointerEvents="none">
       {text}
     </text>
   );
@@ -565,7 +498,6 @@ export default function RevenueAnalyticsDaily({
   const year = selectedYear;
   const month = selectedMonth;
 
-  // Generate unique IDs for gradients to avoid conflicts when multiple instances exist
   const componentId = useMemo(() => `rev-${Math.random().toString(36).substr(2, 9)}`, []);
 
   const { start, end } = computeWindow(
@@ -577,7 +509,6 @@ export default function RevenueAnalyticsDaily({
   );
   const wide = isWideRange(timeRange, start, end);
 
-  // controls month tick labels
   const singleYear =
     !!(start && end && start.getFullYear() === end.getFullYear());
 
@@ -609,7 +540,6 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------------ reference data ----------------------- */
 
-  // Departments (for SSP rows)
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
@@ -631,7 +561,6 @@ export default function RevenueAnalyticsDaily({
     return m;
   }, [departments]);
 
-  // Insurance providers (for USD rows)
   const { data: providers } = useQuery({
     queryKey: ["insurance-providers"],
     queryFn: async () => {
@@ -653,7 +582,6 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------- Shape data for charts ------------------- */
 
-  // daily arrays: ensure an entry for **every** day
   const sspDaily = baseDays.map((day) => ({ day, value: 0 }));
   const usdDaily = baseDays.map((day) => ({ day, value: 0 }));
 
@@ -744,9 +672,8 @@ export default function RevenueAnalyticsDaily({
     ...(!wide ? usdDaily.map((d) => d.value) : usdMonthly.map((d) => d.value))
   );
 
-  // Daily: fixed baseline; Monthly/wide: dynamic
-  const preferredSSPMax = 4_500_000; // <- requested baseline
-  const preferredUSDMax = 1_250; // <- requested baseline
+  const preferredSSPMax = 4_500_000;
+  const preferredUSDMax = 1_250;
 
   const sspScale = !wide
     ? buildTicksPreferred(dataMaxSSP, preferredSSPMax)
@@ -780,11 +707,9 @@ export default function RevenueAnalyticsDaily({
     items: [],
   });
 
-  // Chart type state
   const [chartType, setChartType] = useState<ChartType>("bar");
   const [showAvgLine, setShowAvgLine] = useState(true);
 
-  // Prefer department for SSP, provider for USD; fallbacks included.
   function displaySource(t: any) {
     const currency = String(t.currency || "").toUpperCase();
 
@@ -796,14 +721,13 @@ export default function RevenueAnalyticsDaily({
       deptMap.get(t.department_id);
 
     const provider =
-      t.insuranceProviderName ?? // from API join
-      t.insurance_provider_name ?? // alt snake_case
-      t.insuranceProvider?.name ?? // nested shape
-      providerMap.get(t.insuranceProviderId) ?? // fallback by id
-      providerMap.get(t.insurance_provider_id) ?? // alt id key
+      t.insuranceProviderName ??
+      t.insurance_provider_name ??
+      t.insuranceProvider?.name ??
+      providerMap.get(t.insuranceProviderId) ??
+      providerMap.get(t.insurance_provider_id) ??
       undefined;
 
-    // USD = insurance revenue ⇒ show provider; SSP ⇒ show department.
     if (currency === "USD") return provider ?? "-";
     return dept ?? provider ?? "-";
   }
@@ -825,8 +749,8 @@ export default function RevenueAnalyticsDaily({
         { page: 1, pageSize: 1000, start_date: fromISO, end_date: toISO },
         { page: 1, pageSize: 1000, dateFrom: fromISO, dateTo: toISO },
         { page: 1, pageSize: 1000, rangeStart: fromISO, rangeEnd: toISO },
-        { page: 1, pageSize: 1000, startDateTime, endDateTime }, // UTC window
-        { page: 1, pageSize: 1000, date: fromISO }, // single date
+        { page: 1, pageSize: 1000, startDateTime, endDateTime },
+        { page: 1, pageSize: 1000, date: fromISO },
       ];
 
       for (const params of attempts) {
@@ -890,9 +814,8 @@ export default function RevenueAnalyticsDaily({
 
   /* ------------------------------- UI ---------------------------- */
 
-  const showBarLabels = wide; // labels only in Monthly view to avoid clutter in Daily
+  const showBarLabels = wide;
 
-  // Check if there's no data to display
   const hasNoData = totalSSP === 0 && totalUSD === 0;
 
   return (
@@ -1028,7 +951,7 @@ export default function RevenueAnalyticsDaily({
                         "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm text-[0.8125rem]",
                         isDarkMode
                           ? "bg-teal-500/25 text-teal-200 border-teal-400/50 shadow-teal-500/20"
-                          : "bg-teal-500 text-white border-teal-600 shadow-teal-500/30"
+                          : "bg-teal-50 text-white border-teal-600 shadow-teal-500/30"
                       )}
                       style={isDarkMode ? {
                         textShadow: "0 0 12px rgba(45, 212, 191, 0.6)"
