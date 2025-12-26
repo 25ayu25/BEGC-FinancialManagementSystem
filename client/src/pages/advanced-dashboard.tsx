@@ -1481,10 +1481,10 @@ export default function AdvancedDashboard() {
                         )}
                       >
                         {dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
-                        dashboardData.changes.netIncomeChangeSSP > 0 ? (
+                        dashboardData?.changes?.netIncomeChangeSSP > 0 ? (
                           <TrendingUp className={cn("h-5 w-5", isDarkMode ? "text-emerald-400" : "text-emerald-600")} />
                         ) : dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
-                          dashboardData.changes.netIncomeChangeSSP < 0 ? (
+                          dashboardData?.changes?.netIncomeChangeSSP < 0 ? (
                           <TrendingDown className={cn("h-5 w-5", isDarkMode ? "text-red-400" : "text-red-600")} />
                         ) : (
                           <DollarSign className={cn("h-5 w-5", isDarkMode ? "text-cyan-400" : "text-blue-600")} />
@@ -1607,10 +1607,10 @@ export default function AdvancedDashboard() {
                             : "bg-purple-100"
                         )}
                       >
-                        {insuranceChangePct !== undefined && insuranceChangePct < 0 ? (
-                          <TrendingDown className={cn("h-5 w-5", isDarkMode ? "text-red-400" : "text-red-600")} />
-                        ) : insuranceChangePct !== undefined && insuranceChangePct > 0 ? (
+                        {insuranceChangePct !== undefined && insuranceChangePct > 0 ? (
                           <TrendingUp className={cn("h-5 w-5", isDarkMode ? "text-emerald-400" : "text-emerald-600")} />
+                        ) : insuranceChangePct !== undefined && insuranceChangePct < 0 ? (
+                          <TrendingDown className={cn("h-5 w-5", isDarkMode ? "text-red-400" : "text-red-600")} />
                         ) : (
                           <DollarSign className={cn("h-5 w-5", isDarkMode ? "text-purple-400" : "text-purple-600")} />
                         )}
