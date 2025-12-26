@@ -94,6 +94,10 @@ export default function RevenueAnalyticsCard() {
   // Lock body scroll when modal is open and ensure modal is visible
   React.useEffect(() => {
     if (open) {
+      // Store original scroll position
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+      
       // CRITICAL: Scroll to top immediately before locking scroll
       window.scrollTo({
         top: 0,
@@ -119,7 +123,7 @@ export default function RevenueAnalyticsCard() {
       document.body.style.width = "100%";
       document.documentElement.style.overflow = "hidden";
       
-      // Cleanup
+      // Cleanup: restore original values and scroll position
       return () => {
         document.body.classList.remove("modal-open");
         document.documentElement.classList.remove("modal-open");
@@ -130,6 +134,13 @@ export default function RevenueAnalyticsCard() {
         document.body.style.right = "";
         document.body.style.width = originalWidth || "";
         document.documentElement.style.overflow = originalHtmlOverflow || "";
+        
+        // Restore scroll position
+        window.scrollTo({
+          top: scrollY,
+          left: scrollX,
+          behavior: 'instant'
+        });
       };
     }
   }, [open]);
@@ -186,17 +197,6 @@ export default function RevenueAnalyticsCard() {
           data-modal-backdrop="true"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false);
-          }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 999,
           }}
         >
           <div 

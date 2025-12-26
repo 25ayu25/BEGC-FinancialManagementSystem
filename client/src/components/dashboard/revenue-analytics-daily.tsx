@@ -332,6 +332,10 @@ function Modal({
   // This implementation scrolls to top immediately and locks body scroll
   useEffect(() => {
     if (open) {
+      // Store original scroll position
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+      
       // CRITICAL: Scroll to top immediately before locking scroll
       // This ensures the modal is visible immediately without scrolling
       window.scrollTo({
@@ -358,7 +362,7 @@ function Modal({
       document.body.style.width = "100%";
       document.documentElement.style.overflow = "hidden";
       
-      // Cleanup: restore original values
+      // Cleanup: restore original values and scroll position
       return () => {
         document.body.classList.remove("modal-open");
         document.documentElement.classList.remove("modal-open");
@@ -369,6 +373,13 @@ function Modal({
         document.body.style.right = "";
         document.body.style.width = originalWidth || "";
         document.documentElement.style.overflow = originalHtmlOverflow || "";
+        
+        // Restore scroll position
+        window.scrollTo({
+          top: scrollY,
+          left: scrollX,
+          behavior: 'instant'
+        });
       };
     }
   }, [open]);
@@ -390,17 +401,6 @@ function Modal({
       aria-labelledby="modal-title"
       data-modal-backdrop="true"
       onClick={handleBackdropClick}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 999,
-      }}
     >
       <div 
         className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl p-6 my-8 flex flex-col animate-in zoom-in-95 duration-200"
