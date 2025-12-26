@@ -264,11 +264,13 @@ function Modal({
   onClose,
   title,
   children,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   // Handle escape key to close modal
   useEffect(() => {
@@ -327,12 +329,11 @@ function Modal({
   
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       onClick={handleBackdropClick}
-      style={{ minHeight: '100vh' }}
     >
       <div 
         className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl p-6 my-8 flex flex-col animate-in zoom-in-95 duration-200"
@@ -366,6 +367,11 @@ function Modal({
           </button>
         </div>
         <div className="flex-1 overflow-auto">{children}</div>
+        {footer && (
+          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4 bg-white dark:bg-slate-900">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1612,25 +1618,38 @@ export default function RevenueAnalyticsDaily({
                 }`
             : "Transactions"
         }
+        footer={
+          !loadingDetail && detail.items.length > 0 ? (
+            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+              <span className="text-sm">Total: {detail.items.length} transaction{detail.items.length !== 1 ? "s" : ""}</span>
+              <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">
+                Total Amount: {detail.currency} {nf0.format(detail.items.reduce((sum, t) => {
+                  const amount = Number(t.amount) || 0;
+                  return sum + amount;
+                }, 0))}
+              </span>
+            </div>
+          ) : undefined
+        }
       >
         {loadingDetail ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
-            <span className="ml-3 text-sm text-slate-600">Loading transactions...</span>
+            <span className="ml-3 text-sm text-slate-600 dark:text-slate-400">Loading transactions...</span>
           </div>
         ) : detail.items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="bg-slate-100 p-4 rounded-full mb-3">
+            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-full mb-3">
               <BarChart3 className="h-8 w-8 text-slate-400" />
             </div>
-            <p className="text-slate-600 font-medium">No transactions found</p>
-            <p className="text-sm text-slate-500 mt-1">There are no transactions for this period.</p>
+            <p className="text-slate-600 dark:text-slate-300 font-medium">No transactions found</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">There are no transactions for this period.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 sticky top-0">
-                <tr className="text-left text-slate-600 uppercase text-xs tracking-wider">
+              <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                <tr className="text-left text-slate-600 dark:text-slate-300 uppercase text-xs tracking-wider">
                   <th className="py-3 px-4 font-semibold">Date</th>
                   <th className="py-3 px-4 font-semibold">Source</th>
                   <th className="py-3 px-4 font-semibold">Currency</th>
@@ -1638,13 +1657,13 @@ export default function RevenueAnalyticsDaily({
                   <th className="py-3 px-4 font-semibold">Type</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {detail.items.map((t: any, idx: number) => (
                   <tr 
                     key={t.id} 
-                    className="hover:bg-slate-50 transition-colors"
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                   >
-                    <td className="py-3 px-4 font-mono text-slate-700">
+                    <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">
                       {String(
                         (
                           t.date ??
@@ -1654,20 +1673,20 @@ export default function RevenueAnalyticsDaily({
                         ) ?? ""
                       ).slice(0, 10)}
                     </td>
-                    <td className="py-3 px-4 text-slate-700">{displaySource(t)}</td>
+                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{displaySource(t)}</td>
                     <td className="py-3 px-4">
                       <span className={cn(
                         "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
-                        t.currency === "SSP" ? "bg-teal-100 text-teal-700" : "bg-sky-100 text-sky-700"
+                        t.currency === "SSP" ? "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" : "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
                       )}>
                         {t.currency}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">
+                    <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
                       {nf0.format(Math.round(t.amount ?? 0))}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                         {t.type}
                       </span>
                     </td>
@@ -1675,15 +1694,6 @@ export default function RevenueAnalyticsDaily({
                 ))}
               </tbody>
             </table>
-            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between text-sm text-slate-600">
-              <span>Total: {detail.items.length} transaction{detail.items.length !== 1 ? "s" : ""}</span>
-              <span className="font-mono font-semibold">
-                Total Amount: {detail.currency} {nf0.format(detail.items.reduce((sum, t) => {
-                  const amount = Number(t.amount) || 0;
-                  return sum + amount;
-                }, 0))}
-              </span>
-            </div>
           </div>
         )}
       </Modal>
