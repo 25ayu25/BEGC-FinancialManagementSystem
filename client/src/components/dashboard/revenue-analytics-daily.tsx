@@ -285,6 +285,9 @@ function Modal({
   }, [open, onClose]);
 
   // Lock body scroll when modal is open
+  // Note: This implementation maintains scroll position by fixing the body.
+  // On mobile Safari with dynamic viewport (address bar), minor layout shifts may occur.
+  // This is acceptable as it ensures modal visibility and proper scroll locking.
   useEffect(() => {
     if (open) {
       // Store original values
@@ -324,18 +327,12 @@ function Modal({
   
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       onClick={handleBackdropClick}
-      style={{ 
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        padding: '1rem'
-      }}
+      style={{ minHeight: '100vh' }}
     >
       <div 
         className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl p-6 my-8 flex flex-col animate-in zoom-in-95 duration-200"
@@ -955,17 +952,14 @@ export default function RevenueAnalyticsDaily({
                   {!hasNoData && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className={cn(
-                        "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm",
+                        "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm text-[0.8125rem]",
                         isDarkMode
                           ? "bg-teal-500/25 text-teal-200 border-teal-400/50 shadow-teal-500/20"
                           : "bg-teal-500 text-white border-teal-600 shadow-teal-500/30"
                       )}
                       style={isDarkMode ? {
-                        textShadow: "0 0 12px rgba(45, 212, 191, 0.6)",
-                        fontSize: "0.8125rem"
-                      } : {
-                        fontSize: "0.8125rem"
-                      }}
+                        textShadow: "0 0 12px rgba(45, 212, 191, 0.6)"
+                      } : {}}
                       >
                         TOTAL SSP {nf0.format(Math.round(totalSSP))}
                       </span>
@@ -1287,17 +1281,14 @@ export default function RevenueAnalyticsDaily({
                   {!hasNoData && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className={cn(
-                        "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm",
+                        "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm text-[0.8125rem]",
                         isDarkMode
                           ? "bg-sky-500/25 text-sky-200 border-sky-400/50 shadow-sky-500/20"
                           : "bg-sky-500 text-white border-sky-600 shadow-sky-500/30"
                       )}
                       style={isDarkMode ? {
-                        textShadow: "0 0 12px rgba(56, 189, 248, 0.6)",
-                        fontSize: "0.8125rem"
-                      } : {
-                        fontSize: "0.8125rem"
-                      }}
+                        textShadow: "0 0 12px rgba(56, 189, 248, 0.6)"
+                      } : {}}
                       >
                         TOTAL USD {nf0.format(Math.round(totalUSD))}
                       </span>
