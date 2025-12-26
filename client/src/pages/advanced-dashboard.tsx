@@ -1683,10 +1683,10 @@ export default function AdvancedDashboard() {
                 </motion.div>
               </motion.div>
 
-              {/* MAIN GRID INSIDE SURFACE */}
-              <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+              {/* MAIN GRID INSIDE SURFACE - Full Width Charts */}
+              <div className="space-y-6 mb-8">
+                {/* Revenue Analytics - Full Width */}
                 <motion.div 
-                  className="space-y-6"
                   variants={chartVariants}
                   initial="hidden"
                   animate="visible"
@@ -1699,123 +1699,140 @@ export default function AdvancedDashboard() {
                     customEndDate={customEndDate ?? undefined}
                     isDarkMode={isDarkMode}
                   />
-                  <div className="hidden lg:block">
+                </motion.div>
+
+                {/* Departments and Insurance - Side by Side on Large Screens */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <motion.div variants={cardVariants}>
+                    <DepartmentsPanel
+                      departments={
+                        Array.isArray(departments) ? (departments as any[]) : []
+                      }
+                      departmentBreakdown={dashboardData?.departmentBreakdown}
+                      totalSSP={sspRevenue}
+                      isDarkMode={isDarkMode}
+                    />
+                    </motion.div>
+                  </motion.div>
+
+                  <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <motion.div variants={cardVariants}>
+                    <InsuranceProvidersUSD
+                      breakdown={dashboardData?.insuranceBreakdown}
+                      totalUSD={parseFloat(
+                        dashboardData?.totalIncomeUSD || "0"
+                      )}
+                      isDarkMode={isDarkMode}
+                    />
+                    </motion.div>
+                  </motion.div>
+                </div>
+
+                {/* Quick Actions and System Status - Side by Side on Large Screens */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
                     <QuickActionsCard isDarkMode={isDarkMode} />
-                  </div>
-                </motion.div>
-
-                <motion.div 
-                  className="space-y-6"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  <motion.div variants={cardVariants}>
-                  <DepartmentsPanel
-                    departments={
-                      Array.isArray(departments) ? (departments as any[]) : []
-                    }
-                    departmentBreakdown={dashboardData?.departmentBreakdown}
-                    totalSSP={sspRevenue}
-                    isDarkMode={isDarkMode}
-                  />
                   </motion.div>
 
-                  <motion.div variants={cardVariants}>
-                  <InsuranceProvidersUSD
-                    breakdown={dashboardData?.insuranceBreakdown}
-                    totalUSD={parseFloat(
-                      dashboardData?.totalIncomeUSD || "0"
-                    )}
-                    isDarkMode={isDarkMode}
-                  />
+                  <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <motion.div variants={cardVariants}>
+                    <Card className={cn(
+                      "shadow-sm self-start",
+                      isDarkMode
+                        ? "bg-white/3 border border-white/10"
+                        : "border border-slate-200"
+                    )}>
+                      <CardHeader>
+                        <CardTitle className={cn(
+                          "text-lg font-semibold flex items-center gap-2",
+                          isDarkMode ? "text-white/95" : "text-slate-900"
+                        )}>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
+                          System Status
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className={cn(
+                              "text-sm",
+                              isDarkMode ? "text-white/70" : "text-slate-600"
+                            )}>
+                              Database
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "rounded-full",
+                                isDarkMode
+                                  ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                  : "bg-green-100 text-green-700 border-green-200"
+                              )}
+                            >
+                              Connected
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className={cn(
+                              "text-sm",
+                              isDarkMode ? "text-white/70" : "text-slate-600"
+                            )}>
+                              Last Sync
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "rounded-full",
+                                isDarkMode
+                                  ? "border-white/20 text-white/90"
+                                  : "border-slate-200 text-slate-600"
+                              )}
+                            >
+                              {lastUpdatedLabel}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className={cn(
+                              "text-sm",
+                              isDarkMode ? "text-white/70" : "text-slate-600"
+                            )}>
+                              Active Users
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "rounded-full",
+                                isDarkMode
+                                  ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                  : "bg-blue-50 text-blue-700 border-blue-200"
+                              )}
+                            >
+                              1 online
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    </motion.div>
                   </motion.div>
-
-                  <motion.div variants={cardVariants}>
-                  <Card className={cn(
-                    "shadow-sm self-start",
-                    isDarkMode
-                      ? "bg-white/3 border border-white/10"
-                      : "border border-slate-200"
-                  )}>
-                    <CardHeader>
-                      <CardTitle className={cn(
-                        "text-lg font-semibold flex items-center gap-2",
-                        isDarkMode ? "text-white/95" : "text-slate-900"
-                      )}>
-                        <div className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
-                        System Status
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-sm",
-                            isDarkMode ? "text-white/70" : "text-slate-600"
-                          )}>
-                            Database
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className={cn(
-                              "rounded-full",
-                              isDarkMode
-                                ? "bg-green-500/20 text-green-400 border-green-500/30"
-                                : "bg-green-100 text-green-700 border-green-200"
-                            )}
-                          >
-                            Connected
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-sm",
-                            isDarkMode ? "text-white/70" : "text-slate-600"
-                          )}>
-                            Last Sync
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "rounded-full",
-                              isDarkMode
-                                ? "border-white/20 text-white/90"
-                                : "border-slate-200 text-slate-600"
-                            )}
-                          >
-                            {lastUpdatedLabel}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-sm",
-                            isDarkMode ? "text-white/70" : "text-slate-600"
-                          )}>
-                            Active Users
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "rounded-full",
-                              isDarkMode
-                                ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                : "bg-blue-50 text-blue-700 border-blue-200"
-                            )}
-                          >
-                            1 online
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  </motion.div>
-                </motion.div>
-              </div>
-
-              {/* mobile quick actions */}
-              <div className="lg:hidden mb-4">
-                <QuickActionsCard isDarkMode={isDarkMode} />
+                </div>
               </div>
 
               <ExpensesDrawer
