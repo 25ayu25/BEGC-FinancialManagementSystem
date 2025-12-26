@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from "react";
-import ReactDOM from 'react-dom'; // Added for Portal support
+import ReactDOM from 'react-dom';
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -22,7 +22,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/queryClient";
-import { BarChart3, Plus, AreaChartIcon, LineChartIcon, TrendingUp, Maximize2 } from "lucide-react";
+import { BarChart3, Plus, AreaChartIcon, LineChartIcon, TrendingUp, Maximize2, X } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
@@ -277,7 +277,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
 }
 
 /* ------------------------------ Modal ---------------------------- */
-// REPLACED: Updated Modal to use ReactDOM.createPortal and proper scroll locking
+
 function Modal({
   open,
   onClose,
@@ -302,16 +302,14 @@ function Modal({
   // 2. Handle escape key
   useEffect(() => {
     if (!open || !mounted) return;
-    
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [open, onClose, mounted]);
 
-  // 3. Scroll locking (Fixed position / Negative top pattern)
+  // 3. Scroll locking (Updated with LEFT: 0 to fix "Right Side" shift)
   useEffect(() => {
     if (open && mounted) {
       const scrollY = window.scrollY;
@@ -319,18 +317,26 @@ function Modal({
       const originalStyle = {
         position: document.body.style.position,
         top: document.body.style.top,
+        left: document.body.style.left,
+        right: document.body.style.right,
         width: document.body.style.width,
         overflow: document.body.style.overflow,
       };
 
+      // Lock body in place
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0'; // Fixes horizontal shift
+      document.body.style.right = '0';
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
 
       return () => {
+        // Restore styles
         document.body.style.position = originalStyle.position;
         document.body.style.top = originalStyle.top;
+        document.body.style.left = originalStyle.left;
+        document.body.style.right = originalStyle.right;
         document.body.style.width = originalStyle.width;
         document.body.style.overflow = originalStyle.overflow;
         
@@ -339,49 +345,54 @@ function Modal({
     }
   }, [open, mounted]);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   if (!open || !mounted) return null;
   
-  // 4. Portal Content
+  // 4. Portal Content (Updated to GRID for perfect centering and professional styles)
   const content = (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto p-4 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
+      {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={handleBackdropClick}
+        onClick={onClose}
+        aria-hidden="true"
       />
       
+      {/* Modal Panel */}
       <div 
-        className="relative z-10 w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className={cn(
+          "relative z-10 w-full max-w-4xl flex flex-col max-h-[90vh]",
+          "bg-white dark:bg-slate-900",
+          "rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10",
+          "animate-in zoom-in-95 duration-200 ease-out"
+        )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
           <h4 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Maximize2 className="h-5 w-5 text-teal-500" />
             {title}
           </h4>
           <button
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg p-2 transition-colors"
             onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-400"
             aria-label="Close dialog"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <X className="h-5 w-5" />
           </button>
         </div>
         
-        <div className="flex-1 overflow-auto p-6">{children}</div>
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-0">{children}</div>
         
+        {/* Footer */}
         {footer && (
-          <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-2xl">
             {footer}
           </div>
         )}
