@@ -1354,9 +1354,9 @@ export default function AdvancedDashboard() {
                         {dashboardData?.changes?.expenseChangeSSP !==
                           undefined &&
                         dashboardData.changes.expenseChangeSSP < 0 ? (
-                          <TrendingDown className="h-5 w-5 text-emerald-600" />
+                          <TrendingUp className={cn("h-5 w-5", isDarkMode ? "text-emerald-400" : "text-emerald-600")} />
                         ) : (
-                          <CreditCard className="h-5 w-5 text-red-600" />
+                          <TrendingDown className={cn("h-5 w-5", isDarkMode ? "text-red-400" : "text-red-600")} />
                         )}
                       </div>
                     </div>
