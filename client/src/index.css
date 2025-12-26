@@ -780,21 +780,6 @@ body {
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* Make negative percentages BRIGHT and VISIBLE in dark mode */
-.dark .text-red-400,
-.dark [class*="text-red-"] {
-  color: #fca5a5 !important;
-  font-weight: 700 !important;
-  text-shadow: 0 0 8px rgba(252, 165, 165, 0.3);
-}
-
-/* Ensure positive percentages remain bright green in dark mode */
-.dark .text-emerald-400,
-.dark [class*="text-emerald-"] {
-  color: #4ade80 !important;
-  font-weight: 700 !important;
-}
-
 /* =========================
    Transaction Modal Fixes
    ========================= */
