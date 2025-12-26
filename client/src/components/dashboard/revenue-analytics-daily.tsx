@@ -226,6 +226,25 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
   const avg = currency === "SSP" ? (avgDaySSP ?? 0) : (avgDayUSD ?? 0);
   const diffFromAvg = avg > 0 ? ((value - avg) / avg) * 100 : 0;
 
+  // Helper to get color classes for currency-specific values
+  const getCurrencyColor = (curr: string) => {
+    if (curr === "SSP") {
+      return isDarkMode ? "text-teal-400" : "text-teal-600";
+    }
+    return isDarkMode ? "text-sky-400" : "text-sky-600";
+  };
+
+  // Helper to get color classes for variance indicators
+  const getVarianceColor = (variance: number) => {
+    if (variance > 0) {
+      return isDarkMode ? "text-emerald-400" : "text-emerald-600";
+    }
+    if (variance < 0) {
+      return isDarkMode ? "text-red-400" : "text-red-600";
+    }
+    return isDarkMode ? "text-white/70" : "text-slate-500";
+  };
+
   return (
     <div className={cn(
       "rounded-xl shadow-2xl min-w-[220px] backdrop-blur-xl border",
@@ -245,9 +264,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
             )}>Amount:</span>
             <span className={cn(
               "font-mono font-bold text-base",
-              currency === "SSP" 
-                ? (isDarkMode ? "text-teal-400" : "text-teal-600")
-                : (isDarkMode ? "text-sky-400" : "text-sky-600")
+              getCurrencyColor(currency)
             )}>
               {currency} {formatValue}
             </span>
@@ -270,11 +287,7 @@ function RevenueTooltip({ active, payload, year, month, currency, mode, avgDaySS
               )}>vs Average:</span>
               <span className={cn(
                 "font-mono font-semibold",
-                diffFromAvg > 0 
-                  ? (isDarkMode ? "text-emerald-400" : "text-emerald-600")
-                  : diffFromAvg < 0 
-                  ? (isDarkMode ? "text-red-400" : "text-red-600")
-                  : (isDarkMode ? "text-white/70" : "text-slate-500")
+                getVarianceColor(diffFromAvg)
               )}>
                 {diffFromAvg > 0 ? "+" : ""}{diffFromAvg.toFixed(1)}%
               </span>

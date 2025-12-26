@@ -1701,7 +1701,7 @@ export default function AdvancedDashboard() {
                   />
                 </motion.div>
 
-                {/* Departments and Insurance - Side by Side */}
+                {/* Departments and Insurance - Side by Side on Large Screens */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <motion.div 
                     variants={containerVariants}
@@ -1737,7 +1737,7 @@ export default function AdvancedDashboard() {
                   </motion.div>
                 </div>
 
-                {/* Quick Actions and System Status - Side by Side */}
+                {/* Quick Actions and System Status - Side by Side on Large Screens */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <motion.div 
                     variants={containerVariants}
