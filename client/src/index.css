@@ -837,9 +837,7 @@ body {
 
 /* Prevent body scroll when modal is open - BOTH THEMES */
 body.modal-open,
-html.modal-open,
-.dark body.modal-open,
-.dark html.modal-open {
+.dark body.modal-open {
   overflow: hidden !important;
   height: 100vh !important;
   width: 100% !important;

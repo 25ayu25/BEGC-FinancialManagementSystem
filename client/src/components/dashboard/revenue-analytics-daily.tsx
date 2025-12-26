@@ -332,24 +332,23 @@ function Modal({
   // This implementation scrolls to top immediately and locks body scroll
   useEffect(() => {
     if (open) {
-      // Store original scroll position
+      // CRITICAL: Store scroll position FIRST before any DOM changes
       const scrollY = window.scrollY;
       const scrollX = window.scrollX;
       
-      // CRITICAL: Scroll to top immediately before locking scroll
-      // This ensures the modal is visible immediately without scrolling
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: 'instant' // Instant, not smooth - immediate
-      });
-      
-      // Store original values
+      // Store original style values
       const originalOverflow = document.body.style.overflow;
       const originalPosition = document.body.style.position;
       const originalTop = document.body.style.top;
       const originalWidth = document.body.style.width;
       const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      // Scroll to top AFTER storing position
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant' // Instant, not smooth - immediate
+      });
       
       // Lock body scroll - use fixed position to prevent scrolling
       document.body.classList.add("modal-open");

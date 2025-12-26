@@ -94,23 +94,23 @@ export default function RevenueAnalyticsCard() {
   // Lock body scroll when modal is open and ensure modal is visible
   React.useEffect(() => {
     if (open) {
-      // Store original scroll position
+      // CRITICAL: Store scroll position FIRST before any DOM changes
       const scrollY = window.scrollY;
       const scrollX = window.scrollX;
       
-      // CRITICAL: Scroll to top immediately before locking scroll
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: 'instant'
-      });
-      
-      // Store original values
+      // Store original style values
       const originalOverflow = document.body.style.overflow;
       const originalPosition = document.body.style.position;
       const originalTop = document.body.style.top;
       const originalWidth = document.body.style.width;
       const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      // Scroll to top AFTER storing position
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant'
+      });
       
       // Lock body scroll
       document.body.classList.add("modal-open");
