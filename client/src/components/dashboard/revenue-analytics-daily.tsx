@@ -309,55 +309,53 @@ function Modal({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [open, onClose, mounted]);
 
-  // 3. Scroll locking (Updated with LEFT: 0 to fix "Right Side" shift)
+  // 3. Scroll locking (Simplified to avoid layout shift issues)
   useEffect(() => {
     if (open && mounted) {
-      const scrollY = window.scrollY;
-      
-      const originalStyle = {
-        position: document.body.style.position,
-        top: document.body.style.top,
-        left: document.body.style.left,
-        right: document.body.style.right,
-        width: document.body.style.width,
-        overflow: document.body.style.overflow,
-      };
-
-      // Lock body in place
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.left = '0'; // Fixes horizontal shift
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
+      // Just hide overflow. This prevents the "fixed body position" jump bug
+      // while still preventing scrolling.
+      const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
 
       return () => {
-        // Restore styles
-        document.body.style.position = originalStyle.position;
-        document.body.style.top = originalStyle.top;
-        document.body.style.left = originalStyle.left;
-        document.body.style.right = originalStyle.right;
-        document.body.style.width = originalStyle.width;
-        document.body.style.overflow = originalStyle.overflow;
-        
-        window.scrollTo(0, scrollY);
+        document.body.style.overflow = originalOverflow;
       };
     }
   }, [open, mounted]);
 
   if (!open || !mounted) return null;
   
-  // 4. Portal Content (Updated to GRID for perfect centering and professional styles)
+  // 4. Portal Content with INLINE STYLES to force centering
+  // We use inline styles here to bypass any Tailwind grid/flex conflicts
   const content = (
     <div 
-      className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto p-4 sm:p-6"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 99999, // Ensure it's on top of everything
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem'
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)',
+        }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -365,11 +363,15 @@ function Modal({
       {/* Modal Panel */}
       <div 
         className={cn(
-          "relative z-10 w-full max-w-4xl flex flex-col max-h-[90vh]",
-          "bg-white dark:bg-slate-900",
-          "rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10",
-          "animate-in zoom-in-95 duration-200 ease-out"
+          "relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col",
+          "w-full max-w-4xl max-h-[90vh] animate-in zoom-in-95 duration-200"
         )}
+        style={{
+           // Ensure styling priority
+           margin: '0 auto', 
+           position: 'relative',
+           zIndex: 10
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
