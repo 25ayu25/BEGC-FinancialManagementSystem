@@ -292,6 +292,9 @@ function Modal({
       document.body.classList.add("modal-open");
       document.body.style.overflow = "hidden";
       
+      // Force scroll to top to ensure modal is visible
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      
       // Cleanup: restore original overflow
       return () => {
         document.body.classList.remove("modal-open");
