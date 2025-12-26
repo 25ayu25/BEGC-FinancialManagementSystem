@@ -328,34 +328,57 @@ function Modal({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [open, onClose]);
 
-  // Lock body scroll when modal is open
-  // Note: This implementation maintains scroll position by fixing the body.
-  // On mobile Safari with dynamic viewport (address bar), minor layout shifts may occur.
-  // This is acceptable as it ensures modal visibility and proper scroll locking.
+  // Lock body scroll when modal is open and ensure modal is visible
+  // This implementation scrolls to top immediately and locks body scroll
   useEffect(() => {
     if (open) {
-      // Store original values
+      // CRITICAL: Store scroll position FIRST before any DOM changes
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+      
+      // Store original style values
       const originalOverflow = document.body.style.overflow;
       const originalPosition = document.body.style.position;
       const originalTop = document.body.style.top;
       const originalWidth = document.body.style.width;
-      const scrollY = window.scrollY;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
       
-      // Lock body scroll and maintain scroll position
+      // Scroll to top AFTER storing position
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant' // Instant, not smooth - immediate
+      });
+      
+      // Lock body scroll - use fixed position to prevent scrolling
       document.body.classList.add("modal-open");
+      document.documentElement.classList.add("modal-open");
       document.body.style.overflow = "hidden";
       document.body.style.position = "fixed";
-      document.body.style.top = `-${scrollY}px`;
+      document.body.style.top = "0";
+      document.body.style.left = "0";
+      document.body.style.right = "0";
       document.body.style.width = "100%";
+      document.documentElement.style.overflow = "hidden";
       
       // Cleanup: restore original values and scroll position
       return () => {
         document.body.classList.remove("modal-open");
+        document.documentElement.classList.remove("modal-open");
         document.body.style.overflow = originalOverflow || "";
         document.body.style.position = originalPosition || "";
         document.body.style.top = originalTop || "";
+        document.body.style.left = "";
+        document.body.style.right = "";
         document.body.style.width = originalWidth || "";
-        window.scrollTo(0, scrollY);
+        document.documentElement.style.overflow = originalHtmlOverflow || "";
+        
+        // Restore scroll position
+        window.scrollTo({
+          top: scrollY,
+          left: scrollX,
+          behavior: 'instant'
+        });
       };
     }
   }, [open]);
@@ -375,12 +398,14 @@ function Modal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      data-modal-backdrop="true"
       onClick={handleBackdropClick}
     >
       <div 
         className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl p-6 my-8 flex flex-col animate-in zoom-in-95 duration-200"
         style={{ maxHeight: 'calc(100vh - 4rem)' }}
         onClick={(e) => e.stopPropagation()}
+        data-modal-content="true"
       >
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
           <h4 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">

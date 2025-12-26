@@ -91,6 +91,60 @@ export default function RevenueAnalyticsCard() {
   const [loadingDetail, setLoadingDetail] = React.useState(false);
   const [detail, setDetail] = React.useState<{ from?: string; to?: string; items: any[] }>({ items: [] });
 
+  // Lock body scroll when modal is open and ensure modal is visible
+  React.useEffect(() => {
+    if (open) {
+      // CRITICAL: Store scroll position FIRST before any DOM changes
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+      
+      // Store original style values
+      const originalOverflow = document.body.style.overflow;
+      const originalPosition = document.body.style.position;
+      const originalTop = document.body.style.top;
+      const originalWidth = document.body.style.width;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      // Scroll to top AFTER storing position
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant'
+      });
+      
+      // Lock body scroll
+      document.body.classList.add("modal-open");
+      document.documentElement.classList.add("modal-open");
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = "0";
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.width = "100%";
+      document.documentElement.style.overflow = "hidden";
+      
+      // Cleanup: restore original values and scroll position
+      return () => {
+        document.body.classList.remove("modal-open");
+        document.documentElement.classList.remove("modal-open");
+        document.body.style.overflow = originalOverflow || "";
+        document.body.style.position = originalPosition || "";
+        document.body.style.top = originalTop || "";
+        document.body.style.left = "";
+        document.body.style.right = "";
+        document.body.style.width = originalWidth || "";
+        document.documentElement.style.overflow = originalHtmlOverflow || "";
+        
+        // Restore scroll position
+        window.scrollTo({
+          top: scrollY,
+          left: scrollX,
+          behavior: 'instant'
+        });
+      };
+    }
+  }, [open]);
+
   const handleBarClick = async (row: ChartRow) => {
     // If we inferred an ISO day, drill into that date; otherwise, fall back to label-only dialog.
     if (!row.dateISO) {
@@ -136,28 +190,40 @@ export default function RevenueAnalyticsCard() {
 
       {/* Simple drilldown dialog (no extra UI libs needed) */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-lg p-4">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          data-modal-backdrop="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-xl shadow-lg p-4"
+            onClick={(e) => e.stopPropagation()}
+            data-modal-content="true"
+          >
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold text-slate-900">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
                 {detail.from ? `Details for ${detail.from}` : "Details"}
               </h4>
               <button
-                className="text-slate-500 hover:text-slate-700 text-sm"
+                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-sm"
                 onClick={() => setOpen(false)}
               >
                 Close
               </button>
             </div>
             {loadingDetail ? (
-              <div className="text-sm text-slate-600">Loading…</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Loading…</div>
             ) : detail.items.length === 0 ? (
-              <div className="text-sm text-slate-600">No transactions found.</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">No transactions found.</div>
             ) : (
               <div className="max-h-80 overflow-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-slate-500">
+                    <tr className="text-left text-slate-500 dark:text-slate-400">
                       <th className="py-2">Date</th>
                       <th className="py-2">Dept</th>
                       <th className="py-2">Currency</th>
@@ -168,13 +234,13 @@ export default function RevenueAnalyticsCard() {
                   </thead>
                   <tbody>
                     {detail.items.map((t: any) => (
-                      <tr key={t.id} className="border-t border-slate-100">
-                        <td className="py-2">{t.date}</td>
-                        <td className="py-2">{t.departmentName || "-"}</td>
-                        <td className="py-2">{t.currency}</td>
-                        <td className="py-2">{(t.amount ?? 0).toLocaleString()}</td>
-                        <td className="py-2">{t.type}</td>
-                        <td className="py-2">{t.description || "-"}</td>
+                      <tr key={t.id} className="border-t border-slate-100 dark:border-slate-700">
+                        <td className="py-2 text-slate-700 dark:text-slate-300">{t.date}</td>
+                        <td className="py-2 text-slate-700 dark:text-slate-300">{t.departmentName || "-"}</td>
+                        <td className="py-2 text-slate-700 dark:text-slate-300">{t.currency}</td>
+                        <td className="py-2 text-slate-700 dark:text-slate-300">{(t.amount ?? 0).toLocaleString()}</td>
+                        <td className="py-2 text-slate-700 dark:text-slate-300">{t.type}</td>
+                        <td className="py-2 text-slate-700 dark:text-slate-300">{t.description || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
