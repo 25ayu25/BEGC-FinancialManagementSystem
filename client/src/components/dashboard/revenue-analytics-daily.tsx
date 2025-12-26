@@ -287,18 +287,28 @@ function Modal({
   // Lock body scroll when modal is open
   useEffect(() => {
     if (open) {
-      // Store original overflow value
+      // Store original values
       const originalOverflow = document.body.style.overflow;
+      const originalPosition = document.body.style.position;
+      const originalTop = document.body.style.top;
+      const originalWidth = document.body.style.width;
+      const scrollY = window.scrollY;
+      
+      // Lock body scroll and maintain scroll position
       document.body.classList.add("modal-open");
       document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
       
-      // Force scroll to top to ensure modal is visible
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      
-      // Cleanup: restore original overflow
+      // Cleanup: restore original values and scroll position
       return () => {
         document.body.classList.remove("modal-open");
         document.body.style.overflow = originalOverflow || "";
+        document.body.style.position = originalPosition || "";
+        document.body.style.top = originalTop || "";
+        document.body.style.width = originalWidth || "";
+        window.scrollTo(0, scrollY);
       };
     }
   }, [open]);
@@ -314,20 +324,31 @@ function Modal({
   
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       onClick={handleBackdropClick}
+      style={{ 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: '1rem'
+      }}
     >
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-6 mx-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
-          <h4 id="modal-title" className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+      <div 
+        className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl p-6 my-8 flex flex-col animate-in zoom-in-95 duration-200"
+        style={{ maxHeight: 'calc(100vh - 4rem)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+          <h4 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Maximize2 className="h-5 w-5 text-teal-500" />
             {title}
           </h4>
           <button
-            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-2 transition-colors"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg p-2 transition-colors"
             onClick={onClose}
             aria-label="Close dialog"
           >
@@ -934,11 +955,18 @@ export default function RevenueAnalyticsDaily({
                   {!hasNoData && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className={cn(
-                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold border",
+                        "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm",
                         isDarkMode
-                          ? "bg-teal-500/15 text-teal-300 border-teal-400/30"
-                          : "bg-teal-50 text-teal-700 border-teal-100"
-                      )}>
+                          ? "bg-teal-500/25 text-teal-200 border-teal-400/50 shadow-teal-500/20"
+                          : "bg-teal-500 text-white border-teal-600 shadow-teal-500/30"
+                      )}
+                      style={isDarkMode ? {
+                        textShadow: "0 0 12px rgba(45, 212, 191, 0.6)",
+                        fontSize: "0.8125rem"
+                      } : {
+                        fontSize: "0.8125rem"
+                      }}
+                      >
                         TOTAL SSP {nf0.format(Math.round(totalSSP))}
                       </span>
                       {!wide && avgDaySSP > 0 && (
@@ -1259,11 +1287,18 @@ export default function RevenueAnalyticsDaily({
                   {!hasNoData && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className={cn(
-                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold border",
+                        "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold border-2 shadow-sm",
                         isDarkMode
-                          ? "bg-sky-500/15 text-sky-300 border-sky-400/30"
-                          : "bg-sky-50 text-sky-700 border-sky-100"
-                      )}>
+                          ? "bg-sky-500/25 text-sky-200 border-sky-400/50 shadow-sky-500/20"
+                          : "bg-sky-500 text-white border-sky-600 shadow-sky-500/30"
+                      )}
+                      style={isDarkMode ? {
+                        textShadow: "0 0 12px rgba(56, 189, 248, 0.6)",
+                        fontSize: "0.8125rem"
+                      } : {
+                        fontSize: "0.8125rem"
+                      }}
+                      >
                         TOTAL USD {nf0.format(Math.round(totalUSD))}
                       </span>
                       {!wide && avgDayUSD > 0 && (

@@ -1187,15 +1187,15 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-semibold",
                                 revenueChangePct > 0
-                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
+                                  ? isDarkMode ? "text-emerald-300" : "text-emerald-600"
                                   : revenueChangePct < 0
-                                  ? isDarkMode ? "text-red-400" : "text-red-600"
+                                  ? isDarkMode ? "text-red-300" : "text-red-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
                               style={isDarkMode ? { 
-                                color: revenueChangePct > 0 ? "#4ade80" : revenueChangePct < 0 ? "#fca5a5" : undefined,
+                                color: revenueChangePct > 0 ? "#6ee7b7" : revenueChangePct < 0 ? "#fca5a5" : undefined,
                                 fontWeight: 700,
-                                textShadow: revenueChangePct < 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                                textShadow: revenueChangePct < 0 ? "0 0 10px rgba(252, 165, 165, 0.5)" : "0 0 10px rgba(110, 231, 183, 0.4)"
                               } : {}}
                             >
                               <span className="font-bold">
@@ -1303,15 +1303,15 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-semibold",
                                 dashboardData.changes.expenseChangeSSP > 0
-                                  ? isDarkMode ? "text-red-400" : "text-red-600"
+                                  ? isDarkMode ? "text-red-300" : "text-red-600"
                                   : dashboardData.changes.expenseChangeSSP < 0
-                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
+                                  ? isDarkMode ? "text-emerald-300" : "text-emerald-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
                               style={isDarkMode ? { 
-                                color: dashboardData.changes.expenseChangeSSP > 0 ? "#fca5a5" : dashboardData.changes.expenseChangeSSP < 0 ? "#4ade80" : undefined,
+                                color: dashboardData.changes.expenseChangeSSP > 0 ? "#fca5a5" : dashboardData.changes.expenseChangeSSP < 0 ? "#6ee7b7" : undefined,
                                 fontWeight: 700,
-                                textShadow: dashboardData.changes.expenseChangeSSP > 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                                textShadow: dashboardData.changes.expenseChangeSSP > 0 ? "0 0 10px rgba(252, 165, 165, 0.5)" : "0 0 10px rgba(110, 231, 183, 0.4)"
                               } : {}}
                             >
                               <span className="font-bold">
@@ -1356,7 +1356,7 @@ export default function AdvancedDashboard() {
                         dashboardData.changes.expenseChangeSSP < 0 ? (
                           <TrendingDown className="h-5 w-5 text-emerald-600" />
                         ) : (
-                          <CreditCard className="h-5 w-5 text-red-600" />
+                          <TrendingUp className="h-5 w-5 text-red-600" />
                         )}
                       </div>
                     </div>
@@ -1398,11 +1398,12 @@ export default function AdvancedDashboard() {
                               "text-xs mt-0.5 font-medium",
                               sspNetIncome >= 0
                                 ? isDarkMode ? "text-cyan-400" : "text-blue-600"
-                                : isDarkMode ? "text-red-400" : "text-red-600"
+                                : isDarkMode ? "text-red-300" : "text-red-600"
                             )}
                             style={isDarkMode && sspNetIncome < 0 ? { 
                               color: "#fca5a5",
-                              textShadow: "0 0 8px rgba(252, 165, 165, 0.3)"
+                              fontWeight: 700,
+                              textShadow: "0 0 10px rgba(252, 165, 165, 0.5)"
                             } : {}}
                           >
                             {sspNetIncome >= 0 ? "Profit" : "Loss"} Margin:{" "}
@@ -1428,15 +1429,15 @@ export default function AdvancedDashboard() {
                               className={cn(
                                 "text-xs font-semibold",
                                 dashboardData.changes.netIncomeChangeSSP > 0
-                                  ? isDarkMode ? "text-emerald-400" : "text-emerald-600"
+                                  ? isDarkMode ? "text-emerald-300" : "text-emerald-600"
                                   : dashboardData.changes.netIncomeChangeSSP < 0
-                                  ? isDarkMode ? "text-red-400" : "text-red-600"
+                                  ? isDarkMode ? "text-red-300" : "text-red-600"
                                   : isDarkMode ? "text-white/75" : "text-slate-500"
                               )}
                               style={isDarkMode ? { 
-                                color: dashboardData.changes.netIncomeChangeSSP > 0 ? "#4ade80" : dashboardData.changes.netIncomeChangeSSP < 0 ? "#fca5a5" : undefined,
+                                color: dashboardData.changes.netIncomeChangeSSP > 0 ? "#6ee7b7" : dashboardData.changes.netIncomeChangeSSP < 0 ? "#fca5a5" : undefined,
                                 fontWeight: 700,
-                                textShadow: dashboardData.changes.netIncomeChangeSSP < 0 ? "0 0 8px rgba(252, 165, 165, 0.3)" : undefined
+                                textShadow: dashboardData.changes.netIncomeChangeSSP < 0 ? "0 0 10px rgba(252, 165, 165, 0.5)" : "0 0 10px rgba(110, 231, 183, 0.4)"
                               } : {}}
                             >
                               <span className="font-bold">
