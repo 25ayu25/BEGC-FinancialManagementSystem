@@ -1,3 +1,4 @@
+//client/src/pages/advanced-dashboard.tsx
 "use client";
 
 import { useState, useMemo, useEffect, type KeyboardEvent } from "react";
@@ -86,7 +87,7 @@ function computeRangeParams(
       monthToSend: d.getMonth() + 1,
     };
   }
-  
+
   // ADDED: Logic for Last Year
   if (timeRange === "last-year") {
     return {
@@ -480,6 +481,14 @@ export default function AdvancedDashboard() {
     selectedYear ?? null,
     selectedMonth ?? null
   );
+
+  // ADDED: Compute a label specifically for "last-year" to show the actual year (e.g. "2025")
+  const displayPeriodLabel = useMemo(() => {
+    if (timeRange === "last-year" && yearToSend) {
+      return yearToSend.toString();
+    }
+    return periodLabel;
+  }, [timeRange, yearToSend, periodLabel]);
 
   const handleTimeRangeChange = (
     range:
@@ -913,8 +922,9 @@ export default function AdvancedDashboard() {
               <h1 className={cn("text-2xl font-semibold tracking-tight", isDarkMode ? "text-white/95" : "text-white")}>
                 Executive Dashboard
               </h1>
+              {/* UPDATED: Uses displayPeriodLabel to show "2025" instead of "Last Year" */}
               <p className={cn("mt-1 text-sm", isDarkMode ? "text-white/70" : "text-slate-300")}>
-                Key financials · {periodLabel}
+                Key financials · {displayPeriodLabel}
               </p>
             </div>
 
@@ -1719,10 +1729,11 @@ export default function AdvancedDashboard() {
                 </div>
               </div>
 
+              {/* UPDATED: Pass displayPeriodLabel to ExpensesDrawer too for consistency */}
               <ExpensesDrawer
                 open={openExpenses}
                 onOpenChange={setOpenExpenses}
-                periodLabel={periodLabel}
+                periodLabel={displayPeriodLabel}
                 expenseBreakdown={dashboardData?.expenseBreakdown ?? {}}
                 totalExpenseSSP={Number(dashboardData?.totalExpenses || 0)}
                 onViewFullReport={() => {
