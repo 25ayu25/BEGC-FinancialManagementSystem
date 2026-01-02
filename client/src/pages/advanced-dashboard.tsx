@@ -86,6 +86,16 @@ function computeRangeParams(
       monthToSend: d.getMonth() + 1,
     };
   }
+  
+  // ADDED: Logic for Last Year
+  if (timeRange === "last-year") {
+    return {
+      rangeToSend: "year", // Reuse 'year' range logic in backend
+      yearToSend: today.getFullYear() - 1, // Set to previous year
+      monthToSend: fallbackM,
+    };
+  }
+
   if (timeRange === "month-select") {
     return {
       rangeToSend: "current-month",
@@ -477,6 +487,7 @@ export default function AdvancedDashboard() {
       | "last-month"
       | "last-3-months"
       | "year"
+      | "last-year" // ADDED: type for Last Year
       | "month-select"
       | "custom"
   ) => setTimeRange(range);
@@ -755,6 +766,8 @@ export default function AdvancedDashboard() {
         return "vs previous 3 months";
       case "year":
         return "vs last year";
+      case "last-year": // ADDED: Label for Last Year
+        return "vs previous year";
       case "last-month":
       case "month-select":
         return "vs last month";
@@ -772,10 +785,10 @@ export default function AdvancedDashboard() {
     !!dashboardData?.previousPeriod && dashboardData.previousPeriod.totalIncomeUSD !== 0;
 
   const shouldShowNoComparisonSSP =
-    (timeRange === "year" || timeRange === "last-3-months") && !hasPreviousPeriodSSP;
+    (timeRange === "year" || timeRange === "last-year" || timeRange === "last-3-months") && !hasPreviousPeriodSSP;
 
   const shouldShowNoComparisonUSD =
-    (timeRange === "year" || timeRange === "last-3-months") && !hasPreviousPeriodUSD;
+    (timeRange === "year" || timeRange === "last-year" || timeRange === "last-3-months") && !hasPreviousPeriodUSD;
 
   const currentRevenueValue = monthTotalSSP || parseFloat(dashboardData?.totalIncomeSSP || "0");
   const currentExpenseValue = parseFloat(dashboardData?.totalExpenses || "0");
@@ -938,6 +951,7 @@ export default function AdvancedDashboard() {
                   <SelectItem value="last-month">Last Month</SelectItem>
                   <SelectItem value="last-3-months">Last 3 Months</SelectItem>
                   <SelectItem value="year">This Year</SelectItem>
+                  <SelectItem value="last-year">Last Year</SelectItem> {/* ADDED: Menu Item */}
                   <SelectItem value="month-select">Select Month…</SelectItem>
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>
@@ -1125,7 +1139,7 @@ export default function AdvancedDashboard() {
                               </span>
                             ) : revenueChangePct !== undefined &&
                               revenueChangePct !== null &&
-                              (!(timeRange === "year" || timeRange === "last-3-months") || hasPreviousPeriodSSP) ? (
+                              (!(timeRange === "year" || timeRange === "last-year" || timeRange === "last-3-months") || hasPreviousPeriodSSP) ? (
                               <span
                                 className={cn(
                                   "text-xs font-semibold",
@@ -1232,7 +1246,7 @@ export default function AdvancedDashboard() {
                                 No expenses yet
                               </span>
                             ) : dashboardData?.changes?.expenseChangeSSP !== undefined &&
-                              (!(timeRange === "year" || timeRange === "last-3-months") || hasPreviousPeriodSSP) ? (
+                              (!(timeRange === "year" || timeRange === "last-year" || timeRange === "last-3-months") || hasPreviousPeriodSSP) ? (
                               <span
                                 className={cn(
                                   "text-xs font-semibold",
@@ -1357,7 +1371,7 @@ export default function AdvancedDashboard() {
                                 No transactions yet
                               </span>
                             ) : dashboardData?.changes?.netIncomeChangeSSP !== undefined &&
-                              (!(timeRange === "year" || timeRange === "last-3-months") || hasPreviousPeriodSSP) ? (
+                              (!(timeRange === "year" || timeRange === "last-year" || timeRange === "last-3-months") || hasPreviousPeriodSSP) ? (
                               <span
                                 className={cn(
                                   "text-xs font-semibold",
@@ -1465,7 +1479,7 @@ export default function AdvancedDashboard() {
                               </span>
                             ) : insuranceChangePct !== undefined &&
                               insuranceChangePct !== null &&
-                              (!(timeRange === "year" || timeRange === "last-3-months") || hasPreviousPeriodUSD) ? (
+                              (!(timeRange === "year" || timeRange === "last-year" || timeRange === "last-3-months") || hasPreviousPeriodUSD) ? (
                               <span
                                 className={cn(
                                   "text-xs font-semibold",
